@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() && 
+             request.auth.uid != null &&
+             userDoc != null &&
+             userDoc.data.isAdmin == true;
+    }
+
+    function getUserDocId() {
+      let docs = get(/databases/$(database)/documents/users).where('email', '==', request.auth.token.email).documents;
+      return docs.size() > 0 ? docs[0].id : null;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Allow reading user documents if authenticated or if the document is pending
+      allow read: if isAuthenticated() || (
+        resource.data.status == 'pending'
+      );
+      
+      // Allow listing/querying users collection
+      allow list: if isAuthenticated();
+      
+      // Allow creating pending users by admin
+      allow create: if 
+        isAdmin() && 
+        request.resource.data.status == 'pending' &&
+        request.resource.data.email is string &&
+        request.resource.data.name is string &&
+        request.resource.data.isAdmin is bool &&
+        request.resource.data.createdAt is string &&
+        request.resource.data.updatedAt is string;
+      
+      // Allow updating users
+      allow update: if 
+        (isAuthenticated() && 
+         resource.data.status == 'pending' &&
+         request.resource.data.status == 'active' &&
+         request.resource.data.email == resource.data.email &&
+         request.resource.data.uid == request.auth.uid &&
+         request.resource.data.email == request.auth.token.email) ||
+        (isAuthenticated() && 
+         resource.data.uid == request.auth.uid) ||
+        isAdmin();
+      
+      // Allow deleting pending users during signup
+      allow delete: if 
+        (isAuthenticated() && 
+         resource.data.status == 'pending' && 
+         resource.data.email == request.auth.token.email) ||
+        isAdmin();
+    }
+    
+    // Classes collection
+    match /classes/{classId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        (resource.data.studentEmails != null && request.auth.token.email in resource.data.studentEmails)
+      );
+      allow write: if isAdmin();
+    }
+
+    // Class Materials collection
+    match /classMaterials/{materialId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.token.email == resource.data.studentEmail ||
+        (resource.data.studentEmails != null && request.auth.token.email in resource.data.studentEmails)
+      );
+      allow write: if isAdmin();
+    }
+
+    // Signup tokens collection
+    match /signupTokens/{tokenId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if 
+        isAuthenticated() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'updatedAt']);
+      allow delete: if isAdmin();
+    }
+
+    // Default rule - only admin access
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+} 

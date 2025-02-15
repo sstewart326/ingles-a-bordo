@@ -1,0 +1,395 @@
+[debug] [2025-02-14T01:37:25.857Z] ----------------------------------------------------------------------
+[debug] [2025-02-14T01:37:25.858Z] Command:       /Users/shawn/.nvm/versions/node/v20.18.3/bin/node /opt/homebrew/bin/firebase emulators:start --only functions
+[debug] [2025-02-14T01:37:25.858Z] CLI Version:   13.31.0
+[debug] [2025-02-14T01:37:25.858Z] Platform:      darwin
+[debug] [2025-02-14T01:37:25.859Z] Node Version:  v20.18.3
+[debug] [2025-02-14T01:37:25.859Z] Time:          Thu Feb 13 2025 20:37:25 GMT-0500 (Eastern Standard Time)
+[debug] [2025-02-14T01:37:25.859Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-02-14T01:37:26.000Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-02-14T01:37:26.001Z] > authorizing via signed-in user (sstewart32619@gmail.com)
+[info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
+[debug] [2025-02-14T01:37:26.103Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-02-14T01:37:26.103Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-02-14T01:37:26.106Z] [hub] writing locator at /var/folders/2m/n213g4f94nzbv7jz72njqg0c0000gn/T/hub-ingles-a-bordo.json
+[debug] [2025-02-14T01:37:26.203Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-02-14T01:37:26.203Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-02-14T01:37:26.203Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-02-14T01:37:26.203Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[warn] ⚠  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
+[debug] [2025-02-14T01:37:26.205Z] defaultcredentials: writing to file /Users/shawn/.config/firebase/sstewart32619_gmail_com_application_default_credentials.json
+[debug] [2025-02-14T01:37:26.207Z] Setting GAC to /Users/shawn/.config/firebase/sstewart32619_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to /Users/shawn/.config/firebase/sstewart32619_gmail_com_application_default_credentials.json"}}
+[debug] [2025-02-14T01:37:26.207Z] Checked if tokens are valid: true, expires at: 1739498978658
+[debug] [2025-02-14T01:37:26.208Z] Checked if tokens are valid: true, expires at: 1739498978658
+[debug] [2025-02-14T01:37:26.208Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/ingles-a-bordo/adminSdkConfig [none]
+[debug] [2025-02-14T01:37:26.693Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/ingles-a-bordo/adminSdkConfig 200
+[debug] [2025-02-14T01:37:26.694Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/ingles-a-bordo/adminSdkConfig {"projectId":"ingles-a-bordo","storageBucket":"ingles-a-bordo.firebasestorage.app"}
+[info] i  ui: downloading ui-v1.14.0.zip... {"metadata":{"emulator":{"name":"ui"},"message":"downloading ui-v1.14.0.zip..."}}
+[debug] [2025-02-14T01:37:26.717Z] >>> [apiv2][query] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.14.0.zip 
+[debug] [2025-02-14T01:37:26.960Z] <<< [apiv2][status] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.14.0.zip 200
+[debug] [2025-02-14T01:37:26.960Z] <<< [apiv2][body] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.14.0.zip [stream]
+[debug] [2025-02-14T01:37:27.182Z] Data is 3615311
+[debug] [2025-02-14T01:37:27.182Z] [unzip] Entry: client/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-02-14T01:37:27.182Z] [unzip] Processing entry: client/
+[debug] [2025-02-14T01:37:27.182Z] [unzip] mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/
+[debug] [2025-02-14T01:37:27.182Z] [unzip] Entry: client/favicon-16x16.png (compressed_size=293 bytes, uncompressed_size=293 bytes)
+[debug] [2025-02-14T01:37:27.182Z] [unzip] Processing entry: client/favicon-16x16.png
+[debug] [2025-02-14T01:37:27.182Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.183Z] [unzip] Writing file: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/favicon-16x16.png
+[debug] [2025-02-14T01:37:27.183Z] [unzip] Entry: client/safari-pinned-tab.svg (compressed_size=1433 bytes, uncompressed_size=2611 bytes)
+[debug] [2025-02-14T01:37:27.183Z] [unzip] Processing entry: client/safari-pinned-tab.svg
+[debug] [2025-02-14T01:37:27.183Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.183Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/safari-pinned-tab.svg
+[debug] [2025-02-14T01:37:27.185Z] [unzip] Entry: client/favicon.ico (compressed_size=2933 bytes, uncompressed_size=13294 bytes)
+[debug] [2025-02-14T01:37:27.185Z] [unzip] Processing entry: client/favicon.ico
+[debug] [2025-02-14T01:37:27.186Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.186Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/favicon.ico
+[debug] [2025-02-14T01:37:27.186Z] [unzip] Entry: client/index.html (compressed_size=1363 bytes, uncompressed_size=3071 bytes)
+[debug] [2025-02-14T01:37:27.186Z] [unzip] Processing entry: client/index.html
+[debug] [2025-02-14T01:37:27.186Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.186Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/index.html
+[debug] [2025-02-14T01:37:27.187Z] [unzip] Entry: client/android-chrome-192x192.png (compressed_size=2684 bytes, uncompressed_size=2684 bytes)
+[debug] [2025-02-14T01:37:27.187Z] [unzip] Processing entry: client/android-chrome-192x192.png
+[debug] [2025-02-14T01:37:27.187Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.187Z] [unzip] Writing file: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/android-chrome-192x192.png
+[debug] [2025-02-14T01:37:27.187Z] [unzip] Entry: client/apple-touch-icon.png (compressed_size=2123 bytes, uncompressed_size=2152 bytes)
+[debug] [2025-02-14T01:37:27.187Z] [unzip] Processing entry: client/apple-touch-icon.png
+[debug] [2025-02-14T01:37:27.187Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.187Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/apple-touch-icon.png
+[debug] [2025-02-14T01:37:27.187Z] [unzip] Entry: client/android-chrome-512x512.png (compressed_size=5369 bytes, uncompressed_size=5411 bytes)
+[debug] [2025-02-14T01:37:27.187Z] [unzip] Processing entry: client/android-chrome-512x512.png
+[debug] [2025-02-14T01:37:27.188Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.188Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/android-chrome-512x512.png
+[debug] [2025-02-14T01:37:27.188Z] [unzip] Entry: client/manifest.json (compressed_size=245 bytes, uncompressed_size=551 bytes)
+[debug] [2025-02-14T01:37:27.188Z] [unzip] Processing entry: client/manifest.json
+[debug] [2025-02-14T01:37:27.188Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.188Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/manifest.json
+[debug] [2025-02-14T01:37:27.188Z] [unzip] Entry: client/robots.txt (compressed_size=26 bytes, uncompressed_size=26 bytes)
+[debug] [2025-02-14T01:37:27.188Z] [unzip] Processing entry: client/robots.txt
+[debug] [2025-02-14T01:37:27.188Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.189Z] [unzip] Writing file: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/robots.txt
+[debug] [2025-02-14T01:37:27.189Z] [unzip] Entry: client/mstile-150x150.png (compressed_size=2034 bytes, uncompressed_size=2034 bytes)
+[debug] [2025-02-14T01:37:27.189Z] [unzip] Processing entry: client/mstile-150x150.png
+[debug] [2025-02-14T01:37:27.189Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.189Z] [unzip] Writing file: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/mstile-150x150.png
+[debug] [2025-02-14T01:37:27.189Z] [unzip] Entry: client/assets/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-02-14T01:37:27.189Z] [unzip] Processing entry: client/assets/
+[debug] [2025-02-14T01:37:27.189Z] [unzip] mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/
+[debug] [2025-02-14T01:37:27.189Z] [unzip] Entry: client/assets/index-ClZTY_JS.js.map (compressed_size=2328270 bytes, uncompressed_size=9947004 bytes)
+[debug] [2025-02-14T01:37:27.189Z] [unzip] Processing entry: client/assets/index-ClZTY_JS.js.map
+[debug] [2025-02-14T01:37:27.189Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets
+[debug] [2025-02-14T01:37:27.189Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/index-ClZTY_JS.js.map
+[debug] [2025-02-14T01:37:27.216Z] [unzip] Entry: client/assets/index-ClZTY_JS.js (compressed_size=567195 bytes, uncompressed_size=2035940 bytes)
+[debug] [2025-02-14T01:37:27.216Z] [unzip] Processing entry: client/assets/index-ClZTY_JS.js
+[debug] [2025-02-14T01:37:27.216Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets
+[debug] [2025-02-14T01:37:27.216Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/index-ClZTY_JS.js
+[debug] [2025-02-14T01:37:27.223Z] [unzip] Entry: client/assets/index-BdgySamB.css (compressed_size=35979 bytes, uncompressed_size=298654 bytes)
+[debug] [2025-02-14T01:37:27.223Z] [unzip] Processing entry: client/assets/index-BdgySamB.css
+[debug] [2025-02-14T01:37:27.223Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets
+[debug] [2025-02-14T01:37:27.223Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/index-BdgySamB.css
+[debug] [2025-02-14T01:37:27.225Z] [unzip] Entry: client/assets/extensions/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-02-14T01:37:27.225Z] [unzip] Processing entry: client/assets/extensions/
+[debug] [2025-02-14T01:37:27.225Z] [unzip] mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/extensions/
+[debug] [2025-02-14T01:37:27.226Z] [unzip] Entry: client/assets/extensions/default-extension.png (compressed_size=1646 bytes, uncompressed_size=1657 bytes)
+[debug] [2025-02-14T01:37:27.226Z] [unzip] Processing entry: client/assets/extensions/default-extension.png
+[debug] [2025-02-14T01:37:27.226Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/extensions
+[debug] [2025-02-14T01:37:27.226Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/extensions/default-extension.png
+[debug] [2025-02-14T01:37:27.226Z] [unzip] Entry: client/assets/img/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-02-14T01:37:27.226Z] [unzip] Processing entry: client/assets/img/
+[debug] [2025-02-14T01:37:27.226Z] [unzip] mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/img/
+[debug] [2025-02-14T01:37:27.226Z] [unzip] Entry: client/assets/img/database.png (compressed_size=29449 bytes, uncompressed_size=29988 bytes)
+[debug] [2025-02-14T01:37:27.226Z] [unzip] Processing entry: client/assets/img/database.png
+[debug] [2025-02-14T01:37:27.226Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/img
+[debug] [2025-02-14T01:37:27.226Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/img/database.png
+[debug] [2025-02-14T01:37:27.227Z] [unzip] Entry: client/assets/provider-icons/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-02-14T01:37:27.227Z] [unzip] Processing entry: client/assets/provider-icons/
+[debug] [2025-02-14T01:37:27.227Z] [unzip] mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/
+[debug] [2025-02-14T01:37:27.227Z] [unzip] Entry: client/assets/provider-icons/auth_service_saml.svg (compressed_size=575 bytes, uncompressed_size=1226 bytes)
+[debug] [2025-02-14T01:37:27.227Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_saml.svg
+[debug] [2025-02-14T01:37:27.227Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.227Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_saml.svg
+[debug] [2025-02-14T01:37:27.227Z] [unzip] Entry: client/assets/provider-icons/auth_service_phone.svg (compressed_size=261 bytes, uncompressed_size=414 bytes)
+[debug] [2025-02-14T01:37:27.227Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_phone.svg
+[debug] [2025-02-14T01:37:27.227Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.227Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_phone.svg
+[debug] [2025-02-14T01:37:27.228Z] [unzip] Entry: client/assets/provider-icons/auth_service_facebook.svg (compressed_size=289 bytes, uncompressed_size=457 bytes)
+[debug] [2025-02-14T01:37:27.228Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_facebook.svg
+[debug] [2025-02-14T01:37:27.228Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.228Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_facebook.svg
+[debug] [2025-02-14T01:37:27.228Z] [unzip] Entry: client/assets/provider-icons/auth_service_game_center.svg (compressed_size=991 bytes, uncompressed_size=3921 bytes)
+[debug] [2025-02-14T01:37:27.228Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_game_center.svg
+[debug] [2025-02-14T01:37:27.228Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.228Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_game_center.svg
+[debug] [2025-02-14T01:37:27.228Z] [unzip] Entry: client/assets/provider-icons/auth_service_apple.svg (compressed_size=230 bytes, uncompressed_size=334 bytes)
+[debug] [2025-02-14T01:37:27.228Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_apple.svg
+[debug] [2025-02-14T01:37:27.229Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.229Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_apple.svg
+[debug] [2025-02-14T01:37:27.229Z] [unzip] Entry: client/assets/provider-icons/auth_service_github.svg (compressed_size=466 bytes, uncompressed_size=838 bytes)
+[debug] [2025-02-14T01:37:27.229Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_github.svg
+[debug] [2025-02-14T01:37:27.229Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.229Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_github.svg
+[debug] [2025-02-14T01:37:27.229Z] [unzip] Entry: client/assets/provider-icons/auth_service_mslive.svg (compressed_size=203 bytes, uncompressed_size=378 bytes)
+[debug] [2025-02-14T01:37:27.229Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_mslive.svg
+[debug] [2025-02-14T01:37:27.229Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.229Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_mslive.svg
+[debug] [2025-02-14T01:37:27.229Z] [unzip] Entry: client/assets/provider-icons/auth_service_yahoo.svg (compressed_size=577 bytes, uncompressed_size=1182 bytes)
+[debug] [2025-02-14T01:37:27.229Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_yahoo.svg
+[debug] [2025-02-14T01:37:27.229Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.229Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_yahoo.svg
+[debug] [2025-02-14T01:37:27.230Z] [unzip] Entry: client/assets/provider-icons/auth_service_twitter.svg (compressed_size=444 bytes, uncompressed_size=751 bytes)
+[debug] [2025-02-14T01:37:27.230Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_twitter.svg
+[debug] [2025-02-14T01:37:27.230Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.230Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_twitter.svg
+[debug] [2025-02-14T01:37:27.230Z] [unzip] Entry: client/assets/provider-icons/auth_service_play_games.svg (compressed_size=565 bytes, uncompressed_size=1173 bytes)
+[debug] [2025-02-14T01:37:27.230Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_play_games.svg
+[debug] [2025-02-14T01:37:27.230Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.230Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_play_games.svg
+[debug] [2025-02-14T01:37:27.230Z] [unzip] Entry: client/assets/provider-icons/auth_service_email.svg (compressed_size=228 bytes, uncompressed_size=326 bytes)
+[debug] [2025-02-14T01:37:27.230Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_email.svg
+[debug] [2025-02-14T01:37:27.230Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.230Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_email.svg
+[debug] [2025-02-14T01:37:27.231Z] [unzip] Entry: client/assets/provider-icons/auth_service_google.svg (compressed_size=409 bytes, uncompressed_size=720 bytes)
+[debug] [2025-02-14T01:37:27.231Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_google.svg
+[debug] [2025-02-14T01:37:27.231Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.231Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_google.svg
+[debug] [2025-02-14T01:37:27.231Z] [unzip] Entry: client/assets/provider-icons/auth_service_oidc.svg (compressed_size=414 bytes, uncompressed_size=858 bytes)
+[debug] [2025-02-14T01:37:27.231Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_oidc.svg
+[debug] [2025-02-14T01:37:27.231Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons
+[debug] [2025-02-14T01:37:27.231Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/assets/provider-icons/auth_service_oidc.svg
+[debug] [2025-02-14T01:37:27.231Z] [unzip] Entry: client/browserconfig.xml (compressed_size=491 bytes, uncompressed_size=822 bytes)
+[debug] [2025-02-14T01:37:27.231Z] [unzip] Processing entry: client/browserconfig.xml
+[debug] [2025-02-14T01:37:27.231Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.231Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/browserconfig.xml
+[debug] [2025-02-14T01:37:27.232Z] [unzip] Entry: client/favicon-32x32.png (compressed_size=475 bytes, uncompressed_size=475 bytes)
+[debug] [2025-02-14T01:37:27.232Z] [unzip] Processing entry: client/favicon-32x32.png
+[debug] [2025-02-14T01:37:27.232Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client
+[debug] [2025-02-14T01:37:27.232Z] [unzip] Writing file: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/client/favicon-32x32.png
+[debug] [2025-02-14T01:37:27.232Z] [unzip] Entry: server/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-02-14T01:37:27.232Z] [unzip] Processing entry: server/
+[debug] [2025-02-14T01:37:27.232Z] [unzip] mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server/
+[debug] [2025-02-14T01:37:27.232Z] [unzip] Entry: server/server.mjs.map (compressed_size=296496 bytes, uncompressed_size=1355667 bytes)
+[debug] [2025-02-14T01:37:27.232Z] [unzip] Processing entry: server/server.mjs.map
+[debug] [2025-02-14T01:37:27.232Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server
+[debug] [2025-02-14T01:37:27.232Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server/server.mjs.map
+[debug] [2025-02-14T01:37:27.236Z] [unzip] Entry: server/server.mjs (compressed_size=315701 bytes, uncompressed_size=1172682 bytes)
+[debug] [2025-02-14T01:37:27.236Z] [unzip] Processing entry: server/server.mjs
+[debug] [2025-02-14T01:37:27.236Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server
+[debug] [2025-02-14T01:37:27.236Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server/server.mjs
+[debug] [2025-02-14T01:37:27.241Z] [unzip] Entry: server/assets/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-02-14T01:37:27.241Z] [unzip] Processing entry: server/assets/
+[debug] [2025-02-14T01:37:27.241Z] [unzip] mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server/assets/
+[debug] [2025-02-14T01:37:27.241Z] [unzip] Entry: server/assets/multipart-parser-DGCUZdXu.mjs.map (compressed_size=4791 bytes, uncompressed_size=17918 bytes)
+[debug] [2025-02-14T01:37:27.241Z] [unzip] Processing entry: server/assets/multipart-parser-DGCUZdXu.mjs.map
+[debug] [2025-02-14T01:37:27.241Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server/assets
+[debug] [2025-02-14T01:37:27.241Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server/assets/multipart-parser-DGCUZdXu.mjs.map
+[debug] [2025-02-14T01:37:27.241Z] [unzip] Entry: server/assets/multipart-parser-DGCUZdXu.mjs (compressed_size=2621 bytes, uncompressed_size=10390 bytes)
+[debug] [2025-02-14T01:37:27.241Z] [unzip] Processing entry: server/assets/multipart-parser-DGCUZdXu.mjs
+[debug] [2025-02-14T01:37:27.241Z] [unzip] else mkdir: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server/assets
+[debug] [2025-02-14T01:37:27.241Z] [unzip] deflating: /Users/shawn/.cache/firebase/emulators/ui-v1.14.0/server/assets/multipart-parser-DGCUZdXu.mjs
+[info] i  functions: Watching "/Users/shawn/projects/ingles-a-bordo/functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"/Users/shawn/projects/ingles-a-bordo/functions\" for Cloud Functions..."}}
+[debug] [2025-02-14T01:37:27.246Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[debug] [2025-02-14T01:37:27.722Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "lint": "exit 0",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^13.1.0",
+    "firebase-functions": "^6.3.1"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-import": "^2.29.1",
+    "firebase-functions-test": "^3.1.0",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}
+[debug] [2025-02-14T01:37:27.722Z] Building nodejs source
+[debug] [2025-02-14T01:37:27.723Z] Failed to find version of module node: reached end of search path /Users/shawn/projects/ingles-a-bordo/functions/node_modules
+[info] ✔  functions: Using node@20 from host. 
+[debug] [2025-02-14T01:37:27.724Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-02-14T01:37:27.727Z] Found firebase-functions binary at '/Users/shawn/projects/ingles-a-bordo/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8462
+
+[debug] [2025-02-14T01:37:27.988Z] Got response from /__/functions.yaml {"endpoints":{"deleteAuthUser":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"deleteAuthUser"},"checkUserExists":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"checkUserExists"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[info] ✔  functions: Loaded functions definitions from source: deleteAuthUser, checkUserExists. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: deleteAuthUser, checkUserExists."}}
+[info] ✔  functions[us-central1-deleteAuthUser]: http function initialized (http://127.0.0.1:5001/ingles-a-bordo/us-central1/deleteAuthUser). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/ingles-a-bordo/us-central1/deleteAuthUser)."}}
+[info] ✔  functions[us-central1-checkUserExists]: http function initialized (http://127.0.0.1:5001/ingles-a-bordo/us-central1/checkUserExists). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/ingles-a-bordo/us-central1/checkUserExists)."}}
+[debug] [2025-02-14T01:37:32.021Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌───────────┬────────────────┬─────────────────────────────────┐
+│ Emulator  │ Host:Port      │ View in Emulator UI             │
+├───────────┼────────────────┼─────────────────────────────────┤
+│ Functions │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions │
+└───────────┴────────────────┴─────────────────────────────────┘
+  Emulator Hub running at 127.0.0.1:4400
+  Other reserved ports: 4500
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 
+[debug] [2025-02-14T01:40:02.753Z] [work-queue] {"queuedWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-14T01:40:02.752Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-14T01:40:02.754Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-14T01:40:02.752Z"],"workRunningCount":1}
+[debug] [2025-02-14T01:40:02.754Z] Accepted request OPTIONS /ingles-a-bordo/us-central1/deleteAuthUser --> us-central1-deleteAuthUser
+[debug] [2025-02-14T01:40:02.760Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-02-14T01:40:02.761Z] [functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/"}}
+[debug] [2025-02-14T01:40:02.775Z] [worker-pool] addWorker(us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] addWorker(us-central1-deleteAuthUser)"}}
+[debug] [2025-02-14T01:40:02.776Z] [worker-pool] Adding worker with key us-central1-deleteAuthUser, total=1 {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Adding worker with key us-central1-deleteAuthUser, total=1"}}
+[debug] [2025-02-14T01:40:03.436Z] [runtime-status] [2678] Resolved module firebase-admin {"declared":true,"installed":true,"version":"13.1.0","resolution":"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Resolved module firebase-admin {\"declared\":true,\"installed\":true,\"version\":\"13.1.0\",\"resolution\":\"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/index.js\"}"}}
+[debug] [2025-02-14T01:40:03.436Z] [runtime-status] [2678] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.3.1","resolution":"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Resolved module firebase-functions {\"declared\":true,\"installed\":true,\"version\":\"6.3.1\",\"resolution\":\"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js\"}"}}
+[debug] [2025-02-14T01:40:03.437Z] [runtime-status] [2678] Outgoing network have been stubbed. [{"name":"http","status":"mocked"},{"name":"http","status":"mocked"},{"name":"https","status":"mocked"},{"name":"https","status":"mocked"},{"name":"net","status":"mocked"}] {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Outgoing network have been stubbed. [{\"name\":\"http\",\"status\":\"mocked\"},{\"name\":\"http\",\"status\":\"mocked\"},{\"name\":\"https\",\"status\":\"mocked\"},{\"name\":\"https\",\"status\":\"mocked\"},{\"name\":\"net\",\"status\":\"mocked\"}]"}}
+[debug] [2025-02-14T01:40:03.437Z] [runtime-status] [2678] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.3.1","resolution":"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Resolved module firebase-functions {\"declared\":true,\"installed\":true,\"version\":\"6.3.1\",\"resolution\":\"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js\"}"}}
+[debug] [2025-02-14T01:40:03.639Z] [runtime-status] [2678] Checked functions.config() {"config":{}} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Checked functions.config() {\"config\":{}}"}}
+[debug] [2025-02-14T01:40:03.639Z] [runtime-status] [2678] firebase-functions has been stubbed. {"functionsResolution":{"declared":true,"installed":true,"version":"6.3.1","resolution":"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js"}} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] firebase-functions has been stubbed. {\"functionsResolution\":{\"declared\":true,\"installed\":true,\"version\":\"6.3.1\",\"resolution\":\"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js\"}}"}}
+[debug] [2025-02-14T01:40:03.639Z] [runtime-status] [2678] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.3.1","resolution":"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Resolved module firebase-functions {\"declared\":true,\"installed\":true,\"version\":\"6.3.1\",\"resolution\":\"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js\"}"}}
+[debug] [2025-02-14T01:40:03.641Z] [runtime-status] [2678] Resolved module firebase-admin {"declared":true,"installed":true,"version":"13.1.0","resolution":"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Resolved module firebase-admin {\"declared\":true,\"installed\":true,\"version\":\"13.1.0\",\"resolution\":\"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/index.js\"}"}}
+[debug] [2025-02-14T01:40:03.642Z] [runtime-status] [2678] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.3.1","resolution":"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Resolved module firebase-functions {\"declared\":true,\"installed\":true,\"version\":\"6.3.1\",\"resolution\":\"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/v2/index.js\"}"}}
+[debug] [2025-02-14T01:40:03.642Z] [runtime-status] [2678] firebase-admin has been stubbed. {"adminResolution":{"declared":true,"installed":true,"version":"13.1.0","resolution":"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/index.js"}} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] firebase-admin has been stubbed. {\"adminResolution\":{\"declared\":true,\"installed\":true,\"version\":\"13.1.0\",\"resolution\":\"/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/index.js\"}}"}}
+[debug] [2025-02-14T01:40:03.642Z] [runtime-status] [2678] initializeApp(DEFAULT) {"storageBucket":"ingles-a-bordo.firebasestorage.app","projectId":"ingles-a-bordo"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] initializeApp(DEFAULT) {\"storageBucket\":\"ingles-a-bordo.firebasestorage.app\",\"projectId\":\"ingles-a-bordo\"}"}}
+[debug] [2025-02-14T01:40:03.645Z] [runtime-status] [2678] Functions runtime initialized. {"cwd":"/Users/shawn/projects/ingles-a-bordo/functions","node_version":"20.18.3"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Functions runtime initialized. {\"cwd\":\"/Users/shawn/projects/ingles-a-bordo/functions\",\"node_version\":\"20.18.3\"}"}}
+[debug] [2025-02-14T01:40:03.645Z] [runtime-status] [2678] Listening to port: /var/folders/2m/n213g4f94nzbv7jz72njqg0c0000gn/T/fire_emu_40093d4661d67343.sock {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[runtime-status] [2678] Listening to port: /var/folders/2m/n213g4f94nzbv7jz72njqg0c0000gn/T/fire_emu_40093d4661d67343.sock"}}
+[debug] [2025-02-14T01:40:03.692Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-14T01:40:03.693Z] [worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser)"}}
+[info] i  functions: Beginning execution of "us-central1-deleteAuthUser" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Beginning execution of \"us-central1-deleteAuthUser\""}}
+[debug] [2025-02-14T01:40:03.693Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY"}}
+[debug] [2025-02-14T01:40:03.695Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-deleteAuthUser" in 2.50325ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finished \"us-central1-deleteAuthUser\" in 2.50325ms"}}
+[debug] [2025-02-14T01:40:03.696Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-14T01:40:03.696Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-02-14T01:40:03.696Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-02-14T01:40:03.696Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-14T01:40:03.697Z] [work-queue] {"queuedWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-14T01:40:03.697Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-14T01:40:03.697Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-14T01:40:03.697Z"],"workRunningCount":1}
+[debug] [2025-02-14T01:40:03.697Z] Accepted request POST /ingles-a-bordo/us-central1/deleteAuthUser --> us-central1-deleteAuthUser
+[debug] [2025-02-14T01:40:03.697Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-02-14T01:40:03.697Z] [functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/"}}
+[debug] [2025-02-14T01:40:03.697Z] [worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser)"}}
+[info] i  functions: Beginning execution of "us-central1-deleteAuthUser" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Beginning execution of \"us-central1-deleteAuthUser\""}}
+[debug] [2025-02-14T01:40:03.698Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY"}}
+[info] >  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"} {"user":{"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"verifications\":{\"app\":\"MISSING\",\"auth\":\"VALID\"},\"logging.googleapis.com/labels\":{\"firebase-log-type\":\"callable-request-verification\"},\"severity\":\"DEBUG\",\"message\":\"Callable request verification passed\"}"}}
+[info] >  {"userId":"EjjtBEfF5bUQB63a04DV","severity":"INFO","message":"deleteAuthUser function called"} {"user":{"userId":"EjjtBEfF5bUQB63a04DV","severity":"INFO","message":"deleteAuthUser function called"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"userId\":\"EjjtBEfF5bUQB63a04DV\",\"severity\":\"INFO\",\"message\":\"deleteAuthUser function called\"}"}}
+[warn] ⚠  functions: The Cloud Firestore emulator is not running, so calls to Firestore will affect production. {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"The Cloud Firestore emulator is not running, so calls to Firestore will affect production."}}
+[warn] ⚠  Google API requested!
+   - URL: "https://oauth2.googleapis.com/token"
+   - Be careful, this may be a production service. {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Google API requested!\n   - URL: \"https://oauth2.googleapis.com/token\"\n   - Be careful, this may be a production service."}}
+[warn] ⚠  functions: The Firebase Authentication emulator is not running, so calls to Firebase Authentication will affect production. {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"The Firebase Authentication emulator is not running, so calls to Firebase Authentication will affect production."}}
+[info] >  {"severity":"ERROR","message":"Error deleting user: FirebaseAuthError: There is no user record corresponding to the provided identifier.\n    at FirebaseAuthError.fromServerError (/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/utils/error.js:148:16)\n    at /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/auth/auth-api-request.js:1629:49\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async /Users/shawn/projects/ingles-a-bordo/functions/lib/index.js:54:9\n    at async /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/common/providers/https.js:544:26\n    at async runFunction (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:506:9)\n    at async runHTTPS (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:531:5)\n    at async /opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:694:21 {\n  errorInfo: {\n    code: 'auth/user-not-found',\n    message: 'There is no user record corresponding to the provided identifier.'\n  },\n  codePrefix: 'auth'\n}"} {"user":{"severity":"ERROR","message":"Error deleting user: FirebaseAuthError: There is no user record corresponding to the provided identifier.\n    at FirebaseAuthError.fromServerError (/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/utils/error.js:148:16)\n    at /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/auth/auth-api-request.js:1629:49\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async /Users/shawn/projects/ingles-a-bordo/functions/lib/index.js:54:9\n    at async /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/common/providers/https.js:544:26\n    at async runFunction (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:506:9)\n    at async runHTTPS (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:531:5)\n    at async /opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:694:21 {\n  errorInfo: {\n    code: 'auth/user-not-found',\n    message: 'There is no user record corresponding to the provided identifier.'\n  },\n  codePrefix: 'auth'\n}"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"severity\":\"ERROR\",\"message\":\"Error deleting user: FirebaseAuthError: There is no user record corresponding to the provided identifier.\\n    at FirebaseAuthError.fromServerError (/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/utils/error.js:148:16)\\n    at /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/auth/auth-api-request.js:1629:49\\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\\n    at async /Users/shawn/projects/ingles-a-bordo/functions/lib/index.js:54:9\\n    at async /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/common/providers/https.js:544:26\\n    at async runFunction (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:506:9)\\n    at async runHTTPS (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:531:5)\\n    at async /opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:694:21 {\\n  errorInfo: {\\n    code: 'auth/user-not-found',\\n    message: 'There is no user record corresponding to the provided identifier.'\\n  },\\n  codePrefix: 'auth'\\n}\"}"}}
+[debug] [2025-02-14T01:40:04.419Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-deleteAuthUser" in 721.515ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finished \"us-central1-deleteAuthUser\" in 721.515ms"}}
+[debug] [2025-02-14T01:40:04.420Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-14T01:40:04.420Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-02-14T01:40:04.420Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-02-14T01:40:04.420Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-14T01:45:51.112Z] [work-queue] {"queuedWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-14T01:45:51.111Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-14T01:45:51.114Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-14T01:45:51.111Z"],"workRunningCount":1}
+[debug] [2025-02-14T01:45:51.114Z] Accepted request OPTIONS /ingles-a-bordo/us-central1/deleteAuthUser --> us-central1-deleteAuthUser
+[debug] [2025-02-14T01:45:51.121Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-02-14T01:45:51.121Z] [functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/"}}
+[debug] [2025-02-14T01:45:51.122Z] [worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser)"}}
+[info] i  functions: Beginning execution of "us-central1-deleteAuthUser" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Beginning execution of \"us-central1-deleteAuthUser\""}}
+[debug] [2025-02-14T01:45:51.123Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY"}}
+[debug] [2025-02-14T01:45:51.135Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-deleteAuthUser" in 23.399541ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finished \"us-central1-deleteAuthUser\" in 23.399541ms"}}
+[debug] [2025-02-14T01:45:51.154Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-14T01:45:51.154Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-02-14T01:45:51.154Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-02-14T01:45:51.154Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-14T01:45:51.156Z] [work-queue] {"queuedWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-14T01:45:51.155Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-14T01:45:51.156Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-14T01:45:51.155Z"],"workRunningCount":1}
+[debug] [2025-02-14T01:45:51.156Z] Accepted request POST /ingles-a-bordo/us-central1/deleteAuthUser --> us-central1-deleteAuthUser
+[debug] [2025-02-14T01:45:51.158Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-02-14T01:45:51.158Z] [functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/"}}
+[debug] [2025-02-14T01:45:51.158Z] [worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser)"}}
+[info] i  functions: Beginning execution of "us-central1-deleteAuthUser" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Beginning execution of \"us-central1-deleteAuthUser\""}}
+[debug] [2025-02-14T01:45:51.158Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY"}}
+[info] >  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"} {"user":{"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"verifications\":{\"app\":\"MISSING\",\"auth\":\"VALID\"},\"logging.googleapis.com/labels\":{\"firebase-log-type\":\"callable-request-verification\"},\"severity\":\"DEBUG\",\"message\":\"Callable request verification passed\"}"}}
+[info] >  {"userId":"x5wejUQO9YPBCvGokzmjKTRm7G13","severity":"INFO","message":"deleteAuthUser function called"} {"user":{"userId":"x5wejUQO9YPBCvGokzmjKTRm7G13","severity":"INFO","message":"deleteAuthUser function called"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"userId\":\"x5wejUQO9YPBCvGokzmjKTRm7G13\",\"severity\":\"INFO\",\"message\":\"deleteAuthUser function called\"}"}}
+[info] >  {"userId":"x5wejUQO9YPBCvGokzmjKTRm7G13","severity":"INFO","message":"User deleted successfully"} {"user":{"userId":"x5wejUQO9YPBCvGokzmjKTRm7G13","severity":"INFO","message":"User deleted successfully"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"userId\":\"x5wejUQO9YPBCvGokzmjKTRm7G13\",\"severity\":\"INFO\",\"message\":\"User deleted successfully\"}"}}
+[debug] [2025-02-14T01:45:51.729Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-deleteAuthUser" in 570.778584ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finished \"us-central1-deleteAuthUser\" in 570.778584ms"}}
+[debug] [2025-02-14T01:45:51.730Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-14T01:45:51.730Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-02-14T01:45:51.730Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-02-14T01:45:51.730Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-15T06:36:04.973Z] [work-queue] {"queuedWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-15T06:36:04.971Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-15T06:36:04.978Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-15T06:36:04.971Z"],"workRunningCount":1}
+[debug] [2025-02-15T06:36:04.978Z] Accepted request OPTIONS /ingles-a-bordo/us-central1/deleteAuthUser --> us-central1-deleteAuthUser
+[debug] [2025-02-15T06:36:04.996Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-02-15T06:36:04.997Z] [functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/"}}
+[debug] [2025-02-15T06:36:04.997Z] [worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser)"}}
+[info] i  functions: Beginning execution of "us-central1-deleteAuthUser" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Beginning execution of \"us-central1-deleteAuthUser\""}}
+[debug] [2025-02-15T06:36:04.998Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY"}}
+[debug] [2025-02-15T06:36:05.028Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-deleteAuthUser" in 29.698792ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finished \"us-central1-deleteAuthUser\" in 29.698792ms"}}
+[debug] [2025-02-15T06:36:05.028Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-15T06:36:05.028Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-02-15T06:36:05.028Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-02-15T06:36:05.028Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-15T06:36:05.029Z] [work-queue] {"queuedWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-15T06:36:05.029Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-15T06:36:05.029Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-15T06:36:05.029Z"],"workRunningCount":1}
+[debug] [2025-02-15T06:36:05.029Z] Accepted request POST /ingles-a-bordo/us-central1/deleteAuthUser --> us-central1-deleteAuthUser
+[debug] [2025-02-15T06:36:05.030Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-02-15T06:36:05.030Z] [functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/"}}
+[debug] [2025-02-15T06:36:05.030Z] [worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser)"}}
+[info] i  functions: Beginning execution of "us-central1-deleteAuthUser" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Beginning execution of \"us-central1-deleteAuthUser\""}}
+[debug] [2025-02-15T06:36:05.030Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY"}}
+[info] >  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"} {"user":{"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"verifications\":{\"app\":\"MISSING\",\"auth\":\"VALID\"},\"logging.googleapis.com/labels\":{\"firebase-log-type\":\"callable-request-verification\"},\"severity\":\"DEBUG\",\"message\":\"Callable request verification passed\"}"}}
+[info] >  {"userId":"FcymVLfmK5nL8l3qh4eG","severity":"INFO","message":"deleteAuthUser function called"} {"user":{"userId":"FcymVLfmK5nL8l3qh4eG","severity":"INFO","message":"deleteAuthUser function called"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"userId\":\"FcymVLfmK5nL8l3qh4eG\",\"severity\":\"INFO\",\"message\":\"deleteAuthUser function called\"}"}}
+[info] >  {"severity":"ERROR","message":"Error deleting user: FirebaseAuthError: There is no user record corresponding to the provided identifier.\n    at FirebaseAuthError.fromServerError (/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/utils/error.js:148:16)\n    at /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/auth/auth-api-request.js:1629:49\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async /Users/shawn/projects/ingles-a-bordo/functions/lib/index.js:54:9\n    at async /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/common/providers/https.js:544:26\n    at async runFunction (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:506:9)\n    at async runHTTPS (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:531:5)\n    at async /opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:694:21 {\n  errorInfo: {\n    code: 'auth/user-not-found',\n    message: 'There is no user record corresponding to the provided identifier.'\n  },\n  codePrefix: 'auth'\n}"} {"user":{"severity":"ERROR","message":"Error deleting user: FirebaseAuthError: There is no user record corresponding to the provided identifier.\n    at FirebaseAuthError.fromServerError (/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/utils/error.js:148:16)\n    at /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/auth/auth-api-request.js:1629:49\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async /Users/shawn/projects/ingles-a-bordo/functions/lib/index.js:54:9\n    at async /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/common/providers/https.js:544:26\n    at async runFunction (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:506:9)\n    at async runHTTPS (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:531:5)\n    at async /opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:694:21 {\n  errorInfo: {\n    code: 'auth/user-not-found',\n    message: 'There is no user record corresponding to the provided identifier.'\n  },\n  codePrefix: 'auth'\n}"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"severity\":\"ERROR\",\"message\":\"Error deleting user: FirebaseAuthError: There is no user record corresponding to the provided identifier.\\n    at FirebaseAuthError.fromServerError (/Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/utils/error.js:148:16)\\n    at /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-admin/lib/auth/auth-api-request.js:1629:49\\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\\n    at async /Users/shawn/projects/ingles-a-bordo/functions/lib/index.js:54:9\\n    at async /Users/shawn/projects/ingles-a-bordo/functions/node_modules/firebase-functions/lib/common/providers/https.js:544:26\\n    at async runFunction (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:506:9)\\n    at async runHTTPS (/opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:531:5)\\n    at async /opt/homebrew/lib/node_modules/firebase-tools/lib/emulator/functionsEmulatorRuntime.js:694:21 {\\n  errorInfo: {\\n    code: 'auth/user-not-found',\\n    message: 'There is no user record corresponding to the provided identifier.'\\n  },\\n  codePrefix: 'auth'\\n}\"}"}}
+[debug] [2025-02-15T06:36:05.539Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-deleteAuthUser" in 509.600834ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finished \"us-central1-deleteAuthUser\" in 509.600834ms"}}
+[debug] [2025-02-15T06:36:05.540Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-15T06:36:05.540Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-02-15T06:36:05.540Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-02-15T06:36:05.540Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-15T17:20:51.468Z] [work-queue] {"queuedWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-15T17:20:51.465Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-15T17:20:51.482Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-15T17:20:51.465Z"],"workRunningCount":1}
+[debug] [2025-02-15T17:20:51.482Z] Accepted request OPTIONS /ingles-a-bordo/us-central1/deleteAuthUser --> us-central1-deleteAuthUser
+[debug] [2025-02-15T17:20:51.511Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-02-15T17:20:51.513Z] [functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/"}}
+[debug] [2025-02-15T17:20:51.514Z] [worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser)"}}
+[info] i  functions: Beginning execution of "us-central1-deleteAuthUser" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Beginning execution of \"us-central1-deleteAuthUser\""}}
+[debug] [2025-02-15T17:20:51.517Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY"}}
+[debug] [2025-02-15T17:20:51.548Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-deleteAuthUser" in 30.870167ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finished \"us-central1-deleteAuthUser\" in 30.870167ms"}}
+[debug] [2025-02-15T17:20:51.549Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-15T17:20:51.549Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-02-15T17:20:51.549Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-02-15T17:20:51.549Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-15T17:20:51.549Z] [work-queue] {"queuedWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-15T17:20:51.549Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-02-15T17:20:51.549Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/ingles-a-bordo/us-central1/deleteAuthUser-2025-02-15T17:20:51.549Z"],"workRunningCount":1}
+[debug] [2025-02-15T17:20:51.549Z] Accepted request POST /ingles-a-bordo/us-central1/deleteAuthUser --> us-central1-deleteAuthUser
+[debug] [2025-02-15T17:20:51.550Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-02-15T17:20:51.550Z] [functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/ingles-a-bordo/us-central1/deleteAuthUser, mapping to path=/"}}
+[debug] [2025-02-15T17:20:51.551Z] [worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-deleteAuthUser)"}}
+[info] i  functions: Beginning execution of "us-central1-deleteAuthUser" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Beginning execution of \"us-central1-deleteAuthUser\""}}
+[debug] [2025-02-15T17:20:51.551Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: BUSY"}}
+[info] >  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"} {"user":{"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"verifications\":{\"app\":\"MISSING\",\"auth\":\"VALID\"},\"logging.googleapis.com/labels\":{\"firebase-log-type\":\"callable-request-verification\"},\"severity\":\"DEBUG\",\"message\":\"Callable request verification passed\"}"}}
+[info] >  {"userId":"OjFHHstwF9YeGShqNTCqYArvNSC3","severity":"INFO","message":"deleteAuthUser function called"} {"user":{"userId":"OjFHHstwF9YeGShqNTCqYArvNSC3","severity":"INFO","message":"deleteAuthUser function called"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"userId\":\"OjFHHstwF9YeGShqNTCqYArvNSC3\",\"severity\":\"INFO\",\"message\":\"deleteAuthUser function called\"}"}}
+[info] >  {"userId":"OjFHHstwF9YeGShqNTCqYArvNSC3","severity":"INFO","message":"User deleted successfully"} {"user":{"userId":"OjFHHstwF9YeGShqNTCqYArvNSC3","severity":"INFO","message":"User deleted successfully"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"\u001b[90m> \u001b[39m {\"userId\":\"OjFHHstwF9YeGShqNTCqYArvNSC3\",\"severity\":\"INFO\",\"message\":\"User deleted successfully\"}"}}
+[debug] [2025-02-15T17:20:52.343Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-deleteAuthUser" in 792.332083ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finished \"us-central1-deleteAuthUser\" in 792.332083ms"}}
+[debug] [2025-02-15T17:20:52.345Z] [worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"[worker-us-central1-deleteAuthUser-4afddec2-9fb0-4d21-a51e-7556b955131f]: IDLE"}}
+[debug] [2025-02-15T17:20:52.345Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-02-15T17:20:52.345Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-deleteAuthUser"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-02-15T17:20:52.345Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}

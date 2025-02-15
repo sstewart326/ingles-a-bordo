@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function hasAccessToMaterial(materialId) {
+      let material = firestore.get(/databases/(default)/documents/classMaterials/$(materialId));
+      return material != null && 
+        material.data.studentEmails != null && 
+        request.auth.token.email in material.data.studentEmails;
+    }
+
+    // Function to check file size (10MB limit)
+    function isValidSize() {
+      return request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    // Function to check file type for class materials
+    function isValidMaterialType() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/vnd.ms-powerpoint') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    }
+
+    // Rules for slides
+    match /slides/{materialId}/{fileName} {
+      // Allow read if user is authenticated and has access to the material
+      allow read: if isAuthenticated() && (isAdmin() || hasAccessToMaterial(materialId));
+      
+      // Allow write if user is admin and file meets requirements
+      allow write: if isAdmin() 
+                  && isValidSize() 
+                  && isValidMaterialType();
+    }
+
+    // Default deny for all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 
