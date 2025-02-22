@@ -48,11 +48,24 @@ interface Translation {
   nextMonth: string;
   weeklyScheduleSummary: string;
   studentsLabel: string;
+  dayOfWeek: string;
+  date: string;
+  time: string;
+  notes: string;
+  selectDayToViewDetails: string;
+  availableClassDates: string;
   
   // Class Materials
   classMaterialsTitle: string;
   selectMonthLabel: string;
   selectDateLabel: string;
+  selectClass: string;
+  uploadMaterials: string;
+  addLinkPlaceholder: string;
+  uploading: string;
+  existingMaterials: string;
+  materialsForDate: string;
+  selectDateWithClass: string;
   pleaseLogin: string;
   failedToLoad: string;
   usefulLinks: string;
@@ -68,6 +81,28 @@ interface Translation {
   loading: string;
   error: string;
   success: string;
+
+  // Payment Configuration
+  paymentConfiguration: string;
+  weeklyInterval: string;
+  selectPaymentDay: string;
+  firstDayMonth: string;
+  fifteenthDayMonth: string;
+  lastDayMonth: string;
+  pleaseSpecifyWeeklyInterval: string;
+  pleaseSelectPaymentDay: string;
+  addNewUser: string;
+  generateSignupLink: string;
+  paymentDue: string;
+
+  // Days of Week - Short Names
+  sundayShort: string;
+  mondayShort: string;
+  tuesdayShort: string;
+  wednesdayShort: string;
+  thursdayShort: string;
+  fridayShort: string;
+  saturdayShort: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -119,11 +154,24 @@ const translations: Record<Language, Translation> = {
     nextMonth: 'Next Month',
     weeklyScheduleSummary: 'Weekly Schedule Summary',
     studentsLabel: 'Students',
+    dayOfWeek: 'Day',
+    date: 'Date',
+    time: 'Time',
+    notes: 'Notes',
+    selectDayToViewDetails: 'Select a day to view class details',
+    availableClassDates: 'Available class dates',
     
     // Class Materials
-    classMaterialsTitle: 'Class Materials',
+    classMaterialsTitle: 'Class Materials Management',
     selectMonthLabel: 'Select Month',
     selectDateLabel: 'Select Date',
+    selectClass: 'Select Class on',
+    uploadMaterials: 'Upload Materials',
+    addLinkPlaceholder: 'Add a link to learning materials',
+    uploading: 'Uploading...',
+    existingMaterials: 'Existing Materials',
+    materialsForDate: 'Materials for',
+    selectDateWithClass: 'Select a date with a scheduled class to manage materials',
     pleaseLogin: 'Please log in to view your class materials.',
     failedToLoad: 'Failed to load class materials',
     usefulLinks: 'Useful Links',
@@ -138,7 +186,29 @@ const translations: Record<Language, Translation> = {
     add: 'Add',
     loading: 'Loading...',
     error: 'Error',
-    success: 'Success'
+    success: 'Success',
+
+    // Payment Configuration
+    paymentConfiguration: 'Payment Configuration',
+    weeklyInterval: 'Weekly Interval',
+    selectPaymentDay: 'Select Payment Day',
+    firstDayMonth: 'First day of month',
+    fifteenthDayMonth: '15th of month',
+    lastDayMonth: 'Last day of month',
+    pleaseSpecifyWeeklyInterval: 'Please specify weekly interval',
+    pleaseSelectPaymentDay: 'Please select payment day',
+    addNewUser: 'Add New User',
+    generateSignupLink: 'Generate Signup Link',
+    paymentDue: 'Payment Due',
+
+    // Days of Week - Short Names
+    sundayShort: 'Sun',
+    mondayShort: 'Mon',
+    tuesdayShort: 'Tue',
+    wednesdayShort: 'Wed',
+    thursdayShort: 'Thu',
+    fridayShort: 'Fri',
+    saturdayShort: 'Sat',
   },
   'pt-BR': {
     // Auth & Profile
@@ -147,7 +217,7 @@ const translations: Record<Language, Translation> = {
     logout: 'Sair',
     profile: 'Perfil',
     name: 'Nome',
-    email: 'E-mail',
+    email: 'Email',
     password: 'Senha',
     confirmPassword: 'Confirmar Senha',
     newPassword: 'Nova Senha',
@@ -161,7 +231,7 @@ const translations: Record<Language, Translation> = {
     classMaterials: 'Materiais de Aula',
     adminPanel: 'Painel Admin',
     manageUsers: 'Gerenciar Usuários',
-    manageSchedules: 'Gerenciar Agendas',
+    manageSchedules: 'Gerenciar Horários',
     manageMaterials: 'Gerenciar Materiais',
     
     // Dashboard
@@ -169,32 +239,45 @@ const translations: Record<Language, Translation> = {
     manageScheduleDesc: 'Criar ou editar sessões de aula',
     classMaterialsDesc: 'Enviar e gerenciar materiais',
     upcomingClasses: 'Próximas Aulas',
-    pastClasses: 'Aulas Anteriores',
-    viewAll: 'Ver Todas',
+    pastClasses: 'Aulas Passadas',
+    viewAll: 'Ver Tudo',
     yourUpcomingClasses: 'Suas Próximas Aulas',
     sunday: 'Domingo',
-    monday: 'Segunda-feira',
-    tuesday: 'Terça-feira',
-    wednesday: 'Quarta-feira',
-    thursday: 'Quinta-feira',
-    friday: 'Sexta-feira',
+    monday: 'Segunda',
+    tuesday: 'Terça',
+    wednesday: 'Quarta',
+    thursday: 'Quinta',
+    friday: 'Sexta',
     saturday: 'Sábado',
     class: 'Aula',
     
     // Schedule
-    courseSchedule: 'Agenda do Curso',
+    courseSchedule: 'Agenda de Aulas',
     scheduleDescription: 'Visualize e gerencie sua agenda de aulas.',
     previousMonth: 'Mês Anterior',
     nextMonth: 'Próximo Mês',
     weeklyScheduleSummary: 'Resumo Semanal',
     studentsLabel: 'Alunos',
+    dayOfWeek: 'Dia',
+    date: 'Data',
+    time: 'Horário',
+    notes: 'Observações',
+    selectDayToViewDetails: 'Selecione um dia para ver os detalhes da aula',
+    availableClassDates: 'Datas de aula disponíveis',
     
     // Class Materials
-    classMaterialsTitle: 'Materiais de Aula',
+    classMaterialsTitle: 'Gerenciamento de Materiais',
     selectMonthLabel: 'Selecionar Mês',
     selectDateLabel: 'Selecionar Data',
+    selectClass: 'Selecionar Aula em',
+    uploadMaterials: 'Enviar Materiais',
+    addLinkPlaceholder: 'Adicionar um link para materiais de aprendizagem',
+    uploading: 'Enviando...',
+    existingMaterials: 'Materiais Existentes',
+    materialsForDate: 'Materiais para',
+    selectDateWithClass: 'Selecione uma data com aula agendada para gerenciar materiais',
     pleaseLogin: 'Por favor, faça login para ver seus materiais de aula.',
-    failedToLoad: 'Falha ao carregar materiais de aula',
+    failedToLoad: 'Falha ao carregar materiais',
     usefulLinks: 'Links Úteis',
     noMaterialsFound: 'Nenhum material encontrado',
     downloadSlides: 'Baixar Slides',
@@ -207,7 +290,29 @@ const translations: Record<Language, Translation> = {
     add: 'Adicionar',
     loading: 'Carregando...',
     error: 'Erro',
-    success: 'Sucesso'
+    success: 'Sucesso',
+
+    // Payment Configuration
+    paymentConfiguration: 'Configuração de Pagamento',
+    weeklyInterval: 'Intervalo Semanal',
+    selectPaymentDay: 'Selecionar Dia de Pagamento',
+    firstDayMonth: 'Primeiro dia do mês',
+    fifteenthDayMonth: 'Dia 15 do mês',
+    lastDayMonth: 'Último dia do mês',
+    pleaseSpecifyWeeklyInterval: 'Por favor, especifique o intervalo semanal',
+    pleaseSelectPaymentDay: 'Por favor, selecione o dia de pagamento',
+    addNewUser: 'Adicionar Novo Usuário',
+    generateSignupLink: 'Gerar Link de Cadastro',
+    paymentDue: 'Pagamento Pendente',
+
+    // Days of Week - Short Names
+    sundayShort: 'Dom',
+    mondayShort: 'Seg',
+    tuesdayShort: 'Ter',
+    wednesdayShort: 'Qua',
+    thursdayShort: 'Qui',
+    fridayShort: 'Sex',
+    saturdayShort: 'Sáb',
   }
 };
 

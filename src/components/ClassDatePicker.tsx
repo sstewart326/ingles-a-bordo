@@ -12,6 +12,8 @@ import {
   startOfDay,
 } from 'date-fns';
 import { FaChevronLeft, FaChevronRight, FaUsers, FaClock } from 'react-icons/fa';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
 
 interface ClassInfo {
   id: string;
@@ -29,14 +31,16 @@ interface ClassDatePickerProps {
   availableClasses?: ClassInfo[];
 }
 
-const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
 export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
   selectedDate,
   onDateSelect,
   classInfo,
   availableClasses = [],
 }) => {
+  const { language } = useLanguage();
+  const t = useTranslation(language);
+  const DAYS_OF_WEEK = [t.sundayShort, t.mondayShort, t.tuesdayShort, t.wednesdayShort, t.thursdayShort, t.fridayShort, t.saturdayShort];
+
   const [currentMonth, setCurrentMonth] = React.useState<Date>(startOfMonth(selectedDate));
 
   // Get all dates in the current month
@@ -175,11 +179,8 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
         <div className="text-sm text-gray-800 font-medium">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-2 h-2 rounded-full bg-[var(--brand-color-dark)]" />
-            <span>Available class dates</span>
+            <span>{t.availableClassDates}</span>
           </div>
-          <p>
-            Classes occur every {DAYS_OF_WEEK[classInfo.dayOfWeek]} from {classInfo.startTime} to {classInfo.endTime}
-          </p>
         </div>
       </div>
     </div>

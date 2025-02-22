@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { getCachedCollection, updateCachedDocument, deleteCachedDocument, setCachedDocument } from '../utils/firebaseUtils';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
 
 interface User {
   id: string;
@@ -16,19 +18,38 @@ interface User {
   isAdmin: boolean;
   status?: 'active' | 'pending';
   createdAt: string | Date;
+  paymentConfig: {
+    type: 'weekly' | 'monthly';
+    weeklyInterval?: number;  // for weekly payments, number of weeks
+    monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
+  };
 }
 
 interface NewUser {
   email: string;
   name: string;
+  paymentConfig: {
+    type: 'weekly' | 'monthly';
+    weeklyInterval?: number;
+    monthlyOption?: 'first' | 'fifteen' | 'last';
+  };
 }
 
 export const AdminUsers = () => {
   const { currentUser } = useAuth();
   const { isAdmin } = useAdmin();
+  const { language } = useLanguage();
+  const t = useTranslation(language);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newUser, setNewUser] = useState<NewUser>({ email: '', name: '' });
+  const [newUser, setNewUser] = useState<NewUser>({ 
+    email: '', 
+    name: '', 
+    paymentConfig: { 
+      type: 'weekly',
+      weeklyInterval: 1 
+    } 
+  });
   const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: string}>({});
 
   const fetchUsers = useCallback(async () => {
@@ -167,6 +188,16 @@ export const AdminUsers = () => {
       return;
     }
 
+    // Validate payment configuration
+    if (newUser.paymentConfig.type === 'weekly' && !newUser.paymentConfig.weeklyInterval) {
+      toast.error(t.pleaseSpecifyWeeklyInterval);
+      return;
+    }
+    if (newUser.paymentConfig.type === 'monthly' && !newUser.paymentConfig.monthlyOption) {
+      toast.error(t.pleaseSelectPaymentDay);
+      return;
+    }
+
     try {
       setLoading(true);
       const signupLink = await createSignupLink(newUser.email, newUser.name);
@@ -186,7 +217,8 @@ export const AdminUsers = () => {
         name: newUser.name,
         isAdmin: false,
         status: 'pending',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        paymentConfig: newUser.paymentConfig
       };
       
       // Use setCachedDocument to properly handle caching
@@ -198,7 +230,7 @@ export const AdminUsers = () => {
       // Copy to clipboard
       await navigator.clipboard.writeText(signupLink);
       
-      setNewUser({ email: '', name: '' }); // Reset form
+      setNewUser({ email: '', name: '', paymentConfig: { type: 'weekly', weeklyInterval: 1 } }); // Reset form
       
       // Hide the form
       const form = document.getElementById('addUserForm');
@@ -242,11 +274,11 @@ export const AdminUsers = () => {
               }}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              Add New User
+              {t.addNewUser}
             </button>
             <div id="addUserForm" className="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg p-4 z-10 border border-gray-200">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Add New User</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{t.addNewUser}</h2>
                 <button
                   onClick={() => {
                     const form = document.getElementById('addUserForm');
@@ -264,7 +296,7 @@ export const AdminUsers = () => {
               <form onSubmit={handleNewUserSubmit} className="space-y-3">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                    Name
+                    {t.name}
                   </label>
                   <input
                     type="text"
@@ -278,7 +310,7 @@ export const AdminUsers = () => {
                 </div>
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    Email
+                    {t.email}
                   </label>
                   <input
                     type="email"
@@ -290,12 +322,74 @@ export const AdminUsers = () => {
                     required
                   />
                 </div>
+                <div>
+                  <label htmlFor="paymentConfig" className="block text-sm font-medium text-gray-700">
+                    {t.paymentConfiguration}
+                  </label>
+                  <select
+                    id="paymentConfig"
+                    value={newUser.paymentConfig.type}
+                    onChange={(e) => setNewUser(prev => ({ ...prev, paymentConfig: { ...prev.paymentConfig, type: e.target.value as 'weekly' | 'monthly' } }))}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                <div>
+                  {newUser.paymentConfig.type === 'weekly' && (
+                    <div>
+                      <label htmlFor="weeklyInterval" className="block text-sm font-medium text-gray-700">
+                        {t.weeklyInterval}
+                      </label>
+                      <input
+                        type="number"
+                        id="weeklyInterval"
+                        min="1"
+                        max="52"
+                        value={newUser.paymentConfig.weeklyInterval || ''}
+                        onChange={(e) => setNewUser(prev => ({ 
+                          ...prev, 
+                          paymentConfig: { 
+                            ...prev.paymentConfig, 
+                            weeklyInterval: Number(e.target.value) 
+                          } 
+                        }))}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                  )}
+                  {newUser.paymentConfig.type === 'monthly' && (
+                    <div>
+                      <label htmlFor="monthlyOption" className="block text-sm font-medium text-gray-700">
+                        {t.selectPaymentDay}
+                      </label>
+                      <select
+                        id="monthlyOption"
+                        value={newUser.paymentConfig.monthlyOption || ''}
+                        onChange={(e) => setNewUser(prev => ({ 
+                          ...prev, 
+                          paymentConfig: { 
+                            ...prev.paymentConfig, 
+                            monthlyOption: e.target.value as 'first' | 'fifteen' | 'last'
+                          } 
+                        }))}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      >
+                        <option value="">{t.selectPaymentDay}</option>
+                        <option value="first">{t.firstDayMonth}</option>
+                        <option value="fifteen">{t.fifteenthDayMonth}</option>
+                        <option value="last">{t.lastDayMonth}</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
                 <button
                   type="submit"
                   disabled={loading}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  Generate Signup Link
+                  {t.generateSignupLink}
                 </button>
               </form>
             </div>

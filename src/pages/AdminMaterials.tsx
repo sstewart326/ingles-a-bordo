@@ -5,6 +5,8 @@ import { FaPlus, FaTrash } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { ClassDatePicker } from '../components/ClassDatePicker';
 import { cache } from '../utils/cache';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
 
 interface Class {
   id: string;
@@ -28,7 +30,59 @@ interface ClassMaterial {
   studentIds?: string[]; // Keep for backward compatibility
 }
 
+const getNextClassDate = (classes: Class[]): Date => {
+  const now = new Date();
+  const today = now.getDay();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  // Sort classes by day of week and time
+  const sortedClasses = [...classes].sort((a, b) => {
+    if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+    
+    // Convert time to minutes for comparison
+    const getMinutes = (timeStr: string) => {
+      const [time, period] = timeStr.trim().toUpperCase().split(' ');
+      const [hours, minutes] = time.split(':').map(Number);
+      let totalMinutes = hours * 60 + minutes;
+      if (period === 'PM' && hours !== 12) totalMinutes += 12 * 60;
+      if (period === 'AM' && hours === 12) totalMinutes = minutes;
+      return totalMinutes;
+    };
+    
+    return getMinutes(a.startTime) - getMinutes(b.startTime);
+  });
+
+  // Find the next class
+  const nextClass = sortedClasses.find(c => {
+    if (c.dayOfWeek > today) return true;
+    if (c.dayOfWeek === today) {
+      const classMinutes = (() => {
+        const [time, period] = c.startTime.trim().toUpperCase().split(' ');
+        const [hours, minutes] = time.split(':').map(Number);
+        let totalMinutes = hours * 60 + minutes;
+        if (period === 'PM' && hours !== 12) totalMinutes += 12 * 60;
+        if (period === 'AM' && hours === 12) totalMinutes = minutes;
+        return totalMinutes;
+      })();
+      return classMinutes > currentTime;
+    }
+    return false;
+  });
+
+  // If no class found in current week, get the first class of next week
+  const targetClass = nextClass || sortedClasses[0];
+  if (!targetClass) return now;
+
+  // Calculate the target date
+  const result = new Date();
+  const daysToAdd = targetClass.dayOfWeek - today + (targetClass.dayOfWeek <= today ? 7 : 0);
+  result.setDate(result.getDate() + daysToAdd);
+  return result;
+};
+
 const AdminMaterials = () => {
+  const { language } = useLanguage();
+  const t = useTranslation(language);
   const [classes, setClasses] = useState<Class[]>([]);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [links, setLinks] = useState<string[]>([]);
@@ -124,6 +178,8 @@ const AdminMaterials = () => {
         }
         
         setClasses(classesData);
+        // Set the initial date to the next class date
+        setSelectedDate(getNextClassDate(classesData));
       } catch {
         toast.error('Failed to load classes');
       } finally {
@@ -301,11 +357,11 @@ const AdminMaterials = () => {
   return (
     <div className="flex-1 bg-white">
       <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <h1 className="text-2xl font-bold mb-6">Class Materials Management</h1>
+        <h1 className="text-2xl font-bold mb-6">{t.classMaterialsTitle}</h1>
         
         {/* Date Selection */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Select Class Date</h2>
+          <h2 className="text-xl font-semibold mb-4">{t.selectDateLabel}</h2>
           <div className="max-w-2xl mx-auto">
             <ClassDatePicker
               selectedDate={selectedDate}
@@ -321,7 +377,9 @@ const AdminMaterials = () => {
             {/* Class Selection Dropdown */}
             {classes.filter(c => c.dayOfWeek === selectedDate.getDay()).length > 0 && (
               <div className="max-w-2xl mx-auto mb-6">
-                <h2 className="text-xl font-semibold mb-4">Select Class</h2>
+                <h2 className="text-xl font-semibold mb-4">
+                  {t.selectClass} {selectedDate.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US')}
+                </h2>
                 <div className="relative">
                   <select
                     value={selectedClass?.id || ''}
@@ -329,13 +387,13 @@ const AdminMaterials = () => {
                       const selectedId = e.target.value;
                       handleClassSelect(selectedId);
                     }}
-                    className="w-full p-2 border rounded-lg bg-white appearance-none cursor-pointer"
+                    className="w-full p-2 border rounded-lg bg-white cursor-pointer"
                   >
-                    <option value="" disabled>Select a class...</option>
+                    <option value="" disabled>{t.selectClass}...</option>
                     {classes
                       .filter(c => c.dayOfWeek === selectedDate.getDay())
                       .map(classItem => {
-                        const displayText = `${classItem.courseType || 'Class'} (${classItem.startTime} - ${classItem.endTime})`;
+                        const displayText = `${classItem.courseType || t.class} (${classItem.startTime} - ${classItem.endTime})`;
                         return (
                           <option key={classItem.id} value={classItem.id}>
                             {displayText}
@@ -343,11 +401,6 @@ const AdminMaterials = () => {
                         );
                       })}
                   </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                    </svg>
-                  </div>
                 </div>
               </div>
             )}
@@ -356,7 +409,7 @@ const AdminMaterials = () => {
               <>
                 {/* Materials Upload */}
                 <div className="mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Upload Materials</h2>
+                  <h2 className="text-xl font-semibold mb-4">{t.uploadMaterials}</h2>
                   
                   <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
                     {/* File Upload */}
@@ -381,7 +434,7 @@ const AdminMaterials = () => {
                           type="text"
                           value={newLink}
                           onChange={(e) => setNewLink(e.target.value)}
-                          placeholder="Add a link to learning materials"
+                          placeholder={t.addLinkPlaceholder}
                           className="flex-1 p-2 border rounded"
                         />
                         <button
@@ -418,7 +471,7 @@ const AdminMaterials = () => {
                         hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed
                         transition duration-200"
                     >
-                      {uploading ? 'Uploading...' : 'Upload Materials'}
+                      {uploading ? t.uploading : t.uploadMaterials}
                     </button>
                   </form>
                 </div>
@@ -426,12 +479,12 @@ const AdminMaterials = () => {
                 {/* Existing Materials */}
                 {existingMaterials.length > 0 && (
                   <div className="mb-8">
-                    <h2 className="text-xl font-semibold mb-4">Existing Materials</h2>
+                    <h2 className="text-xl font-semibold mb-4">{t.existingMaterials}</h2>
                     <div className="space-y-4">
                       {existingMaterials.map((material, index) => (
                         <div key={index} className="p-4 border rounded-lg">
                           <div className="flex items-center justify-between">
-                            <h3 className="font-medium">Materials for {new Date(material.classDate).toLocaleDateString()}</h3>
+                            <h3 className="font-medium">{t.materialsForDate} {new Date(material.classDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US')}</h3>
                             {material.slides && (
                               <a
                                 href={material.slides}
@@ -439,13 +492,13 @@ const AdminMaterials = () => {
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-2 text-blue-500 hover:text-blue-600"
                               >
-                                Download Slides
+                                {t.downloadSlides}
                               </a>
                             )}
                           </div>
                           {material.links && material.links.length > 0 && (
                             <div className="mt-2">
-                              <p className="font-medium mb-2">Links:</p>
+                              <p className="font-medium mb-2">{t.usefulLinks}:</p>
                               <ul className="space-y-2">
                                 {material.links.map((link, linkIndex) => (
                                   <li key={linkIndex} className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100">
@@ -470,7 +523,7 @@ const AdminMaterials = () => {
               </>
             ) : (
               <div className="text-center py-8 text-gray-600">
-                Select a date with a scheduled class to manage materials
+                {t.selectDateWithClass}
               </div>
             )}
           </div>

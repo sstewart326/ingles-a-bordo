@@ -17,6 +17,8 @@ node_modules
 .env.development.local
 .env.test.local
 .env.production.local
+firestore.rules
+storage.rules
 
 # Logs
 npm-debug.log*
@@ -31,3 +33,4 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+.cursor

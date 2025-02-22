@@ -46,24 +46,60 @@ export const Dashboard = () => {
         { userId: currentUser.uid }
       );
 
+      console.log('Fetched classes:', allClasses);
+
       const now = new Date();
       const upcoming: ClassSession[] = [];
       const past: ClassSession[] = [];
 
       allClasses.forEach(classSession => {
-        if (classSession.endDate && new Date(classSession.endDate.seconds * 1000) < now) {
-          past.push(classSession);
-          return;
-        }
+        console.log('Processing class:', {
+          id: classSession.id,
+          dayOfWeek: classSession.dayOfWeek,
+          startTime: classSession.startTime,
+          endDate: classSession.endDate?.toDate(),
+          now: now
+        });
 
         if (classSession.dayOfWeek !== undefined) {
-          const isUpcoming = isRecurringClassUpcoming(classSession.dayOfWeek, classSession.startTime);
-          if (isUpcoming) {
-            upcoming.push(classSession);
+          // Check if today's instance of the class has passed
+          const isPastToday = isClassPastToday(classSession.dayOfWeek, classSession.startTime);
+          // Check if the class is upcoming (either later this week or next week)
+          const isUpcoming = isClassUpcoming(classSession.dayOfWeek, classSession.startTime);
+          
+          console.log('Class status:', {
+            id: classSession.id,
+            isPastToday,
+            isUpcoming,
+            dayOfWeek: classSession.dayOfWeek,
+            currentDayOfWeek: now.getDay(),
+            startTime: classSession.startTime,
+            currentTime: `${now.getHours()}:${now.getMinutes()}`,
+            hasEndDate: !!classSession.endDate,
+            endDate: classSession.endDate?.toDate(),
+            isRecurring: !classSession.endDate
+          });
+
+          // For recurring classes (no endDate) or classes that haven't reached their endDate
+          if (!classSession.endDate || new Date(classSession.endDate.seconds * 1000) >= now) {
+            // Add to past if today's instance has passed
+            if (isPastToday) {
+              past.push(classSession);
+            }
+            // Also add to upcoming if it's recurring or will happen again
+            if (isUpcoming) {
+              upcoming.push(classSession);
+            }
           } else {
+            // If the class has an endDate that's passed, it only goes to past
             past.push(classSession);
           }
         }
+      });
+
+      console.log('Final results:', {
+        upcomingClasses: upcoming,
+        pastClasses: past
       });
 
       // Sort upcoming classes by day of week and time
@@ -88,19 +124,60 @@ export const Dashboard = () => {
     fetchClasses();
   }, [fetchClasses]);
 
-  const isRecurringClassUpcoming = (dayOfWeek: number, startTime?: string) => {
+  const isClassPastToday = (dayOfWeek: number, startTime?: string) => {
     const now = new Date();
     const currentDayOfWeek = now.getDay();
     
+    // If it's not today, it's not past today
+    if (dayOfWeek !== currentDayOfWeek) {
+      return false;
+    }
+
+    // If it's today, check if the time has passed
+    if (startTime) {
+      const [hours, minutes] = startTime.split(':');
+      let hour = parseInt(hours);
+      if (startTime.toLowerCase().includes('pm') && hour !== 12) {
+        hour += 12;
+      } else if (startTime.toLowerCase().includes('am') && hour === 12) {
+        hour = 0;
+      }
+      
+      const classTime = new Date();
+      classTime.setHours(hour, parseInt(minutes), 0, 0);
+      
+      return now > classTime;
+    }
+    
+    return false;
+  };
+
+  const isClassUpcoming = (dayOfWeek: number, startTime?: string) => {
+    const now = new Date();
+    const currentDayOfWeek = now.getDay();
+    
+    // If the class is later this week
     if (dayOfWeek > currentDayOfWeek) {
       return true;
-    } else if (dayOfWeek === currentDayOfWeek && startTime) {
-      const [hours, minutes] = startTime.split(':').map(Number);
+    } 
+    // If it's today and hasn't started yet
+    else if (dayOfWeek === currentDayOfWeek && startTime) {
+      const [hours, minutes] = startTime.split(':');
+      let hour = parseInt(hours);
+      if (startTime.toLowerCase().includes('pm') && hour !== 12) {
+        hour += 12;
+      } else if (startTime.toLowerCase().includes('am') && hour === 12) {
+        hour = 0;
+      }
+      
       const classTime = new Date();
-      classTime.setHours(hours, minutes, 0, 0);
+      classTime.setHours(hour, parseInt(minutes), 0, 0);
+      
       return now < classTime;
     }
-    return false;
+    // If it's earlier in the week or today but already passed,
+    // it's upcoming because it will happen next week
+    return true;
   };
 
   const formatClassTitle = (classSession: ClassSession) => {
@@ -135,7 +212,7 @@ export const Dashboard = () => {
   }
 
   const AdminDashboard = () => (
-    <div className="space-y-8 max-w-3xl mx-auto pt-8">
+    <div className="space-y-8 max-w-3xl mx-auto pt-8 px-4 sm:px-6 lg:px-8">
       {/* Quick Actions */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.quickActions}</h2>

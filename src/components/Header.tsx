@@ -29,14 +29,15 @@ export const Header = () => {
   };
 
   const navigation = [
-    { name: t.dashboard, href: '/dashboard', current: location.pathname === '/dashboard' },
-    { name: t.schedule, href: '/schedule', current: location.pathname === '/schedule' },
-    { name: t.classMaterials, href: '/materials', current: location.pathname === '/materials' },
     ...(isAdmin ? [
+      { name: t.dashboard, href: '/dashboard', current: location.pathname === '/dashboard' },
       { name: t.manageUsers, href: '/admin/users', current: location.pathname === '/admin/users' },
       { name: t.manageSchedules, href: '/admin/schedule', current: location.pathname === '/admin/schedule' },
       { name: t.manageMaterials, href: '/admin/materials', current: location.pathname === '/admin/materials' }
-    ] : [])
+    ] : [
+      { name: t.schedule, href: '/schedule', current: location.pathname === '/schedule' },
+      { name: t.classMaterials, href: '/materials', current: location.pathname === '/materials' }
+    ])
   ];
 
   return (
@@ -46,7 +47,7 @@ export const Header = () => {
           <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
             <div className="relative flex h-16 items-center justify-between">
               <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">
-                <Disclosure.Button className="header-nav-button relative inline-flex items-center justify-center rounded-md p-2 text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
+                <Disclosure.Button className="header-nav-button relative inline-flex items-center justify-center rounded-md p-2 text-[var(--brand-color)] hover:text-[var(--brand-color-dark)] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--brand-color)] bg-transparent">
                   <span className="sr-only">Open main menu</span>
                   {open ? (
                     <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
@@ -124,16 +125,16 @@ export const Header = () => {
             </div>
           </div>
 
-          <Disclosure.Panel className="sm:hidden">
-            <div className="space-y-1 px-2 pb-3 pt-2">
+          <Disclosure.Panel className="sm:hidden fixed inset-y-0 left-0 w-48 bg-[var(--header-bg)] shadow-lg transform transition-transform duration-200 ease-in-out z-50">
+            <div className="pt-16 px-2 space-y-1">
               {navigation.map((item) => (
                 <Disclosure.Button
                   key={item.name}
                   as={Link}
                   to={item.href}
                   className={classNames(
-                    'header-nav-item nav-item block rounded-md px-3 py-2 text-base font-medium',
-                    item.current ? 'active' : ''
+                    'header-nav-item nav-item block w-full text-left rounded-md px-3 py-2 text-base font-medium',
+                    item.current ? 'bg-[var(--brand-color-light)] text-white' : 'text-gray-300 hover:bg-[var(--brand-color-light)] hover:text-white'
                   )}
                   aria-current={item.current ? 'page' : undefined}
                 >

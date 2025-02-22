@@ -218,8 +218,6 @@ export const getStudentClassMaterials = async (studentEmail: string): Promise<Cl
       return cachedData;
     }
 
-    console.log('Fetching materials for student email:', studentEmail);
-
     // First get the student's classes
     const classesQuery = query(
       collection(db, 'classes'),
@@ -227,8 +225,6 @@ export const getStudentClassMaterials = async (studentEmail: string): Promise<Cl
     );
     const classesSnapshot = await getDocs(classesQuery);
     const classIds = classesSnapshot.docs.map(doc => doc.id);
-
-    console.log('Found classes for student:', { classIds });
 
     if (classIds.length === 0) {
       return [];
@@ -240,15 +236,8 @@ export const getStudentClassMaterials = async (studentEmail: string): Promise<Cl
       where('classId', 'in', classIds),
       where('studentEmails', 'array-contains', studentEmail)
     );
-    
-    console.log('Querying materials with:', { 
-      classIds, 
-      studentEmail,
-      collectionPath: COLLECTION_PATH 
-    });
 
     const materialsSnapshot = await getDocs(materialsQuery);
-    console.log('Found materials:', { count: materialsSnapshot.docs.length });
 
     const materials = materialsSnapshot.docs.map(doc => {
       const data = doc.data();

@@ -35,13 +35,13 @@ export const AppRoutes = () => {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <Header />
               <main className="flex-1">
                 <Dashboard />
               </main>
               <Footer />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route

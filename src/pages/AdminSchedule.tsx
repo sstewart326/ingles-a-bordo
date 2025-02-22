@@ -9,6 +9,8 @@ import {
   deleteCachedDocument 
 } from '../utils/firebaseUtils';
 import { Timestamp } from 'firebase/firestore';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
 
 interface User {
   id: string;
@@ -28,6 +30,7 @@ interface Class {
   endTime: string;
   courseType: string;
   notes?: string;
+  startDate: Timestamp;
   endDate?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -39,8 +42,6 @@ interface SelectOption {
 }
 
 type SelectStyles = StylesConfig<SelectOption, true>;
-
-const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const generateTimeOptions = () => {
   const times = [];
@@ -58,6 +59,9 @@ const generateTimeOptions = () => {
 const timeOptions = generateTimeOptions();
 
 export const AdminSchedule = () => {
+  const { language } = useLanguage();
+  const t = useTranslation(language);
+  const DAYS_OF_WEEK = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
   const [classes, setClasses] = useState<Class[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +73,7 @@ export const AdminSchedule = () => {
     courseType: 'Individual',
     notes: '',
     studentEmails: [] as string[],
+    startDate: new Date(),
     endDate: null as Date | null
   });
 
@@ -130,6 +135,7 @@ export const AdminSchedule = () => {
         courseType: newClass.courseType,
         notes: newClass.notes || '',
         studentEmails: studentEmails,
+        startDate: Timestamp.fromDate(newClass.startDate),
         ...(newClass.endDate ? { endDate: Timestamp.fromDate(new Date(newClass.endDate)) } : {}),
         createdAt: now,
         updatedAt: now
@@ -148,6 +154,7 @@ export const AdminSchedule = () => {
         courseType: 'Individual',
         notes: '',
         studentEmails: [],
+        startDate: new Date(),
         endDate: null
       });
       toast.success('Class created successfully');
@@ -374,6 +381,14 @@ export const AdminSchedule = () => {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                  <DatePicker
+                    selected={newClass.startDate}
+                    onChange={(date: Date | null) => setNewClass(prev => ({ ...prev, startDate: date || new Date() }))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700">
                     End Date <span className="text-gray-500 font-normal">(Optional)</span>
                   </label>
@@ -467,6 +482,9 @@ export const AdminSchedule = () => {
                     Students
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Start Date
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     End Date
                   </th>
                   <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -502,6 +520,9 @@ export const AdminSchedule = () => {
                           <div key={`${classItem.id}-no-students`} className="text-gray-500 italic">No students assigned</div>
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {classItem.startDate.toDate().toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {classItem.endDate?.toDate().toLocaleDateString() || 'N/A'}
