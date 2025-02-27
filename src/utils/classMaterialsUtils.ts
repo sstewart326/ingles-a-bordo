@@ -35,6 +35,12 @@ const ALLOWED_FILE_TYPES = [
   'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 ];
 
+const logMaterialsUtil = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[MATERIALS-UTIL] ${message}`, data ? data : '');
+  }
+};
+
 export const validateFile = (file: File): string | null => {
   // Check file size
   const fileSizeInMB = file.size / (1024 * 1024);
@@ -223,40 +229,55 @@ export const getStudentClassMaterials = async (studentEmail: string): Promise<Cl
       collection(db, 'classes'),
       where('studentEmails', 'array-contains', studentEmail)
     );
-    const classesSnapshot = await getDocs(classesQuery);
-    const classIds = classesSnapshot.docs.map(doc => doc.id);
+    
+    try {
+      const classesSnapshot = await getDocs(classesQuery);
+      const classIds = classesSnapshot.docs.map(doc => doc.id);
 
-    if (classIds.length === 0) {
+      if (classIds.length === 0) {
+        // Return empty array if student has no classes
+        return [];
+      }
+
+      // Then get materials for all their classes where they are specifically included
+      const materialsQuery = query(
+        collection(db, COLLECTION_PATH),
+        where('classId', 'in', classIds),
+        where('studentEmails', 'array-contains', studentEmail)
+      );
+
+      const materialsSnapshot = await getDocs(materialsQuery);
+
+      const materials = materialsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          createdAt: data.createdAt.toDate(),
+          updatedAt: data.updatedAt.toDate(),
+          classDate: data.classDate.toDate(),
+        } as ClassMaterial;
+      });
+
+      // Sort by date descending
+      materials.sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
+
+      // Cache the result
+      setCached(cacheKey, materials, COLLECTION_PATH);
+      return materials;
+    } catch (error) {
+      // If there's a permissions error, it likely means the student has no access
+      // Just return empty array instead of throwing
+      logMaterialsUtil('No classes or materials found:', error);
       return [];
     }
-
-    // Then get materials for all their classes where they are specifically included
-    const materialsQuery = query(
-      collection(db, COLLECTION_PATH),
-      where('classId', 'in', classIds),
-      where('studentEmails', 'array-contains', studentEmail)
-    );
-
-    const materialsSnapshot = await getDocs(materialsQuery);
-
-    const materials = materialsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate(),
-        classDate: data.classDate.toDate(),
-      } as ClassMaterial;
-    });
-
-    // Sort by date descending
-    materials.sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
-
-    // Cache the result
-    setCached(cacheKey, materials, COLLECTION_PATH);
-    return materials;
   } catch (error) {
-    console.error('Error getting student class materials:', error);
-    throw error;
+    // Only log as error if it's not a permission issue
+    if (error instanceof Error && !error.message.includes('permission')) {
+      console.error('Error getting student class materials:', error);
+    } else {
+      logMaterialsUtil('No classes or materials found:', error);
+    }
+    // Return empty array instead of throwing
+    return [];
   }
 }; 

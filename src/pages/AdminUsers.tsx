@@ -16,9 +16,10 @@ interface User {
   email: string;
   name: string;
   isAdmin: boolean;
+  isTeacher?: boolean;
   status?: 'active' | 'pending';
   createdAt: string | Date;
-  paymentConfig: {
+  paymentConfig?: {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;  // for weekly payments, number of weeks
     monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
@@ -28,12 +29,20 @@ interface User {
 interface NewUser {
   email: string;
   name: string;
-  paymentConfig: {
+  isTeacher: boolean;
+  isAdmin: boolean;
+  paymentConfig?: {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;
     monthlyOption?: 'first' | 'fifteen' | 'last';
   };
 }
+
+const logAdmin = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[ADMIN-USERS] ${message}`, data ? data : '');
+  }
+};
 
 export const AdminUsers = () => {
   const { currentUser } = useAuth();
@@ -44,7 +53,9 @@ export const AdminUsers = () => {
   const [loading, setLoading] = useState(true);
   const [newUser, setNewUser] = useState<NewUser>({ 
     email: '', 
-    name: '', 
+    name: '',
+    isTeacher: false,
+    isAdmin: false,
     paymentConfig: { 
       type: 'weekly',
       weeklyInterval: 1 
@@ -110,12 +121,7 @@ export const AdminUsers = () => {
       return;
     }
 
-    console.log('User to delete:', {
-      id: userToDelete.id,
-      uid: userToDelete.uid,
-      email: userToDelete.email,
-      name: userToDelete.name
-    });
+    logAdmin('User to delete:', { email: userToDelete.email, uid: userToDelete.uid });
 
     if (!window.confirm(`Are you sure you want to delete ${userToDelete.name} (${userToDelete.email})?`)) {
       return;
@@ -152,25 +158,42 @@ export const AdminUsers = () => {
         if (userToDelete.uid) {
           // delete from Firebase Auth using our cloud function
           const deleteAuthUserFunc = httpsCallable(functions, 'deleteAuthUser');
-          console.log('Attempting to delete user with auth ID:', userToDelete.uid);
-          await deleteAuthUserFunc({ userId: userToDelete.uid });
-          console.log('Successfully called delete function');
+          logAdmin('Attempting to delete user with auth ID:', userToDelete.uid);
+          try {
+            const result = await deleteAuthUserFunc({ userId: userToDelete.uid });
+            logAdmin('Delete auth user function result:', result);
+          } catch (authError: unknown) {
+            logAdmin('Error deleting auth user:', {
+              error: authError,
+              message: authError instanceof Error ? authError.message : 'Unknown error',
+              code: (authError as any)?.code,
+              details: (authError as any)?.details
+            });
+            throw authError; // Re-throw to be caught by outer catch
+          }
+          logAdmin('Successfully called delete function');
         } else {
-          console.log('No Firebase Auth user found - skipping auth deletion');
+          logAdmin('No Firebase Auth user found - skipping auth deletion');
         }
         
         await deleteCachedDocument('users', userId);
-        console.log('Successfully deleted user document');
+        logAdmin('Successfully deleted user document');
       } catch (error: unknown) {
-        console.error('Error deleting auth user:', error);
+        logAdmin('Error in delete process:', {
+          error,
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: (error as any)?.code,
+          details: (error as any)?.details
+        });
         // If there's an error deleting the auth user, we should still try to delete the Firestore document
         try {
           await deleteCachedDocument('users', userId);
-          console.log('Successfully deleted user document despite auth deletion error');
+          logAdmin('Successfully deleted user document despite auth deletion error');
         } catch (docError) {
-          console.error('Error deleting user document:', docError);
+          logAdmin('Error deleting user document:', docError);
           throw docError; // Re-throw if we can't even delete the document
         }
+        throw error; // Re-throw the original error
       }
 
       await fetchUsers();
@@ -188,14 +211,16 @@ export const AdminUsers = () => {
       return;
     }
 
-    // Validate payment configuration
-    if (newUser.paymentConfig.type === 'weekly' && !newUser.paymentConfig.weeklyInterval) {
-      toast.error(t.pleaseSpecifyWeeklyInterval);
-      return;
-    }
-    if (newUser.paymentConfig.type === 'monthly' && !newUser.paymentConfig.monthlyOption) {
-      toast.error(t.pleaseSelectPaymentDay);
-      return;
+    // Validate payment configuration only for non-teacher users
+    if (!newUser.isTeacher) {
+      if (newUser.paymentConfig?.type === 'weekly' && !newUser.paymentConfig.weeklyInterval) {
+        toast.error(t.pleaseSpecifyWeeklyInterval);
+        return;
+      }
+      if (newUser.paymentConfig?.type === 'monthly' && !newUser.paymentConfig.monthlyOption) {
+        toast.error(t.pleaseSelectPaymentDay);
+        return;
+      }
     }
 
     try {
@@ -208,21 +233,26 @@ export const AdminUsers = () => {
         [newUser.email]: signupLink
       }));
       
-      // Create a new document reference with a generated ID
-      const newDocId = doc(collection(db, 'users')).id;
+      // Create a new document with a temporary ID that includes 'pending_' prefix
+      const tempId = `${doc(collection(db, 'users')).id}`;
       
       const newUserData: User = {
-        id: newDocId,
+        id: tempId,
         email: newUser.email,
         name: newUser.name,
-        isAdmin: false,
+        isAdmin: newUser.isAdmin,
+        isTeacher: newUser.isTeacher,
         status: 'pending',
         createdAt: new Date().toISOString(),
-        paymentConfig: newUser.paymentConfig
       };
+
+      // Only add paymentConfig if user is not an admin and not a teacher
+      if (!newUser.isAdmin && !newUser.isTeacher && newUser.paymentConfig) {
+        newUserData.paymentConfig = newUser.paymentConfig;
+      }
       
       // Use setCachedDocument to properly handle caching
-      await setCachedDocument('users', newDocId, newUserData, { userId: currentUser?.uid });
+      await setCachedDocument('users', tempId, newUserData, { userId: currentUser?.uid });
       
       // Update local state immediately with the new user
       setUsers(prevUsers => [...prevUsers, newUserData]);
@@ -230,7 +260,16 @@ export const AdminUsers = () => {
       // Copy to clipboard
       await navigator.clipboard.writeText(signupLink);
       
-      setNewUser({ email: '', name: '', paymentConfig: { type: 'weekly', weeklyInterval: 1 } }); // Reset form
+      setNewUser({ 
+        email: '', 
+        name: '', 
+        isTeacher: false,
+        isAdmin: false,
+        paymentConfig: { 
+          type: 'weekly', 
+          weeklyInterval: 1 
+        } 
+      }); // Reset form
       
       // Hide the form
       const form = document.getElementById('addUserForm');
@@ -323,70 +362,115 @@ export const AdminUsers = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="paymentConfig" className="block text-sm font-medium text-gray-700">
-                    {t.paymentConfiguration}
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={newUser.isTeacher}
+                      onChange={(e) => {
+                        const isTeacher = e.target.checked;
+                        setNewUser(prev => ({
+                          ...prev,
+                          isTeacher,
+                          // Clear payment config if teacher is selected
+                          paymentConfig: isTeacher ? undefined : (prev.isAdmin ? undefined : prev.paymentConfig)
+                        }));
+                      }}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Teacher Account</span>
                   </label>
-                  <select
-                    id="paymentConfig"
-                    value={newUser.paymentConfig.type}
-                    onChange={(e) => setNewUser(prev => ({ ...prev, paymentConfig: { ...prev.paymentConfig, type: e.target.value as 'weekly' | 'monthly' } }))}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  >
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
                 </div>
                 <div>
-                  {newUser.paymentConfig.type === 'weekly' && (
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={newUser.isAdmin}
+                      onChange={(e) => {
+                        const isAdmin = e.target.checked;
+                        setNewUser(prev => ({
+                          ...prev,
+                          isAdmin,
+                          // Clear payment config if admin is selected
+                          paymentConfig: isAdmin ? undefined : (prev.isTeacher ? undefined : prev.paymentConfig)
+                        }));
+                      }}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Admin Account</span>
+                  </label>
+                </div>
+                {!newUser.isTeacher && !newUser.isAdmin && (
+                  <>
                     <div>
-                      <label htmlFor="weeklyInterval" className="block text-sm font-medium text-gray-700">
-                        {t.weeklyInterval}
-                      </label>
-                      <input
-                        type="number"
-                        id="weeklyInterval"
-                        min="1"
-                        max="52"
-                        value={newUser.paymentConfig.weeklyInterval || ''}
-                        onChange={(e) => setNewUser(prev => ({ 
-                          ...prev, 
-                          paymentConfig: { 
-                            ...prev.paymentConfig, 
-                            weeklyInterval: Number(e.target.value) 
-                          } 
-                        }))}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      />
-                    </div>
-                  )}
-                  {newUser.paymentConfig.type === 'monthly' && (
-                    <div>
-                      <label htmlFor="monthlyOption" className="block text-sm font-medium text-gray-700">
-                        {t.selectPaymentDay}
+                      <label htmlFor="paymentConfig" className="block text-sm font-medium text-gray-700">
+                        {t.paymentConfiguration}
                       </label>
                       <select
-                        id="monthlyOption"
-                        value={newUser.paymentConfig.monthlyOption || ''}
+                        id="paymentConfig"
+                        value={newUser.paymentConfig?.type}
                         onChange={(e) => setNewUser(prev => ({ 
                           ...prev, 
                           paymentConfig: { 
-                            ...prev.paymentConfig, 
-                            monthlyOption: e.target.value as 'first' | 'fifteen' | 'last'
+                            ...prev.paymentConfig!, 
+                            type: e.target.value as 'weekly' | 'monthly' 
                           } 
                         }))}
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                       >
-                        <option value="">{t.selectPaymentDay}</option>
-                        <option value="first">{t.firstDayMonth}</option>
-                        <option value="fifteen">{t.fifteenthDayMonth}</option>
-                        <option value="last">{t.lastDayMonth}</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
                       </select>
                     </div>
-                  )}
-                </div>
+                    {newUser.paymentConfig?.type === 'weekly' && (
+                      <div>
+                        <label htmlFor="weeklyInterval" className="block text-sm font-medium text-gray-700">
+                          {t.weeklyInterval}
+                        </label>
+                        <input
+                          type="number"
+                          id="weeklyInterval"
+                          min="1"
+                          max="52"
+                          value={newUser.paymentConfig.weeklyInterval || ''}
+                          onChange={(e) => setNewUser(prev => ({ 
+                            ...prev, 
+                            paymentConfig: { 
+                              ...prev.paymentConfig!, 
+                              weeklyInterval: Number(e.target.value) 
+                            } 
+                          }))}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                    )}
+                    {newUser.paymentConfig?.type === 'monthly' && (
+                      <div>
+                        <label htmlFor="monthlyOption" className="block text-sm font-medium text-gray-700">
+                          {t.selectPaymentDay}
+                        </label>
+                        <select
+                          id="monthlyOption"
+                          value={newUser.paymentConfig.monthlyOption || ''}
+                          onChange={(e) => setNewUser(prev => ({ 
+                            ...prev, 
+                            paymentConfig: { 
+                              ...prev.paymentConfig!, 
+                              monthlyOption: e.target.value as 'first' | 'fifteen' | 'last'
+                            } 
+                          }))}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        >
+                          <option value="">{t.selectPaymentDay}</option>
+                          <option value="first">{t.firstDayMonth}</option>
+                          <option value="fifteen">{t.fifteenthDayMonth}</option>
+                          <option value="last">{t.lastDayMonth}</option>
+                        </select>
+                      </div>
+                    )}
+                  </>
+                )}
                 <button
                   type="submit"
-                  disabled={loading}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   {t.generateSignupLink}

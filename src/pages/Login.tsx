@@ -3,6 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../config/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { signOut, signInWithRedirect, signInWithPopup } from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { GoogleAuthProvider } from 'firebase/auth';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -10,7 +13,7 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login, loginWithGoogle } = useAuth();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,10 +36,40 @@ export const Login = () => {
       setError('');
       setLoading(true);
       
-      // Attempt Google sign in
-      const result = await loginWithGoogle();
+      // Clear any pending signup data to ensure we're in login mode
+      localStorage.removeItem('pendingSignupToken');
+      localStorage.removeItem('pendingSignupValidation');
       
-      if (!result || !result.user || !result.user.email) {
+      // Create Google Auth Provider
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      // Force account selection
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+
+      // Check if mobile device
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        console.log('Mobile device detected, using redirect flow');
+        await signInWithRedirect(auth, provider);
+        return; // The redirect will happen here
+      }
+
+      // For desktop, continue with popup
+      console.log('Starting Google login with popup...');
+      const result = await signInWithPopup(auth, provider);
+      
+      console.log('Checking login result:', {
+        success: !!result,
+        hasUser: !!result?.user,
+        email: result?.user?.email
+      });
+      
+      if (!result.user || !result.user.email) {
         throw new Error('Failed to get user information from Google');
       }
 
@@ -50,10 +83,13 @@ export const Login = () => {
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) {
+        console.log('No active account found for email:', result.user.email);
         setError('No account found. Please sign up first.');
+        await signOut(auth);
         return;
       }
 
+      console.log('Login successful, navigating to dashboard');
       navigate('/dashboard');
     } catch (err) {
       console.error('Error during Google sign in:', err);

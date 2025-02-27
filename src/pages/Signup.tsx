@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { validateSignupToken, consumeSignupToken } from '../utils/signupLinks';
-import { doc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
 
 export const Signup = () => {
   const [searchParams] = useSearchParams();
@@ -15,12 +13,47 @@ export const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [validatingToken, setValidatingToken] = useState(true);
   const navigate = useNavigate();
-  const { signup, loginWithGoogle } = useAuth();
+  const { signup, loginWithGoogle, clearAuthError } = useAuth();
 
   useEffect(() => {
     const validateToken = async () => {
       const token = searchParams.get('token');
-      console.log('Initial token validation - token present:', !!token);
+      const error = searchParams.get('error');
+      
+      // Clean up any existing redirect state
+      localStorage.removeItem('auth_debug_redirect_start');
+      localStorage.removeItem('auth_debug_id');
+      localStorage.removeItem('auth_debug_stored');
+      localStorage.removeItem('pendingSignupToken');
+      localStorage.removeItem('pendingSignupValidation');
+      
+      if (error) {
+        console.log('[POST-REDIRECT] Handling error from redirect:', {
+          error,
+          token,
+          timestamp: new Date().toISOString()
+        });
+        
+        switch (error) {
+          case 'email_mismatch':
+            setError('The Google account email does not match the invitation email. Please try again with the correct Google account.');
+            break;
+          case 'no_invitation':
+            setError('No pending invitation found for this email. Please contact your administrator.');
+            break;
+          case 'auth_failed':
+            setError('Authentication failed. Please try again with Google sign-in.');
+            break;
+          case 'signup_failed':
+            setError('Failed to complete the signup process. Please try again or contact support.');
+            break;
+          default:
+            setError('An error occurred during signup. Please try again or contact your administrator.');
+        }
+        setValidatingToken(false);
+        return;
+      }
+
       if (!token) {
         setError('Invalid signup link. Please contact your administrator.');
         setValidatingToken(false);
@@ -28,9 +61,17 @@ export const Signup = () => {
       }
 
       try {
-        console.log('Validating token...');
+        console.log('[POST-REDIRECT] Validating token after redirect:', {
+          token,
+          timestamp: new Date().toISOString()
+        });
+        
         const result = await validateSignupToken(token);
-        console.log('Validation result:', result);
+        console.log('[POST-REDIRECT] Token validation result:', {
+          valid: result.valid,
+          email: result.email,
+          timestamp: new Date().toISOString()
+        });
         
         if (!result.valid) {
           setError('This signup link is invalid or has expired. Please contact your administrator.');
@@ -44,14 +85,7 @@ export const Signup = () => {
         setName(result.name || '');
         setValidatingToken(false);
       } catch (err) {
-        console.error('Error in validateToken:', err);
-        if (err instanceof Error) {
-          console.error('Error details:', {
-            message: err.message,
-            stack: err.stack,
-            name: err.name
-          });
-        }
+        console.error('[POST-REDIRECT] Error validating token:', err);
         setError('Error validating signup link. Please contact your administrator.');
         setValidatingToken(false);
       }
@@ -90,7 +124,7 @@ export const Signup = () => {
       }
 
       console.log('Creating account...');
-      await signup(email, password, name, token);
+      await signup(email, password, token);
 
       // After successful signup, mark the token as used
       await consumeSignupToken(token);
@@ -115,6 +149,8 @@ export const Signup = () => {
 
   const handleGoogleSignIn = async () => {
     const token = searchParams.get('token');
+    console.log('[PRE-REDIRECT] Starting Google sign-in');
+    
     if (!token) {
       return setError('Invalid signup link');
     }
@@ -122,56 +158,37 @@ export const Signup = () => {
     try {
       setError('');
       setLoading(true);
+      clearAuthError();
 
-      // First validate the signup token
       const result = await validateSignupToken(token);
+      console.log('[PRE-REDIRECT] Token validation:', {
+        valid: result.valid,
+        email: result.email
+      });
       
       if (!result.valid) {
         setError('This signup link is invalid or has expired');
         return;
       }
 
-      // Perform Google sign in
-      const googleResult = await loginWithGoogle();
+      const signupData = {
+        token,
+        validation: {
+          valid: result.valid,
+          email: result.email,
+          name: result.name,
+          token: result.token
+        }
+      };
       
-      if (!googleResult || !googleResult.user || !googleResult.user.email) {
-        throw new Error('Failed to get user information from Google');
-      }
+      console.log('[PRE-REDIRECT] Storing signup data and initiating redirect');
+      localStorage.setItem('pendingSignupToken', token);
+      localStorage.setItem('pendingSignupValidation', JSON.stringify(signupData.validation));
 
-      // Verify the email matches the invitation
-      if (result.email && result.email !== googleResult.user.email) {
-        setError('The Google account email does not match the invitation email');
-        return;
-      }
-
-      // Find the pending user document
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef, 
-        where('email', '==', googleResult.user.email),
-        where('status', '==', 'pending')
-      );
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        // Update the user document with the new UID and status
-        await updateDoc(doc(db, 'users', userDoc.id), {
-          status: 'active',
-          uid: googleResult.user.uid,
-          updatedAt: new Date().toISOString()
-        });
-
-        // Mark the signup token as used
-        await consumeSignupToken(token);
-        
-        navigate('/dashboard');
-      } else {
-        setError('No pending invitation found for this email');
-      }
+      await loginWithGoogle(signupData);
     } catch (err) {
-      console.error('Error during Google sign in:', err);
-      setError('Failed to sign in with Google. Please try again.');
+      console.error('[PRE-REDIRECT] Error initiating signup:', err);
+      setError('Failed to complete signup. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -182,7 +199,8 @@ export const Signup = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Validating signup link...</p>
+          <p className="mt-4 text-gray-600">Processing signup...</p>
+          <p className="mt-2 text-sm text-gray-500">Please wait while we complete your registration.</p>
         </div>
       </div>
     );
@@ -288,7 +306,11 @@ export const Signup = () => {
 
             <button
               type="button"
-              onClick={handleGoogleSignIn}
+              onClick={(e) => {
+                e.preventDefault();
+                console.log('[SIGNUP-DEBUG] Button clicked (inline)');
+                handleGoogleSignIn();
+              }}
               disabled={loading}
               className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
@@ -298,7 +320,14 @@ export const Signup = () => {
                   fill="currentColor"
                 />
               </svg>
-              Sign up with Google
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700 mr-2"></div>
+                  Connecting to Google...
+                </>
+              ) : (
+                'Sign up with Google'
+              )}
             </button>
           </div>
         </form>

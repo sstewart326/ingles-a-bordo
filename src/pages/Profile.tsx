@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { Language } from '../contexts/LanguageContext';
-import { getCachedCollection, updateCachedDocument } from '../utils/firebaseUtils';
+import { getCachedCollection, updateCachedDocument, getCachedDocument } from '../utils/firebaseUtils';
 import { where } from 'firebase/firestore';
 
 interface UserProfile {
@@ -18,6 +18,12 @@ interface UserProfile {
   uid: string;
   updatedAt: string;
 }
+
+const logProfile = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[PROFILE] ${message}`, data ? data : '');
+  }
+};
 
 export const Profile = () => {
   const { currentUser } = useAuth();
@@ -37,27 +43,24 @@ export const Profile = () => {
     if (!currentUser) return;
 
     try {
-      console.log('Profile fetch - Attempting to fetch user document for uid:', currentUser.uid);
-      const users = await getCachedCollection<UserProfile>('users', [
-        where('uid', '==', currentUser.uid)
-      ], { userId: currentUser.uid });
+      logProfile('Attempting to fetch user document for uid:', currentUser.uid);
+      const userDoc = await getCachedDocument<UserProfile>('users', currentUser.uid, { userId: currentUser.uid });
       
-      if (!users || users.length === 0) {
-        console.error('Profile fetch - User document not found for uid:', currentUser.uid);
+      if (!userDoc) {
+        logProfile('Profile fetch - User document not found for id:', currentUser.uid);
         throw new Error('User document not found');
       }
 
-      const userDoc = users[0];
-      console.log('Profile fetch - Successfully retrieved user document:', userDoc);
+      logProfile('Profile fetch - Successfully retrieved user document:', userDoc);
       setProfile(userDoc);
       setName(userDoc.name || '');
       setSelectedLanguage(userDoc.language || 'en');
       
       setLoading(false);
     } catch (error) {
-      console.error('Profile fetch - Error:', error);
+      logProfile('Profile fetch - Error:', error);
       if (error instanceof Error) {
-        console.error('Profile fetch - Error details:', {
+        logProfile('Profile fetch - Error details:', {
           message: error.message,
           name: error.name,
           stack: error.stack
@@ -79,18 +82,18 @@ export const Profile = () => {
     if (!currentUser) return;
 
     try {
-      console.log('Profile update - Attempting to fetch current user document for uid:', currentUser.uid);
+      logProfile('Attempting to fetch current user document for uid:', currentUser.uid);
       const users = await getCachedCollection<UserProfile>('users', [
         where('uid', '==', currentUser.uid)
       ], { userId: currentUser.uid });
       
       if (!users || users.length === 0) {
-        console.error('Profile update - User document not found for uid:', currentUser.uid);
+        logProfile('Profile update - User document not found for uid:', currentUser.uid);
         throw new Error('User document not found');
       }
 
       const userDoc = users[0];
-      console.log('Profile update - Current document data:', userDoc);
+      logProfile('Profile update - Current document data:', userDoc);
       
       // Only include fields that have actually changed and have valid values
       const updates: { name?: string; language?: Language } = {};
@@ -102,36 +105,36 @@ export const Profile = () => {
         updates.language = selectedLanguage;
       }
 
-      console.log('Profile update - Current user:', currentUser.uid);
-      console.log('Profile update - Updates to apply:', updates);
-      console.log('Profile update - Fields being updated:', Object.keys(updates));
+      logProfile('Profile update - Current user:', currentUser.uid);
+      logProfile('Profile update - Updates to apply:', updates);
+      logProfile('Profile update - Fields being updated:', Object.keys(updates));
 
       if (Object.keys(updates).length === 0) {
-        console.log('Profile update - No changes detected or no valid values to update, skipping update');
+        logProfile('Profile update - No changes detected or no valid values to update, skipping update');
         setSuccess(t.profileUpdated);
         setEditing(false);
         return;
       }
 
-      console.log('Profile update - Attempting to update document');
+      logProfile('Profile update - Attempting to update document');
       try {
         await updateCachedDocument('users', userDoc.id, updates, { userId: currentUser.uid });
-        console.log('Profile update - Document updated successfully');
+        logProfile('Profile update - Document updated successfully');
         
         if (selectedLanguage !== userDoc.language) {
-          console.log('Profile update - Attempting to update language context');
+          logProfile('Profile update - Attempting to update language context');
           await setLanguage(selectedLanguage);
-          console.log('Profile update - Language context updated successfully');
+          logProfile('Profile update - Language context updated successfully');
         }
       } catch (docError) {
-        console.error('Profile update - Document update error:', docError);
+        logProfile('Profile update - Document update error:', docError);
         if (docError instanceof Error) {
-          console.error('Profile update - Error details:', {
+          logProfile('Profile update - Error details:', {
             message: docError.message,
             name: docError.name,
             stack: docError.stack
           });
-          console.error('Profile update - Update operation details:', {
+          logProfile('Profile update - Update operation details:', {
             documentId: currentUser.uid,
             currentData: userDoc,
             attemptedUpdates: updates,
@@ -156,9 +159,9 @@ export const Profile = () => {
       setConfirmPassword('');
       setSuccess(t.profileUpdated);
     } catch (error) {
-      console.error('Profile update - Error:', error);
+      logProfile('Profile update - Error:', error);
       if (error instanceof Error) {
-        console.error('Profile update - Error details:', {
+        logProfile('Profile update - Error details:', {
           message: error.message,
           name: error.name,
           stack: error.stack

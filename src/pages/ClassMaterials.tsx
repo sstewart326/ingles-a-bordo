@@ -40,6 +40,12 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+const logMaterials = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[MATERIALS] ${message}`, data ? data : '');
+  }
+};
+
 export const ClassMaterials = () => {
   const { currentUser } = useAuth();
   const { language } = useLanguage();
@@ -75,30 +81,33 @@ export const ClassMaterials = () => {
         
         setExistingMaterials(sortedMaterials);
         
-        // Fetch class info for all materials
-        const classIds = [...new Set(fetchedMaterials.map(m => m.classId))];
-        const classInfoMap: Record<string, Class> = {};
-        
-        for (const classId of classIds) {
-          const classData = await getCachedDocument<Class>('classes', classId, { userId: currentUser.uid });
-          if (classData) {
-            classInfoMap[classId] = {
-              ...classData,
-              id: classId
-            };
-          }
-        }
-        
-        setClassesInfo(classInfoMap);
-        
-        // Set initial selection to most recent material
         if (sortedMaterials.length > 0) {
+          // Fetch class info for all materials
+          const classIds = [...new Set(fetchedMaterials.map(m => m.classId))];
+          const classInfoMap: Record<string, Class> = {};
+          
+          for (const classId of classIds) {
+            const classData = await getCachedDocument<Class>('classes', classId, { userId: currentUser.uid });
+            if (classData) {
+              classInfoMap[classId] = {
+                ...classData,
+                id: classId
+              };
+            }
+          }
+          
+          setClassesInfo(classInfoMap);
+          
+          // Set initial selection to most recent material
           setSelectedMaterial(sortedMaterials[0]);
         }
       } catch (error) {
         console.error('Error fetching materials:', error);
-        setError(t.failedToLoad);
-        toast.error(t.failedToLoad);
+        // Only set error if it's not a "no materials" case
+        if (error instanceof Error && !error.message.includes('permission')) {
+          setError(t.failedToLoad);
+          toast.error(t.failedToLoad);
+        }
       } finally {
         setLoading(false);
       }
@@ -167,9 +176,8 @@ export const ClassMaterials = () => {
 
       setLoadingSlides(true);
       try {
-        // Log relevant information for debugging
-        console.log('Current user email:', currentUser.email);
-        console.log('Selected material:', selectedMaterial);
+        logMaterials('Current user email:', currentUser.email);
+        logMaterials('Selected material:', selectedMaterial);
         
         // The slides field already contains the full download URL
         setSlidesUrl(selectedMaterial.slides);

@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "ingles-a-bordo"
-  }
+  },
+  "targets": {
+    "ingles-a-bordo": {
+      "hosting": {
+        "app-inglesabordo-com": [
+          "app-inglesabordo-com"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

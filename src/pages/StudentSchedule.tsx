@@ -25,6 +25,12 @@ interface Class {
 const COURSE_TYPES = ['Individual', 'Pair', 'Group'];
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+const logSchedule = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[STUDENT-SCHEDULE] ${message}`, data ? data : '');
+  }
+};
+
 export const StudentSchedule = () => {
   const { currentUser } = useAuth();
   const [students, setStudents] = useState<User[]>([]);
@@ -58,10 +64,10 @@ export const StudentSchedule = () => {
 
   const fetchClasses = useCallback(async () => {
     try {
-      console.log('Fetching classes...');
+      logSchedule('Fetching classes...');
       const classesRef = collection(db, 'classes');
       const snapshot = await getDocs(classesRef);
-      console.log('Classes snapshot received:', {
+      logSchedule('Classes snapshot received:', {
         count: snapshot.size,
         docs: snapshot.docs.map(doc => ({
           id: doc.id,
@@ -80,7 +86,7 @@ export const StudentSchedule = () => {
         };
       }) as Class[];
       
-      console.log('Processed classes:', {
+      logSchedule('Processed classes:', {
         count: fetchedClasses.length,
         classes: fetchedClasses.map(c => ({
           id: c.id,

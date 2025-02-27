@@ -43,7 +43,7 @@ const REGION = 'us-central1';
 export const deleteAuthUser = onCall({
   enforceAppCheck: false,
   region: REGION,
-  cors: ["ingles-a-bordo.firebaseapp.com", "ingles-a-bordo.web.app", "localhost", "http://localhost:5173"],
+  cors: ["ingles-a-bordo.firebaseapp.com", "ingles-a-bordo.web.app", "localhost", "http://localhost:5173", "https://app.inglesabordo.com"],
   maxInstances: 10
 }, async (request) => {
   logger.info("deleteAuthUser function called", { userId: request.data.userId });
@@ -58,10 +58,13 @@ export const deleteAuthUser = onCall({
 
   // Get the caller's UID and check if they are an admin
   const callerUid = request.auth.uid;
-  const callerRef = await admin.firestore().collection('users').doc(callerUid).get();
-  const callerData = callerRef.data();
+  const callerQuery = await admin.firestore().collection('users')
+    .where('uid', '==', callerUid)
+    .where('status', '==', 'active')
+    .limit(1)
+    .get();
 
-  if (!callerData?.isAdmin) {
+  if (callerQuery.empty || !callerQuery.docs[0].data()?.isAdmin) {
     throw new HttpsError(
       'permission-denied',
       'Only admin users can delete other users.'
@@ -101,7 +104,7 @@ export const deleteAuthUser = onCall({
 export const checkUserExists = onCall({
   enforceAppCheck: false,
   region: REGION,
-  cors: ["ingles-a-bordo.firebaseapp.com", "ingles-a-bordo.web.app", "localhost", "http://localhost:5173"],
+  cors: ["ingles-a-bordo.firebaseapp.com", "ingles-a-bordo.web.app", "localhost", "http://localhost:5173", "https://app.inglesabordo.com"],
   maxInstances: 10
 }, async (request) => {
   logger.info("checkUserExists function called", { userId: request.data.userId });
@@ -116,10 +119,13 @@ export const checkUserExists = onCall({
 
   // Get the caller's UID and check if they are an admin
   const callerUid = request.auth.uid;
-  const callerRef = await admin.firestore().collection('users').doc(callerUid).get();
-  const callerData = callerRef.data();
+  const callerQuery = await admin.firestore().collection('users')
+    .where('uid', '==', callerUid)
+    .where('status', '==', 'active')
+    .limit(1)
+    .get();
 
-  if (!callerData?.isAdmin) {
+  if (callerQuery.empty || !callerQuery.docs[0].data()?.isAdmin) {
     throw new HttpsError(
       'permission-denied',
       'Only admin users can check user existence.'

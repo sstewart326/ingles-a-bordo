@@ -1,7 +1,18 @@
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getCachedDocument, updateCachedDocument } from '../utils/firebaseUtils';
+
+interface UserProfile {
+  id: string;
+  name?: string;
+  email: string;
+  language?: Language;
+  status: string;
+  isAdmin: boolean;
+  updatedAt: string;
+}
 
 export type Language = 'en' | 'pt-BR';
 
@@ -17,84 +28,36 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
   const [language, setLanguageState] = useState<Language>('en');
 
   useEffect(() => {
-    const fetchLanguagePreference = async () => {
-      if (!currentUser) {
-        setLanguageState('en');
-        return;
-      }
+    const fetchUserLanguage = async () => {
+      if (!currentUser) return;
 
       try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('uid', '==', currentUser.uid));
-        const querySnapshot = await getDocs(q);
+        const userDoc = await getCachedDocument<UserProfile>('users', currentUser.uid, { userId: currentUser.uid });
         
-        if (!querySnapshot.empty) {
-          const userDoc = querySnapshot.docs[0];
-          if (userDoc.data().language) {
-            setLanguageState(userDoc.data().language as Language);
-          }
+        if (userDoc?.language) {
+          setLanguageState(userDoc.language);
         }
       } catch (error) {
-        console.error('Error fetching language preference:', error);
+        console.error('Error fetching user language:', error);
       }
     };
 
-    fetchLanguagePreference();
+    fetchUserLanguage();
   }, [currentUser]);
 
   const setLanguage = async (newLanguage: Language) => {
     if (!currentUser) return;
 
+    console.log('Language update - Current user:', currentUser.uid);
+    
     try {
-      console.log('Language update - Current user:', currentUser.uid);
-      console.log('Language update - New language:', newLanguage);
-
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('uid', '==', currentUser.uid));
-      console.log('Language update - Querying for user document');
-      
-      const querySnapshot = await getDocs(q);
-      console.log('Language update - Query results:', {
-        empty: querySnapshot.empty,
-        size: querySnapshot.size
-      });
-      
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        console.log('Language update - Found user document:', userDoc.id);
-        
-        try {
-          console.log('Language update - Attempting to update document');
-          await updateDoc(doc(db, 'users', userDoc.id), {
-            language: newLanguage
-          });
-          console.log('Language update - Document updated successfully');
-          setLanguageState(newLanguage);
-        } catch (docError) {
-          console.error('Language update - Document update error:', docError);
-          if (docError instanceof Error) {
-            console.error('Language update - Error details:', {
-              message: docError.message,
-              name: docError.name,
-              stack: docError.stack
-            });
-          }
-          throw docError;
-        }
-      } else {
-        console.error('Language update - No user document found');
-        throw new Error('User document not found');
-      }
+      await updateCachedDocument('users', currentUser.uid, 
+        { language: newLanguage, updatedAt: new Date().toISOString() },
+        { userId: currentUser.uid }
+      );
+      setLanguageState(newLanguage);
     } catch (error) {
-      console.error('Language update - Error:', error);
-      if (error instanceof Error) {
-        console.error('Language update - Error details:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
-        });
-      }
-      throw error;
+      console.error('Error updating user language:', error);
     }
   };
 

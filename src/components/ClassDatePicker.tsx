@@ -22,6 +22,8 @@ interface ClassInfo {
   endTime: string;
   studentEmails: string[];
   studentIds?: string[]; // Keep for backward compatibility
+  startDate: { toDate: () => Date }; // Firebase Timestamp
+  endDate?: { toDate: () => Date }; // Firebase Timestamp
 }
 
 interface ClassDatePickerProps {
@@ -29,6 +31,7 @@ interface ClassDatePickerProps {
   onDateSelect: (date: Date) => void;
   classInfo: ClassInfo;
   availableClasses?: ClassInfo[];
+  allowPastDates?: boolean;
 }
 
 export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
@@ -36,6 +39,7 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
   onDateSelect,
   classInfo,
   availableClasses = [],
+  allowPastDates = false,
 }) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -59,9 +63,42 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
   // Function to check if a date is a valid class day
   const isValidClassDay = (date: Date): boolean => {
     const hasClasses = availableClasses.length > 0 
-      ? availableClasses.some(c => c.dayOfWeek === date.getDay())
-      : classInfo.dayOfWeek === date.getDay();
-    return hasClasses && !isBefore(startOfDay(date), startOfDay(new Date()));
+      ? availableClasses.some(c => {
+          const classStartDate = c.startDate?.toDate();
+          const classEndDate = c.endDate?.toDate();
+          const dateToCheck = startOfDay(date);
+          
+          // Check if the date is on or after the class start date
+          if (classStartDate && dateToCheck < startOfDay(classStartDate)) {
+            return false;
+          }
+          
+          // Check if the date is before or on the class end date (if it exists)
+          if (classEndDate && dateToCheck > startOfDay(classEndDate)) {
+            return false;
+          }
+          
+          return c.dayOfWeek === date.getDay();
+        })
+      : (() => {
+          const classStartDate = classInfo.startDate?.toDate();
+          const classEndDate = classInfo.endDate?.toDate();
+          const dateToCheck = startOfDay(date);
+          
+          // Check if the date is on or after the class start date
+          if (classStartDate && dateToCheck < startOfDay(classStartDate)) {
+            return false;
+          }
+          
+          // Check if the date is before or on the class end date (if it exists)
+          if (classEndDate && dateToCheck > startOfDay(classEndDate)) {
+            return false;
+          }
+          
+          return classInfo.dayOfWeek === date.getDay();
+        })();
+
+    return hasClasses && (allowPastDates || !isBefore(startOfDay(date), startOfDay(new Date())));
   };
 
   // Function to get classes for a specific date
@@ -117,14 +154,14 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
           return (
             <div key={date.toISOString()} className="relative">
               <button
-                onClick={() => isClassDay && !isPast && onDateSelect(date)}
-                disabled={!isClassDay || isPast}
+                onClick={() => isClassDay && (allowPastDates || !isPast) && onDateSelect(date)}
+                disabled={!isClassDay || (!allowPastDates && isPast)}
                 type="button"
                 className={`
                   w-full aspect-square p-1
-                  ${!isClassDay || isPast ? 'cursor-not-allowed bg-gray-50 select-none' : 'cursor-pointer bg-white hover:bg-[var(--brand-color-light)] border-2 border-[var(--brand-color-dark)]'}
+                  ${!isClassDay || (!allowPastDates && isPast) ? 'cursor-not-allowed bg-gray-50 select-none' : 'cursor-pointer bg-white hover:bg-[var(--brand-color-light)] border-2 border-[var(--brand-color-dark)]'}
                   ${isSelected ? 'bg-[var(--brand-color-medium)] ring-2 ring-[var(--brand-color-dark)] border-0' : ''}
-                  ${isPast ? 'opacity-40' : ''}
+                  ${!allowPastDates && isPast ? 'opacity-40' : ''}
                   rounded-lg transition-colors
                 `}
               >
@@ -132,11 +169,11 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
                   className={`
                     w-full h-full flex flex-col items-center justify-center
                     ${isToday(date) ? 'font-bold' : ''}
-                    ${!isClassDay || isPast ? 'text-gray-400' : 'text-[var(--brand-color-dark)]'}
+                    ${!isClassDay || (!allowPastDates && isPast) ? 'text-gray-400' : 'text-[var(--brand-color-dark)]'}
                   `}
                 >
                   <span>{format(date, 'd')}</span>
-                  {isClassDay && !isPast && classesOnDay.length > 0 && (
+                  {isClassDay && (allowPastDates || !isPast) && classesOnDay.length > 0 && (
                     <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-1">
                       {classesOnDay.map((_, idx) => (
                         <div key={idx} className="w-1 h-1 rounded-full bg-[var(--brand-color)]" />
@@ -147,7 +184,7 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
               </button>
 
               {/* Tooltip for class info */}
-              {isClassDay && !isPast && (
+              {isClassDay && (allowPastDates || !isPast) && (
                 <div className="absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block">
                   <div className="bg-[var(--header-bg)] text-white text-xs rounded py-2 px-3 whitespace-nowrap">
                     <div className="font-medium mb-1">{format(date, 'MMM d, yyyy')}</div>

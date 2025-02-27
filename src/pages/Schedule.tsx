@@ -60,6 +60,12 @@ interface ClassMaterial {
   studentIds?: string[];
 }
 
+const logSchedule = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[SCHEDULE] ${message}`, data ? data : '');
+  }
+};
+
 export const Schedule = () => {
   const [classes, setClasses] = useState<ClassWithStudents[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +170,7 @@ export const Schedule = () => {
               });
           });
         } else {
-          console.log('No classes found for the current user');
+          logSchedule('No classes found for the current user');
         }
         
         setClasses(classesData);

@@ -20,6 +20,12 @@ const generateToken = () => {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
+const logSignup = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[SIGNUP] ${message}`, data ? data : '');
+  }
+};
+
 // Create a signup link for a student
 export const createSignupLink = async (studentEmail: string, studentName: string): Promise<string> => {
   // Check for existing valid tokens first
@@ -56,37 +62,37 @@ export const createSignupLink = async (studentEmail: string, studentName: string
 // Validate a signup token
 export const validateSignupToken = async (token?: string): Promise<ValidationResult> => {
   if (!token) {
-    console.log('No token provided for validation');
+    logSignup('No token provided for validation');
     return { valid: false };
   }
 
   try {
     const tokenDoc = await getDoc(doc(db, 'signupTokens', token));
-    console.log('Token document exists:', tokenDoc.exists());
+    logSignup('Token document exists:', tokenDoc.exists());
     
     if (!tokenDoc.exists()) {
-      console.log('Token document does not exist');
+      logSignup('Token document does not exist');
       return { valid: false };
     }
     
     const data = tokenDoc.data();
-    console.log('Token document data:', data);
+    logSignup('Token document data:', data);
     
     if (data.used) {
-      console.log('Token is already used');
+      logSignup('Token is already used');
       return { valid: false };
     }
 
     const now = new Date();
     const tokenExpiry = new Date(data.expiresAt);
-    console.log('Token expiry check:', {
+    logSignup('Token expiry check:', {
       now: now.toISOString(),
       expiresAt: data.expiresAt,
       isExpired: tokenExpiry < now
     });
     
     if (tokenExpiry < now) {
-      console.log('Token has expired');
+      logSignup('Token has expired');
       return { valid: false };
     }
 
@@ -97,9 +103,9 @@ export const validateSignupToken = async (token?: string): Promise<ValidationRes
       token 
     };
   } catch (error) {
-    console.error('Error in validateSignupToken:', error);
+    logSignup('Error in validateSignupToken:', error);
     if (error instanceof Error) {
-      console.error('Error details:', {
+      logSignup('Error details:', {
         message: error.message,
         stack: error.stack,
         name: error.name

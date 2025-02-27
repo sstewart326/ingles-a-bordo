@@ -17,6 +17,8 @@ interface Class {
   notes?: string;
   studentEmails: string[];
   studentIds?: string[]; // Keep for backward compatibility
+  startDate: { toDate: () => Date }; // Required Firebase Timestamp
+  endDate?: { toDate: () => Date }; // Optional Firebase Timestamp
 }
 
 interface ClassMaterial {
@@ -366,8 +368,17 @@ const AdminMaterials = () => {
             <ClassDatePicker
               selectedDate={selectedDate}
               onDateSelect={handleDateSelect}
-              classInfo={selectedClass || { id: '', dayOfWeek: 0, startTime: '', endTime: '', studentEmails: [] }}
+              classInfo={selectedClass || { 
+                id: '', 
+                dayOfWeek: 0, 
+                startTime: '', 
+                endTime: '', 
+                studentEmails: [],
+                courseType: '',
+                startDate: { toDate: () => new Date() }
+              }}
               availableClasses={classes}
+              allowPastDates={true}
             />
           </div>
         </div>

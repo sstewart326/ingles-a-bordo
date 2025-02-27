@@ -78,12 +78,18 @@ export const AdminSchedule = () => {
   });
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAllUsers();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const loadData = async () => {
       setLoading(true);
       try {
-        // First fetch users
         await fetchAllUsers();
-        // Then fetch classes
         await fetchClasses();
       } catch (error) {
         console.error('Error loading data:', error);
@@ -94,6 +100,10 @@ export const AdminSchedule = () => {
     };
     
     loadData();
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const fetchClasses = async () => {
@@ -355,7 +365,13 @@ export const AdminSchedule = () => {
           <h1 className="text-2xl font-bold text-black">Manage Classes</h1>
           <div className="relative">
             <button
-              onClick={() => setShowAddForm(!showAddForm)}
+              onClick={async () => {
+                setShowAddForm(!showAddForm);
+                if (!showAddForm) {
+                  // If we're opening the form, refresh the users list
+                  await fetchAllUsers();
+                }
+              }}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Add New Class
