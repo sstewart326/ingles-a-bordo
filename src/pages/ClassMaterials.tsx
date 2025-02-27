@@ -74,20 +74,34 @@ export const ClassMaterials = () => {
         setLoading(true);
         const fetchedMaterials = await getStudentClassMaterials(currentUser.email);
         
+        console.log('Fetched materials:', fetchedMaterials);
+        
         // Sort materials by date (most recent first)
         const sortedMaterials = fetchedMaterials.sort((a, b) => 
           b.classDate.getTime() - a.classDate.getTime()
         );
         
+        console.log('Sorted materials:', sortedMaterials);
+        
         setExistingMaterials(sortedMaterials);
         
         if (sortedMaterials.length > 0) {
+          // Set initial month/year to match the most recent material
+          const mostRecentDate = sortedMaterials[0].classDate;
+          setSelectedMonthYear({
+            month: mostRecentDate.getMonth(),
+            year: mostRecentDate.getFullYear()
+          });
+
           // Fetch class info for all materials
           const classIds = [...new Set(fetchedMaterials.map(m => m.classId))];
+          console.log('Class IDs to fetch:', classIds);
+          
           const classInfoMap: Record<string, Class> = {};
           
           for (const classId of classIds) {
             const classData = await getCachedDocument<Class>('classes', classId, { userId: currentUser.uid });
+            console.log('Class data for', classId, ':', classData);
             if (classData) {
               classInfoMap[classId] = {
                 ...classData,
@@ -96,6 +110,7 @@ export const ClassMaterials = () => {
             }
           }
           
+          console.log('Final class info map:', classInfoMap);
           setClassesInfo(classInfoMap);
           
           // Set initial selection to most recent material
@@ -118,12 +133,13 @@ export const ClassMaterials = () => {
 
   // Get unique month/year combinations from materials
   const availableMonths = React.useMemo(() => {
+    console.log('Calculating available months from materials:', existingMaterials);
     const months = new Set<string>();
     existingMaterials.forEach(material => {
       const date = material.classDate;
       months.add(`${date.getFullYear()}-${date.getMonth()}`);
     });
-    return Array.from(months)
+    const result = Array.from(months)
       .map(monthStr => {
         const [year, month] = monthStr.split('-').map(Number);
         return { month, year };
@@ -132,15 +148,20 @@ export const ClassMaterials = () => {
         if (a.year !== b.year) return b.year - a.year;
         return b.month - a.month;
       });
+    console.log('Available months:', result);
+    return result;
   }, [existingMaterials]);
 
   // Filter materials by selected month
   const filteredMaterials = React.useMemo(() => {
-    return existingMaterials.filter(material => {
+    console.log('Filtering materials for month/year:', selectedMonthYear);
+    const filtered = existingMaterials.filter(material => {
       const date = material.classDate;
       return date.getMonth() === selectedMonthYear.month && 
              date.getFullYear() === selectedMonthYear.year;
     }).sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
+    console.log('Filtered materials:', filtered);
+    return filtered;
   }, [existingMaterials, selectedMonthYear]);
 
   // Handle month selection

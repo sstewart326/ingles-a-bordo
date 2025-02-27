@@ -51,13 +51,10 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
     console.log('Language update - Current user:', currentUser.uid);
     
     try {
-      await updateCachedDocument('users', currentUser.uid, 
-        { language: newLanguage, updatedAt: new Date().toISOString() },
-        { userId: currentUser.uid }
-      );
+      // Only update the state, document updates are handled by the Profile component
       setLanguageState(newLanguage);
     } catch (error) {
-      console.error('Error updating user language:', error);
+      console.error('Error updating language state:', error);
     }
   };
 

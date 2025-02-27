@@ -38,23 +38,42 @@ export const Profile = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(language);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [updateSuccessful, setUpdateSuccessful] = useState(false);
 
   const fetchProfile = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      logProfile('No current user found, returning early');
+      return;
+    }
 
     try {
-      logProfile('Attempting to fetch user document for uid:', currentUser.uid);
-      const userDoc = await getCachedDocument<UserProfile>('users', currentUser.uid, { userId: currentUser.uid });
+      logProfile('Attempting to fetch user documents for uid:', currentUser.uid);
+      const users = await getCachedCollection<UserProfile>('users', [
+        where('uid', '==', currentUser.uid)
+      ], { userId: currentUser.uid });
       
-      if (!userDoc) {
-        logProfile('Profile fetch - User document not found for id:', currentUser.uid);
+      if (!users || users.length === 0) {
+        logProfile('No user document found for uid:', currentUser.uid);
         throw new Error('User document not found');
       }
 
-      logProfile('Profile fetch - Successfully retrieved user document:', userDoc);
+      const userDoc = users[0];
+      logProfile('Found user document:', {
+        id: userDoc.id,
+        name: userDoc.name,
+        email: userDoc.email,
+        language: userDoc.language
+      });
+      
       setProfile(userDoc);
       setName(userDoc.name || '');
       setSelectedLanguage(userDoc.language || 'en');
+      
+      logProfile('State updated with profile data:', {
+        profileSet: !!userDoc,
+        nameSet: userDoc.name || '',
+        languageSet: userDoc.language || 'en'
+      });
       
       setLoading(false);
     } catch (error) {
@@ -74,10 +93,19 @@ export const Profile = () => {
     fetchProfile();
   }, [fetchProfile]);
 
+  // Add new useEffect to handle success message after language updates
+  useEffect(() => {
+    if (updateSuccessful) {
+      setSuccess(t.profileUpdated);
+      setUpdateSuccessful(false);
+    }
+  }, [language, t, updateSuccessful]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setUpdateSuccessful(false);
 
     if (!currentUser) return;
 
@@ -111,13 +139,14 @@ export const Profile = () => {
 
       if (Object.keys(updates).length === 0) {
         logProfile('Profile update - No changes detected or no valid values to update, skipping update');
-        setSuccess(t.profileUpdated);
+        setUpdateSuccessful(true);
         setEditing(false);
         return;
       }
 
       logProfile('Profile update - Attempting to update document');
       try {
+        // Always update using the document ID from the query result
         await updateCachedDocument('users', userDoc.id, updates, { userId: currentUser.uid });
         logProfile('Profile update - Document updated successfully');
         
@@ -126,6 +155,20 @@ export const Profile = () => {
           await setLanguage(selectedLanguage);
           logProfile('Profile update - Language context updated successfully');
         }
+
+        if (newPassword) {
+          if (newPassword !== confirmPassword) {
+            setError(t.error);
+            return;
+          }
+          await updatePassword(currentUser, newPassword);
+        }
+
+        await fetchProfile();
+        setEditing(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        setUpdateSuccessful(true);
       } catch (docError) {
         logProfile('Profile update - Document update error:', docError);
         if (docError instanceof Error) {
@@ -135,7 +178,7 @@ export const Profile = () => {
             stack: docError.stack
           });
           logProfile('Profile update - Update operation details:', {
-            documentId: currentUser.uid,
+            documentId: userDoc.id,  // Log the actual document ID being used
             currentData: userDoc,
             attemptedUpdates: updates,
             userId: currentUser.uid,
@@ -144,20 +187,6 @@ export const Profile = () => {
         }
         throw docError;
       }
-
-      if (newPassword) {
-        if (newPassword !== confirmPassword) {
-          setError(t.error);
-          return;
-        }
-        await updatePassword(currentUser, newPassword);
-      }
-
-      await fetchProfile();
-      setEditing(false);
-      setNewPassword('');
-      setConfirmPassword('');
-      setSuccess(t.profileUpdated);
     } catch (error) {
       logProfile('Profile update - Error:', error);
       if (error instanceof Error) {

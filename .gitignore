@@ -25,6 +25,7 @@ storage.rules
 firestore-debug.log
 functions/firebase-data/
 functions/firestore-debug.log
+functions/firebase-debug.log
 
 # Logs
 npm-debug.log*
