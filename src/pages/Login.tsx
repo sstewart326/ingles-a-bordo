@@ -100,8 +100,22 @@ export const Login = () => {
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full card space-y-8">
+    <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 min-h-screen bg-gradient-to-b from-sky-100 to-white relative overflow-hidden">
+      {/* Decorative airplane elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute right-0 top-20 transform rotate-45 opacity-10">
+          <svg width="400" height="400" viewBox="0 0 24 24" fill="currentColor" className="text-sky-600">
+            <path d="M22,16v-2l-8.5-5V3.5C13.5,2.67,12.83,2,12,2s-1.5,0.67-1.5,1.5V9L2,14v2l8.5-2.5V19L8,20.5L8,22l4-1l4,1l0-1.5L13.5,19 v-5.5L22,16z"/>
+          </svg>
+        </div>
+        <div className="absolute left-0 bottom-20 transform -rotate-12 opacity-10">
+          <svg width="300" height="300" viewBox="0 0 24 24" fill="currentColor" className="text-sky-600">
+            <path d="M22,16v-2l-8.5-5V3.5C13.5,2.67,12.83,2,12,2s-1.5,0.67-1.5,1.5V9L2,14v2l8.5-2.5V19L8,20.5L8,22l4-1l4,1l0-1.5L13.5,19 v-5.5L22,16z"/>
+          </svg>
+        </div>
+      </div>
+      
+      <div className="max-w-md w-full card space-y-8 bg-white/95 backdrop-blur-sm shadow-xl rounded-xl p-8 relative z-10">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold section-title">
             Sign in to your account
@@ -187,7 +201,7 @@ export const Login = () => {
         </form>
         <div className="text-sm text-center">
           <Link to="/signup" className="link !text-gray-700">
-            Don't have an account? Sign up
+            Don't have an account? Contact cursoinglesabordo@gmail.com
           </Link>
         </div>
       </div>
