@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { Language } from '../contexts/LanguageContext';
-import { getCachedCollection, updateCachedDocument, getCachedDocument } from '../utils/firebaseUtils';
+import { getCachedCollection, updateCachedDocument } from '../utils/firebaseUtils';
 import { where } from 'firebase/firestore';
 
 interface UserProfile {

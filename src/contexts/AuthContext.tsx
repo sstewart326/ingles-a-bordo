@@ -39,33 +39,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [redirectProcessed, setRedirectProcessed] = useState(false);
+  const [redirectProcessed] = useState(false);
   const [isProcessingAuth, setIsProcessingAuth] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const clearAuthError = () => setAuthError(null);
-
-  // Helper function to clean up stored data and handle failure
-  const handleFailure = (token: string | null, error: string) => {
-    logAuth('REDIRECT', 'Handling failure:', { error });
-    cleanupStoredData();
-    if (token) {
-      navigate(`/signup?token=${token}&error=${error}`);
-    }
-  };
-
-  // Helper function to clean up stored data
-  const cleanupStoredData = () => {
-    logAuth('REDIRECT', 'Cleaning up stored data');
-    localStorage.removeItem('pendingSignupToken');
-    localStorage.removeItem('pendingSignupValidation');
-    localStorage.removeItem('auth_debug_id');
-    localStorage.removeItem('auth_debug_start');
-    localStorage.removeItem('auth_debug_stored');
-    localStorage.removeItem('auth_debug_redirect_start');
-    localStorage.removeItem('auth_debug_error');
-  };
 
   useEffect(() => {
     let mounted = true;
@@ -89,6 +68,117 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 path: location.pathname,
                 email: user.email
               });
+
+              // Check for pending signup data from Google sign-in
+              const pendingToken = localStorage.getItem('pendingSignupToken');
+              const pendingValidationStr = localStorage.getItem('pendingSignupValidation');
+              
+              if (pendingToken && pendingValidationStr) {
+                try {
+                  logAuth('FLOW', 'Found pending signup data, processing...');
+                  const pendingValidation = JSON.parse(pendingValidationStr);
+                  
+                  // Verify the Google account email matches the invitation
+                  if (user.email !== pendingValidation.email) {
+                    logAuth('FLOW', 'Email mismatch:', {
+                      google: user.email,
+                      invitation: pendingValidation.email
+                    });
+                    await signOut(auth);
+                    navigate('/signup?token=' + pendingToken + '&error=email_mismatch');
+                    return;
+                  }
+
+                  // Find the pending user document
+                  const usersRef = collection(db, 'users');
+                  const q = query(usersRef, where('email', '==', user.email), where('status', '==', 'pending'));
+                  const querySnapshot = await getDocs(q);
+
+                  if (querySnapshot.empty) {
+                    logAuth('FLOW', 'No pending user found for email:', user.email);
+                    await signOut(auth);
+                    navigate('/signup?token=' + pendingToken + '&error=no_invitation');
+                    return;
+                  }
+
+                  const pendingUserDoc = querySnapshot.docs[0];
+                  const currentData = pendingUserDoc.data();
+
+                  try {
+                    // For admin users, create new document with auth UID and delete pending
+                    if (currentData.isAdmin) {
+                      const newUserData = {
+                        uid: user.uid,
+                        email: currentData.email,
+                        name: currentData.name,
+                        isAdmin: currentData.isAdmin,
+                        status: 'active',
+                        createdAt: currentData.createdAt,
+                        updatedAt: new Date().toISOString()
+                      };
+
+                      logAuth('FLOW', 'Creating new admin document:', {
+                        id: user.uid,
+                        data: newUserData
+                      });
+
+                      // Create new document with auth UID
+                      await setCachedDocument('users', user.uid, newUserData);
+                      
+                      // Delete the pending document
+                      await deleteCachedDocument('users', pendingUserDoc.id);
+                      
+                      logAuth('FLOW', 'Admin user document created successfully');
+                    } else {
+                      // For non-admin users, update the pending document
+                      const newUserData = {
+                        uid: user.uid,
+                        email: currentData.email,
+                        name: currentData.name,
+                        isAdmin: currentData.isAdmin,
+                        status: 'active',
+                        createdAt: currentData.createdAt,
+                        updatedAt: new Date().toISOString()
+                      };
+
+                      logAuth('FLOW', 'Updating user document:', {
+                        id: pendingUserDoc.id,
+                        data: newUserData
+                      });
+
+                      // Update the pending document to active
+                      await updateCachedDocument('users', pendingUserDoc.id, newUserData);
+                      logAuth('FLOW', 'User document updated successfully');
+                    }
+
+                    // Mark the signup token as used
+                    logAuth('FLOW', 'Marking signup token as used:', pendingToken);
+                    await updateDoc(doc(db, 'signupTokens', pendingToken), {
+                      used: true,
+                      updatedAt: new Date().toISOString()
+                    });
+                    logAuth('FLOW', 'Signup token marked as used');
+
+                    // Clear the pending signup data
+                    localStorage.removeItem('pendingSignupToken');
+                    localStorage.removeItem('pendingSignupValidation');
+
+                    // Navigate to dashboard
+                    navigate('/dashboard');
+                    return;
+                  } catch (error) {
+                    logAuth('FLOW', 'Error updating user document:', error);
+                    await signOut(auth);
+                    navigate('/signup?token=' + pendingToken + '&error=signup_failed');
+                    return;
+                  }
+                } catch (error) {
+                  logAuth('FLOW', 'Error processing signup:', error);
+                  await signOut(auth);
+                  navigate('/signup?token=' + pendingToken + '&error=auth_failed');
+                  return;
+                }
+              }
               
               if ((location.pathname === '/login' || location.pathname === '/') && !redirectProcessed) {
                 logAuth('FLOW', 'On login page, checking user status');

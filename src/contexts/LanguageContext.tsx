@@ -1,8 +1,6 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { getCachedDocument, updateCachedDocument } from '../utils/firebaseUtils';
+import { getCachedDocument } from '../utils/firebaseUtils';
 
 interface UserProfile {
   id: string;
