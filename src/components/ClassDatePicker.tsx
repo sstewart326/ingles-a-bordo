@@ -115,18 +115,18 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => setCurrentMonth(prev => subMonths(prev, 1))}
-          className="p-2 hover:bg-[var(--brand-color-light)] rounded-full transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--brand-color)] hover:bg-[var(--brand-color-dark)] text-[var(--header-bg)] transition-colors text-xl"
         >
-          <FaChevronLeft className="w-4 h-4 text-[var(--brand-color-dark)]" />
+          ‹
         </button>
         <h2 className="text-lg font-semibold text-black">
           {format(currentMonth, 'MMMM yyyy')}
         </h2>
         <button
           onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}
-          className="p-2 hover:bg-[var(--brand-color-light)] rounded-full transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--brand-color)] hover:bg-[var(--brand-color-dark)] text-[var(--header-bg)] transition-colors text-xl"
         >
-          <FaChevronRight className="w-4 h-4 text-[var(--brand-color-dark)]" />
+          ›
         </button>
       </div>
 
