@@ -1,62 +1,105 @@
-# Inglés a Bordo
+# Inglés a Bordo 🚀
 
-A React-based web application built with TypeScript and Vite, designed to help users learn English. The app features a modern UI using Tailwind CSS and includes authentication powered by Firebase.
+A modern web application built with React and Firebase for managing learning resources and scheduling.
 
-## Prerequisites
+## 🌟 Features
 
-- Node.js (v18 or higher recommended)
-- npm or yarn package manager
+- User authentication and authorization
+- Real-time data synchronization with Firebase
+- Responsive design using Tailwind CSS
+- Multi-language support
+- Course management system
+- Scheduling and booking system
+- Modern and intuitive user interface
 
-## Getting Started
+## 🛠️ Tech Stack
 
-1. Clone the repository
-2. Install dependencies:
-```bash
-npm install
+- **Frontend Framework**: React 19
+- **Type Safety**: TypeScript
+- **Styling**: Tailwind CSS
+- **Backend/Database**: Firebase
+  - Firestore
+  - Firebase Authentication
+  - Firebase Storage
+  - Firebase Functions
+- **State Management**: React Query (TanStack Query)
+- **Routing**: React Router v7
+- **Development Tools**:
+  - Vite
+  - ESLint
+  - PostCSS
+  - TypeScript
+
+## 📦 Prerequisites
+
+- Node.js (LTS version recommended)
+- npm or yarn
+- Firebase account and project setup
+
+## 🚀 Getting Started
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/ingles-a-bordo.git
+   cd ingles-a-bordo
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**
+   - Copy `.env.example` to `.env.local`
+   - Fill in your Firebase configuration details
+
+4. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+## 🔧 Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run lint` - Run ESLint
+- `npm run preview` - Preview production build
+
+## 📁 Project Structure
+
+```
+ingles-a-bordo/
+├── src/
+│   ├── assets/        # Static assets
+│   ├── components/    # Reusable components
+│   ├── config/        # Configuration files
+│   ├── contexts/      # React contexts
+│   ├── hooks/         # Custom React hooks
+│   ├── pages/         # Page components
+│   ├── translations/  # i18n translations
+│   └── utils/         # Utility functions
+├── public/            # Public assets
+├── functions/         # Firebase Cloud Functions
+└── firebase-data/     # Firebase related data
 ```
 
-## Available Scripts
+## 🔒 Environment Variables
 
-- `npm run dev` - Starts the development server with hot-reload at localhost:5173
-- `npm run build` - Builds the app for production
-- `npm run lint` - Runs ESLint to check code quality
-- `npm run preview` - Preview the production build locally
-
-## Project Structure
+Required environment variables:
 
 ```
-src/
-├── assets/      # Static assets like images
-├── components/  # Reusable UI components
-├── config/      # Configuration files
-├── contexts/    # React context providers
-├── pages/       # Application pages/routes
-└── App.tsx      # Main application component
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
 ```
 
-## Features
+## 📄 License
 
-- React 19 with TypeScript for type-safe development
-- Vite for fast development and building
-- Tailwind CSS for styling
-- Firebase integration
-- React Router for navigation
-- Responsive design with Headless UI components
+This project is licensed under the terms of the license included in the repository.
 
-## Navigation
+## 🤝 Contributing
 
-The app uses React Router for navigation between pages. Main routes include:
-- `/` - Home page
-- `/profile` - User profile page
-
-## Development
-
-The app uses several modern development tools:
-- TypeScript for type checking
-- ESLint for code linting
-- Tailwind CSS for styling
-- Vite for development and building
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Contributions are welcome! Please feel free to submit a Pull Request.
