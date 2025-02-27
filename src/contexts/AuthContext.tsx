@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   const pendingValidation = JSON.parse(pendingValidationStr);
                   
                   // Verify the Google account email matches the invitation
-                  if (user.email !== pendingValidation.email) {
+                  if (user.email?.toLowerCase() !== pendingValidation.email.toLowerCase()) {
                     logAuth('FLOW', 'Email mismatch:', {
                       google: user.email,
                       invitation: pendingValidation.email
