@@ -56,6 +56,16 @@ const generateTimeOptions = () => {
   return times;
 };
 
+const getNextDayOccurrence = (dayOfWeek: number) => {
+  const today = new Date();
+  const resultDate = new Date();
+  const daysUntilNext = (dayOfWeek - today.getDay() + 7) % 7;
+  resultDate.setDate(today.getDate() + daysUntilNext);
+  // Reset time to start of day
+  resultDate.setHours(0, 0, 0, 0);
+  return resultDate;
+};
+
 const timeOptions = generateTimeOptions();
 
 export const AdminSchedule = () => {
@@ -73,7 +83,7 @@ export const AdminSchedule = () => {
     courseType: 'Individual',
     notes: '',
     studentEmails: [] as string[],
-    startDate: new Date(),
+    startDate: getNextDayOccurrence(1),
     endDate: null as Date | null
   });
 
@@ -164,7 +174,7 @@ export const AdminSchedule = () => {
         courseType: 'Individual',
         notes: '',
         studentEmails: [],
-        startDate: new Date(),
+        startDate: getNextDayOccurrence(1),
         endDate: null
       });
       toast.success('Class created successfully');
@@ -189,10 +199,12 @@ export const AdminSchedule = () => {
     }
   };
 
-  const studentOptions = users.map(user => ({
-    value: user.email,
-    label: `${user.name} ${user.status === 'pending' ? '(Pending)' : ''}`
-  }));
+  const studentOptions = users
+    .filter(user => !user.isAdmin) // Filter out admin users
+    .map(user => ({
+      value: user.email,
+      label: `${user.name} ${user.status === 'pending' ? '(Pending)' : ''}`
+    }));
 
   const customSelectStyles: SelectStyles = {
     control: (base, state) => ({
@@ -366,15 +378,36 @@ export const AdminSchedule = () => {
           <div className="relative">
             <button
               onClick={async () => {
-                setShowAddForm(!showAddForm);
                 if (!showAddForm) {
-                  // If we're opening the form, refresh the users list
+                  // If we're opening the form, refresh the users list and reset the form
                   await fetchAllUsers();
+                  setNewClass(prev => ({
+                    ...prev,
+                    dayOfWeek: 1,
+                    startTime: '09:00 AM',
+                    endTime: '10:00 AM',
+                    courseType: 'Individual',
+                    notes: '',
+                    studentEmails: [],
+                    startDate: getNextDayOccurrence(1),
+                    endDate: null
+                  }));
                 }
+                setShowAddForm(!showAddForm);
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className={`${
+                showAddForm 
+                  ? "bg-gray-200 hover:bg-gray-300 text-gray-800" 
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white"
+              } px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                showAddForm ? "focus:ring-gray-500" : "focus:ring-indigo-500"
+              }`}
             >
-              Add New Class
+              {showAddForm ? (
+                <span className="text-xl">&times;</span>
+              ) : (
+                "Add New Class"
+              )}
             </button>
           </div>
         </div>
@@ -388,7 +421,15 @@ export const AdminSchedule = () => {
                   <label className="block text-sm font-medium text-gray-700">Day of Week</label>
                   <select
                     value={newClass.dayOfWeek}
-                    onChange={(e) => setNewClass(prev => ({ ...prev, dayOfWeek: parseInt(e.target.value) }))}
+                    onChange={(e) => {
+                      const newDayOfWeek = parseInt(e.target.value);
+                      const nextOccurrence = getNextDayOccurrence(newDayOfWeek);
+                      setNewClass(prev => ({ 
+                        ...prev, 
+                        dayOfWeek: newDayOfWeek,
+                        startDate: nextOccurrence
+                      }));
+                    }}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   >
                     {DAYS_OF_WEEK.map((day, index) => (

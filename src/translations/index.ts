@@ -40,6 +40,10 @@ interface Translation {
   friday: string;
   saturday: string;
   class: string;
+  noClassesScheduled: string;
+  students: string;
+  pair: string;
+  group: string;
   
   // Schedule
   courseSchedule: string;
@@ -146,6 +150,10 @@ const translations: Record<Language, Translation> = {
     friday: 'Friday',
     saturday: 'Saturday',
     class: 'Class',
+    noClassesScheduled: 'No classes scheduled for this day',
+    students: 'Students',
+    pair: 'Pair Class',
+    group: 'Group Class',
     
     // Schedule
     courseSchedule: 'Course Schedule',
@@ -250,6 +258,10 @@ const translations: Record<Language, Translation> = {
     friday: 'Sexta',
     saturday: 'Sábado',
     class: 'Aula',
+    noClassesScheduled: 'Não há aulas agendadas para este dia',
+    students: 'Alunos',
+    pair: 'Aula em Par',
+    group: 'Aula em Grupo',
     
     // Schedule
     courseSchedule: 'Agenda de Aulas',

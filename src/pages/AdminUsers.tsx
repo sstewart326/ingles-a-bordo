@@ -89,19 +89,6 @@ export const AdminUsers = () => {
     fetchUsersData();
   }, [fetchUsers]);
 
-  const toggleAdmin = async (userId: string, currentStatus: boolean) => {
-    try {
-      await updateCachedDocument('users', userId, {
-        isAdmin: !currentStatus
-      });
-      await fetchUsers();
-      toast.success('User admin status updated');
-    } catch (error) {
-      console.error('Error updating user:', error);
-      toast.error('Failed to update user');
-    }
-  };
-
   const deleteUser = async (userId: string) => {
     // Security checks
     if (!currentUser || !isAdmin) {
@@ -506,16 +493,13 @@ export const AdminUsers = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {user.status === 'active' ? (
-                        <button
-                          onClick={() => toggleAdmin(user.id, user.isAdmin)}
-                          className={`px-4 py-1 text-sm rounded-full ${
-                            user.isAdmin
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
+                        <span className={`inline-flex items-center px-4 py-1 rounded-full text-sm font-medium ${
+                          user.isAdmin
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
                           {user.isAdmin ? 'Admin' : 'User'}
-                        </button>
+                        </span>
                       ) : (
                         <span className="inline-flex items-center px-4 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
                           Pending Signup
