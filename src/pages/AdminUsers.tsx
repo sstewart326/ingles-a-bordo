@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { doc, collection, where } from 'firebase/firestore';
 import { db, functions } from '../config/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { getAuth } from 'firebase/auth';
 import { createSignupLink } from '../utils/signupLinks';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
@@ -173,21 +173,34 @@ export const AdminUsers = () => {
       try {
         // Only attempt to delete from Firebase Auth if the user has a uid
         if (userToDelete.uid) {
-          // delete from Firebase Auth using our cloud function
-          const deleteAuthUserFunc = httpsCallable(functions, 'deleteAuthUser');
-          logAdmin('Attempting to delete user with auth ID:', userToDelete.uid);
-          try {
-            const result = await deleteAuthUserFunc({ userId: userToDelete.uid });
-            logAdmin('Delete auth user function result:', result);
-          } catch (authError: unknown) {
-            logAdmin('Error deleting auth user:', {
-              error: authError,
-              message: authError instanceof Error ? authError.message : 'Unknown error',
-              code: (authError as any)?.code,
-              details: (authError as any)?.details
-            });
-            throw authError; // Re-throw to be caught by outer catch
+          // Get the current user's ID token
+          const auth = getAuth();
+          const idToken = await auth.currentUser?.getIdToken();
+
+          if (!idToken) {
+            throw new Error('No ID token available');
           }
+
+          // Get the functions URL from the Firebase config
+          const functionUrl = `${functions.customDomain || `https://${functions.region}-${functions.app.options.projectId}.cloudfunctions.net`}/deleteAuthUserHttp`;
+          logAdmin('Attempting to delete user with auth ID:', userToDelete.uid);
+          
+          const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ userId: userToDelete.uid })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete user');
+          }
+
+          const result = await response.json();
+          logAdmin('Delete auth user function result:', result);
           logAdmin('Successfully called delete function');
         } else {
           logAdmin('No Firebase Auth user found - skipping auth deletion');
@@ -198,19 +211,9 @@ export const AdminUsers = () => {
       } catch (error: unknown) {
         logAdmin('Error in delete process:', {
           error,
-          message: error instanceof Error ? error.message : 'Unknown error',
-          code: (error as any)?.code,
-          details: (error as any)?.details
+          message: error instanceof Error ? error.message : 'Unknown error'
         });
-        // If there's an error deleting the auth user, we should still try to delete the Firestore document
-        try {
-          await deleteCachedDocument('users', userId);
-          logAdmin('Successfully deleted user document despite auth deletion error');
-        } catch (docError) {
-          logAdmin('Error deleting user document:', docError);
-          throw docError; // Re-throw if we can't even delete the document
-        }
-        throw error; // Re-throw the original error
+        throw error;
       }
 
       await fetchUsers();
