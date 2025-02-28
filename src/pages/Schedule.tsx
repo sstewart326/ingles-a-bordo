@@ -671,19 +671,19 @@ export const Schedule = () => {
                         </div>
 
                         <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2">
-                          <span className="text-sm font-medium text-[#6b7280]">{t.dayOfWeek}</span>
-                          <span className="text-sm">{DAYS_OF_WEEK_FULL[selectedDayDetails.date.getDay()]}</span>
+                          <span className="text-sm font-medium text-[#4b5563]">{t.dayOfWeek}</span>
+                          <span className="text-sm text-[#1a1a1a]">{DAYS_OF_WEEK_FULL[selectedDayDetails.date.getDay()]}</span>
                           
-                          <span className="text-sm font-medium text-[#6b7280]">{t.time}</span>
-                          <span className="text-sm">{classItem.startTime} - {classItem.endTime}</span>
+                          <span className="text-sm font-medium text-[#4b5563]">{t.time}</span>
+                          <span className="text-sm text-[#1a1a1a]">{classItem.startTime} - {classItem.endTime}</span>
 
-                          <span className="text-sm font-medium text-[#6b7280]">{t.class}</span>
-                          <span className="text-sm">{classItem.courseType || t.class}</span>
+                          <span className="text-sm font-medium text-[#4b5563]">{t.class}</span>
+                          <span className="text-sm text-[#1a1a1a]">{classItem.courseType || t.class}</span>
 
                           {classItem.notes && (
                             <>
-                              <span className="text-sm font-medium text-[#6b7280]">{t.notes}</span>
-                              <span className="text-sm">{classItem.notes}</span>
+                              <span className="text-sm font-medium text-[#4b5563]">{t.notes}</span>
+                              <span className="text-sm text-[#1a1a1a]">{classItem.notes}</span>
                             </>
                           )}
                         </div>
