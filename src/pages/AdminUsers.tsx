@@ -56,6 +56,7 @@ export const AdminUsers = () => {
   const [loading, setLoading] = useState(true);
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [newUser, setNewUser] = useState<NewUser>({ 
     email: '', 
     name: '',
@@ -404,30 +405,47 @@ export const AdminUsers = () => {
           <div className="relative">
             <button
               onClick={() => {
-                const form = document.getElementById('addUserForm');
-                if (form) {
-                  form.classList.toggle('hidden');
+                setShowAddForm(!showAddForm);
+                if (!showAddForm) {
+                  const form = document.getElementById('addUserForm');
+                  if (form) {
+                    form.classList.remove('hidden');
+                  }
+                } else {
+                  const form = document.getElementById('addUserForm');
+                  if (form) {
+                    form.classList.add('hidden');
+                  }
                 }
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className={`${
+                showAddForm 
+                  ? "bg-gray-200 hover:bg-gray-300 text-gray-800" 
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white"
+              } px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                showAddForm ? "focus:ring-gray-500" : "focus:ring-indigo-500"
+              }`}
             >
-              {t.addNewUser}
+              {showAddForm ? (
+                <span className="text-xl">&times;</span>
+              ) : (
+                t.addNewUser
+              )}
             </button>
             <div id="addUserForm" className="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg p-4 z-10 border border-gray-200">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">{t.addNewUser}</h2>
                 <button
                   onClick={() => {
+                    setShowAddForm(false);
                     const form = document.getElementById('addUserForm');
                     if (form) {
                       form.classList.add('hidden');
                     }
                   }}
-                  className="text-gray-400 hover:text-gray-500"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 w-8 h-8 rounded-md text-xl font-medium flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                 >
-                  <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
+                  &times;
                 </button>
               </div>
               <form onSubmit={handleNewUserSubmit} className="space-y-3">

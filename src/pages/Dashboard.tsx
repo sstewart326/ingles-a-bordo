@@ -1,29 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { where, Timestamp } from 'firebase/firestore';
+import { where } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { getCachedCollection } from '../utils/firebaseUtils';
 import { getDaysInMonth } from '../utils/dateUtils';
-
-interface ClassSession {
-  id: string;
-  date?: string;
-  title?: string;
-  description?: string;
-  studentEmails: string[];
-  studentIds?: string[]; // Keep for backward compatibility
-  dayOfWeek?: number;
-  startTime?: string;
-  endTime?: string;
-  courseType?: string;
-  notes?: string;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
-  endDate?: Timestamp;
-  startDate?: Timestamp;
-}
+import {
+  ClassSession,
+  User,
+  isClassPastToday,
+  isClassUpcoming,
+  sortClassesByTime
+} from '../utils/scheduleUtils';
 
 export const Dashboard = () => {
   const [upcomingClasses, setUpcomingClasses] = useState<ClassSession[]>([]);
@@ -31,8 +20,10 @@ export const Dashboard = () => {
   const [selectedDayDetails, setSelectedDayDetails] = useState<{
     date: Date;
     classes: ClassSession[];
+    paymentsDue: { user: User; classSession: ClassSession }[];
   } | null>(null);
   const [userNames, setUserNames] = useState<{[email: string]: string}>({});
+  const [users, setUsers] = useState<User[]>([]);
   const { currentUser } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { language } = useLanguage();
@@ -76,14 +67,16 @@ export const Dashboard = () => {
       });
 
       // Fetch user data for all students
-      const users = await getCachedCollection<{ email: string; name: string }>('users', [], { userId: currentUser.uid });
+      const fetchedUsers = await getCachedCollection<User>('users', [], { userId: currentUser.uid });
       const nameMap: {[email: string]: string} = {};
-      users.forEach(user => {
-        if (uniqueEmails.has(user.email)) {
-          nameMap[user.email] = user.name;
-        }
+      const relevantUsers = fetchedUsers.filter(user => uniqueEmails.has(user.email));
+      
+      relevantUsers.forEach(user => {
+        nameMap[user.email] = user.name;
       });
+      
       setUserNames(nameMap);
+      setUsers(relevantUsers);
 
       const now = new Date();
       const upcoming: ClassSession[] = [];
@@ -189,62 +182,6 @@ export const Dashboard = () => {
     };
   }, [hoverData]);
 
-  const isClassPastToday = (dayOfWeek: number, startTime?: string) => {
-    const now = new Date();
-    const currentDayOfWeek = now.getDay();
-    
-    // If it's not today, it's not past today
-    if (dayOfWeek !== currentDayOfWeek) {
-      return false;
-    }
-
-    // If it's today, check if the time has passed
-    if (startTime) {
-      const [hours, minutes] = startTime.split(':');
-      let hour = parseInt(hours);
-      if (startTime.toLowerCase().includes('pm') && hour !== 12) {
-        hour += 12;
-      } else if (startTime.toLowerCase().includes('am') && hour === 12) {
-        hour = 0;
-      }
-      
-      const classTime = new Date();
-      classTime.setHours(hour, parseInt(minutes), 0, 0);
-      
-      return now > classTime;
-    }
-    
-    return false;
-  };
-
-  const isClassUpcoming = (dayOfWeek: number, startTime?: string) => {
-    const now = new Date();
-    const currentDayOfWeek = now.getDay();
-    
-    // If the class is later this week
-    if (dayOfWeek > currentDayOfWeek) {
-      return true;
-    } 
-    // If it's today and hasn't started yet
-    else if (dayOfWeek === currentDayOfWeek && startTime) {
-      const [hours, minutes] = startTime.split(':');
-      let hour = parseInt(hours);
-      if (startTime.toLowerCase().includes('pm') && hour !== 12) {
-        hour += 12;
-      } else if (startTime.toLowerCase().includes('am') && hour === 12) {
-        hour = 0;
-      }
-      
-      const classTime = new Date();
-      classTime.setHours(hour, parseInt(minutes), 0, 0);
-      
-      return now < classTime;
-    }
-    // If it's earlier in the week or today but already passed,
-    // it's upcoming because it will happen next week
-    return true;
-  };
-
   const formatClassTime = (classSession: ClassSession) => {
     if (classSession.dayOfWeek !== undefined && classSession.startTime && classSession.endTime) {
       // Get timezone abbreviation
@@ -281,10 +218,110 @@ export const Dashboard = () => {
 
   const { days, firstDay } = getDaysInMonth(selectedDate);
 
-  const handleDayClick = (date: Date, classes: ClassSession[]) => {
+  const getNextPaymentDates = (paymentConfig: User['paymentConfig'], classSession: ClassSession) => {
+    console.log('Calculating payment dates:', {
+      paymentConfig,
+      classSession: {
+        id: classSession.id,
+        startDate: classSession.startDate?.toDate(),
+        endDate: classSession.endDate?.toDate()
+      }
+    });
+
+    if (!paymentConfig || !classSession.startDate) {
+      console.log('No payment config or start date, returning empty array');
+      return [];
+    }
+    
+    const dates: Date[] = [];
+    const startDate = classSession.startDate.toDate();
+    startDate.setHours(0, 0, 0, 0);
+    
+    // Parse the payment start date in local timezone
+    const paymentStartDate = paymentConfig.startDate ? 
+      new Date(paymentConfig.startDate.split('T')[0] + 'T00:00:00') : 
+      startDate;
+    
+    // Get the first and last day of the currently viewed month
+    const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+
+    console.log('Date ranges:', {
+      paymentStartDate: paymentStartDate.toISOString(),
+      monthStart: monthStart.toISOString(),
+      monthEnd: monthEnd.toISOString()
+    });
+    
+    // If class has ended, no payments
+    if (classSession.endDate) {
+      const endDate = classSession.endDate.toDate();
+      endDate.setHours(23, 59, 59, 999);
+      if (endDate < monthStart) {
+        console.log('Class has ended before month start, returning empty array');
+        return [];
+      }
+    }
+
+    if (paymentConfig.type === 'weekly') {
+      const interval = paymentConfig.weeklyInterval || 1;
+      let currentPaymentDate = new Date(paymentStartDate);
+      
+      console.log('Processing weekly payments:', {
+        interval,
+        startingFrom: currentPaymentDate.toISOString()
+      });
+
+      while (currentPaymentDate <= monthEnd) {
+        if (currentPaymentDate >= monthStart) {
+          dates.push(new Date(currentPaymentDate));
+          console.log('Added weekly payment date:', currentPaymentDate.toISOString());
+        }
+        currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * interval));
+      }
+    } else if (paymentConfig.type === 'monthly') {
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth();
+      
+      console.log('Processing monthly payment:', {
+        option: paymentConfig.monthlyOption,
+        year,
+        month
+      });
+
+      let paymentDate: Date;
+      switch (paymentConfig.monthlyOption) {
+        case 'first':
+          paymentDate = new Date(year, month, 1);
+          break;
+        case 'fifteen':
+          paymentDate = new Date(year, month, 15);
+          break;
+        case 'last':
+          paymentDate = new Date(year, month + 1, 0);
+          break;
+        default:
+          console.log('Invalid monthly option:', paymentConfig.monthlyOption);
+          return dates;
+      }
+      
+      if (paymentDate >= paymentStartDate && 
+          (!classSession.endDate || paymentDate <= classSession.endDate.toDate())) {
+        dates.push(paymentDate);
+        console.log('Added monthly payment date:', paymentDate.toISOString());
+      }
+    }
+    
+    console.log('Final payment dates:', dates.map(d => d.toISOString()));
+    return dates;
+  };
+
+  const handleDayClick = (date: Date, classes: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => {
     setSelectedDayDetails({
       date,
-      classes
+      classes,
+      paymentsDue
     });
   };
 
@@ -373,25 +410,6 @@ export const Dashboard = () => {
     </div>
   );
 
-  const sortClassesByTime = (classes: ClassSession[]) => {
-    return [...classes].sort((a, b) => {
-      const getTime = (timeStr: string | undefined) => {
-        if (!timeStr) return 0;
-        const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-        if (!match) return 0;
-        let [_, hours, minutes, period] = match;
-        let hour = parseInt(hours);
-        if (period) {
-          period = period.toUpperCase();
-          if (period === 'PM' && hour !== 12) hour += 12;
-          if (period === 'AM' && hour === 12) hour = 0;
-        }
-        return hour * 60 + parseInt(minutes);
-      };
-      return getTime(a.startTime) - getTime(b.startTime);
-    });
-  };
-
   if (adminLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -454,84 +472,142 @@ export const Dashboard = () => {
                   date.getDate() === new Date().getDate() &&
                   date.getMonth() === new Date().getMonth() &&
                   date.getFullYear() === new Date().getFullYear();
+
+                // Calculate payment information for all classes, not just classes on this day
+                const paymentsDue: { user: User; classSession: ClassSession }[] = [];
+                upcomingClasses.forEach(classSession => {
+                  classSession.studentEmails.forEach(email => {
+                    const user = users.find(u => u.email === email);
+                    console.log('Checking payments for user:', {
+                      email,
+                      hasPaymentConfig: !!user?.paymentConfig,
+                      date: date.toISOString()
+                    });
+
+                    if (user?.paymentConfig) {
+                      const paymentDates = getNextPaymentDates(user.paymentConfig, classSession);
+                      const isPaymentDue = paymentDates.some(paymentDate => {
+                        const matches = paymentDate.getFullYear() === date.getFullYear() &&
+                          paymentDate.getMonth() === date.getMonth() &&
+                          paymentDate.getDate() === date.getDate();
+                        
+                        if (matches) {
+                          console.log('Found payment due:', {
+                            user: user.email,
+                            date: date.toISOString(),
+                            paymentDate: paymentDate.toISOString()
+                          });
+                        }
+                        return matches;
+                      });
+                      
+                      if (isPaymentDue) {
+                        console.log('Adding payment due:', {
+                          user: user.email,
+                          classId: classSession.id,
+                          date: date.toISOString()
+                        });
+                        paymentsDue.push({ user, classSession });
+                      }
+                    }
+                  });
+                });
+
+                const isPaymentDay = paymentsDue.length > 0;
+                const daysUntilPayment = isPaymentDay ? 
+                  Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+                const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+
                 const isSelected = selectedDayDetails?.date.toDateString() === date.toDateString();
 
                 return (
                   <div
-                    key={`day-${index}`}
-                    onClick={() => handleDayClick(date, dayClasses)}
-                    className={`calendar-day transition-colors relative cursor-pointer
-                      ${isToday ? 'bg-gray-50' : ''} 
-                      ${isSelected ? 'bg-indigo-50' : ''}
-                      ${hoverData?.classes === dayClasses ? 'bg-gray-50' : ''}`}
+                    key={index}
+                    onClick={() => handleDayClick(date, dayClasses, paymentsDue)}
+                    className={`calendar-day hover:bg-[#f8f8f8] transition-colors
+                      ${isToday ? 'bg-[#f8f8f8]' : ''} 
+                      ${isSelected ? 'bg-[#f0f0f0]' : ''}`}
                   >
                     <div className="h-full flex flex-col p-2">
                       {/* Indicators */}
                       <div className="calendar-day-indicators flex justify-center gap-1 mb-1">
                         {dayClasses.length > 0 && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" title="Has classes" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#6366f1]" title="Has classes" />
+                        )}
+                        {isPaymentDay && (
+                          <div 
+                            className={`w-1.5 h-1.5 rounded-full ${isPaymentSoon ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`}
+                            title={isPaymentSoon ? 'Payment due soon' : 'Payment due'}
+                          />
                         )}
                       </div>
-                      {/* Date */}
-                      <div className={`font-medium text-center ${isToday ? 'text-indigo-600' : 'text-gray-900'}`}>
-                        <span>{index + 1}</span>
+                      {/* Date and Payment Pill */}
+                      <div className="flex flex-col items-center">
+                        <div className={`font-medium text-center ${isToday ? 'text-[#6366f1]' : 'text-[#1a1a1a]'} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
+                          <span>{index + 1}</span>
+                        </div>
+                        {isPaymentDay && (
+                          <div className={`text-[0.6rem] px-1 py-0.5 rounded mt-1 ${
+                            isPaymentSoon 
+                              ? 'bg-[#fef2f2] text-[#ef4444]' 
+                              : 'bg-[#fffbeb] text-[#f59e0b]'
+                          }`}>
+                            {t.paymentDue}
+                          </div>
+                        )}
                       </div>
                       {/* Class details */}
-                      {dayClasses.length > 0 && (
-                        <div className="class-details mt-1">
-                          <div className="time-slots-container relative flex-1">
-                            {/* Regular view - showing 3 slots */}
-                            <div className="time-slots relative h-full flex flex-col gap-1">
-                              {sortClassesByTime(dayClasses)
-                                .slice(0, dayClasses.length > 3 ? 2 : 3)
-                                .map((classItem) => (
-                                  <div
-                                    key={classItem.id}
-                                    className="right-0 left-0 bg-indigo-600 rounded-md py-0.5 px-1"
-                                  >
-                                    <span className="text-[0.6rem] leading-none text-white font-medium block text-center truncate">
-                                      {classItem.startTime}
-                                    </span>
-                                  </div>
-                                ))}
-                              
-                              {/* More indicator as a separate slot */}
-                              {dayClasses.length > 3 && (
-                                <div 
-                                  className="right-0 left-0 bg-indigo-600 rounded-md py-0.5 px-1 cursor-pointer hover:bg-indigo-700 transition-colors relative"
-                                  onMouseEnter={(e) => {
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    if (hoverTimeoutRef.current) {
-                                      window.clearTimeout(hoverTimeoutRef.current);
-                                    }
-                                    hoverTimeoutRef.current = window.setTimeout(() => {
-                                      setHoverData({
-                                        classes: dayClasses,
-                                        position: {
-                                          x: rect.left + (rect.width / 2),
-                                          y: rect.bottom
-                                        }
-                                      });
-                                      hoverTimeoutRef.current = null;
-                                    }, HOVER_DELAY_MS);
-                                  }}
-                                  onMouseLeave={() => {
-                                    if (hoverTimeoutRef.current) {
-                                      window.clearTimeout(hoverTimeoutRef.current);
-                                      hoverTimeoutRef.current = null;
-                                    }
-                                    setHoverData(null);
-                                  }}
+                      <div className="class-details mt-1">
+                        <div className="time-slots-container relative flex-1">
+                          <div className="time-slots relative h-full flex flex-col gap-1">
+                            {sortClassesByTime(dayClasses)
+                              .slice(0, dayClasses.length > 3 ? 2 : 3)
+                              .map((classItem) => (
+                                <div
+                                  key={classItem.id}
+                                  className="right-0 left-0 bg-indigo-600 rounded-md py-0.5 px-1"
                                 >
-                                  <span className="text-[0.6rem] leading-none text-white font-medium block text-center">
-                                    +{dayClasses.length - 2} more
+                                  <span className="text-[0.6rem] leading-none text-white font-medium block text-center truncate">
+                                    {classItem.startTime}
                                   </span>
                                 </div>
-                              )}
-                            </div>
+                              ))}
+                            
+                            {dayClasses.length > 3 && (
+                              <div 
+                                className="right-0 left-0 bg-indigo-600 rounded-md py-0.5 px-1 cursor-pointer hover:bg-indigo-700 transition-colors relative"
+                                onMouseEnter={(e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  if (hoverTimeoutRef.current) {
+                                    window.clearTimeout(hoverTimeoutRef.current);
+                                  }
+                                  hoverTimeoutRef.current = window.setTimeout(() => {
+                                    setHoverData({
+                                      classes: dayClasses,
+                                      position: {
+                                        x: rect.left + (rect.width / 2),
+                                        y: rect.bottom
+                                      }
+                                    });
+                                    hoverTimeoutRef.current = null;
+                                  }, HOVER_DELAY_MS);
+                                }}
+                                onMouseLeave={() => {
+                                  if (hoverTimeoutRef.current) {
+                                    window.clearTimeout(hoverTimeoutRef.current);
+                                    hoverTimeoutRef.current = null;
+                                  }
+                                  setHoverData(null);
+                                }}
+                              >
+                                <span className="text-[0.6rem] leading-none text-white font-medium block text-center">
+                                  +{dayClasses.length - 2} more
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -579,7 +655,48 @@ export const Dashboard = () => {
                   day: 'numeric'
                 })}
               </h3>
-              {selectedDayDetails.classes.length > 0 ? (
+
+              {/* Payment Due Section */}
+              {selectedDayDetails.paymentsDue.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-md font-semibold text-amber-600 mb-2">{t.paymentDue}</h4>
+                  <div className="space-y-3">
+                    {selectedDayDetails.paymentsDue.map(({ user, classSession }) => {
+                      const daysUntilPayment = Math.ceil(
+                        (selectedDayDetails.date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+                      );
+                      const isPaymentSoon = daysUntilPayment <= 3 && daysUntilPayment >= 0;
+
+                      return (
+                        <div 
+                          key={`${user.id}-${classSession.id}`} 
+                          className={`p-3 rounded-lg border ${
+                            isPaymentSoon 
+                              ? 'bg-red-50 border-red-200' 
+                              : 'bg-amber-50 border-amber-200'
+                          }`}
+                        >
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-medium text-gray-900">{user.name}</span>
+                            <span className="text-xs text-gray-600">
+                              {classSession.courseType} - {classSession.startTime} to {classSession.endTime}
+                            </span>
+                            <span className={`text-xs ${isPaymentSoon ? 'text-red-600' : 'text-amber-600'}`}>
+                              {user.paymentConfig?.type === 'weekly' ? 
+                                `Weekly payment (${user.paymentConfig.weeklyInterval || 1} week interval)` :
+                                `Monthly payment (${user.paymentConfig?.monthlyOption} of month)`}
+                              {isPaymentSoon && ' - Due soon'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Classes Section */}
+              {selectedDayDetails.classes.length > 0 && (
                 <div className="space-y-4">
                   {sortClassesByTime(selectedDayDetails.classes).map((classItem) => (
                     <div
@@ -603,8 +720,11 @@ export const Dashboard = () => {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-gray-500 text-center">{t.selectDayToViewDetails}</p>
+              )}
+
+              {/* Show empty state only if there are no classes AND no payments due */}
+              {selectedDayDetails.classes.length === 0 && selectedDayDetails.paymentsDue.length === 0 && (
+                <p className="text-gray-500 text-center">{t.noClassesScheduled}</p>
               )}
             </div>
           ) : (
