@@ -92,25 +92,25 @@ export const AdminUsers = () => {
   const deleteUser = async (userId: string) => {
     // Security checks
     if (!currentUser || !isAdmin) {
-      toast.error('Unauthorized action');
+      toast.error(t.unauthorizedAction);
       return;
     }
 
     if (userId === currentUser.uid) {
-      toast.error('Cannot delete your own account');
+      toast.error(t.cannotDeleteOwnAccount);
       return;
     }
 
     // Get user details for confirmation
     const userToDelete = users.find(user => user.id === userId);
     if (!userToDelete) {
-      toast.error('User not found');
+      toast.error(t.userNotFound);
       return;
     }
 
     logAdmin('User to delete:', { email: userToDelete.email, uid: userToDelete.uid });
 
-    if (!window.confirm(`Are you sure you want to delete ${userToDelete.name} (${userToDelete.email})?`)) {
+    if (!window.confirm(t.confirmDelete.replace('{name}', userToDelete.name).replace('{email}', userToDelete.email))) {
       return;
     }
 
@@ -184,17 +184,17 @@ export const AdminUsers = () => {
       }
 
       await fetchUsers();
-      toast.success('User and associated data deleted successfully');
+      toast.success(t.userDeleted);
     } catch (error) {
       console.error('Error deleting user:', error);
-      toast.error('Failed to delete user');
+      toast.error(t.failedToDeleteUser);
     }
   };
 
   const handleNewUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUser.email || !newUser.name) {
-      toast.error('Please fill in both name and email');
+      toast.error(t.pleaseEnterNameEmail);
       return;
     }
 
@@ -264,17 +264,17 @@ export const AdminUsers = () => {
         form.classList.add('hidden');
       }
       
-      toast.success('Signup link copied to clipboard!');
+      toast.success(t.signupLinkCopied);
     } catch (error) {
       console.error('Error generating signup link:', error);
-      toast.error('Failed to generate signup link');
+      toast.error(t.failedToGenerateLink);
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="text-center p-4">Loading...</div>;
+    return <div className="text-center p-4">{t.loading}</div>;
   }
 
   const allUsers = users.sort((a, b) => {
@@ -289,7 +289,7 @@ export const AdminUsers = () => {
     <div className="flex-1 bg-white">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-black">Manage Users</h1>
+          <h1 className="text-2xl font-bold text-black">{t.manageUsers}</h1>
           <div className="relative">
             <button
               onClick={() => {
@@ -329,7 +329,7 @@ export const AdminUsers = () => {
                     id="name"
                     value={newUser.name}
                     onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter full name"
+                    placeholder={t.enterFullName}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     required
                   />
@@ -343,7 +343,7 @@ export const AdminUsers = () => {
                     id="email"
                     value={newUser.email}
                     onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="Enter email address"
+                    placeholder={t.enterEmailAddress}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     required
                   />
@@ -364,7 +364,7 @@ export const AdminUsers = () => {
                       }}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <span className="text-sm font-medium text-gray-700">Teacher Account</span>
+                    <span className="text-sm font-medium text-gray-700">{t.teacherAccount}</span>
                   </label>
                 </div>
                 <div>
@@ -383,7 +383,7 @@ export const AdminUsers = () => {
                       }}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <span className="text-sm font-medium text-gray-700">Admin Account</span>
+                    <span className="text-sm font-medium text-gray-700">{t.adminAccount}</span>
                   </label>
                 </div>
                 {!newUser.isTeacher && !newUser.isAdmin && (
@@ -417,13 +417,12 @@ export const AdminUsers = () => {
                           type="number"
                           id="weeklyInterval"
                           min="1"
-                          max="52"
-                          value={newUser.paymentConfig.weeklyInterval || ''}
+                          value={newUser.paymentConfig.weeklyInterval || 1}
                           onChange={(e) => setNewUser(prev => ({ 
                             ...prev, 
                             paymentConfig: { 
                               ...prev.paymentConfig!, 
-                              weeklyInterval: Number(e.target.value) 
+                              weeklyInterval: parseInt(e.target.value) || 1
                             } 
                           }))}
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
@@ -473,16 +472,16 @@ export const AdminUsers = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
+                    {t.name}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
+                    {t.email}
                   </th>
                   <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    {t.userStatus}
                   </th>
                   <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    {t.actions}
                   </th>
                 </tr>
               </thead>
@@ -498,11 +497,11 @@ export const AdminUsers = () => {
                             ? 'bg-green-100 text-green-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}>
-                          {user.isAdmin ? 'Admin' : 'User'}
+                          {user.isAdmin ? 'Admin' : t.activeUser}
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-4 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                          Pending Signup
+                          {t.pendingSignup}
                         </span>
                       )}
                     </td>
@@ -513,7 +512,7 @@ export const AdminUsers = () => {
                             onClick={() => deleteUser(user.id)}
                             className="w-24 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
                           >
-                            Delete
+                            {t.delete}
                           </button>
                         )}
                         {user.status === 'pending' && (
@@ -537,21 +536,21 @@ export const AdminUsers = () => {
                                   }
                                   
                                   await navigator.clipboard.writeText(signupLink);
-                                  toast.success('Signup link copied to clipboard!');
+                                  toast.success(t.signupLinkCopied);
                                 } catch (error) {
                                   console.error('Error copying signup link:', error);
-                                  toast.error('Failed to copy signup link');
+                                  toast.error(t.failedToCopyLink);
                                 }
                               }}
                               className="w-24 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-sm"
                             >
-                              Copy Link
+                              {t.copyLink}
                             </button>
                             <button
                               onClick={() => deleteUser(user.id)}
                               className="w-24 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
                             >
-                              Delete
+                              {t.delete}
                             </button>
                           </>
                         )}

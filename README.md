@@ -1,4 +1,4 @@
-# Inglés a Bordo 🚀
+# Inglês a Bordo 🚀
 
 A modern web application built with React and Firebase for managing learning resources and scheduling.
 

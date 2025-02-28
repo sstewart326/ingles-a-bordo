@@ -120,7 +120,7 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
           ‹
         </button>
         <h2 className="text-lg font-semibold text-black">
-          {format(currentMonth, 'MMMM yyyy')}
+          {currentMonth.toLocaleString(language === 'pt-BR' ? 'pt-BR' : 'en', { month: 'long', year: 'numeric' })}
         </h2>
         <button
           onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}

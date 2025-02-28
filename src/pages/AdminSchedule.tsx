@@ -374,12 +374,11 @@ export const AdminSchedule = () => {
     <div className="flex-1 bg-white">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-black">Manage Classes</h1>
+          <h1 className="text-2xl font-bold text-black">{t.manageClasses}</h1>
           <div className="relative">
             <button
               onClick={async () => {
                 if (!showAddForm) {
-                  // If we're opening the form, refresh the users list and reset the form
                   await fetchAllUsers();
                   setNewClass(prev => ({
                     ...prev,
@@ -406,7 +405,7 @@ export const AdminSchedule = () => {
               {showAddForm ? (
                 <span className="text-xl">&times;</span>
               ) : (
-                "Add New Class"
+                t.addNewClass
               )}
             </button>
           </div>
@@ -414,11 +413,11 @@ export const AdminSchedule = () => {
 
         {showAddForm && (
           <div className="bg-white shadow-md rounded-lg p-4 mb-6">
-            <h2 className="text-lg font-semibold mb-4">Create New Class</h2>
+            <h2 className="text-lg font-semibold mb-4">{t.createNewClass}</h2>
             <form onSubmit={handleCreateClass} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Day of Week</label>
+                  <label className="block text-sm font-medium text-gray-700">{t.dayOfWeek}</label>
                   <select
                     value={newClass.dayOfWeek}
                     onChange={(e) => {
@@ -438,7 +437,7 @@ export const AdminSchedule = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                  <label className="block text-sm font-medium text-gray-700">{t.startDate}</label>
                   <DatePicker
                     selected={newClass.startDate}
                     onChange={(date: Date | null) => setNewClass(prev => ({ ...prev, startDate: date || new Date() }))}
@@ -447,7 +446,7 @@ export const AdminSchedule = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    End Date <span className="text-gray-500 font-normal">(Optional)</span>
+                    {t.endDate} <span className="text-gray-500 font-normal">({t.optional})</span>
                   </label>
                   <DatePicker
                     selected={newClass.endDate}
@@ -458,7 +457,7 @@ export const AdminSchedule = () => {
                 </div>
                 <div className="flex space-x-4 md:col-span-2">
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                    <label className="block text-sm font-medium text-gray-700">{t.time}</label>
                     <select
                       value={newClass.startTime}
                       onChange={(e) => handleStartTimeChange(e.target.value)}
@@ -470,7 +469,7 @@ export const AdminSchedule = () => {
                     </select>
                   </div>
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700">End Time</label>
+                    <label className="block text-sm font-medium text-gray-700">{t.time}</label>
                     <select
                       value={newClass.endTime}
                       onChange={(e) => handleEndTimeChange(e.target.value)}
@@ -483,7 +482,7 @@ export const AdminSchedule = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Students</label>
+                  <label className="block text-sm font-medium text-gray-700">{t.students}</label>
                   <Select
                     isMulti
                     value={studentOptions.filter(option => 
@@ -493,7 +492,7 @@ export const AdminSchedule = () => {
                     options={studentOptions}
                     className="mt-1"
                     classNamePrefix="select"
-                    placeholder="Select students..."
+                    placeholder={t.selectStudents}
                     isClearable={true}
                     closeMenuOnSelect={false}
                     hideSelectedOptions={false}
@@ -504,7 +503,7 @@ export const AdminSchedule = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Notes</label>
+                <label className="block text-sm font-medium text-gray-700">{t.notes}</label>
                 <textarea
                   value={newClass.notes}
                   onChange={(e) => setNewClass(prev => ({ ...prev, notes: e.target.value }))}
@@ -517,7 +516,7 @@ export const AdminSchedule = () => {
                   type="submit"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                 >
-                  Create Class
+                  {t.createNewClass}
                 </button>
               </div>
             </form>
@@ -530,22 +529,22 @@ export const AdminSchedule = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Day & Time
+                    {t.dayAndTime}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Course Type
+                    {t.courseType}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Students
+                    {t.students}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Start Date
+                    {t.startDate}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    End Date
+                    {t.endDate}
                   </th>
                   <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    {t.actions}
                   </th>
                 </tr>
               </thead>
@@ -565,31 +564,31 @@ export const AdminSchedule = () => {
                           const student = users.find(u => u.email === email);
                           return student ? (
                             <div key={`${classItem.id}-${email}`} className="mb-1">
-                              {student.name}{student.status === 'pending' ? ' (Pending)' : ''}
+                              {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
                             </div>
                           ) : (
                             <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
-                              Unknown Email: {email}
+                              {t.unknownEmail}: {email}
                             </div>
                           );
                         })}
                         {(!classItem.studentEmails || classItem.studentEmails.length === 0) && (
-                          <div key={`${classItem.id}-no-students`} className="text-gray-500 italic">No students assigned</div>
+                          <div key={`${classItem.id}-no-students`} className="text-gray-500 italic">{t.noStudentsAssigned}</div>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {classItem.startDate.toDate().toLocaleDateString()}
+                      {classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {classItem.endDate?.toDate().toLocaleDateString() || 'N/A'}
+                      {classItem.endDate?.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
                       <button
                         onClick={() => handleDeleteClass(classItem.id)}
                         className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
                       >
-                        Delete
+                        {t.delete}
                       </button>
                     </td>
                   </tr>

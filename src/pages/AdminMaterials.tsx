@@ -495,7 +495,11 @@ const AdminMaterials = () => {
                       {existingMaterials.map((material, index) => (
                         <div key={index} className="p-4 border rounded-lg">
                           <div className="flex items-center justify-between">
-                            <h3 className="font-medium">{t.materialsForDate} {new Date(material.classDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US')}</h3>
+                            <h3 className="font-medium">{t.materialsForDate} {new Date(material.classDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}</h3>
                             {material.slides && (
                               <a
                                 href={material.slides}

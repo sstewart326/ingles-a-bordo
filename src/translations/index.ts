@@ -107,6 +107,42 @@ interface Translation {
   thursdayShort: string;
   fridayShort: string;
   saturdayShort: string;
+
+  // Admin Schedule
+  manageClasses: string;
+  addNewClass: string;
+  createNewClass: string;
+  dayAndTime: string;
+  courseType: string;
+  startDate: string;
+  endDate: string;
+  actions: string;
+  optional: string;
+  selectStudents: string;
+  noStudentsAssigned: string;
+  pending: string;
+  unknownEmail: string;
+
+  // Admin Users
+  teacherAccount: string;
+  adminAccount: string;
+  enterFullName: string;
+  enterEmailAddress: string;
+  userStatus: string;
+  activeUser: string;
+  pendingSignup: string;
+  copyLink: string;
+  confirmDelete: string;
+  signupLinkCopied: string;
+  failedToCopyLink: string;
+  pleaseEnterNameEmail: string;
+  failedToGenerateLink: string;
+  failedToFetchUsers: string;
+  failedToDeleteUser: string;
+  cannotDeleteOwnAccount: string;
+  userNotFound: string;
+  userDeleted: string;
+  unauthorizedAction: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -217,6 +253,42 @@ const translations: Record<Language, Translation> = {
     thursdayShort: 'Thu',
     fridayShort: 'Fri',
     saturdayShort: 'Sat',
+
+    // Admin Schedule
+    manageClasses: 'Manage Classes',
+    addNewClass: 'Add New Class',
+    createNewClass: 'Create New Class',
+    dayAndTime: 'Day & Time',
+    courseType: 'Course Type',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    actions: 'Actions',
+    optional: 'Optional',
+    selectStudents: 'Select students...',
+    noStudentsAssigned: 'No students assigned',
+    pending: 'Pending',
+    unknownEmail: 'Unknown Email',
+
+    // Admin Users
+    teacherAccount: 'Teacher Account',
+    adminAccount: 'Admin Account',
+    enterFullName: 'Enter full name',
+    enterEmailAddress: 'Enter email address',
+    userStatus: 'Status',
+    activeUser: 'User',
+    pendingSignup: 'Pending Signup',
+    copyLink: 'Copy Link',
+    confirmDelete: 'Are you sure you want to delete {name} ({email})?',
+    signupLinkCopied: 'Signup link copied to clipboard!',
+    failedToCopyLink: 'Failed to copy signup link',
+    pleaseEnterNameEmail: 'Please fill in both name and email',
+    failedToGenerateLink: 'Failed to generate signup link',
+    failedToFetchUsers: 'Failed to fetch users',
+    failedToDeleteUser: 'Failed to delete user',
+    cannotDeleteOwnAccount: 'Cannot delete your own account',
+    userNotFound: 'User not found',
+    userDeleted: 'User and associated data deleted successfully',
+    unauthorizedAction: 'Unauthorized action',
   },
   'pt-BR': {
     // Auth & Profile
@@ -325,6 +397,42 @@ const translations: Record<Language, Translation> = {
     thursdayShort: 'Qui',
     fridayShort: 'Sex',
     saturdayShort: 'Sáb',
+
+    // Admin Schedule
+    manageClasses: 'Gerenciar Aulas',
+    addNewClass: 'Adicionar Nova Aula',
+    createNewClass: 'Criar Nova Aula',
+    dayAndTime: 'Dia e Horário',
+    courseType: 'Tipo de Aula',
+    startDate: 'Data de Início',
+    endDate: 'Data de Término',
+    actions: 'Ações',
+    optional: 'Opcional',
+    selectStudents: 'Selecionar alunos...',
+    noStudentsAssigned: 'Nenhum aluno atribuído',
+    pending: 'Pendente',
+    unknownEmail: 'Email Desconhecido',
+
+    // Admin Users
+    teacherAccount: 'Conta de Professor',
+    adminAccount: 'Conta de Admin',
+    enterFullName: 'Digite o nome completo',
+    enterEmailAddress: 'Digite o endereço de email',
+    userStatus: 'Status',
+    activeUser: 'Usuário',
+    pendingSignup: 'Cadastro Pendente',
+    copyLink: 'Copiar Link',
+    confirmDelete: 'Tem certeza que deseja excluir {name} ({email})?',
+    signupLinkCopied: 'Link de cadastro copiado!',
+    failedToCopyLink: 'Falha ao copiar link de cadastro',
+    pleaseEnterNameEmail: 'Por favor, preencha nome e email',
+    failedToGenerateLink: 'Falha ao gerar link de cadastro',
+    failedToFetchUsers: 'Falha ao buscar usuários',
+    failedToDeleteUser: 'Falha ao excluir usuário',
+    cannotDeleteOwnAccount: 'Não é possível excluir sua própria conta',
+    userNotFound: 'Usuário não encontrado',
+    userDeleted: 'Usuário e dados associados excluídos com sucesso',
+    unauthorizedAction: 'Ação não autorizada',
   }
 };
 
