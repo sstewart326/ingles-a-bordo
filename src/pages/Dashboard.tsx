@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { where, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
@@ -6,6 +6,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { getCachedCollection } from '../utils/firebaseUtils';
 import { getDaysInMonth } from '../utils/dateUtils';
+import { createPortal } from 'react-dom';
 
 interface ClassSession {
   id: string;
@@ -37,6 +38,12 @@ export const Dashboard = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { language } = useLanguage();
   const t = useTranslation(language);
+  const [hoverData, setHoverData] = useState<{
+    classes: ClassSession[];
+    position: { x: number; y: number };
+  } | null>(null);
+  const hoverTimeoutRef = useRef<number | null>(null);
+  const HOVER_DELAY_MS = 500; // Half second delay
 
   const formatStudentNames = (studentEmails: string[]) => {
     const names = studentEmails.map(email => userNames[email] || email);
@@ -154,17 +161,8 @@ export const Dashboard = () => {
         return acc;
       }, {});
 
-      // Take only first 5 classes total across all days
-      let classCount = 0;
-      const limitedGroupedClasses: Record<number, ClassSession[]> = {};
-      for (const [day, classes] of Object.entries(groupedClasses)) {
-        if (classCount >= 5) break;
-        limitedGroupedClasses[parseInt(day)] = classes.slice(0, 5 - classCount);
-        classCount += classes.length;
-      }
-
-      setUpcomingClasses(upcoming.slice(0, 5)); // Keep this for calendar functionality
-      setGroupedUpcomingClasses(limitedGroupedClasses);
+      setUpcomingClasses(upcoming);
+      setGroupedUpcomingClasses(groupedClasses);
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
@@ -175,6 +173,22 @@ export const Dashboard = () => {
   useEffect(() => {
     fetchClasses();
   }, [fetchClasses]);
+
+  useEffect(() => {
+    const handleMouseMove = () => {
+      if (hoverData) {
+        setHoverData(null);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, [hoverData]);
 
   const isClassPastToday = (dayOfWeek: number, startTime?: string) => {
     const now = new Date();
@@ -307,41 +321,77 @@ export const Dashboard = () => {
   const renderUpcomingClassesSection = () => (
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.upcomingClasses}</h2>
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        {Object.keys(groupedUpcomingClasses).length > 0 ? (
-          <ul className="divide-y divide-gray-200">
-            {Object.entries(groupedUpcomingClasses).map(([dayOfWeek, classes]) => (
-              <li key={dayOfWeek} className="px-4 py-4 sm:px-6">
-                <div className="space-y-3">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    {DAYS_OF_WEEK_FULL[parseInt(dayOfWeek)]} {t.class}
-                  </h3>
-                  <div className="space-y-3 pl-4">
-                    {classes.map((classSession) => (
-                      <div key={classSession.id} className="flex items-center justify-between border-l-2 border-gray-200 pl-3">
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-500">
-                            {formatClassTime(classSession)}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {formatStudentNames(classSession.studentEmails)}
-                          </p>
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg relative">
+        <div 
+          className="max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#D1D5DB transparent'
+          }}
+        >
+          {Object.keys(groupedUpcomingClasses).length > 0 ? (
+            <ul className="divide-y divide-gray-100">
+              {Object.entries(groupedUpcomingClasses).map(([dayOfWeek, classes]) => (
+                <li key={dayOfWeek} className="px-4 sm:px-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 sticky top-0 bg-white py-3 -mx-4 px-4 z-10 border-b border-gray-100">
+                      {DAYS_OF_WEEK_FULL[parseInt(dayOfWeek)]} {t.class}
+                    </h3>
+                    <div className="py-3 space-y-3">
+                      {sortClassesByTime(classes).map((classSession) => (
+                        <div 
+                          key={classSession.id} 
+                          className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors duration-150 ease-in-out border border-gray-100"
+                        >
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-indigo-600"></div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {formatClassTime(classSession)}
+                              </p>
+                            </div>
+                            <div className="pl-4">
+                              <p className="text-sm text-gray-600">
+                                {formatStudentNames(classSession.studentEmails)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
-            {t.noClassesScheduled}
-          </div>
-        )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
+              {t.noClassesScheduled}
+            </div>
+          )}
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
       </div>
     </div>
   );
+
+  const sortClassesByTime = (classes: ClassSession[]) => {
+    return [...classes].sort((a, b) => {
+      const getTime = (timeStr: string | undefined) => {
+        if (!timeStr) return 0;
+        const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+        if (!match) return 0;
+        let [_, hours, minutes, period] = match;
+        let hour = parseInt(hours);
+        if (period) {
+          period = period.toUpperCase();
+          if (period === 'PM' && hour !== 12) hour += 12;
+          if (period === 'AM' && hour === 12) hour = 0;
+        }
+        return hour * 60 + parseInt(minutes);
+      };
+      return getTime(a.startTime) - getTime(b.startTime);
+    });
+  };
 
   if (adminLoading) {
     return (
@@ -351,7 +401,7 @@ export const Dashboard = () => {
     );
   }
 
-  const AdminDashboard = () => (
+  const DashboardContent = () => (
     <div className="space-y-8 max-w-7xl mx-auto pt-8 px-4 sm:px-6 lg:px-8">
       {/* Upcoming Classes */}
       {renderUpcomingClassesSection()}
@@ -409,11 +459,12 @@ export const Dashboard = () => {
 
                 return (
                   <div
-                    key={index}
+                    key={`day-${index}`}
                     onClick={() => handleDayClick(date, dayClasses)}
-                    className={`calendar-day hover:bg-gray-50 transition-colors
+                    className={`calendar-day transition-colors relative cursor-pointer
                       ${isToday ? 'bg-gray-50' : ''} 
-                      ${isSelected ? 'bg-indigo-50' : ''}`}
+                      ${isSelected ? 'bg-indigo-50' : ''}
+                      ${hoverData?.classes === dayClasses ? 'bg-gray-50' : ''}`}
                   >
                     <div className="h-full flex flex-col p-2">
                       {/* Indicators */}
@@ -430,26 +481,54 @@ export const Dashboard = () => {
                       {dayClasses.length > 0 && (
                         <div className="class-details mt-1">
                           <div className="time-slots-container relative flex-1">
-                            {/* Class slots */}
-                            <div className="time-slots relative h-full">
-                              {dayClasses.map(classItem => {
-                                // Convert time to position
-                                const startHour = parseInt(classItem.startTime?.split(':')[0] || '0');
-                                const startMinutes = parseInt(classItem.startTime?.split(':')[1] || '0');
-                                const position = ((startHour + startMinutes / 60 - 6) / 12) * 100;
-                                
-                                return (
+                            {/* Regular view - showing 3 slots */}
+                            <div className="time-slots relative h-full flex flex-col gap-1">
+                              {sortClassesByTime(dayClasses)
+                                .slice(0, dayClasses.length > 3 ? 2 : 3)
+                                .map((classItem) => (
                                   <div
                                     key={classItem.id}
-                                    className="absolute right-0 left-0 transform -translate-y-1/2 bg-indigo-600 rounded-md py-0.5 px-1"
-                                    style={{ top: `${position}%` }}
+                                    className="right-0 left-0 bg-indigo-600 rounded-md py-0.5 px-1"
                                   >
                                     <span className="text-[0.6rem] leading-none text-white font-medium block text-center truncate">
                                       {classItem.startTime}
                                     </span>
                                   </div>
-                                );
-                              })}
+                                ))}
+                              
+                              {/* More indicator as a separate slot */}
+                              {dayClasses.length > 3 && (
+                                <div 
+                                  className="right-0 left-0 bg-indigo-600 rounded-md py-0.5 px-1 cursor-pointer hover:bg-indigo-700 transition-colors relative"
+                                  onMouseEnter={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    if (hoverTimeoutRef.current) {
+                                      window.clearTimeout(hoverTimeoutRef.current);
+                                    }
+                                    hoverTimeoutRef.current = window.setTimeout(() => {
+                                      setHoverData({
+                                        classes: dayClasses,
+                                        position: {
+                                          x: rect.left + (rect.width / 2),
+                                          y: rect.bottom
+                                        }
+                                      });
+                                      hoverTimeoutRef.current = null;
+                                    }, HOVER_DELAY_MS);
+                                  }}
+                                  onMouseLeave={() => {
+                                    if (hoverTimeoutRef.current) {
+                                      window.clearTimeout(hoverTimeoutRef.current);
+                                      hoverTimeoutRef.current = null;
+                                    }
+                                    setHoverData(null);
+                                  }}
+                                >
+                                  <span className="text-[0.6rem] leading-none text-white font-medium block text-center">
+                                    +{dayClasses.length - 2} more
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -462,166 +541,32 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        {/* Details Section */}
-        <div className="lg:col-span-1">
-          {selectedDayDetails ? (
-            <div className="bg-white shadow rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </h3>
-              {selectedDayDetails.classes.length > 0 ? (
-                <div className="space-y-4">
-                  {selectedDayDetails.classes.map((classItem) => (
-                    <div
-                      key={classItem.id}
-                      className="p-4 rounded-lg border border-gray-200 hover:border-indigo-200 bg-gray-50 hover:bg-indigo-50 transition-colors"
-                    >
-                      <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2">
-                        <span className="text-sm font-medium text-gray-600">{t.time}</span>
-                        <span className="text-sm text-gray-900">{formatClassTime(classItem)}</span>
-
-                        <span className="text-sm font-medium text-gray-600">{t.students}</span>
-                        <span className="text-sm text-gray-900">{formatStudentNames(classItem.studentEmails)}</span>
-
-                        {classItem.notes && (
-                          <>
-                            <span className="text-sm font-medium text-gray-600">{t.notes}</span>
-                            <span className="text-sm text-gray-900">{classItem.notes}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center">{t.selectDayToViewDetails}</p>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white shadow rounded-lg p-6">
-              <p className="text-gray-500 text-center">{t.selectDayToViewDetails}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  const StudentDashboard = () => (
-    <div className="space-y-8 max-w-7xl mx-auto pt-8 px-4 sm:px-6 lg:px-8">
-      {/* Upcoming Classes */}
-      {renderUpcomingClassesSection()}
-
-      {/* Calendar and Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Calendar */}
-        <div className="lg:col-span-2">
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            {/* Calendar Header */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {selectedDate.toLocaleString(language === 'pt-BR' ? 'pt-BR' : 'en', { month: 'long', year: 'numeric' })}
-                </h2>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={previousMonth}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--brand-color)] hover:bg-[var(--brand-color-dark)] text-[var(--header-bg)] transition-colors text-xl"
+        {/* Tooltip */}
+        {hoverData && (
+          <div 
+            className="fixed z-[9999] pointer-events-none"
+            style={{ 
+              left: `${hoverData.position.x}px`,
+              top: `${hoverData.position.y}px`,
+              transform: 'translate(-50%, 8px)'
+            }}
+          >
+            <div className="bg-white rounded-lg shadow-xl p-2 border border-gray-200 min-w-[120px]">
+              <div className="flex flex-col gap-1 items-center">
+                {sortClassesByTime(hoverData.classes).map((classItem) => (
+                  <div
+                    key={classItem.id}
+                    className="bg-indigo-600 rounded-md py-1 px-3 w-fit"
                   >
-                    ‹
-                  </button>
-                  <button
-                    onClick={nextMonth}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--brand-color)] hover:bg-[var(--brand-color-dark)] text-[var(--header-bg)] transition-colors text-xl"
-                  >
-                    ›
-                  </button>
-                </div>
+                    <span className="text-sm leading-none text-white font-medium whitespace-nowrap">
+                      {classItem.startTime}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-
-            {/* Calendar Grid */}
-            <div className="calendar-grid">
-              {DAYS_OF_WEEK.map((day) => (
-                <div
-                  key={day}
-                  className="calendar-day-header text-center text-sm font-medium text-gray-600 py-4"
-                >
-                  {day}
-                </div>
-              ))}
-              {Array.from({ length: firstDay }).map((_, index) => (
-                <div key={`empty-${index}`} className="calendar-day" />
-              ))}
-              {Array.from({ length: days }).map((_, index) => {
-                const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), index + 1);
-                const dayOfWeek = date.getDay();
-                const dayClasses = getClassesForDay(dayOfWeek, date);
-                const isToday =
-                  date.getDate() === new Date().getDate() &&
-                  date.getMonth() === new Date().getMonth() &&
-                  date.getFullYear() === new Date().getFullYear();
-                const isSelected = selectedDayDetails?.date.toDateString() === date.toDateString();
-
-                return (
-                  <div
-                    key={index}
-                    onClick={() => handleDayClick(date, dayClasses)}
-                    className={`calendar-day hover:bg-gray-50 transition-colors
-                      ${isToday ? 'bg-gray-50' : ''} 
-                      ${isSelected ? 'bg-indigo-50' : ''}`}
-                  >
-                    <div className="h-full flex flex-col p-2">
-                      {/* Indicators */}
-                      <div className="calendar-day-indicators flex justify-center gap-1 mb-1">
-                        {dayClasses.length > 0 && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" title="Has classes" />
-                        )}
-                      </div>
-                      {/* Date */}
-                      <div className={`font-medium text-center ${isToday ? 'text-indigo-600' : 'text-gray-900'}`}>
-                        <span>{index + 1}</span>
-                      </div>
-                      {/* Class details */}
-                      {dayClasses.length > 0 && (
-                        <div className="class-details mt-1">
-                          <div className="time-slots-container relative flex-1">
-                            {/* Class slots */}
-                            <div className="time-slots relative h-full">
-                              {dayClasses.map(classItem => {
-                                // Convert time to position
-                                const startHour = parseInt(classItem.startTime?.split(':')[0] || '0');
-                                const startMinutes = parseInt(classItem.startTime?.split(':')[1] || '0');
-                                const position = ((startHour + startMinutes / 60 - 6) / 12) * 100;
-                                
-                                return (
-                                  <div
-                                    key={classItem.id}
-                                    className="absolute right-0 left-0 transform -translate-y-1/2 bg-indigo-600 rounded-md py-0.5 px-1"
-                                    style={{ top: `${position}%` }}
-                                  >
-                                    <span className="text-[0.6rem] leading-none text-white font-medium block text-center truncate">
-                                      {classItem.startTime}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
-        </div>
+        )}
 
         {/* Details Section */}
         <div className="lg:col-span-1">
@@ -637,7 +582,7 @@ export const Dashboard = () => {
               </h3>
               {selectedDayDetails.classes.length > 0 ? (
                 <div className="space-y-4">
-                  {selectedDayDetails.classes.map((classItem) => (
+                  {sortClassesByTime(selectedDayDetails.classes).map((classItem) => (
                     <div
                       key={classItem.id}
                       className="p-4 rounded-lg border border-gray-200 hover:border-indigo-200 bg-gray-50 hover:bg-indigo-50 transition-colors"
@@ -675,7 +620,7 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {isAdmin ? <AdminDashboard /> : <StudentDashboard />}
+      <DashboardContent />
     </div>
   );
 }; 
