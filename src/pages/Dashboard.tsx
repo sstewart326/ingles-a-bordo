@@ -4,7 +4,6 @@ import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { Link } from 'react-router-dom';
 import { getCachedCollection } from '../utils/firebaseUtils';
 import { getDaysInMonth } from '../utils/dateUtils';
 
@@ -231,15 +230,6 @@ export const Dashboard = () => {
     // If it's earlier in the week or today but already passed,
     // it's upcoming because it will happen next week
     return true;
-  };
-
-  const formatClassTitle = (classSession: ClassSession) => {
-    if (classSession.title) return classSession.title;
-    if (classSession.dayOfWeek !== undefined) {
-      const days = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
-      return `${days[classSession.dayOfWeek]} ${t.class}`;
-    }
-    return t.class;
   };
 
   const formatClassTime = (classSession: ClassSession) => {

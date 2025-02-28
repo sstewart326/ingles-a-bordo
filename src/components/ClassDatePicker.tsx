@@ -11,7 +11,7 @@ import {
   subMonths,
   startOfDay,
 } from 'date-fns';
-import { FaChevronLeft, FaChevronRight, FaUsers, FaClock } from 'react-icons/fa';
+import { FaUsers, FaClock } from 'react-icons/fa';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 

@@ -6,7 +6,7 @@ import { createSignupLink } from '../utils/signupLinks';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
-import { getCachedCollection, updateCachedDocument, deleteCachedDocument, setCachedDocument } from '../utils/firebaseUtils';
+import { getCachedCollection, deleteCachedDocument, setCachedDocument } from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 
