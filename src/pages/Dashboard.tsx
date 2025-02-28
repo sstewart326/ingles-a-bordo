@@ -145,12 +145,33 @@ export const Dashboard = () => {
         return timeA.localeCompare(timeB);
       });
 
-      setUpcomingClasses(upcoming);
-      setPastClasses(past);
+      // Group classes by day of week
+      const groupedClasses = upcoming.reduce<Record<number, ClassSession[]>>((acc, classSession) => {
+        const dayOfWeek = classSession.dayOfWeek || 0;
+        if (!acc[dayOfWeek]) {
+          acc[dayOfWeek] = [];
+        }
+        acc[dayOfWeek].push(classSession);
+        return acc;
+      }, {});
+
+      // Take only first 5 classes total across all days
+      let classCount = 0;
+      const limitedGroupedClasses: Record<number, ClassSession[]> = {};
+      for (const [day, classes] of Object.entries(groupedClasses)) {
+        if (classCount >= 5) break;
+        limitedGroupedClasses[parseInt(day)] = classes.slice(0, 5 - classCount);
+        classCount += classes.length;
+      }
+
+      setUpcomingClasses(upcoming.slice(0, 5)); // Keep this for calendar functionality
+      setGroupedUpcomingClasses(limitedGroupedClasses);
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
   }, [currentUser, adminLoading, isAdmin]);
+
+  const [groupedUpcomingClasses, setGroupedUpcomingClasses] = useState<Record<number, ClassSession[]>>({});
 
   useEffect(() => {
     fetchClasses();
@@ -291,6 +312,46 @@ export const Dashboard = () => {
   };
 
   const DAYS_OF_WEEK = [t.sundayShort, t.mondayShort, t.tuesdayShort, t.wednesdayShort, t.thursdayShort, t.fridayShort, t.saturdayShort];
+  const DAYS_OF_WEEK_FULL = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
+
+  const renderUpcomingClassesSection = () => (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.upcomingClasses}</h2>
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+        {Object.keys(groupedUpcomingClasses).length > 0 ? (
+          <ul className="divide-y divide-gray-200">
+            {Object.entries(groupedUpcomingClasses).map(([dayOfWeek, classes]) => (
+              <li key={dayOfWeek} className="px-4 py-4 sm:px-6">
+                <div className="space-y-3">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    {DAYS_OF_WEEK_FULL[parseInt(dayOfWeek)]} {t.class}
+                  </h3>
+                  <div className="space-y-3 pl-4">
+                    {classes.map((classSession) => (
+                      <div key={classSession.id} className="flex items-center justify-between border-l-2 border-gray-200 pl-3">
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-500">
+                            {formatClassTime(classSession)}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {formatStudentNames(classSession.studentEmails)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
+            {t.noClassesScheduled}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   if (adminLoading) {
     return (
@@ -302,32 +363,8 @@ export const Dashboard = () => {
 
   const AdminDashboard = () => (
     <div className="space-y-8 max-w-7xl mx-auto pt-8 px-4 sm:px-6 lg:px-8">
-      {/* Quick Actions */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.quickActions}</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Link
-            to="/admin/schedule"
-            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
-          >
-            <div className="flex-1 min-w-0">
-              <span className="absolute inset-0" aria-hidden="true" />
-              <p className="text-sm font-medium text-gray-900">{t.manageSchedules}</p>
-              <p className="text-sm text-gray-500">{t.manageScheduleDesc}</p>
-            </div>
-          </Link>
-          <Link
-            to="/admin/materials"
-            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
-          >
-            <div className="flex-1 min-w-0">
-              <span className="absolute inset-0" aria-hidden="true" />
-              <p className="text-sm font-medium text-gray-900">{t.classMaterials}</p>
-              <p className="text-sm text-gray-500">{t.classMaterialsDesc}</p>
-            </div>
-          </Link>
-        </div>
-      </div>
+      {/* Upcoming Classes */}
+      {renderUpcomingClassesSection()}
 
       {/* Calendar and Details */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -472,7 +509,7 @@ export const Dashboard = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center">{t.noClassesScheduled}</p>
+                <p className="text-gray-500 text-center">{t.selectDayToViewDetails}</p>
               )}
             </div>
           ) : (
@@ -487,6 +524,9 @@ export const Dashboard = () => {
 
   const StudentDashboard = () => (
     <div className="space-y-8 max-w-7xl mx-auto pt-8 px-4 sm:px-6 lg:px-8">
+      {/* Upcoming Classes */}
+      {renderUpcomingClassesSection()}
+
       {/* Calendar and Details */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Calendar */}
@@ -630,7 +670,7 @@ export const Dashboard = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center">{t.noClassesScheduled}</p>
+                <p className="text-gray-500 text-center">{t.selectDayToViewDetails}</p>
               )}
             </div>
           ) : (
