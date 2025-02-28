@@ -51,6 +51,8 @@ export const AdminUsers = () => {
   const t = useTranslation(language);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const [newUser, setNewUser] = useState<NewUser>({ 
     email: '', 
     name: '',
@@ -87,6 +89,34 @@ export const AdminUsers = () => {
       await fetchUsers();
     };
     fetchUsersData();
+
+    const handleResize = () => {
+      setShowMobileView(window.innerWidth < 768);
+    };
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+      
+      const hasHorizontalScroll = target.scrollWidth > target.clientWidth;
+      const isScrolledToEnd = target.scrollLeft + target.clientWidth >= target.scrollWidth - 10;
+      setShowScrollIndicator(hasHorizontalScroll && !isScrolledToEnd);
+    };
+
+    window.addEventListener('resize', handleResize);
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+      tableContainer.addEventListener('scroll', handleScroll);
+      // Initial check
+      handleScroll({ target: tableContainer } as unknown as Event);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (tableContainer) {
+        tableContainer.removeEventListener('scroll', handleScroll);
+      }
+    };
   }, [fetchUsers]);
 
   const deleteUser = async (userId: string) => {
@@ -285,6 +315,76 @@ export const AdminUsers = () => {
     return a.name.localeCompare(b.name);
   });
 
+  const renderMobileCard = (user: User) => (
+    <div key={user.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <div className="font-semibold text-gray-900">{user.name}</div>
+          <div className="text-sm text-gray-600">{user.email}</div>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          {user.status === 'active' ? (
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+              user.isAdmin
+                ? 'bg-green-100 text-green-800'
+                : user.isTeacher
+                ? 'bg-blue-100 text-blue-800'
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+              {user.isAdmin ? 'Admin' : user.isTeacher ? t.teacherAccount : t.activeUser}
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              {t.pendingSignup}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 mt-4">
+        {user.status === 'active' ? (
+          <button
+            onClick={() => deleteUser(user.id)}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm min-w-[100px]"
+          >
+            {t.delete}
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={async () => {
+                try {
+                  let signupLink = recentSignupLinks[user.email];
+                  if (!signupLink) {
+                    signupLink = await createSignupLink(user.email, user.name);
+                    setRecentSignupLinks(prev => ({
+                      ...prev,
+                      [user.email]: signupLink
+                    }));
+                  }
+                  await navigator.clipboard.writeText(signupLink);
+                  toast.success(t.signupLinkCopied);
+                } catch (error) {
+                  console.error('Error copying signup link:', error);
+                  toast.error(t.failedToCopyLink);
+                }
+              }}
+              className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded text-sm min-w-[100px]"
+            >
+              {t.copyLink}
+            </button>
+            <button
+              onClick={() => deleteUser(user.id)}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm min-w-[100px]"
+            >
+              {t.delete}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex-1 bg-white">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -467,100 +567,114 @@ export const AdminUsers = () => {
         </div>
 
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.name}
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.email}
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.userStatus}
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.actions}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {allUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      {user.status === 'active' ? (
-                        <span className={`inline-flex items-center px-4 py-1 rounded-full text-sm font-medium ${
-                          user.isAdmin
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {user.isAdmin ? 'Admin' : t.activeUser}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-4 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                          {t.pendingSignup}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex flex-col justify-center items-center space-y-2">
-                        {user.status === 'active' && (
-                          <button
-                            onClick={() => deleteUser(user.id)}
-                            className="w-24 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
-                          >
-                            {t.delete}
-                          </button>
-                        )}
-                        {user.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  // Check if we have a recent signup link for this email
-                                  let signupLink = recentSignupLinks[user.email];
-                                  
-                                  // If not, create a new one and update the user's token
-                                  if (!signupLink) {
-                                    // Create new signup link
-                                    signupLink = await createSignupLink(user.email, user.name);
-                                    
-                                    // Update recent signup links state
-                                    setRecentSignupLinks(prev => ({
-                                      ...prev,
-                                      [user.email]: signupLink
-                                    }));
-                                  }
-                                  
-                                  await navigator.clipboard.writeText(signupLink);
-                                  toast.success(t.signupLinkCopied);
-                                } catch (error) {
-                                  console.error('Error copying signup link:', error);
-                                  toast.error(t.failedToCopyLink);
-                                }
-                              }}
-                              className="w-24 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-sm"
-                            >
-                              {t.copyLink}
-                            </button>
-                            <button
-                              onClick={() => deleteUser(user.id)}
-                              className="w-24 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
-                            >
-                              {t.delete}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {showMobileView ? (
+            // Mobile card view
+            <div className="space-y-4 p-4">
+              {allUsers.map(renderMobileCard)}
+            </div>
+          ) : (
+            // Desktop table view
+            <div className="relative">
+              <div className="table-container overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {t.name}
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {t.email}
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {t.userStatus}
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {t.actions}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {allUsers.map((user) => (
+                      <tr key={user.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {user.status === 'active' ? (
+                            <span className={`inline-flex items-center px-4 py-1 rounded-full text-sm font-medium ${
+                              user.isAdmin
+                                ? 'bg-green-100 text-green-800'
+                                : user.isTeacher
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {user.isAdmin ? 'Admin' : user.isTeacher ? t.teacherAccount : t.activeUser}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-4 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                              {t.pendingSignup}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="flex flex-col justify-center items-center space-y-2">
+                            {user.status === 'active' && (
+                              <button
+                                onClick={() => deleteUser(user.id)}
+                                className="w-40 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                              >
+                                {t.delete}
+                              </button>
+                            )}
+                            {user.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      let signupLink = recentSignupLinks[user.email];
+                                      if (!signupLink) {
+                                        signupLink = await createSignupLink(user.email, user.name);
+                                        setRecentSignupLinks(prev => ({
+                                          ...prev,
+                                          [user.email]: signupLink
+                                        }));
+                                      }
+                                      await navigator.clipboard.writeText(signupLink);
+                                      toast.success(t.signupLinkCopied);
+                                    } catch (error) {
+                                      console.error('Error copying signup link:', error);
+                                      toast.error(t.failedToCopyLink);
+                                    }
+                                  }}
+                                  className="w-40 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-sm"
+                                >
+                                  {t.copyLink}
+                                </button>
+                                <button
+                                  onClick={() => deleteUser(user.id)}
+                                  className="w-40 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                                >
+                                  {t.delete}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {showScrollIndicator && (
+                <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-white to-transparent flex items-center justify-center">
+                  <div className="animate-bounce text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

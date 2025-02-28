@@ -86,6 +86,8 @@ export const AdminSchedule = () => {
     startDate: getNextDayOccurrence(1),
     endDate: null as Date | null
   });
+  const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -111,8 +113,33 @@ export const AdminSchedule = () => {
     
     loadData();
 
+    const handleResize = () => {
+      setShowMobileView(window.innerWidth < 768);
+    };
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+      
+      const hasHorizontalScroll = target.scrollWidth > target.clientWidth;
+      const isScrolledToEnd = target.scrollLeft + target.clientWidth >= target.scrollWidth - 10;
+      setShowScrollIndicator(hasHorizontalScroll && !isScrolledToEnd);
+    };
+
+    window.addEventListener('resize', handleResize);
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+      tableContainer.addEventListener('scroll', handleScroll);
+      // Initial check
+      handleScroll({ target: tableContainer } as unknown as Event);
+    }
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('resize', handleResize);
+      if (tableContainer) {
+        tableContainer.removeEventListener('scroll', handleScroll);
+      }
     };
   }, []);
 
@@ -370,6 +397,71 @@ export const AdminSchedule = () => {
     return <div className="text-center p-4">Loading...</div>;
   }
 
+  const renderMobileCard = (classItem: Class) => (
+    <div key={classItem.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <div className="font-semibold text-gray-900">
+            {DAYS_OF_WEEK[classItem.dayOfWeek]}
+          </div>
+          <div className="text-sm text-gray-600">
+            {classItem.startTime} - {classItem.endTime}
+          </div>
+        </div>
+        <button
+          onClick={() => handleDeleteClass(classItem.id)}
+          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+        >
+          {t.delete}
+        </button>
+      </div>
+      
+      <div className="space-y-2">
+        <div>
+          <div className="text-sm font-medium text-gray-500">{t.courseType}</div>
+          <div className="text-sm text-gray-900">{classItem.courseType}</div>
+        </div>
+        
+        <div>
+          <div className="text-sm font-medium text-gray-500">{t.students}</div>
+          <div className="text-sm text-gray-900">
+            {classItem.studentEmails?.map(email => {
+              const student = users.find(u => u.email === email);
+              return student ? (
+                <div key={`${classItem.id}-${email}`} className="mb-1">
+                  {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
+                </div>
+              ) : (
+                <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
+                  {t.unknownEmail}: {email}
+                </div>
+              );
+            })}
+            {(!classItem.studentEmails || classItem.studentEmails.length === 0) && (
+              <div className="text-gray-500 italic">{t.noStudentsAssigned}</div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-sm font-medium text-gray-500">{t.startDate}</div>
+          <div className="text-sm text-gray-900">
+            {classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+          </div>
+        </div>
+
+        {classItem.endDate && (
+          <div>
+            <div className="text-sm font-medium text-gray-500">{t.endDate}</div>
+            <div className="text-sm text-gray-900">
+              {classItem.endDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex-1 bg-white">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -523,80 +615,97 @@ export const AdminSchedule = () => {
           </div>
         )}
 
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.dayAndTime}
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.courseType}
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.students}
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.startDate}
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.endDate}
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t.actions}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {classes.map((classItem) => (
-                  <tr key={classItem.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {DAYS_OF_WEEK[classItem.dayOfWeek]}<br />
-                      {classItem.startTime} - {classItem.endTime}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {classItem.courseType}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      <div className="max-h-24 overflow-y-auto">
-                        {classItem.studentEmails?.map(email => {
-                          const student = users.find(u => u.email === email);
-                          return student ? (
-                            <div key={`${classItem.id}-${email}`} className="mb-1">
-                              {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
-                            </div>
-                          ) : (
-                            <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
-                              {t.unknownEmail}: {email}
-                            </div>
-                          );
-                        })}
-                        {(!classItem.studentEmails || classItem.studentEmails.length === 0) && (
-                          <div key={`${classItem.id}-no-students`} className="text-gray-500 italic">{t.noStudentsAssigned}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {classItem.endDate?.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                      <button
-                        onClick={() => handleDeleteClass(classItem.id)}
-                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
-                      >
-                        {t.delete}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {showMobileView ? (
+          // Mobile card view
+          <div className="space-y-4">
+            {classes.map(renderMobileCard)}
           </div>
-        </div>
+        ) : (
+          // Desktop table view
+          <div className="bg-white shadow-md rounded-lg overflow-hidden relative">
+            <div className="table-container overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {t.dayAndTime}
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {t.courseType}
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {t.students}
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {t.startDate}
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {t.endDate}
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {t.actions}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {classes.map((classItem) => (
+                    <tr key={classItem.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {DAYS_OF_WEEK[classItem.dayOfWeek]}<br />
+                        {classItem.startTime} - {classItem.endTime}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {classItem.courseType}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <div className="max-h-24 overflow-y-auto">
+                          {classItem.studentEmails?.map(email => {
+                            const student = users.find(u => u.email === email);
+                            return student ? (
+                              <div key={`${classItem.id}-${email}`} className="mb-1">
+                                {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
+                              </div>
+                            ) : (
+                              <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
+                                {t.unknownEmail}: {email}
+                              </div>
+                            );
+                          })}
+                          {(!classItem.studentEmails || classItem.studentEmails.length === 0) && (
+                            <div key={`${classItem.id}-no-students`} className="text-gray-500 italic">{t.noStudentsAssigned}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {classItem.endDate?.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                        <button
+                          onClick={() => handleDeleteClass(classItem.id)}
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                        >
+                          {t.delete}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {showScrollIndicator && (
+              <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-white to-transparent flex items-center justify-center">
+                <div className="animate-bounce text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
