@@ -244,9 +244,9 @@ export const ClassMaterials = () => {
 
   if (existingMaterials.length === 0) {
     return (
-      <div className="bg-gray-50 py-8">
+      <div className="min-h-screen py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="card">
             <h1 className="text-2xl font-bold text-gray-900 mb-6">{t.classMaterialsTitle}</h1>
             <p className="text-gray-500 text-center py-4">{t.noMaterialsFound}</p>
           </div>
@@ -256,9 +256,9 @@ export const ClassMaterials = () => {
   }
 
   return (
-    <div className="bg-gray-50 py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="card">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">{t.classMaterialsTitle}</h1>
 
           {/* Month and Date Selection */}

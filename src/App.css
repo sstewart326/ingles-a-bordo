@@ -17,15 +17,23 @@ body,
   width: 100%;
 }
 
+html {
+  min-height: 100%;
+  height: auto;
+}
+
 body {
   overflow-x: hidden;
   min-height: 100vh;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 #root {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 100vh;
   width: 100%;
 }
@@ -60,16 +68,24 @@ body {
 
 .card {
   padding: 2em;
-  border: 1px solid #eee;
+  border: 1px solid rgba(225, 201, 230, 0.3);
   border-radius: 8px;
   transition: all 0.3s ease;
-  background: white;
-  @apply bg-white text-black;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  box-shadow: 
+    0 4px 6px rgba(0, 0, 0, 0.02),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  @apply text-black;
 }
 
 .card:hover {
   border-color: var(--brand-color);
-  box-shadow: 0 4px 16px var(--brand-color-light);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.05),
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    0 0 0 3px var(--brand-color-light);
+  transform: translateY(-1px);
 }
 
 button {

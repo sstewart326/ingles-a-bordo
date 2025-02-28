@@ -422,7 +422,10 @@ export const Schedule = () => {
   }
 
   return (
-    <div className="flex-1 bg-white">
+    <div className="flex-1 relative min-h-screen bg-[#fafafa]" style={{
+      backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E")`,
+      backgroundAttachment: 'fixed'
+    }}>
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="md:flex md:items-center md:justify-between">
           <div className="flex-1 min-w-0">

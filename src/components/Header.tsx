@@ -45,7 +45,7 @@ export const Header = () => {
       {({ open }) => (
         <>
           <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
-            <div className="relative flex h-16 items-center justify-between">
+            <div className="relative flex h-20 items-center justify-between">
               <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">
                 <Disclosure.Button className="header-nav-button relative inline-flex items-center justify-center rounded-md p-2 text-[var(--brand-color)] hover:text-[var(--brand-color-dark)] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--brand-color)] bg-transparent">
                   <span className="sr-only">Open main menu</span>
@@ -58,7 +58,11 @@ export const Header = () => {
               </div>
               <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
                 <div className="flex flex-shrink-0 items-center">
-                  <span className="header-nav-logo text-white text-xl font-bold">Inglês a Bordo</span>
+                  <img
+                    src="/ingles-a-bordo.png"
+                    alt="Inglês a Bordo"
+                    className="h-12 w-auto"
+                  />
                 </div>
                 <div className="hidden sm:ml-6 sm:block">
                   <div className="flex space-x-4">
