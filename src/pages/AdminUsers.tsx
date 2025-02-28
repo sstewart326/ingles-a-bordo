@@ -9,6 +9,7 @@ import { useAdmin } from '../hooks/useAdmin';
 import { getCachedCollection, deleteCachedDocument, setCachedDocument } from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
+import { DatePicker } from '../components/DatePicker';
 
 interface User {
   id: string;
@@ -23,6 +24,7 @@ interface User {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;  // for weekly payments, number of weeks
     monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
+    startDate: string;  // ISO date string for when payments should start
   };
 }
 
@@ -35,6 +37,7 @@ interface NewUser {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;
     monthlyOption?: 'first' | 'fifteen' | 'last';
+    startDate: string;
   };
 }
 
@@ -60,7 +63,8 @@ export const AdminUsers = () => {
     isAdmin: false,
     paymentConfig: { 
       type: 'weekly',
-      weeklyInterval: 1 
+      weeklyInterval: 1,
+      startDate: new Date().toISOString().split('T')[0]  // Today's date as default
     } 
   });
   const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: string}>({});
@@ -287,7 +291,8 @@ export const AdminUsers = () => {
         isAdmin: false,
         paymentConfig: { 
           type: 'weekly', 
-          weeklyInterval: 1 
+          weeklyInterval: 1,
+          startDate: new Date().toISOString().split('T')[0]  // Today's date as default
         } 
       }); // Reset form
       
@@ -491,6 +496,22 @@ export const AdminUsers = () => {
                 </div>
                 {!newUser.isTeacher && !newUser.isAdmin && (
                   <>
+                    <div>
+                      <label htmlFor="paymentStartDate" className="block text-sm font-medium text-gray-700">
+                        {t.paymentStartDate}
+                      </label>
+                      <DatePicker
+                        selectedDate={newUser.paymentConfig?.startDate || new Date().toISOString().split('T')[0]}
+                        onChange={(date) => setNewUser(prev => ({ 
+                          ...prev, 
+                          paymentConfig: { 
+                            ...prev.paymentConfig!, 
+                            startDate: date
+                          } 
+                        }))}
+                        minDate={new Date()}
+                      />
+                    </div>
                     <div>
                       <label htmlFor="paymentConfig" className="block text-sm font-medium text-gray-700">
                         {t.paymentConfiguration}

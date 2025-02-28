@@ -34,6 +34,7 @@ interface ClassWithStudents extends Class {
       type: 'weekly' | 'monthly';
       weeklyInterval?: number;
       monthlyOption?: 'first' | 'fifteen' | 'last';
+      startDate: string;
     };
   }[];
 }
@@ -46,6 +47,7 @@ interface User {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;
     monthlyOption?: 'first' | 'fifteen' | 'last';
+    startDate: string;
   };
 }
 
@@ -133,7 +135,7 @@ export const Schedule = () => {
         const classesData = await getCachedCollection<ClassWithStudents>('classes', queryConstraints, {
           includeIds: true
         });
-        
+
         if (classesData.length > 0) {
           // Fetch all users that are students in any class
           const allStudentEmails = new Set<string>();
@@ -221,7 +223,7 @@ export const Schedule = () => {
       .filter(classItem => {
         // Check if this date is on or after the class start date
         const classStartDate = startOfDay(classItem.startDate.toDate());
-        const hasStarted = calendarDate >= classStartDate;
+        const hasStarted = calendarDate >= classStartDate;      
         if (!hasStarted) {
           return false;
         }
@@ -232,9 +234,10 @@ export const Schedule = () => {
         }
         
         // Otherwise check if it's not expired and within end date
-        return classItem.dayOfWeek === dayOfWeek && 
+        const isValid = classItem.dayOfWeek === dayOfWeek && 
           classItem.endDate.toDate() >= today && // Must not be expired
-          calendarDate <= classItem.endDate.toDate(); // Must not be past the end date
+          calendarDate <= classItem.endDate.toDate(); // Must not be past the end date      
+        return isValid;
       });
 
     return filteredClasses;
@@ -294,23 +297,73 @@ export const Schedule = () => {
     
     const dates: Date[] = [];
     const startDate = classItem.startDate.toDate();
+    startDate.setHours(0, 0, 0, 0);
+    
+    // Parse the payment start date in local timezone
+    const paymentStartDate = paymentConfig.startDate ? 
+      new Date(paymentConfig.startDate.split('T')[0] + 'T00:00:00') : 
+      startDate;
     
     // Get the first and last day of the currently viewed month
     const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
     const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
     
-    // If class hasn't started yet or has ended, no payments
-    if (startDate > monthEnd || (classItem.endDate && classItem.endDate.toDate() < monthStart)) {
-      return [];
+    // If class has ended, no payments
+    if (classItem.endDate) {
+      const endDate = classItem.endDate.toDate();
+      endDate.setHours(23, 59, 59, 999);
+      if (endDate < monthStart) {
+        console.log('Class has ended before month start:', endDate.toISOString());
+        return [];
+      }
     }
 
-    // Add the first class date as a payment date if it falls within the current month
-    const firstClassDate = new Date(startDate);
-    if (firstClassDate >= monthStart && firstClassDate <= monthEnd) {
-      dates.push(new Date(firstClassDate));
+    // Add the payment start date if it falls within the current month
+    if (paymentStartDate >= monthStart && paymentStartDate <= monthEnd) {
+      console.log('Adding payment start date:', paymentStartDate.toISOString());
+      const newPaymentDate = new Date(paymentStartDate);
+      const dateExists = dates.some(d => 
+        d.getFullYear() === newPaymentDate.getFullYear() &&
+        d.getMonth() === newPaymentDate.getMonth() &&
+        d.getDate() === newPaymentDate.getDate()
+      );
+      if (!dateExists) {
+        dates.push(newPaymentDate);
+      }
     }
     
-    if (paymentConfig.type === 'monthly') {
+    if (paymentConfig.type === 'weekly') {
+      const interval = paymentConfig.weeklyInterval || 1;
+      console.log('Weekly payment calculation:', { interval });
+      
+      // Start from the payment start date
+      let currentPaymentDate = new Date(paymentStartDate);
+      currentPaymentDate.setHours(0, 0, 0, 0);
+      
+      // If we're viewing a month after the start date, find the first payment date in/before this month
+      if (currentPaymentDate < monthStart) {
+        const weeksToAdd = Math.ceil((monthStart.getTime() - currentPaymentDate.getTime()) / (7 * 24 * 60 * 60 * 1000) / interval) * interval;
+        console.log('Weeks to add calculation:', {
+          weeksToAdd,
+          currentPaymentDate: currentPaymentDate.toISOString(),
+          monthStart: monthStart.toISOString()
+        });
+        currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * weeksToAdd));
+      }
+      
+      // Add all payment dates in this month
+      while (currentPaymentDate <= monthEnd) {
+        if (currentPaymentDate >= monthStart) {
+          console.log('Adding payment date:', currentPaymentDate.toISOString());
+          const paymentDate = new Date(currentPaymentDate);
+          paymentDate.setHours(0, 0, 0, 0);
+          dates.push(paymentDate);
+        }
+        currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * interval));
+      }
+    } else if (paymentConfig.type === 'monthly') {
       const year = selectedDate.getFullYear();
       const month = selectedDate.getMonth();
       
@@ -329,40 +382,25 @@ export const Schedule = () => {
           return dates; // Return with only first class date if present
       }
       
-      if (paymentDate >= startDate && 
+      paymentDate.setHours(0, 0, 0, 0);
+      console.log('Monthly payment calculation:', {
+        monthlyOption: paymentConfig.monthlyOption,
+        paymentDate: paymentDate.toISOString()
+      });
+      
+      // Only add the monthly payment date if it's after the payment start date
+      if (paymentDate >= paymentStartDate && 
           (!classItem.endDate || paymentDate <= classItem.endDate.toDate())) {
-        dates.push(paymentDate);
-      }
-    } else if (paymentConfig.type === 'weekly') {
-      const interval = paymentConfig.weeklyInterval || 1;
-      
-      // Start from the class start date
-      const baseDate = new Date(startDate);
-      
-      // Move forward to the first date in the current month if the start date is before it
-      while (baseDate < monthStart) {
-        baseDate.setDate(baseDate.getDate() + (7 * interval));
-      }
-      
-      // Now find all payment dates in the sequence
-      const currentPaymentDate = new Date(baseDate);
-      
-      // Keep going until we're past the end of the month
-      while (currentPaymentDate <= monthEnd) {
-        // Only add dates that are in this month and not already added
-        if (currentPaymentDate >= monthStart && currentPaymentDate <= monthEnd) {
-          // Check if this date is not already in the dates array
-          const dateExists = dates.some(d => d.getTime() === currentPaymentDate.getTime());
-          if (!dateExists) {
-            dates.push(new Date(currentPaymentDate));
-          }
+        // Check if this date is not already in the dates array
+        const dateExists = dates.some(d => d.getTime() === paymentDate.getTime());
+        if (!dateExists) {
+          console.log('Adding monthly payment date:', paymentDate.toISOString());
+          dates.push(paymentDate);
         }
-        
-        // Move to next payment date
-        currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * interval));
       }
     }
     
+    console.log('Final payment dates:', dates.map(d => d.toISOString()));
     return dates;
   };
 
@@ -435,14 +473,50 @@ export const Schedule = () => {
                   date.getDate() === new Date().getDate() &&
                   date.getMonth() === new Date().getMonth() &&
                   date.getFullYear() === new Date().getFullYear();
+                
+                console.log('Checking payment dates for:', {
+                  date: date.toISOString(),
+                  hasClasses: dayClasses.length > 0,
+                  hasPaymentConfig: !!userData?.paymentConfig,
+                  paymentConfig: userData?.paymentConfig
+                });
+                
+                const paymentDates = userData?.paymentConfig && classes.length > 0 ? 
+                  classes.flatMap(classItem => {
+                    console.log('Calculating payment dates for class:', {
+                      classId: classItem.id,
+                      classStartDate: classItem.startDate.toDate().toISOString(),
+                      classEndDate: classItem.endDate?.toDate().toISOString(),
+                      paymentConfig: userData.paymentConfig
+                    });
+                    const dates = getNextPaymentDates(userData.paymentConfig, classItem);
+                    console.log('Payment dates for class:', classItem.id, dates.map(d => d.toISOString()));
+                    return dates;
+                  }) : [];
 
-                const paymentDates = dayClasses.length > 0 && userData?.paymentConfig ? 
-                  dayClasses.flatMap(classItem => getNextPaymentDates(userData.paymentConfig, classItem)) : [];
+                console.log('Final payment dates array:', {
+                  date: date.toISOString(),
+                  paymentDatesCount: paymentDates.length,
+                  paymentDates: paymentDates.map(d => d.toISOString())
+                });
 
                 const isPaymentDay = paymentDates.some(paymentDate => {
-                  const paymentDateStr = paymentDate.toISOString().split('T')[0];
-                  const dateStr = date.toISOString().split('T')[0];
-                  return paymentDateStr === dateStr;
+                  const matches = date.getFullYear() === paymentDate.getFullYear() &&
+                         date.getMonth() === paymentDate.getMonth() &&
+                         date.getDate() === paymentDate.getDate();
+                  if (matches) {
+                    console.log('Found payment day match:', {
+                      date: date.toISOString(),
+                      paymentDate: paymentDate.toISOString()
+                    });
+                  }
+                  return matches;
+                });
+
+                console.log('Calendar day render:', {
+                  date: date.toISOString(),
+                  isPaymentDay,
+                  hasClasses: dayClasses.length > 0
                 });
 
                 const daysUntilPayment = isPaymentDay ? 
@@ -472,9 +546,20 @@ export const Schedule = () => {
                           />
                         )}
                       </div>
-                      {/* Date */}
-                      <div className={`font-medium text-center ${isToday ? 'text-[#6366f1]' : 'text-[#1a1a1a]'} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
-                        <span>{index + 1}</span>
+                      {/* Date and Payment Pill */}
+                      <div className="flex flex-col items-center">
+                        <div className={`font-medium text-center ${isToday ? 'text-[#6366f1]' : 'text-[#1a1a1a]'} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
+                          <span>{index + 1}</span>
+                        </div>
+                        {isPaymentDay && (
+                          <div className={`text-[0.6rem] px-1 py-0.5 rounded mt-1 ${
+                            isPaymentSoon 
+                              ? 'bg-[#fef2f2] text-[#ef4444]' 
+                              : 'bg-[#fffbeb] text-[#f59e0b]'
+                          }`}>
+                            {t.paymentDue}
+                          </div>
+                        )}
                       </div>
                       {/* Class details (hidden on mobile) */}
                       {dayClasses.length > 0 && (
@@ -541,41 +626,50 @@ export const Schedule = () => {
           <div className="mt-8 lg:mt-[3.75rem]"> {/* Align with calendar grid */}
             {selectedDayDetails ? (
               <div className="bg-white rounded-2xl shadow-sm border border-[#f0f0f0] p-6 lg:sticky lg:top-8">
-                {selectedDayDetails.classes.map(classItem => {
-                  const dateStr = selectedDayDetails.date.toISOString().split('T')[0];
-                  const key = `${classItem.id}_${dateStr}`;
-                  const materialInfo = materialsInfo.get(key);
-                  const hasMaterials = !!materialInfo;
+                <div className="flex items-center gap-2 mb-4">
+                  <h3 className="text-lg font-medium text-[#1a1a1a]">
+                    {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </h3>
+                </div>
 
-                  return (
-                    <div
-                      key={classItem.id}
-                      onClick={() => hasMaterials && handleClassClick(classItem, selectedDayDetails.date)}
-                      className={`p-4 rounded-xl mb-4 last:mb-0 border ${
-                        hasMaterials 
-                          ? 'border-[#e0e7ff] bg-[#f5f7ff] hover:border-[#c7d2fe] hover:bg-[#eef2ff] cursor-pointer' 
-                          : 'border-[#f0f0f0] bg-[#f8f8f8]'
-                      } transition-colors`}
-                    >
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="w-2 h-2 rounded-full bg-[#6366f1]" />
-                        <h3 className="text-lg font-medium text-[#1a1a1a]">
-                          {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </h3>
-                      </div>
+                {selectedDayDetails.isPaymentDay && (
+                  <div className="flex items-center gap-2 bg-[#fffbeb] p-3 rounded-lg mb-4">
+                    <div className={`w-2 h-2 rounded-full ${selectedDayDetails.isPaymentSoon ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`} />
+                    <div>
+                      <span className="text-sm font-medium text-[#f59e0b]">{t.paymentDue}</span>
+                      {selectedDayDetails.isPaymentSoon && (
+                        <span className="text-xs ml-2 text-[#ef4444]">Due soon</span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-                      <div className="space-y-3 text-[#4b5563]">
-                        {selectedDayDetails.isPaymentDay && (
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${selectedDayDetails.isPaymentSoon ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`} />
-                            <span className="text-sm">{t.paymentDue}</span>
-                          </div>
-                        )}
-                        
+                {selectedDayDetails.classes.length > 0 ? (
+                  selectedDayDetails.classes.map(classItem => {
+                    const dateStr = selectedDayDetails.date.toISOString().split('T')[0];
+                    const key = `${classItem.id}_${dateStr}`;
+                    const materialInfo = materialsInfo.get(key);
+                    const hasMaterials = !!materialInfo;
+
+                    return (
+                      <div
+                        key={classItem.id}
+                        onClick={() => hasMaterials && handleClassClick(classItem, selectedDayDetails.date)}
+                        className={`p-4 rounded-xl mb-4 last:mb-0 border ${
+                          hasMaterials 
+                            ? 'border-[#e0e7ff] bg-[#f5f7ff] hover:border-[#c7d2fe] hover:bg-[#eef2ff] cursor-pointer' 
+                            : 'border-[#f0f0f0] bg-[#f8f8f8]'
+                        } transition-colors`}
+                      >
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-2 h-2 rounded-full bg-[#6366f1]" />
+                          <span className="text-sm font-medium text-[#1a1a1a]">{t.class}</span>
+                        </div>
+
                         <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2">
                           <span className="text-sm font-medium text-[#6b7280]">{t.dayOfWeek}</span>
                           <span className="text-sm">{DAYS_OF_WEEK_FULL[selectedDayDetails.date.getDay()]}</span>
@@ -593,27 +687,31 @@ export const Schedule = () => {
                             </>
                           )}
                         </div>
-                      </div>
 
-                      {hasMaterials && (
-                        <div className="mt-4 pt-4 border-t border-[#e5e7eb] flex gap-2">
-                          {materialInfo.hasSlides && (
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-[#e0e7ff] text-[#4f46e5]">
-                              <FaFileAlt className="w-3 h-3 mr-1" />
-                              Doc
-                            </span>
-                          )}
-                          {materialInfo.hasLinks && (
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-[#e0e7ff] text-[#4f46e5]">
-                              <FaLink className="w-3 h-3 mr-1" />
-                              Links
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        {hasMaterials && (
+                          <div className="mt-4 pt-4 border-t border-[#e5e7eb] flex gap-2">
+                            {materialInfo.hasSlides && (
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-[#e0e7ff] text-[#4f46e5]">
+                                <FaFileAlt className="w-3 h-3 mr-1" />
+                                Doc
+                              </span>
+                            )}
+                            {materialInfo.hasLinks && (
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-[#e0e7ff] text-[#4f46e5]">
+                                <FaLink className="w-3 h-3 mr-1" />
+                                Links
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-sm text-[#6b7280] text-center">
+                    {t.noClassesScheduled}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="bg-white rounded-2xl shadow-sm border border-[#f0f0f0] p-6 lg:sticky lg:top-8">

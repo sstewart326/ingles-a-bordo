@@ -95,6 +95,7 @@ interface Translation {
   lastDayMonth: string;
   pleaseSpecifyWeeklyInterval: string;
   pleaseSelectPaymentDay: string;
+  paymentStartDate: string;
   addNewUser: string;
   generateSignupLink: string;
   paymentDue: string;
@@ -241,6 +242,7 @@ const translations: Record<Language, Translation> = {
     lastDayMonth: 'Last day of month',
     pleaseSpecifyWeeklyInterval: 'Please specify weekly interval',
     pleaseSelectPaymentDay: 'Please select payment day',
+    paymentStartDate: 'Payment Start Date',
     addNewUser: 'Add New User',
     generateSignupLink: 'Generate Signup Link',
     paymentDue: 'Payment Due',
@@ -385,6 +387,7 @@ const translations: Record<Language, Translation> = {
     lastDayMonth: 'Último dia do mês',
     pleaseSpecifyWeeklyInterval: 'Por favor, especifique o intervalo semanal',
     pleaseSelectPaymentDay: 'Por favor, selecione o dia de pagamento',
+    paymentStartDate: 'Data de Início do Pagamento',
     addNewUser: 'Adicionar Novo Usuário',
     generateSignupLink: 'Gerar Link de Cadastro',
     paymentDue: 'Pagamento Pendente',
