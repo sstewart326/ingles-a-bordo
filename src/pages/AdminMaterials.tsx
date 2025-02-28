@@ -7,6 +7,13 @@ import { ClassDatePicker } from '../components/ClassDatePicker';
 import { cache } from '../utils/cache';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
+import { where } from 'firebase/firestore';
+
+interface User {
+  id: string;
+  email: string;
+  name?: string;
+}
 
 interface Class {
   id: string;
@@ -94,6 +101,7 @@ const AdminMaterials = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [existingMaterials, setExistingMaterials] = useState<ClassMaterial[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
 
   const fetchMaterialsAndStudents = useCallback(async () => {
     if (!selectedClass || !selectedClass.id) {
@@ -141,6 +149,21 @@ const AdminMaterials = () => {
         // Clear the cache before fetching to ensure we get fresh data with IDs
         cache.clearAll();
         const classesData = await getCachedCollection<Class>('classes', [], { includeIds: true });
+        
+        // Fetch all users that are students in any class
+        const allStudentEmails = new Set<string>();
+        classesData.forEach(c => {
+          c.studentEmails.forEach(email => allStudentEmails.add(email));
+        });
+
+        // Get all users data in one query
+        const usersData = await getCachedCollection<User>('users', [
+          where('email', 'in', Array.from(allStudentEmails))
+        ], {
+          includeIds: true
+        });
+
+        setUsers(usersData);
         
         // Validate that we have IDs and proper time format
         const invalidClasses = classesData.filter(c => {
@@ -404,10 +427,12 @@ const AdminMaterials = () => {
                     {classes
                       .filter(c => c.dayOfWeek === selectedDate.getDay())
                       .map(classItem => {
-                        const displayText = `${classItem.courseType || t.class} (${classItem.startTime} - ${classItem.endTime})`;
+                        // Find the student for this class
+                        const student = users.find(u => classItem.studentEmails.includes(u.email));
+                        const displayText = student?.name || student?.email || t.unknownEmail;
                         return (
                           <option key={classItem.id} value={classItem.id}>
-                            {displayText}
+                            {displayText} ({classItem.startTime} - {classItem.endTime})
                           </option>
                         );
                       })}

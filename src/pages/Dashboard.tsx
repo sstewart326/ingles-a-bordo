@@ -6,7 +6,6 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { getCachedCollection } from '../utils/firebaseUtils';
 import { getDaysInMonth } from '../utils/dateUtils';
-import { createPortal } from 'react-dom';
 
 interface ClassSession {
   id: string;

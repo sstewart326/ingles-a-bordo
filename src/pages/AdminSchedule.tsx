@@ -11,6 +11,8 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
+import { db } from '../config/firebase';
+import { getDocs, collection } from 'firebase/firestore';
 
 interface User {
   id: string;
@@ -155,8 +157,12 @@ export const AdminSchedule = () => {
 
   const fetchAllUsers = async () => {
     try {
-      // Fetch all users (both active and pending)
-      const users = await getCachedCollection<User>('users', [], { includeIds: true });
+      // Fetch all users directly from Firestore to get fresh data
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const users = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as User[];
       setUsers(users);
     } catch (error) {
       console.error('Error fetching users:', error);
