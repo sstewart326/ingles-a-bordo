@@ -218,7 +218,13 @@ export const AdminSchedule = () => {
   };
 
   const handleDeleteClass = async (classId: string) => {
-    if (!window.confirm('Are you sure you want to delete this class?')) {
+    const classToDelete = classes.find(c => c.id === classId);
+    if (!classToDelete) return;
+
+    const dayName = DAYS_OF_WEEK[classToDelete.dayOfWeek];
+    const confirmMessage = `Are you sure you want to delete the ${classToDelete.courseType} class on ${dayName} at ${classToDelete.startTime}?`;
+    
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
@@ -416,7 +422,7 @@ export const AdminSchedule = () => {
         </div>
         <button
           onClick={() => handleDeleteClass(classItem.id)}
-          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+          className="btn-delete-soft"
         >
           {t.delete}
         </button>
@@ -469,7 +475,7 @@ export const AdminSchedule = () => {
   );
 
   return (
-    <div className="flex-1 bg-white">
+    <div className="flex-1">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-black">{t.manageClasses}</h1>
@@ -691,7 +697,7 @@ export const AdminSchedule = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
                         <button
                           onClick={() => handleDeleteClass(classItem.id)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                          className="btn-delete-soft"
                         >
                           {t.delete}
                         </button>

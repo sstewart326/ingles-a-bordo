@@ -144,7 +144,10 @@ export const AdminUsers = () => {
 
     logAdmin('User to delete:', { email: userToDelete.email, uid: userToDelete.uid });
 
-    if (!window.confirm(t.confirmDelete.replace('{name}', userToDelete.name).replace('{email}', userToDelete.email))) {
+    const userType = userToDelete.isAdmin ? 'admin' : userToDelete.isTeacher ? 'teacher' : 'student';
+    const confirmMessage = `Are you sure you want to delete ${userToDelete.name} (${userToDelete.email})?\n\nThis will permanently delete this ${userType}'s account and remove them from all associated classes.\n\nThis action cannot be undone.`;
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
@@ -353,7 +356,7 @@ export const AdminUsers = () => {
         {user.status === 'active' ? (
           <button
             onClick={() => deleteUser(user.id)}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm min-w-[100px]"
+            className="btn-delete-soft min-w-[100px]"
           >
             {t.delete}
           </button>
@@ -383,7 +386,7 @@ export const AdminUsers = () => {
             </button>
             <button
               onClick={() => deleteUser(user.id)}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm min-w-[100px]"
+              className="btn-delete-soft min-w-[100px]"
             >
               {t.delete}
             </button>
@@ -394,7 +397,7 @@ export const AdminUsers = () => {
   );
 
   return (
-    <div className="flex-1 bg-white">
+    <div className="flex-1">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-black">{t.manageUsers}</h1>
@@ -644,7 +647,7 @@ export const AdminUsers = () => {
                             {user.status === 'active' && (
                               <button
                                 onClick={() => deleteUser(user.id)}
-                                className="w-40 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                                className="btn-delete-soft min-w-[100px]"
                               >
                                 {t.delete}
                               </button>
@@ -675,7 +678,7 @@ export const AdminUsers = () => {
                                 </button>
                                 <button
                                   onClick={() => deleteUser(user.id)}
-                                  className="w-40 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                                  className="btn-delete-soft min-w-[100px]"
                                 >
                                   {t.delete}
                                 </button>

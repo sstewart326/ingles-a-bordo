@@ -141,6 +141,16 @@ export const StudentSchedule = () => {
   };
 
   const deleteClass = async (classId: string) => {
+    const classToDelete = classes.find(c => c.id === classId);
+    if (!classToDelete) return;
+
+    const dayName = DAYS_OF_WEEK[classToDelete.dayOfWeek];
+    const confirmMessage = `Are you sure you want to delete the ${classToDelete.courseType} class on ${dayName} at ${classToDelete.startTime}?`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'classes', classId));
       await fetchClasses();
@@ -210,7 +220,7 @@ export const StudentSchedule = () => {
                   </div>
                   <button
                     onClick={() => deleteClass(classItem.id)}
-                    className="text-red-600 hover:text-red-900"
+                    className="btn-delete-soft"
                   >
                     Delete
                   </button>
