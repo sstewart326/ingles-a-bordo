@@ -153,15 +153,25 @@ const AdminMaterials = () => {
         // Fetch all users that are students in any class
         const allStudentEmails = new Set<string>();
         classesData.forEach(c => {
-          c.studentEmails.forEach(email => allStudentEmails.add(email));
+          if (c.studentEmails && c.studentEmails.length > 0) {
+            c.studentEmails.forEach(email => allStudentEmails.add(email));
+          }
         });
 
-        // Get all users data in one query
-        const usersData = await getCachedCollection<User>('users', [
-          where('email', 'in', Array.from(allStudentEmails))
-        ], {
-          includeIds: true
-        });
+        // Only fetch users if we have student emails
+        let usersData: User[] = [];
+        if (allStudentEmails.size > 0) {
+          try {
+            usersData = await getCachedCollection<User>('users', [
+              where('email', 'in', Array.from(allStudentEmails))
+            ], {
+              includeIds: true
+            });
+          } catch (error) {
+            console.error('Failed to fetch users:', error);
+            // Continue execution even if user fetch fails
+          }
+        }
 
         setUsers(usersData);
         
@@ -198,15 +208,22 @@ const AdminMaterials = () => {
 
         if (invalidClasses.length > 0) {
           console.error('Invalid classes found:', invalidClasses);
-          toast.error('Error loading classes: Invalid data format');
+          toast.error(t.invalidField);
           return;
         }
-        
+
         setClasses(classesData);
+        
+        if (classesData.length === 0) {
+          setLoading(false);
+          return;
+        }
+
         // Set the initial date to the next class date
         setSelectedDate(getNextClassDate(classesData));
-      } catch {
-        toast.error('Failed to load classes');
+      } catch (error) {
+        console.error('Failed to load classes:', error);
+        toast.error(t.failedToLoad);
       } finally {
         setLoading(false);
       }
@@ -372,7 +389,7 @@ const AdminMaterials = () => {
       <div className="flex-1 bg-white">
         <div className="container mx-auto px-4">
           <div className="py-8 text-center">
-            <p>Loading...</p>
+            <p>{t.loading}</p>
           </div>
         </div>
       </div>
@@ -513,7 +530,7 @@ const AdminMaterials = () => {
                 </div>
 
                 {/* Existing Materials */}
-                {existingMaterials.length > 0 && (
+                {existingMaterials.length > 0 ? (
                   <div className="mb-8">
                     <h2 className="text-xl font-semibold mb-4">{t.existingMaterials}</h2>
                     <div className="space-y-4">
@@ -558,6 +575,10 @@ const AdminMaterials = () => {
                         </div>
                       ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-600">
+                    {t.noMaterialsFound}
                   </div>
                 )}
               </>

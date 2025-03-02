@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Select, { MultiValue, StylesConfig } from 'react-select';
 import DatePicker from 'react-datepicker';
@@ -6,7 +6,8 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { 
   getCachedCollection, 
   setCachedDocument, 
-  deleteCachedDocument 
+  deleteCachedDocument,
+  updateCachedDocument 
 } from '../utils/firebaseUtils';
 import { Timestamp } from 'firebase/firestore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -123,7 +124,20 @@ export const AdminSchedule = () => {
     };
   });
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
-  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+
+  // Replace editing states with modal state
+  const [editingClass, setEditingClass] = useState<{
+    id: string;
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+    courseType: string;
+    notes: string;
+    studentEmails: string[];
+    startDate: Date;
+    endDate: Date | null;
+    paymentConfig: PaymentConfig;
+  } | null>(null);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -153,29 +167,11 @@ export const AdminSchedule = () => {
       setShowMobileView(window.innerWidth < 768);
     };
 
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (!target) return;
-      
-      const hasHorizontalScroll = target.scrollWidth > target.clientWidth;
-      const isScrolledToEnd = target.scrollLeft + target.clientWidth >= target.scrollWidth - 10;
-      setShowScrollIndicator(hasHorizontalScroll && !isScrolledToEnd);
-    };
-
     window.addEventListener('resize', handleResize);
-    const tableContainer = document.querySelector('.table-container');
-    if (tableContainer) {
-      tableContainer.addEventListener('scroll', handleScroll);
-      // Initial check
-      handleScroll({ target: tableContainer } as unknown as Event);
-    }
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('resize', handleResize);
-      if (tableContainer) {
-        tableContainer.removeEventListener('scroll', handleScroll);
-      }
     };
   }, []);
 
@@ -460,91 +456,183 @@ export const AdminSchedule = () => {
     }
   };
 
+  // Function to handle opening the edit modal
+  const openEditModal = (classItem: Class) => {
+    setEditingClass({
+      id: classItem.id,
+      dayOfWeek: classItem.dayOfWeek,
+      startTime: classItem.startTime,
+      endTime: classItem.endTime,
+      courseType: classItem.courseType,
+      notes: classItem.notes || '',
+      studentEmails: classItem.studentEmails,
+      startDate: classItem.startDate.toDate(),
+      endDate: classItem.endDate?.toDate() || null,
+      paymentConfig: classItem.paymentConfig
+    });
+  };
+
+  // Function to handle saving all changes
+  const handleSaveChanges = async () => {
+    if (!editingClass) return;
+
+    try {
+      const updateData = {
+        dayOfWeek: editingClass.dayOfWeek,
+        startTime: editingClass.startTime,
+        endTime: editingClass.endTime,
+        courseType: editingClass.courseType,
+        notes: editingClass.notes,
+        studentEmails: editingClass.studentEmails,
+        startDate: Timestamp.fromDate(editingClass.startDate),
+        endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate) : null,
+        paymentConfig: editingClass.paymentConfig,
+        updatedAt: Timestamp.now()
+      };
+
+      await updateCachedDocument('classes', editingClass.id, updateData);
+      await fetchClasses();
+      setEditingClass(null);
+      toast.success(t.updateSuccessful);
+    } catch (error) {
+      console.error('Error updating class:', error);
+      toast.error(t.updateFailed);
+    }
+  };
+
+  // Add these helper functions
+  const adjustTime = (time: string, hourOffset: number): string => {
+    const [timeStr, period] = time.split(' ');
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    
+    const date = new Date();
+    date.setHours(
+      period === 'PM' && hours !== 12 ? hours + 12 : hours,
+      minutes
+    );
+    
+    // Add/subtract hours
+    date.setTime(date.getTime() + hourOffset * 60 * 60 * 1000);
+    
+    // Format back to 12-hour format
+    return date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: true 
+    }).toUpperCase();
+  };
+
+  const handleEditStartTimeChange = (startTime: string) => {
+    setEditingClass(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        startTime,
+        // Automatically set end time to be 1 hour after start time
+        endTime: adjustTime(startTime, 1)
+      };
+    });
+  };
+
+  const handleEditEndTimeChange = (endTime: string) => {
+    setEditingClass(prev => {
+      if (!prev) return prev;
+      
+      // Parse both times
+      const [startTime, startPeriod] = prev.startTime.split(' ');
+      const [endTime_, endPeriod] = endTime.split(' ');
+      const [startHours, startMinutes] = startTime.split(':').map(Number);
+      const [endHours, endMinutes] = endTime_.split(':').map(Number);
+
+      // Create Date objects for comparison
+      const startDate = new Date();
+      const endDate = new Date();
+      
+      startDate.setHours(
+        startPeriod === 'PM' && startHours !== 12 ? startHours + 12 : startHours,
+        startMinutes
+      );
+      endDate.setHours(
+        endPeriod === 'PM' && endHours !== 12 ? endHours + 12 : endHours,
+        endMinutes
+      );
+
+      // If end time is before or equal to start time, adjust start time to be 1 hour before end time
+      if (endDate <= startDate) {
+        return {
+          ...prev,
+          startTime: adjustTime(endTime, -1),
+          endTime
+        };
+      }
+
+      return {
+        ...prev,
+        endTime
+      };
+    });
+  };
+
   if (loading) {
     return <div className="text-center p-4">Loading...</div>;
   }
 
   const renderMobileCard = (classItem: Class) => (
     <div key={classItem.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <div className="font-semibold text-gray-900">
-            {DAYS_OF_WEEK[classItem.dayOfWeek]}
-          </div>
-          <div className="text-sm text-gray-600">
-            {classItem.startTime} - {classItem.endTime}
-          </div>
-        </div>
-        <button
-          onClick={() => handleDeleteClass(classItem.id)}
-          className="btn-delete-soft"
-        >
-          {t.delete}
-        </button>
-      </div>
-      
       <div className="space-y-2">
-        <div>
-          <div className="text-sm font-medium text-gray-500">{t.courseType}</div>
-          <div className="text-sm text-gray-900">{classItem.courseType}</div>
-        </div>
-        
-        <div>
-          <div className="text-sm font-medium text-gray-500">{t.students}</div>
-          <div className="text-sm text-gray-900">
-            {classItem.studentEmails?.map(email => {
-              const student = users.find(u => u.email === email);
-              return student ? (
-                <div key={`${classItem.id}-${email}`} className="mb-1">
-                  {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
-                </div>
-              ) : (
-                <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
-                  {t.unknownEmail}: {email}
-                </div>
-              );
-            })}
-            {(!classItem.studentEmails || classItem.studentEmails.length === 0) && (
-              <div className="text-gray-500 italic">{t.noStudentsAssigned}</div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-sm font-medium text-gray-500">{t.startDate}</div>
-          <div className="text-sm text-gray-900">
-            {classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
-          </div>
-        </div>
-
-        {classItem.endDate && (
+        <div className="flex justify-between items-start">
           <div>
-            <div className="text-sm font-medium text-gray-500">{t.endDate}</div>
-            <div className="text-sm text-gray-900">
-              {classItem.endDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+            <div className="font-semibold">{DAYS_OF_WEEK[classItem.dayOfWeek]}</div>
+            <div>{classItem.startTime} - {classItem.endTime}</div>
+            <div className="mt-2">
+              <div className="font-medium">{t.courseType}</div>
+              <div>{classItem.courseType}</div>
+            </div>
+            <div className="mt-2">
+              <div className="font-medium">{t.students}</div>
+              <div className="max-h-24 overflow-y-auto">
+                {classItem.studentEmails?.map(email => {
+                  const student = users.find(u => u.email === email);
+                  return student ? (
+                    <div key={`${classItem.id}-${email}`} className="mb-1">
+                      {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
+                    </div>
+                  ) : (
+                    <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
+                      {t.unknownEmail}: {email}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="mt-2">
+              <div className="font-medium">{t.startDate}</div>
+              <div>{classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}</div>
+            </div>
+            {classItem.endDate && (
+              <div className="mt-2">
+                <div className="font-medium">{t.endDate}</div>
+                <div>{classItem.endDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}</div>
+              </div>
+            )}
+            <div className="mt-2">
+              <div className="font-medium">{t.notes}</div>
+              <div>{classItem.notes || t.noNotes}</div>
             </div>
           </div>
-        )}
-
-        <div>
-          <div className="text-sm font-medium text-gray-500">{t.paymentConfiguration}</div>
-          <div className="text-sm text-gray-900">
-            <div>{classItem.paymentConfig.type === 'weekly' ? t.weeklyPayment : t.monthlyPayment}</div>
-            {classItem.paymentConfig.type === 'weekly' && (
-              <div className="text-gray-600">
-                {t.weeklyInterval}: {classItem.paymentConfig.weeklyInterval}
-              </div>
-            )}
-            {classItem.paymentConfig.type === 'monthly' && (
-              <div className="text-gray-600">
-                {classItem.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
-                {classItem.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
-                {classItem.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
-              </div>
-            )}
-            <div className="text-gray-600">
-              {t.startDate}: {new Date(classItem.paymentConfig.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
-            </div>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => openEditModal(classItem)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm"
+            >
+              {t.edit}
+            </button>
+            <button
+              onClick={() => handleDeleteClass(classItem.id)}
+              className="btn-delete-soft"
+            >
+              {t.delete}
+            </button>
           </div>
         </div>
       </div>
@@ -801,12 +889,10 @@ export const AdminSchedule = () => {
         )}
 
         {showMobileView ? (
-          // Mobile card view
           <div className="space-y-4">
             {classes.map(renderMobileCard)}
           </div>
         ) : (
-          // Desktop table view
           <div className="bg-white shadow-md rounded-lg overflow-hidden relative">
             <div className="table-container overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -827,9 +913,6 @@ export const AdminSchedule = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {t.endDate}
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t.paymentConfiguration}
-                    </th>
                     <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {t.actions}
                     </th>
@@ -839,8 +922,8 @@ export const AdminSchedule = () => {
                   {classes.map((classItem) => (
                     <tr key={classItem.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {DAYS_OF_WEEK[classItem.dayOfWeek]}<br />
-                        {classItem.startTime} - {classItem.endTime}
+                        <div>{DAYS_OF_WEEK[classItem.dayOfWeek]}</div>
+                        <div>{classItem.startTime} - {classItem.endTime}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {classItem.courseType}
@@ -859,59 +942,170 @@ export const AdminSchedule = () => {
                               </div>
                             );
                           })}
-                          {(!classItem.studentEmails || classItem.studentEmails.length === 0) && (
-                            <div key={`${classItem.id}-no-students`} className="text-gray-500 italic">{t.noStudentsAssigned}</div>
-                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {classItem.endDate?.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') || 'N/A'}
+                        {classItem.endDate ? classItem.endDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') : t.noEndDate}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div>
-                          <div>{classItem.paymentConfig.type === 'weekly' ? t.weeklyPayment : t.monthlyPayment}</div>
-                          {classItem.paymentConfig.type === 'weekly' && (
-                            <div className="text-gray-600">
-                              {t.weeklyInterval}: {classItem.paymentConfig.weeklyInterval}
-                            </div>
-                          )}
-                          {classItem.paymentConfig.type === 'monthly' && (
-                            <div className="text-gray-600">
-                              {classItem.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
-                              {classItem.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
-                              {classItem.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
-                            </div>
-                          )}
-                          <div className="text-gray-600">
-                            {t.startDate}: {new Date(classItem.paymentConfig.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
-                          </div>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => openEditModal(classItem)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm"
+                          >
+                            {t.edit}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClass(classItem.id)}
+                            className="btn-delete-soft"
+                          >
+                            {t.delete}
+                          </button>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                        <button
-                          onClick={() => handleDeleteClass(classItem.id)}
-                          className="btn-delete-soft"
-                        >
-                          {t.delete}
-                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {showScrollIndicator && (
-              <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-white to-transparent flex items-center justify-center">
-                <div className="animate-bounce text-gray-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {editingClass && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">{t.edit} {t.class}</h2>
+                <button
+                  onClick={() => setEditingClass(null)}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 w-8 h-8 rounded-md text-xl font-medium flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t.dayOfWeek}</label>
+                  <select
+                    value={editingClass.dayOfWeek}
+                    onChange={(e) => setEditingClass(prev => ({ ...prev!, dayOfWeek: parseInt(e.target.value) }))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    {DAYS_OF_WEEK.map((day, index) => (
+                      <option key={day} value={index}>{day}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">{t.time}</label>
+                    <select
+                      value={editingClass.startTime}
+                      onChange={(e) => handleEditStartTimeChange(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      {timeOptions.map(time => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">{t.time}</label>
+                    <select
+                      value={editingClass.endTime}
+                      onChange={(e) => handleEditEndTimeChange(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      {timeOptions.map(time => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t.courseType}</label>
+                  <select
+                    value={editingClass.courseType}
+                    onChange={(e) => setEditingClass(prev => ({ ...prev!, courseType: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="Individual">Individual</option>
+                    <option value="Pair">Pair</option>
+                    <option value="Group">Group</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t.students}</label>
+                  <Select
+                    isMulti
+                    value={studentOptions.filter(option => editingClass.studentEmails.includes(option.value))}
+                    onChange={(selected: MultiValue<SelectOption>) => {
+                      const selectedEmails = selected ? selected.map(option => option.value) : [];
+                      setEditingClass(prev => ({ ...prev!, studentEmails: selectedEmails }));
+                    }}
+                    options={studentOptions}
+                    className="mt-1"
+                    classNamePrefix="select"
+                    styles={customSelectStyles}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">{t.startDate}</label>
+                    <DatePicker
+                      selected={editingClass.startDate}
+                      onChange={(date: Date | null) => setEditingClass(prev => ({ ...prev!, startDate: date || new Date() }))}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t.endDate} <span className="text-gray-500 font-normal">({t.optional})</span>
+                    </label>
+                    <DatePicker
+                      selected={editingClass.endDate}
+                      onChange={(date: Date | null) => setEditingClass(prev => ({ ...prev!, endDate: date }))}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      isClearable
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t.notes}</label>
+                  <textarea
+                    value={editingClass.notes}
+                    onChange={(e) => setEditingClass(prev => ({ ...prev!, notes: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 mt-6">
+                  <button
+                    onClick={() => setEditingClass(null)}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded text-sm"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    onClick={handleSaveChanges}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm"
+                  >
+                    {t.save}
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>

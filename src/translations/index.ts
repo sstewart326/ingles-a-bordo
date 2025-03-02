@@ -125,6 +125,12 @@ interface Translation {
   noStudentsAssigned: string;
   pending: string;
   unknownEmail: string;
+  classNotFound: string;
+  invalidField: string;
+  updateSuccessful: string;
+  updateFailed: string;
+  noNotes: string;
+  noEndDate: string;
 
   // Admin Users
   teacherAccount: string;
@@ -146,6 +152,11 @@ interface Translation {
   userNotFound: string;
   userDeleted: string;
   unauthorizedAction: string;
+  pleaseEnterName: string;
+  enterName: string;
+  nameUpdated: string;
+  failedToUpdateName: string;
+  copy: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -274,6 +285,12 @@ const translations: Record<Language, Translation> = {
     noStudentsAssigned: 'No students assigned',
     pending: 'Pending',
     unknownEmail: 'Unknown Email',
+    classNotFound: 'Class not found',
+    invalidField: 'Invalid field',
+    updateSuccessful: 'Update successful',
+    updateFailed: 'Update failed',
+    noNotes: 'No notes',
+    noEndDate: 'No end date',
 
     // Admin Users
     teacherAccount: 'Teacher Account',
@@ -283,9 +300,9 @@ const translations: Record<Language, Translation> = {
     userStatus: 'Status',
     activeUser: 'User',
     pendingSignup: 'Pending Signup',
-    copyLink: 'Copy Signup Link',
+    copyLink: 'Copy Link',
     confirmDelete: 'Are you sure you want to delete {name} ({email})?',
-    signupLinkCopied: 'Signup link copied to clipboard!',
+    signupLinkCopied: 'Signup link copied to clipboard',
     failedToCopyLink: 'Failed to copy signup link',
     pleaseEnterNameEmail: 'Please fill in both name and email',
     failedToGenerateLink: 'Failed to generate signup link',
@@ -295,6 +312,11 @@ const translations: Record<Language, Translation> = {
     userNotFound: 'User not found',
     userDeleted: 'User and associated data deleted successfully',
     unauthorizedAction: 'Unauthorized action',
+    pleaseEnterName: 'Please enter a name',
+    enterName: 'Enter name',
+    nameUpdated: 'Name updated successfully',
+    failedToUpdateName: 'Failed to update name',
+    copy: 'Copy',
   },
   'pt-BR': {
     // Auth & Profile
@@ -421,6 +443,12 @@ const translations: Record<Language, Translation> = {
     noStudentsAssigned: 'Nenhum aluno atribuído',
     pending: 'Pendente',
     unknownEmail: 'Email Desconhecido',
+    classNotFound: 'Aula não encontrada',
+    invalidField: 'Campo inválido',
+    updateSuccessful: 'Atualização bem-sucedida',
+    updateFailed: 'Falha na atualização',
+    noNotes: 'Sem notas',
+    noEndDate: 'Sem data de término',
 
     // Admin Users
     teacherAccount: 'Conta de Professor',
@@ -430,9 +458,9 @@ const translations: Record<Language, Translation> = {
     userStatus: 'Status',
     activeUser: 'Usuário',
     pendingSignup: 'Cadastro Pendente',
-    copyLink: 'Copiar Link do Cadastro',
+    copyLink: 'Copiar Link',
     confirmDelete: 'Tem certeza que deseja excluir {name} ({email})?',
-    signupLinkCopied: 'Link de cadastro copiado!',
+    signupLinkCopied: 'Link de cadastro copiado',
     failedToCopyLink: 'Falha ao copiar link de cadastro',
     pleaseEnterNameEmail: 'Por favor, preencha nome e email',
     failedToGenerateLink: 'Falha ao gerar link de cadastro',
@@ -442,6 +470,11 @@ const translations: Record<Language, Translation> = {
     userNotFound: 'Usuário não encontrado',
     userDeleted: 'Usuário e dados associados excluídos com sucesso',
     unauthorizedAction: 'Ação não autorizada',
+    pleaseEnterName: 'Por favor, insira um nome',
+    enterName: 'Digite o nome',
+    nameUpdated: 'Nome atualizado com sucesso',
+    failedToUpdateName: 'Falha ao atualizar nome',
+    copy: 'Copiar',
   }
 };
 

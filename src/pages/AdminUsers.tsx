@@ -6,10 +6,11 @@ import { createSignupLink } from '../utils/signupLinks';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
-import { getCachedCollection, deleteCachedDocument, setCachedDocument } from '../utils/firebaseUtils';
+import { getCachedCollection, deleteCachedDocument, setCachedDocument, updateCachedDocument } from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { cache } from '../utils/cache';
+import { PencilIcon } from '@heroicons/react/24/outline';
 
 interface User {
   id: string;
@@ -53,6 +54,8 @@ export const AdminUsers = () => {
     isAdmin: false
   });
   const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: string}>({});
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -282,6 +285,39 @@ export const AdminUsers = () => {
     }
   };
 
+  const handleUpdateName = async (userId: string) => {
+    if (!currentUser || !isAdmin) {
+      toast.error(t.unauthorizedAction);
+      return;
+    }
+
+    try {
+      const userToUpdate = users.find(user => user.id === userId);
+      if (!userToUpdate) {
+        toast.error(t.userNotFound);
+        return;
+      }
+
+      if (!editingName.trim()) {
+        toast.error(t.pleaseEnterName);
+        return;
+      }
+
+      await updateCachedDocument('users', userId, { 
+        name: editingName.trim(),
+        updatedAt: new Date().toISOString()
+      }, { userId: currentUser.uid });
+
+      await fetchUsers();
+      setEditingUserId(null);
+      setEditingName('');
+      toast.success(t.nameUpdated);
+    } catch (error) {
+      console.error('Error updating user name:', error);
+      toast.error(t.failedToUpdateName);
+    }
+  };
+
   if (loading) {
     return <div className="text-center p-4">{t.loading}</div>;
   }
@@ -298,8 +334,49 @@ export const AdminUsers = () => {
     <div key={user.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
       <div className="flex justify-between items-start mb-3">
         <div>
-          <div className="font-semibold text-gray-900">{user.name}</div>
-          <div className="text-sm text-gray-600">{user.email}</div>
+          {editingUserId === user.id ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                placeholder={t.enterName}
+              />
+              <button
+                onClick={() => handleUpdateName(user.id)}
+                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm"
+              >
+                {t.save}
+              </button>
+              <button
+                onClick={() => {
+                  setEditingUserId(null);
+                  setEditingName('');
+                }}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
+              >
+                {t.cancel}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="font-semibold text-gray-900 flex items-center gap-2">
+                {user.name}
+                {user.status === 'active' && (
+                  <PencilIcon
+                    className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    title={t.edit}
+                    onClick={() => {
+                      setEditingUserId(user.id);
+                      setEditingName(user.name);
+                    }}
+                  />
+                )}
+              </div>
+              <div className="text-sm text-gray-600">{user.email}</div>
+            </>
+          )}
         </div>
         <div className="flex flex-col items-end gap-2">
           {user.status === 'active' ? (
@@ -348,13 +425,13 @@ export const AdminUsers = () => {
                   toast.error(t.failedToCopyLink);
                 }
               }}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded text-sm min-w-[100px]"
+              className="btn-copy-soft w-[120px]"
             >
               {t.copyLink}
             </button>
             <button
               onClick={() => deleteUser(user.id)}
-              className="btn-delete-soft min-w-[100px]"
+              className="btn-delete-soft w-[120px]"
             >
               {t.delete}
             </button>
@@ -523,7 +600,48 @@ export const AdminUsers = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {allUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {editingUserId === user.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder={t.enterName}
+                              />
+                              <button
+                                onClick={() => handleUpdateName(user.id)}
+                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm"
+                              >
+                                {t.save}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingUserId(null);
+                                  setEditingName('');
+                                }}
+                                className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
+                              >
+                                {t.cancel}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              {user.name}
+                              {user.status === 'active' && (
+                                <PencilIcon
+                                  className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                  title={t.edit}
+                                  onClick={() => {
+                                    setEditingUserId(user.id);
+                                    setEditingName(user.name);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           {user.status === 'active' ? (
@@ -547,7 +665,7 @@ export const AdminUsers = () => {
                             {user.status === 'active' && (
                               <button
                                 onClick={() => deleteUser(user.id)}
-                                className="btn-delete-soft min-w-[100px]"
+                                className="btn-delete-soft w-[120px]"
                               >
                                 {t.delete}
                               </button>
@@ -572,13 +690,13 @@ export const AdminUsers = () => {
                                       toast.error(t.failedToCopyLink);
                                     }
                                   }}
-                                  className="w-40 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-sm"
+                                  className="btn-copy-soft w-[120px]"
                                 >
                                   {t.copyLink}
                                 </button>
                                 <button
                                   onClick={() => deleteUser(user.id)}
-                                  className="btn-delete-soft min-w-[100px]"
+                                  className="btn-delete-soft w-[120px]"
                                 >
                                   {t.delete}
                                 </button>
