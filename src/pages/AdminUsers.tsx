@@ -9,7 +9,7 @@ import { useAdmin } from '../hooks/useAdmin';
 import { getCachedCollection, deleteCachedDocument, setCachedDocument } from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { DatePicker } from '../components/DatePicker';
+import { cache } from '../utils/cache';
 
 interface User {
   id: string;
@@ -20,12 +20,6 @@ interface User {
   isTeacher?: boolean;
   status?: 'active' | 'pending';
   createdAt: string | Date;
-  paymentConfig?: {
-    type: 'weekly' | 'monthly';
-    weeklyInterval?: number;  // for weekly payments, number of weeks
-    monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
-    startDate: string;  // ISO date string for when payments should start
-  };
 }
 
 interface NewUser {
@@ -33,12 +27,7 @@ interface NewUser {
   name: string;
   isTeacher: boolean;
   isAdmin: boolean;
-  paymentConfig?: {
-    type: 'weekly' | 'monthly';
-    weeklyInterval?: number;
-    monthlyOption?: 'first' | 'fifteen' | 'last';
-    startDate: string;
-  };
+  paymentConfig?: any;
 }
 
 const logAdmin = (message: string, data?: any) => {
@@ -61,21 +50,18 @@ export const AdminUsers = () => {
     email: '', 
     name: '',
     isTeacher: false,
-    isAdmin: false,
-    paymentConfig: { 
-      type: 'weekly',
-      weeklyInterval: 1,
-      startDate: new Date().toISOString().split('T')[0]  // Today's date as default
-    } 
+    isAdmin: false
   });
   const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: string}>({});
 
   const fetchUsers = useCallback(async () => {
     try {
+      // Force a fresh fetch from Firestore by clearing the cache first
+      cache.clearAll();
+      
       const usersList = await getCachedCollection<User>('users', [], { 
         userId: currentUser?.uid
       });
-      // Ensure users default to 'active' if the status field is not present
       const updatedUsersList = usersList.map(user => ({
         ...user,
         status: user.status === 'pending' ? 'pending' : 'active'
@@ -190,7 +176,10 @@ export const AdminUsers = () => {
           }
 
           // Get the functions URL from the Firebase config
-          const functionUrl = `${functions.customDomain || `https://${functions.region}-${functions.app.options.projectId}.cloudfunctions.net`}/deleteAuthUserHttp`;
+          const isDevelopment = import.meta.env.MODE === 'development';
+          const functionUrl = isDevelopment
+            ? `http://localhost:5001/${functions.app.options.projectId}/${functions.region}/deleteAuthUserHttp`
+            : `${functions.customDomain || `https://${functions.region}-${functions.app.options.projectId}.cloudfunctions.net`}/deleteAuthUserHttp`;
           logAdmin('Attempting to delete user with auth ID:', userToDelete.uid);
           
           const response = await fetch(functionUrl, {
@@ -239,18 +228,6 @@ export const AdminUsers = () => {
       return;
     }
 
-    // Validate payment configuration only for non-teacher users
-    if (!newUser.isTeacher) {
-      if (newUser.paymentConfig?.type === 'weekly' && !newUser.paymentConfig.weeklyInterval) {
-        toast.error(t.pleaseSpecifyWeeklyInterval);
-        return;
-      }
-      if (newUser.paymentConfig?.type === 'monthly' && !newUser.paymentConfig.monthlyOption) {
-        toast.error(t.pleaseSelectPaymentDay);
-        return;
-      }
-    }
-
     try {
       setLoading(true);
       const signupLink = await createSignupLink(newUser.email, newUser.name);
@@ -273,11 +250,6 @@ export const AdminUsers = () => {
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
-
-      // Only add paymentConfig if user is not an admin and not a teacher
-      if (!newUser.isAdmin && !newUser.isTeacher && newUser.paymentConfig) {
-        newUserData.paymentConfig = newUser.paymentConfig;
-      }
       
       // Use setCachedDocument to properly handle caching
       await setCachedDocument('users', tempId, newUserData, { userId: currentUser?.uid });
@@ -292,12 +264,7 @@ export const AdminUsers = () => {
         email: '', 
         name: '', 
         isTeacher: false,
-        isAdmin: false,
-        paymentConfig: { 
-          type: 'weekly', 
-          weeklyInterval: 1,
-          startDate: new Date().toISOString().split('T')[0]  // Today's date as default
-        } 
+        isAdmin: false
       }); // Reset form
       
       // Hide the form
@@ -515,91 +482,6 @@ export const AdminUsers = () => {
                     <span className="text-sm font-medium text-gray-700">{t.adminAccount}</span>
                   </label>
                 </div>
-                {!newUser.isTeacher && !newUser.isAdmin && (
-                  <>
-                    <div>
-                      <label htmlFor="paymentStartDate" className="block text-sm font-medium text-gray-700">
-                        {t.paymentStartDate}
-                      </label>
-                      <DatePicker
-                        selectedDate={newUser.paymentConfig?.startDate || new Date().toISOString().split('T')[0]}
-                        onChange={(date) => setNewUser(prev => ({ 
-                          ...prev, 
-                          paymentConfig: { 
-                            ...prev.paymentConfig!, 
-                            startDate: date
-                          } 
-                        }))}
-                        minDate={new Date()}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="paymentConfig" className="block text-sm font-medium text-gray-700">
-                        {t.paymentConfiguration}
-                      </label>
-                      <select
-                        id="paymentConfig"
-                        value={newUser.paymentConfig?.type}
-                        onChange={(e) => setNewUser(prev => ({ 
-                          ...prev, 
-                          paymentConfig: { 
-                            ...prev.paymentConfig!, 
-                            type: e.target.value as 'weekly' | 'monthly' 
-                          } 
-                        }))}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      >
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-                    {newUser.paymentConfig?.type === 'weekly' && (
-                      <div>
-                        <label htmlFor="weeklyInterval" className="block text-sm font-medium text-gray-700">
-                          {t.weeklyInterval}
-                        </label>
-                        <input
-                          type="number"
-                          id="weeklyInterval"
-                          min="1"
-                          value={newUser.paymentConfig.weeklyInterval || 1}
-                          onChange={(e) => setNewUser(prev => ({ 
-                            ...prev, 
-                            paymentConfig: { 
-                              ...prev.paymentConfig!, 
-                              weeklyInterval: parseInt(e.target.value) || 1
-                            } 
-                          }))}
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        />
-                      </div>
-                    )}
-                    {newUser.paymentConfig?.type === 'monthly' && (
-                      <div>
-                        <label htmlFor="monthlyOption" className="block text-sm font-medium text-gray-700">
-                          {t.selectPaymentDay}
-                        </label>
-                        <select
-                          id="monthlyOption"
-                          value={newUser.paymentConfig.monthlyOption || ''}
-                          onChange={(e) => setNewUser(prev => ({ 
-                            ...prev, 
-                            paymentConfig: { 
-                              ...prev.paymentConfig!, 
-                              monthlyOption: e.target.value as 'first' | 'fifteen' | 'last'
-                            } 
-                          }))}
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        >
-                          <option value="">{t.selectPaymentDay}</option>
-                          <option value="first">{t.firstDayMonth}</option>
-                          <option value="fifteen">{t.fifteenthDayMonth}</option>
-                          <option value="last">{t.lastDayMonth}</option>
-                        </select>
-                      </div>
-                    )}
-                  </>
-                )}
                 <button
                   type="submit"
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"

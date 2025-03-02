@@ -43,7 +43,6 @@ export const Schedule = () => {
     isPaymentDay: boolean;
     isPaymentSoon: boolean;
   } | null>(null);
-  const [userData, setUserData] = useState<User | null>(null);
   const { currentUser } = useAuth();
   const { isAdmin } = useAdmin();
   const { language } = useLanguage();
@@ -114,8 +113,6 @@ export const Schedule = () => {
           return;
         }
 
-        setUserData(currentUserDoc || null);
-
         // Then fetch classes using email
         const queryConstraints = isAdmin 
           ? []
@@ -153,8 +150,7 @@ export const Schedule = () => {
                 return user ? { 
                   id: user.id, 
                   name: user.name, 
-                  email: email,
-                  paymentConfig: user.paymentConfig
+                  email: email
                 } : {
                   id: email, // Use email as fallback id
                   email: email
@@ -278,16 +274,16 @@ export const Schedule = () => {
             date.getMonth() === new Date().getMonth() &&
             date.getFullYear() === new Date().getFullYear();
 
-          const paymentDates = userData?.paymentConfig && classes.length > 0 ? 
+          const paymentDates = classes.length > 0 ? 
             classes.flatMap(classItem => {
               if (!classItem.startDate) return [];
               console.log('Calculating payment dates for class:', {
                 classId: classItem.id,
                 classStartDate: classItem.startDate.toDate().toISOString(),
                 classEndDate: classItem.endDate?.toDate().toISOString(),
-                paymentConfig: userData.paymentConfig
+                paymentConfig: classItem.paymentConfig
               });
-              const dates = getNextPaymentDates(userData.paymentConfig, classItem, selectedDate);
+              const dates = getNextPaymentDates(classItem.paymentConfig, classItem, selectedDate);
               console.log('Payment dates for class:', classItem.id, dates.map(d => d.toISOString()));
               return dates;
             }) : [];
@@ -551,12 +547,9 @@ export const Schedule = () => {
                   setSelectedMaterial(null);
                   setSlidesUrl(null);
                 }}
-                className="text-gray-400 hover:text-gray-500"
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-black hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               >
-                <span className="sr-only">Close</span>
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                X
               </button>
             </div>
 

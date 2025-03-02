@@ -58,103 +58,70 @@ export const Dashboard = () => {
         { userId: currentUser.uid }
       );
 
-      console.log('Fetched classes:', allClasses);
+      // Transform the classes to include the required fields
+      const transformedClasses: ClassSession[] = allClasses.map(classDoc => ({
+        ...classDoc,
+        paymentConfig: classDoc.paymentConfig || {
+          type: 'monthly',
+          monthlyOption: 'first',
+          startDate: classDoc.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+        }
+      }));
+
+      console.log('Fetched classes:', transformedClasses);
 
       // Fetch all unique student emails
       const uniqueEmails = new Set<string>();
-      allClasses.forEach(classSession => {
+      transformedClasses.forEach(classSession => {
         classSession.studentEmails.forEach(email => uniqueEmails.add(email));
       });
 
       // Fetch user data for all students
-      const fetchedUsers = await getCachedCollection<User>('users', [], { userId: currentUser.uid });
-      const nameMap: {[email: string]: string} = {};
-      const relevantUsers = fetchedUsers.filter(user => uniqueEmails.has(user.email));
-      
-      relevantUsers.forEach(user => {
-        nameMap[user.email] = user.name;
-      });
-      
-      setUserNames(nameMap);
-      setUsers(relevantUsers);
+      const userDocs = await getCachedCollection<User>('users', [
+        where('email', 'in', Array.from(uniqueEmails))
+      ], { userId: currentUser.uid });
 
-      const now = new Date();
+      // Create a map of email to user data
+      const userMap = new Map<string, User>();
+      userDocs.forEach(user => {
+        userMap.set(user.email, user);
+        userNames[user.email] = user.name;
+      });
+      setUserNames(userNames);
+      setUsers(userDocs);
+
       const upcoming: ClassSession[] = [];
       const past: ClassSession[] = [];
 
-      allClasses.forEach(classSession => {
+      transformedClasses.forEach(classSession => {
         console.log('Processing class:', {
           id: classSession.id,
           dayOfWeek: classSession.dayOfWeek,
           startTime: classSession.startTime,
-          endDate: classSession.endDate?.toDate(),
-          now: now
+          endTime: classSession.endTime,
+          startDate: classSession.startDate?.toDate().toISOString(),
+          endDate: classSession.endDate?.toDate().toISOString(),
+          paymentConfig: classSession.paymentConfig
         });
 
-        if (classSession.dayOfWeek !== undefined) {
-          // Check if today's instance of the class has passed
-          const isPastToday = isClassPastToday(classSession.dayOfWeek, classSession.startTime);
-          // Check if the class is upcoming (either later this week or next week)
-          const isUpcoming = isClassUpcoming(classSession.dayOfWeek, classSession.startTime);
-          
-          console.log('Class status:', {
-            id: classSession.id,
-            isPastToday,
-            isUpcoming,
-            dayOfWeek: classSession.dayOfWeek,
-            currentDayOfWeek: now.getDay(),
-            startTime: classSession.startTime,
-            currentTime: `${now.getHours()}:${now.getMinutes()}`,
-            hasEndDate: !!classSession.endDate,
-            endDate: classSession.endDate?.toDate(),
-            isRecurring: !classSession.endDate
-          });
-
-          // For recurring classes (no endDate) or classes that haven't reached their endDate
-          if (!classSession.endDate || new Date(classSession.endDate.seconds * 1000) >= now) {
-            // Add to past if today's instance has passed
-            if (isPastToday) {
-              past.push(classSession);
-            }
-            // Also add to upcoming if it's recurring or will happen again
-            if (isUpcoming) {
-              upcoming.push(classSession);
-            }
-          } else {
-            // If the class has an endDate that's passed, it only goes to past
-            past.push(classSession);
-          }
+        if (isClassPastToday(classSession.dayOfWeek || 0, classSession.startTime)) {
+          past.push(classSession);
+        } else if (isClassUpcoming(classSession.dayOfWeek || 0, classSession.startTime)) {
+          upcoming.push(classSession);
         }
       });
-
-      console.log('Final results:', {
-        upcomingClasses: upcoming,
-        pastClasses: past
-      });
-
-      // Sort upcoming classes by day of week and time
-      upcoming.sort((a, b) => {
-        const dayA = a.dayOfWeek || 0;
-        const dayB = b.dayOfWeek || 0;
-        if (dayA !== dayB) return dayA - dayB;
-        
-        const timeA = a.startTime || '00:00';
-        const timeB = b.startTime || '00:00';
-        return timeA.localeCompare(timeB);
-      });
-
-      // Group classes by day of week
-      const groupedClasses = upcoming.reduce<Record<number, ClassSession[]>>((acc, classSession) => {
-        const dayOfWeek = classSession.dayOfWeek || 0;
-        if (!acc[dayOfWeek]) {
-          acc[dayOfWeek] = [];
-        }
-        acc[dayOfWeek].push(classSession);
-        return acc;
-      }, {});
 
       setUpcomingClasses(upcoming);
-      setGroupedUpcomingClasses(groupedClasses);
+      setGroupedUpcomingClasses(
+        upcoming.reduce<Record<number, ClassSession[]>>((acc, classSession) => {
+          const dayOfWeek = classSession.dayOfWeek || 0;
+          if (!acc[dayOfWeek]) {
+            acc[dayOfWeek] = [];
+          }
+          acc[dayOfWeek].push(classSession);
+          return acc;
+        }, {})
+      );
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
@@ -218,7 +185,7 @@ export const Dashboard = () => {
 
   const { days, firstDay } = getDaysInMonth(selectedDate);
 
-  const getNextPaymentDates = (paymentConfig: User['paymentConfig'], classSession: ClassSession) => {
+  const getNextPaymentDates = (paymentConfig: User['paymentConfig'], classSession: ClassSession, selectedDate: Date) => {
     console.log('Calculating payment dates:', {
       paymentConfig,
       classSession: {
@@ -239,8 +206,9 @@ export const Dashboard = () => {
     
     // Parse the payment start date in local timezone
     const paymentStartDate = paymentConfig.startDate ? 
-      new Date(paymentConfig.startDate.split('T')[0] + 'T00:00:00') : 
+      new Date(paymentConfig.startDate + 'T00:00:00') : 
       startDate;
+    paymentStartDate.setHours(0, 0, 0, 0);
     
     // Get the first and last day of the currently viewed month
     const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
@@ -249,9 +217,9 @@ export const Dashboard = () => {
     monthEnd.setHours(23, 59, 59, 999);
 
     console.log('Date ranges:', {
-      paymentStartDate: paymentStartDate.toISOString(),
-      monthStart: monthStart.toISOString(),
-      monthEnd: monthEnd.toISOString()
+      paymentStartDate: paymentStartDate.toISOString().split('T')[0],
+      monthStart: monthStart.toISOString().split('T')[0],
+      monthEnd: monthEnd.toISOString().split('T')[0]
     });
     
     // If class has ended, no payments
@@ -336,7 +304,7 @@ export const Dashboard = () => {
       
       // Check if the class has started (startDate has passed)
       if (classItem.startDate) {
-        const startDate = new Date(classItem.startDate.seconds * 1000);
+        const startDate = classItem.startDate.toDate();
         startDate.setHours(0, 0, 0, 0);
         if (startDate > calendarDate) return false;
       }
@@ -345,7 +313,7 @@ export const Dashboard = () => {
       if (!classItem.endDate) return true;
       
       // Check if the class hasn't ended yet
-      const endDate = new Date(classItem.endDate.seconds * 1000);
+      const endDate = classItem.endDate.toDate();
       endDate.setHours(0, 0, 0, 0);
       return endDate >= calendarDate;
     });
@@ -476,41 +444,38 @@ export const Dashboard = () => {
                 // Calculate payment information for all classes, not just classes on this day
                 const paymentsDue: { user: User; classSession: ClassSession }[] = [];
                 upcomingClasses.forEach(classSession => {
-                  classSession.studentEmails.forEach(email => {
-                    const user = users.find(u => u.email === email);
-                    console.log('Checking payments for user:', {
-                      email,
-                      hasPaymentConfig: !!user?.paymentConfig,
-                      date: date.toISOString()
-                    });
-
-                    if (user?.paymentConfig) {
-                      const paymentDates = getNextPaymentDates(user.paymentConfig, classSession);
-                      const isPaymentDue = paymentDates.some(paymentDate => {
-                        const matches = paymentDate.getFullYear() === date.getFullYear() &&
-                          paymentDate.getMonth() === date.getMonth() &&
-                          paymentDate.getDate() === date.getDate();
-                        
-                        if (matches) {
-                          console.log('Found payment due:', {
-                            user: user.email,
-                            date: date.toISOString(),
-                            paymentDate: paymentDate.toISOString()
-                          });
-                        }
-                        return matches;
-                      });
+                  // Get payment dates using the class's payment configuration
+                  if (classSession.paymentConfig) {
+                    const paymentDates = getNextPaymentDates(classSession.paymentConfig, classSession, selectedDate);
+                    const isPaymentDue = paymentDates.some(paymentDate => {
+                      const matches = paymentDate.getFullYear() === date.getFullYear() &&
+                        paymentDate.getMonth() === date.getMonth() &&
+                        paymentDate.getDate() === date.getDate();
                       
-                      if (isPaymentDue) {
-                        console.log('Adding payment due:', {
-                          user: user.email,
+                      if (matches) {
+                        console.log('Found payment due:', {
                           classId: classSession.id,
-                          date: date.toISOString()
+                          date: date.toISOString(),
+                          paymentDate: paymentDate.toISOString()
                         });
-                        paymentsDue.push({ user, classSession });
                       }
+                      return matches;
+                    });
+                    
+                    if (isPaymentDue) {
+                      console.log('Adding payment due:', {
+                        classId: classSession.id,
+                        date: date.toISOString()
+                      });
+                      // Add all students in the class to the payments due list
+                      classSession.studentEmails.forEach(email => {
+                        const user = users.find(u => u.email === email);
+                        if (user) {
+                          paymentsDue.push({ user, classSession });
+                        }
+                      });
                     }
-                  });
+                  }
                 });
 
                 const isPaymentDay = paymentsDue.length > 0;
@@ -682,9 +647,9 @@ export const Dashboard = () => {
                               {classSession.courseType} - {classSession.startTime} to {classSession.endTime}
                             </span>
                             <span className={`text-xs ${isPaymentSoon ? 'text-red-600' : 'text-amber-600'}`}>
-                              {user.paymentConfig?.type === 'weekly' ? 
-                                `Weekly payment (${user.paymentConfig.weeklyInterval || 1} week interval)` :
-                                `Monthly payment (${user.paymentConfig?.monthlyOption} of month)`}
+                              {classSession.paymentConfig?.type === 'weekly' ? 
+                                `Weekly payment (${classSession.paymentConfig.weeklyInterval || 1} week interval)` :
+                                `Monthly payment (${classSession.paymentConfig?.monthlyOption} of month)`}
                               {isPaymentSoon && ' - Due soon'}
                             </span>
                           </div>

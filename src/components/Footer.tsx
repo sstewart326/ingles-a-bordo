@@ -6,7 +6,7 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center gap-1">
           <p className="text-center text-sm">
-            © {new Date().getFullYear()} Inglês a Bordo. All rights reserved.
+            © {new Date().getFullYear()} Inglês a Bordo, LLC. All rights reserved.
           </p>
           <a 
             href="mailto:cursoinglesabordo@gmail.com" 

@@ -23,6 +23,13 @@ interface User {
   status?: 'active' | 'pending';
 }
 
+interface PaymentConfig {
+  type: 'weekly' | 'monthly';
+  weeklyInterval?: number;  // for weekly payments, number of weeks
+  monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
+  startDate: string;  // YYYY-MM-DD date string
+}
+
 interface Class {
   id: string;
   studentEmails: string[];
@@ -36,6 +43,7 @@ interface Class {
   endDate?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  paymentConfig: PaymentConfig;
 }
 
 interface SelectOption {
@@ -70,6 +78,23 @@ const getNextDayOccurrence = (dayOfWeek: number) => {
 
 const timeOptions = generateTimeOptions();
 
+interface NewClass {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  courseType: string;
+  notes: string;
+  studentEmails: string[];
+  startDate: Date;
+  endDate: Date | null;
+  paymentConfig: {
+    type: 'weekly' | 'monthly';
+    weeklyInterval: number | null;
+    monthlyOption: 'first' | 'fifteen' | 'last' | null;
+    startDate: string;  // YYYY-MM-DD date string
+  };
+}
+
 export const AdminSchedule = () => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -78,15 +103,24 @@ export const AdminSchedule = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newClass, setNewClass] = useState({
-    dayOfWeek: 1,
-    startTime: '09:00 AM',
-    endTime: '10:00 AM',
-    courseType: 'Individual',
-    notes: '',
-    studentEmails: [] as string[],
-    startDate: getNextDayOccurrence(1),
-    endDate: null as Date | null
+  const [newClass, setNewClass] = useState<NewClass>(() => {
+    const today = new Date();
+    return {
+      dayOfWeek: 1,
+      startTime: '09:00 AM',
+      endTime: '10:00 AM',
+      courseType: 'Individual',
+      notes: '',
+      studentEmails: [],
+      startDate: getNextDayOccurrence(1),
+      endDate: null,
+      paymentConfig: {
+        type: 'weekly',
+        weeklyInterval: 1,
+        monthlyOption: null,
+        startDate: today.toISOString().split('T')[0]
+      }
+    };
   });
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
@@ -181,17 +215,31 @@ export const AdminSchedule = () => {
       );
       const studentEmails = selectedStudents.map(student => student.email);
       
+      // Clean up payment config to remove undefined/null values
+      const paymentConfig = {
+        type: newClass.paymentConfig.type,
+        startDate: newClass.paymentConfig.startDate,
+        ...(newClass.paymentConfig.type === 'weekly' ? { 
+          weeklyInterval: newClass.paymentConfig.weeklyInterval || 1,
+          monthlyOption: null
+        } : { 
+          weeklyInterval: null,
+          monthlyOption: newClass.paymentConfig.monthlyOption || 'first'
+        })
+      };
+      
       const classData = {
         dayOfWeek: newClass.dayOfWeek,
         startTime: newClass.startTime,
         endTime: newClass.endTime,
         courseType: newClass.courseType,
-        notes: newClass.notes || '',
+        notes: newClass.notes,
         studentEmails: studentEmails,
         startDate: Timestamp.fromDate(newClass.startDate),
-        ...(newClass.endDate ? { endDate: Timestamp.fromDate(new Date(newClass.endDate)) } : {}),
+        ...(newClass.endDate ? { endDate: Timestamp.fromDate(newClass.endDate) } : {}),
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        paymentConfig
       };
 
       // Generate a unique ID for the new class
@@ -200,6 +248,7 @@ export const AdminSchedule = () => {
       
       await fetchClasses();
       setShowAddForm(false);
+      const today = new Date();
       setNewClass({
         dayOfWeek: 1,
         startTime: '09:00 AM',
@@ -208,7 +257,13 @@ export const AdminSchedule = () => {
         notes: '',
         studentEmails: [],
         startDate: getNextDayOccurrence(1),
-        endDate: null
+        endDate: null,
+        paymentConfig: {
+          type: 'weekly',
+          weeklyInterval: 1,
+          monthlyOption: null,
+          startDate: today.toISOString().split('T')[0]
+        }
       });
       toast.success('Class created successfully');
     } catch (error) {
@@ -470,6 +525,28 @@ export const AdminSchedule = () => {
             </div>
           </div>
         )}
+
+        <div>
+          <div className="text-sm font-medium text-gray-500">{t.paymentConfiguration}</div>
+          <div className="text-sm text-gray-900">
+            <div>{classItem.paymentConfig.type === 'weekly' ? t.weeklyPayment : t.monthlyPayment}</div>
+            {classItem.paymentConfig.type === 'weekly' && (
+              <div className="text-gray-600">
+                {t.weeklyInterval}: {classItem.paymentConfig.weeklyInterval}
+              </div>
+            )}
+            {classItem.paymentConfig.type === 'monthly' && (
+              <div className="text-gray-600">
+                {classItem.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
+                {classItem.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
+                {classItem.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+              </div>
+            )}
+            <div className="text-gray-600">
+              {t.startDate}: {new Date(classItem.paymentConfig.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -484,8 +561,8 @@ export const AdminSchedule = () => {
               onClick={async () => {
                 if (!showAddForm) {
                   await fetchAllUsers();
-                  setNewClass(prev => ({
-                    ...prev,
+                  const today = new Date();
+                  setNewClass({
                     dayOfWeek: 1,
                     startTime: '09:00 AM',
                     endTime: '10:00 AM',
@@ -493,8 +570,14 @@ export const AdminSchedule = () => {
                     notes: '',
                     studentEmails: [],
                     startDate: getNextDayOccurrence(1),
-                    endDate: null
-                  }));
+                    endDate: null,
+                    paymentConfig: {
+                      type: 'weekly',
+                      weeklyInterval: 1,
+                      monthlyOption: null,
+                      startDate: today.toISOString().split('T')[0]
+                    }
+                  });
                 }
                 setShowAddForm(!showAddForm);
               }}
@@ -605,6 +688,96 @@ export const AdminSchedule = () => {
                     maxMenuHeight={300}
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t.paymentConfiguration}</label>
+                  <div className="mt-2 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">{t.paymentStartDate}</label>
+                      <DatePicker
+                        selected={new Date(newClass.paymentConfig.startDate)}
+                        onChange={(date: Date | null) => {
+                          if (date) {
+                            // Store just the date portion in YYYY-MM-DD format
+                            const dateStr = date.toISOString().split('T')[0];
+                            setNewClass(prev => ({
+                              ...prev,
+                              paymentConfig: {
+                                ...prev.paymentConfig,
+                                startDate: dateStr
+                              }
+                            }));
+                          }
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        showTimeSelect={false}
+                        dateFormat="MMMM d, yyyy"
+                      />
+                    </div>
+                    <div>
+                      <select
+                        value={newClass.paymentConfig.type}
+                        onChange={(e) => setNewClass(prev => ({
+                          ...prev,
+                          paymentConfig: {
+                            ...prev.paymentConfig,
+                            type: e.target.value as 'weekly' | 'monthly',
+                            // Set default values based on type
+                            weeklyInterval: e.target.value === 'weekly' ? 1 : null,
+                            monthlyOption: e.target.value === 'monthly' ? 'first' : null
+                          }
+                        }))}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    {newClass.paymentConfig.type === 'weekly' && (
+                      <div>
+                        <label htmlFor="weeklyInterval" className="block text-sm font-medium text-gray-700">
+                          {t.weeklyInterval}
+                        </label>
+                        <input
+                          type="number"
+                          id="weeklyInterval"
+                          min="1"
+                          value={newClass.paymentConfig.weeklyInterval || 1}
+                          onChange={(e) => setNewClass(prev => ({
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              weeklyInterval: parseInt(e.target.value) || 1
+                            }
+                          }))}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                    )}
+                    {newClass.paymentConfig.type === 'monthly' && (
+                      <div>
+                        <label htmlFor="monthlyOption" className="block text-sm font-medium text-gray-700">
+                          {t.selectPaymentDay}
+                        </label>
+                        <select
+                          id="monthlyOption"
+                          value={newClass.paymentConfig.monthlyOption || 'first'}
+                          onChange={(e) => setNewClass(prev => ({
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              monthlyOption: e.target.value as 'first' | 'fifteen' | 'last'
+                            }
+                          }))}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          <option value="first">{t.firstDayMonth}</option>
+                          <option value="fifteen">{t.fifteenthDayMonth}</option>
+                          <option value="last">{t.lastDayMonth}</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">{t.notes}</label>
@@ -654,6 +827,9 @@ export const AdminSchedule = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {t.endDate}
                     </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {t.paymentConfiguration}
+                    </th>
                     <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {t.actions}
                     </th>
@@ -693,6 +869,26 @@ export const AdminSchedule = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {classItem.endDate?.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div>
+                          <div>{classItem.paymentConfig.type === 'weekly' ? t.weeklyPayment : t.monthlyPayment}</div>
+                          {classItem.paymentConfig.type === 'weekly' && (
+                            <div className="text-gray-600">
+                              {t.weeklyInterval}: {classItem.paymentConfig.weeklyInterval}
+                            </div>
+                          )}
+                          {classItem.paymentConfig.type === 'monthly' && (
+                            <div className="text-gray-600">
+                              {classItem.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
+                              {classItem.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
+                              {classItem.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                            </div>
+                          )}
+                          <div className="text-gray-600">
+                            {t.startDate}: {new Date(classItem.paymentConfig.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
                         <button

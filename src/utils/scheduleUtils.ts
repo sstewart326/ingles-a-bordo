@@ -16,6 +16,12 @@ export interface ClassSession {
   updatedAt?: Timestamp;
   endDate?: Timestamp;
   startDate?: Timestamp;
+  paymentConfig?: {
+    type: 'weekly' | 'monthly';
+    weeklyInterval?: number;  // for weekly payments, number of weeks
+    monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
+    startDate: string;  // YYYY-MM-DD date string
+  };
 }
 
 export interface User {
@@ -24,9 +30,9 @@ export interface User {
   name: string;
   paymentConfig?: {
     type: 'weekly' | 'monthly';
-    weeklyInterval?: number;
-    monthlyOption?: 'first' | 'fifteen' | 'last';
-    startDate: string;
+    weeklyInterval?: number;  // for weekly payments, number of weeks
+    monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
+    startDate: string;  // YYYY-MM-DD date string
   };
 }
 
@@ -37,6 +43,12 @@ export interface ClassWithStudents extends ClassSession {
     email: string;
     paymentConfig?: User['paymentConfig'];
   }[];
+  paymentConfig: {
+    type: 'weekly' | 'monthly';
+    weeklyInterval?: number;  // for weekly payments, number of weeks
+    monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
+    startDate: string;  // YYYY-MM-DD date string
+  };
 }
 
 export const formatClassTime = (classSession: ClassSession): string => {
@@ -95,8 +107,8 @@ export const getClassesForDay = (
 };
 
 export const getNextPaymentDates = (
-  paymentConfig: User['paymentConfig'] | undefined,
-  classItem: ClassWithStudents,
+  paymentConfig: ClassSession['paymentConfig'],
+  classItem: ClassSession | ClassWithStudents,
   selectedDate: Date
 ): Date[] => {
   if (!paymentConfig || !classItem.startDate) {
@@ -107,10 +119,9 @@ export const getNextPaymentDates = (
   const startDate = classItem.startDate.toDate();
   startDate.setHours(0, 0, 0, 0);
   
-  // Parse the payment start date in local timezone
-  const paymentStartDate = paymentConfig.startDate ? 
-    new Date(paymentConfig.startDate.split('T')[0] + 'T00:00:00') : 
-    startDate;
+  // Parse the payment start date in local timezone without time component
+  const paymentStartDate = new Date(paymentConfig.startDate);
+  paymentStartDate.setHours(0, 0, 0, 0);
   
   // Get the first and last day of the currently viewed month
   const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
@@ -153,8 +164,8 @@ export const getNextPaymentDates = (
     // Add all payment dates in this month
     while (currentPaymentDate <= monthEnd) {
       if (currentPaymentDate >= monthStart) {
+        // Create new date object to avoid modifying the current one
         const paymentDate = new Date(currentPaymentDate);
-        paymentDate.setHours(0, 0, 0, 0);
         dates.push(paymentDate);
       }
       currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * interval));
@@ -163,6 +174,7 @@ export const getNextPaymentDates = (
     const year = selectedDate.getFullYear();
     const month = selectedDate.getMonth();
     
+    // Create the payment date in the current timezone
     let paymentDate: Date;
     switch (paymentConfig.monthlyOption) {
       case 'first':
@@ -177,7 +189,6 @@ export const getNextPaymentDates = (
       default:
         return dates;
     }
-    
     paymentDate.setHours(0, 0, 0, 0);
     
     // Only add the monthly payment date if it's after the payment start date

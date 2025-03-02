@@ -99,6 +99,8 @@ interface Translation {
   addNewUser: string;
   generateSignupLink: string;
   paymentDue: string;
+  weeklyPayment: string;
+  monthlyPayment: string;
 
   // Days of Week - Short Names
   sundayShort: string;
@@ -246,6 +248,8 @@ const translations: Record<Language, Translation> = {
     addNewUser: 'Add New User',
     generateSignupLink: 'Generate Signup Link',
     paymentDue: 'Payment Due',
+    weeklyPayment: 'Weekly Payment',
+    monthlyPayment: 'Monthly Payment',
 
     // Days of Week - Short Names
     sundayShort: 'Sun',
@@ -391,6 +395,8 @@ const translations: Record<Language, Translation> = {
     addNewUser: 'Adicionar Novo Usuário',
     generateSignupLink: 'Gerar Link de Cadastro',
     paymentDue: 'Pagamento Pendente',
+    weeklyPayment: 'Pagamento Semanal',
+    monthlyPayment: 'Pagamento Mensal',
 
     // Days of Week - Short Names
     sundayShort: 'Dom',
