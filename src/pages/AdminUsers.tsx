@@ -402,7 +402,7 @@ export const AdminUsers = () => {
         {user.status === 'active' ? (
           <button
             onClick={() => deleteUser(user.id)}
-            className="btn-delete-soft min-w-[100px]"
+            className={`${styles.buttons.danger} w-[120px]`}
           >
             {t.delete}
           </button>
@@ -426,13 +426,13 @@ export const AdminUsers = () => {
                   toast.error(t.failedToCopyLink);
                 }
               }}
-              className="btn-copy-soft w-[120px]"
+              className={`${styles.buttons.primary} w-[120px]`}
             >
               {t.copyLink}
             </button>
             <button
               onClick={() => deleteUser(user.id)}
-              className="btn-delete-soft w-[120px]"
+              className={`${styles.buttons.danger} w-[120px]`}
             >
               {t.delete}
             </button>
@@ -654,7 +654,7 @@ export const AdminUsers = () => {
                             {user.status === 'active' && (
                               <button
                                 onClick={() => deleteUser(user.id)}
-                                className="btn-delete-soft w-[120px]"
+                                className={`${styles.buttons.danger} w-[120px]`}
                               >
                                 {t.delete}
                               </button>
@@ -679,13 +679,13 @@ export const AdminUsers = () => {
                                       toast.error(t.failedToCopyLink);
                                     }
                                   }}
-                                  className="btn-copy-soft w-[120px]"
+                                  className={`${styles.buttons.primary} w-[120px]`}
                                 >
                                   {t.copyLink}
                                 </button>
                                 <button
                                   onClick={() => deleteUser(user.id)}
-                                  className="btn-delete-soft w-[120px]"
+                                  className={`${styles.buttons.danger} w-[120px]`}
                                 >
                                   {t.delete}
                                 </button>

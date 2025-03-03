@@ -12,56 +12,6 @@ import { styles, classNames } from '../styles/styleUtils';
 import { ClassMaterial, Class, User } from '../types/interfaces';
 import { useSearchParams } from 'react-router-dom';
 
-const getNextClassDate = (classes: Class[]): Date => {
-  const now = new Date();
-  const today = now.getDay();
-  const currentTime = now.getHours() * 60 + now.getMinutes();
-
-  // Sort classes by day of week and time
-  const sortedClasses = [...classes].sort((a, b) => {
-    if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
-    
-    // Convert time to minutes for comparison
-    const getMinutes = (timeStr: string) => {
-      const [time, period] = timeStr.trim().toUpperCase().split(' ');
-      const [hours, minutes] = time.split(':').map(Number);
-      let totalMinutes = hours * 60 + minutes;
-      if (period === 'PM' && hours !== 12) totalMinutes += 12 * 60;
-      if (period === 'AM' && hours === 12) totalMinutes = minutes;
-      return totalMinutes;
-    };
-    
-    return getMinutes(a.startTime) - getMinutes(b.startTime);
-  });
-
-  // Find the next class
-  const nextClass = sortedClasses.find(c => {
-    if (c.dayOfWeek > today) return true;
-    if (c.dayOfWeek === today) {
-      const classMinutes = (() => {
-        const [time, period] = c.startTime.trim().toUpperCase().split(' ');
-        const [hours, minutes] = time.split(':').map(Number);
-        let totalMinutes = hours * 60 + minutes;
-        if (period === 'PM' && hours !== 12) totalMinutes += 12 * 60;
-        if (period === 'AM' && hours === 12) totalMinutes = minutes;
-        return totalMinutes;
-      })();
-      return classMinutes > currentTime;
-    }
-    return false;
-  });
-
-  // If no class found in current week, get the first class of next week
-  const targetClass = nextClass || sortedClasses[0];
-  if (!targetClass) return now;
-
-  // Calculate the target date
-  const result = new Date();
-  const daysToAdd = targetClass.dayOfWeek - today + (targetClass.dayOfWeek <= today ? 7 : 0);
-  result.setDate(result.getDate() + daysToAdd);
-  return result;
-};
-
 const AdminMaterials = () => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -374,30 +324,32 @@ const AdminMaterials = () => {
         <h1 className={classNames(styles.headings.h1)}>{t.classMaterialsTitle}</h1>
         
         {/* Date Selection */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">{t.selectDateLabel}</h2>
+        <div className="mb-8 mt-6">
           <div className="max-w-2xl mx-auto">
-            <ClassDatePicker
-              selectedDate={selectedDate}
-              onDateSelect={handleDateSelect}
-              classInfo={selectedClass ? {
-                ...selectedClass,
-                startDate: selectedClass.startDate || { toDate: () => new Date() }
-              } : { 
-                id: '', 
-                dayOfWeek: 0, 
-                startTime: '', 
-                endTime: '', 
-                studentEmails: [],
-                courseType: '',
-                startDate: { toDate: () => new Date() }
-              }}
-              availableClasses={classes.map(cls => ({
-                ...cls,
-                startDate: cls.startDate || { toDate: () => new Date() }
-              }))}
-              allowPastDates={true}
-            />
+            <div className="bg-white rounded-lg shadow p-4 pt-12 mt-4 relative">
+              <h2 className="text-xl font-semibold absolute top-4 left-4">{t.selectDateLabel}</h2>
+              <ClassDatePicker
+                selectedDate={selectedDate}
+                onDateSelect={handleDateSelect}
+                classInfo={selectedClass ? {
+                  ...selectedClass,
+                  startDate: selectedClass.startDate || { toDate: () => new Date() }
+                } : { 
+                  id: '', 
+                  dayOfWeek: 0, 
+                  startTime: '', 
+                  endTime: '', 
+                  studentEmails: [],
+                  courseType: '',
+                  startDate: { toDate: () => new Date() }
+                }}
+                availableClasses={classes.map(cls => ({
+                  ...cls,
+                  startDate: cls.startDate || { toDate: () => new Date() }
+                }))}
+                allowPastDates={true}
+              />
+            </div>
           </div>
         </div>
 

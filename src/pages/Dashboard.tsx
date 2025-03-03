@@ -628,7 +628,7 @@ export const Dashboard = () => {
 
         {/* Details section */}
         <div className="lg:col-span-1" ref={detailsRef}>
-          {selectedDayDetails && (
+          {selectedDayDetails ? (
             <div className="bg-white shadow-md rounded-lg p-4">
               <h2 className={styles.headings.h2}>
                 {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
@@ -744,6 +744,10 @@ export const Dashboard = () => {
                   </div>
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="bg-white shadow-md rounded-lg p-4">
+              <p className="text-gray-500 text-center py-8">{t.selectDayToViewDetails}</p>
             </div>
           )}
         </div>

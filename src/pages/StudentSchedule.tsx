@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, query, getDocs, addDoc, deleteDoc, doc, where, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
+import { styles } from '../styles/styleUtils';
 
 interface User {
   id: string;
@@ -220,7 +221,7 @@ export const StudentSchedule = () => {
                   </div>
                   <button
                     onClick={() => deleteClass(classItem.id)}
-                    className="btn-delete-soft"
+                    className={styles.buttons.danger}
                   >
                     Delete
                   </button>

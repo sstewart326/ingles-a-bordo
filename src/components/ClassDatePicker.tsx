@@ -100,7 +100,7 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <div className="w-full">
       {/* Month Navigation */}
       <div className="flex items-center justify-between mb-4">
         <button
