@@ -465,33 +465,21 @@ export const AdminUsers = () => {
               }}
               className={`${
                 showAddForm 
-                  ? "bg-gray-200 hover:bg-gray-300 text-gray-800" 
-                  : "bg-indigo-600 hover:bg-indigo-700 text-white"
-              } px-4 py-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  ? "bg-gray-200 hover:bg-gray-300 text-gray-800 w-8 h-8" 
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2"
+              } rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                 showAddForm ? "focus:ring-gray-500" : "focus:ring-indigo-500"
-              }`}
+              } flex items-center justify-center`}
             >
               {showAddForm ? (
-                <span className="text-xl">&times;</span>
+                "\u00D7"
               ) : (
                 t.addNewUser
               )}
             </button>
-            <div id="addUserForm" className="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg p-4 z-10 border border-gray-200">
+            <div id="addUserForm" className="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg p-6 z-10 border border-gray-200">
               <div className="flex justify-between items-center mb-4">
                 <h2 className={styles.headings.h2}>{t.addNewUser}</h2>
-                <button
-                  onClick={() => {
-                    setShowAddForm(false);
-                    const form = document.getElementById('addUserForm');
-                    if (form) {
-                      form.classList.add('hidden');
-                    }
-                  }}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <span className="text-xl">&times;</span>
-                </button>
               </div>
               <form onSubmit={handleNewUserSubmit} className="space-y-3">
                 <div>
