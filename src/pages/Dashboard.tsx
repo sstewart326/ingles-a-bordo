@@ -39,6 +39,7 @@ export const Dashboard = () => {
     position: { x: number; y: number };
   } | null>(null);
   const hoverTimeoutRef = useRef<number | null>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
 
   const formatStudentNames = (studentEmails: string[]) => {
     const names = studentEmails.map(email => userNames[email] || email);
@@ -274,6 +275,14 @@ export const Dashboard = () => {
       classes,
       paymentsDue
     });
+
+    // Check if we're on mobile (screen width less than 1024px - lg breakpoint in Tailwind)
+    if (window.innerWidth < 1024 && detailsRef.current) {
+      // Add a small delay to ensure the details content is rendered
+      setTimeout(() => {
+        detailsRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
   };
 
   const getClassesForDay = (dayOfWeek: number, date: Date) => {
@@ -455,6 +464,11 @@ export const Dashboard = () => {
         </div>
       </div>
 
+      {/* Upcoming Classes section */}
+      <div className="mt-8">
+        {renderUpcomingClassesSection()}
+      </div>
+
       <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">
         {/* Calendar section */}
         <div>
@@ -467,11 +481,9 @@ export const Dashboard = () => {
         </div>
 
         {/* Details section */}
-        <div className="lg:col-span-1">
-          {renderUpcomingClassesSection()}
-          
+        <div className="lg:col-span-1" ref={detailsRef}>
           {selectedDayDetails && (
-            <div className="bg-white shadow-md rounded-lg p-4 mt-6">
+            <div className="bg-white shadow-md rounded-lg p-4">
               <h2 className={styles.headings.h2}>
                 {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
                   weekday: 'long', 

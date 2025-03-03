@@ -949,7 +949,7 @@ export const AdminSchedule = () => {
                         {classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
                       </td>
                       <td className={styles.table.cell}>
-                        {classItem.endDate ? classItem.endDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') : t.noEndDate}
+                        {classItem.endDate ? classItem.endDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') : '-'}
                       </td>
                       <td className={`${styles.table.cell} text-center`}>
                         <div className="flex justify-center gap-2">
