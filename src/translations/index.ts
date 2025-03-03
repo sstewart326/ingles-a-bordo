@@ -190,7 +190,7 @@ const translations: Record<Language, Translation> = {
     classMaterials: 'Class Materials',
     adminPanel: 'Admin Panel',
     manageUsers: 'Manage Users',
-    manageSchedules: 'Manage Schedules',
+    manageSchedules: 'Manage Classes',
     manageMaterials: 'Manage Materials',
     
     // Dashboard
@@ -357,7 +357,7 @@ const translations: Record<Language, Translation> = {
     classMaterials: 'Materiais de Aula',
     adminPanel: 'Painel Admin',
     manageUsers: 'Gerenciar Usuários',
-    manageSchedules: 'Gerenciar Horários',
+    manageSchedules: 'Gerenciar Aulas',
     manageMaterials: 'Gerenciar Materiais',
     
     // Dashboard

@@ -459,6 +459,15 @@ export const AdminSchedule = () => {
 
   // Function to handle opening the edit modal
   const openEditModal = (classItem: Class) => {
+    // Ensure payment config has proper structure
+    const paymentConfig: PaymentConfig = {
+      type: classItem.paymentConfig.type,
+      startDate: classItem.paymentConfig.startDate,
+      ...(classItem.paymentConfig.type === 'weekly' 
+        ? { weeklyInterval: classItem.paymentConfig.weeklyInterval || 1 } 
+        : { monthlyOption: classItem.paymentConfig.monthlyOption || 'first' })
+    };
+
     setEditingClass({
       id: classItem.id,
       dayOfWeek: classItem.dayOfWeek,
@@ -469,7 +478,7 @@ export const AdminSchedule = () => {
       studentEmails: classItem.studentEmails,
       startDate: classItem.startDate.toDate(),
       endDate: classItem.endDate?.toDate() || null,
-      paymentConfig: classItem.paymentConfig
+      paymentConfig: paymentConfig
     });
   };
 
@@ -478,6 +487,19 @@ export const AdminSchedule = () => {
     if (!editingClass) return;
 
     try {
+      // Clean up payment config to remove undefined values
+      const paymentConfig = {
+        type: editingClass.paymentConfig.type,
+        startDate: editingClass.paymentConfig.startDate,
+        ...(editingClass.paymentConfig.type === 'weekly' ? { 
+          weeklyInterval: editingClass.paymentConfig.weeklyInterval || 1,
+          monthlyOption: null
+        } : { 
+          weeklyInterval: null,
+          monthlyOption: editingClass.paymentConfig.monthlyOption || 'first'
+        })
+      };
+
       const updateData = {
         dayOfWeek: editingClass.dayOfWeek,
         startTime: editingClass.startTime,
@@ -487,7 +509,7 @@ export const AdminSchedule = () => {
         studentEmails: editingClass.studentEmails,
         startDate: Timestamp.fromDate(editingClass.startDate),
         endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate) : null,
-        paymentConfig: editingClass.paymentConfig,
+        paymentConfig: paymentConfig,
         updatedAt: Timestamp.now()
       };
 
@@ -526,11 +548,22 @@ export const AdminSchedule = () => {
   const handleEditStartTimeChange = (startTime: string) => {
     setEditingClass(prev => {
       if (!prev) return prev;
+      
+      // Ensure payment config has proper structure
+      const paymentConfig: PaymentConfig = {
+        type: prev.paymentConfig.type,
+        startDate: prev.paymentConfig.startDate,
+        ...(prev.paymentConfig.type === 'weekly' 
+          ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 } 
+          : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' })
+      };
+      
       return {
         ...prev,
         startTime,
         // Automatically set end time to be 1 hour after start time
-        endTime: adjustTime(startTime, 1)
+        endTime: adjustTime(startTime, 1),
+        paymentConfig
       };
     });
   };
@@ -538,6 +571,15 @@ export const AdminSchedule = () => {
   const handleEditEndTimeChange = (endTime: string) => {
     setEditingClass(prev => {
       if (!prev) return prev;
+      
+      // Ensure payment config has proper structure
+      const paymentConfig: PaymentConfig = {
+        type: prev.paymentConfig.type,
+        startDate: prev.paymentConfig.startDate,
+        ...(prev.paymentConfig.type === 'weekly' 
+          ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 } 
+          : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' })
+      };
       
       // Parse both times
       const [startTime, startPeriod] = prev.startTime.split(' ');
@@ -563,13 +605,15 @@ export const AdminSchedule = () => {
         return {
           ...prev,
           startTime: adjustTime(endTime, -1),
-          endTime
+          endTime,
+          paymentConfig
         };
       }
 
       return {
         ...prev,
-        endTime
+        endTime,
+        paymentConfig
       };
     });
   };
@@ -607,15 +651,32 @@ export const AdminSchedule = () => {
               </div>
             </div>
             <div className="mt-2">
-              <div className={styles.card.label}>{t.startDate}</div>
-              <div className="text-gray-800">{classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}</div>
-            </div>
-            {classItem.endDate && (
-              <div className="mt-2">
-                <div className={styles.card.label}>{t.endDate}</div>
-                <div className="text-gray-800">{classItem.endDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}</div>
+              <div className={styles.card.label}>Payment Type</div>
+              <div className="text-gray-800">
+                {classItem.paymentConfig.type === 'weekly' ? 'Weekly' : 'Monthly'}
               </div>
-            )}
+            </div>
+            <div className="mt-2">
+              <div className={styles.card.label}>Payment Details</div>
+              <div className="text-gray-800">
+                {classItem.paymentConfig.type === 'weekly' 
+                  ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
+                      ? 'Every week' 
+                      : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
+                  : classItem.paymentConfig.monthlyOption === 'first' 
+                    ? 'First day of month'
+                    : classItem.paymentConfig.monthlyOption === 'fifteen'
+                      ? '15th day of month'
+                      : 'Last day of month'
+                }
+              </div>
+            </div>
+            <div className="mt-2">
+              <div className={styles.card.label}>{t.paymentStartDate || "Payment Start Date"}</div>
+              <div className="text-gray-800">
+                {new Date(classItem.paymentConfig.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+              </div>
+            </div>
             <div className="mt-2">
               <div className={styles.card.label}>{t.notes}</div>
               <div className="text-gray-800">{classItem.notes || t.noNotes}</div>
@@ -713,23 +774,94 @@ export const AdminSchedule = () => {
                   </select>
                 </div>
                 <div>
-                  <label className={styles.form.label}>{t.startDate}</label>
-                  <DatePicker
-                    selected={newClass.startDate}
-                    onChange={(date: Date | null) => setNewClass(prev => ({ ...prev, startDate: date || new Date() }))}
+                  <label className={styles.form.label}>Payment Type</label>
+                  <select
+                    value={newClass.paymentConfig.type}
+                    onChange={(e) => setNewClass(prev => ({
+                      ...prev,
+                      paymentConfig: {
+                        ...prev.paymentConfig,
+                        type: e.target.value as 'weekly' | 'monthly',
+                        // Set default values based on type
+                        weeklyInterval: e.target.value === 'weekly' ? 1 : null,
+                        monthlyOption: e.target.value === 'monthly' ? 'first' : null
+                      }
+                    }))}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={styles.form.label}>{t.paymentStartDate || "Payment Start Date"}</label>
+                  <DatePicker
+                    selected={new Date(newClass.paymentConfig.startDate)}
+                    onChange={(date: Date | null) => {
+                      if (date) {
+                        // Store just the date portion in YYYY-MM-DD format
+                        const dateStr = date.toISOString().split('T')[0];
+                        setNewClass(prev => ({
+                          ...prev,
+                          paymentConfig: {
+                            ...prev.paymentConfig,
+                            startDate: dateStr
+                          }
+                        }));
+                      }
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    showTimeSelect={false}
+                    dateFormat="MMMM d, yyyy"
                   />
                 </div>
                 <div>
-                  <label className={styles.form.label}>
-                    {t.endDate} <span className="text-gray-500 font-normal">({t.optional})</span>
-                  </label>
-                  <DatePicker
-                    selected={newClass.endDate}
-                    onChange={(date: Date | null) => setNewClass(prev => ({ ...prev, endDate: date || null }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    isClearable={true}
-                  />
+                  {newClass.paymentConfig.type === 'weekly' ? (
+                    <div>
+                      <label htmlFor="weeklyInterval" className={styles.form.label}>
+                        {t.weeklyInterval || "Payment Frequency"}
+                      </label>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          id="weeklyInterval"
+                          min="1"
+                          value={newClass.paymentConfig.weeklyInterval || 1}
+                          onChange={(e) => setNewClass(prev => ({
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              weeklyInterval: parseInt(e.target.value) || 1
+                            }
+                          }))}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        />
+                        <span className="ml-2">weeks</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label htmlFor="monthlyOption" className={styles.form.label}>
+                        {t.selectPaymentDay || "Payment Day"}
+                      </label>
+                      <select
+                        id="monthlyOption"
+                        value={newClass.paymentConfig.monthlyOption || 'first'}
+                        onChange={(e) => setNewClass(prev => ({
+                          ...prev,
+                          paymentConfig: {
+                            ...prev.paymentConfig,
+                            monthlyOption: e.target.value as 'first' | 'fifteen' | 'last'
+                          }
+                        }))}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        <option value="first">{t.firstDayMonth}</option>
+                        <option value="fifteen">{t.fifteenthDayMonth}</option>
+                        <option value="last">{t.lastDayMonth}</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
                 <div className="flex space-x-4 md:col-span-2">
                   <div className="flex-1">
@@ -778,104 +910,14 @@ export const AdminSchedule = () => {
                   />
                 </div>
                 <div>
-                  <label className={styles.form.label}>{t.paymentConfiguration}</label>
-                  <div className="mt-2 space-y-4">
-                    <div>
-                      <label className={styles.form.label}>{t.paymentStartDate}</label>
-                      <DatePicker
-                        selected={new Date(newClass.paymentConfig.startDate)}
-                        onChange={(date: Date | null) => {
-                          if (date) {
-                            // Store just the date portion in YYYY-MM-DD format
-                            const dateStr = date.toISOString().split('T')[0];
-                            setNewClass(prev => ({
-                              ...prev,
-                              paymentConfig: {
-                                ...prev.paymentConfig,
-                                startDate: dateStr
-                              }
-                            }));
-                          }
-                        }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        showTimeSelect={false}
-                        dateFormat="MMMM d, yyyy"
-                      />
-                    </div>
-                    <div>
-                      <select
-                        value={newClass.paymentConfig.type}
-                        onChange={(e) => setNewClass(prev => ({
-                          ...prev,
-                          paymentConfig: {
-                            ...prev.paymentConfig,
-                            type: e.target.value as 'weekly' | 'monthly',
-                            // Set default values based on type
-                            weeklyInterval: e.target.value === 'weekly' ? 1 : null,
-                            monthlyOption: e.target.value === 'monthly' ? 'first' : null
-                          }
-                        }))}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      >
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-                    {newClass.paymentConfig.type === 'weekly' && (
-                      <div>
-                        <label htmlFor="weeklyInterval" className={styles.form.label}>
-                          {t.weeklyInterval}
-                        </label>
-                        <input
-                          type="number"
-                          id="weeklyInterval"
-                          min="1"
-                          value={newClass.paymentConfig.weeklyInterval || 1}
-                          onChange={(e) => setNewClass(prev => ({
-                            ...prev,
-                            paymentConfig: {
-                              ...prev.paymentConfig,
-                              weeklyInterval: parseInt(e.target.value) || 1
-                            }
-                          }))}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        />
-                      </div>
-                    )}
-                    {newClass.paymentConfig.type === 'monthly' && (
-                      <div>
-                        <label htmlFor="monthlyOption" className={styles.form.label}>
-                          {t.selectPaymentDay}
-                        </label>
-                        <select
-                          id="monthlyOption"
-                          value={newClass.paymentConfig.monthlyOption || 'first'}
-                          onChange={(e) => setNewClass(prev => ({
-                            ...prev,
-                            paymentConfig: {
-                              ...prev.paymentConfig,
-                              monthlyOption: e.target.value as 'first' | 'fifteen' | 'last'
-                            }
-                          }))}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        >
-                          <option value="first">{t.firstDayMonth}</option>
-                          <option value="fifteen">{t.fifteenthDayMonth}</option>
-                          <option value="last">{t.lastDayMonth}</option>
-                        </select>
-                      </div>
-                    )}
-                  </div>
+                  <label className={styles.form.label}>{t.notes}</label>
+                  <textarea
+                    value={newClass.notes}
+                    onChange={(e) => setNewClass(prev => ({ ...prev, notes: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    rows={3}
+                  />
                 </div>
-              </div>
-              <div>
-                <label className={styles.form.label}>{t.notes}</label>
-                <textarea
-                  value={newClass.notes}
-                  onChange={(e) => setNewClass(prev => ({ ...prev, notes: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  rows={3}
-                />
               </div>
               <div className="flex justify-end">
                 <button
@@ -909,10 +951,10 @@ export const AdminSchedule = () => {
                       {t.students}
                     </th>
                     <th scope="col" className={styles.table.header}>
-                      {t.startDate}
+                      Payment Type
                     </th>
                     <th scope="col" className={styles.table.header}>
-                      {t.endDate}
+                      Payment Details
                     </th>
                     <th scope="col" className={`${styles.table.header} text-center`}>
                       {t.actions}
@@ -946,10 +988,19 @@ export const AdminSchedule = () => {
                         </div>
                       </td>
                       <td className={styles.table.cell}>
-                        {classItem.startDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+                        {classItem.paymentConfig.type === 'weekly' ? 'Weekly' : 'Monthly'}
                       </td>
                       <td className={styles.table.cell}>
-                        {classItem.endDate ? classItem.endDate.toDate().toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en') : '-'}
+                        {classItem.paymentConfig.type === 'weekly' 
+                          ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
+                              ? 'Every week' 
+                              : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
+                          : classItem.paymentConfig.monthlyOption === 'first' 
+                            ? 'First day of month'
+                            : classItem.paymentConfig.monthlyOption === 'fifteen'
+                              ? '15th day of month'
+                              : 'Last day of month'
+                        }
                       </td>
                       <td className={`${styles.table.cell} text-center`}>
                         <div className="flex justify-center gap-2">
@@ -1061,25 +1112,137 @@ export const AdminSchedule = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={styles.form.label}>{t.startDate}</label>
-                    <DatePicker
-                      selected={editingClass.startDate}
-                      onChange={(date: Date | null) => setEditingClass(prev => ({ ...prev!, startDate: date || new Date() }))}
+                    <label className={styles.form.label}>Payment Type</label>
+                    <select
+                      value={editingClass.paymentConfig.type}
+                      onChange={(e) => {
+                        const type = e.target.value as 'weekly' | 'monthly';
+                        setEditingClass(prev => {
+                          if (!prev) return prev;
+                          
+                          // Create a properly structured payment config
+                          const paymentConfig: PaymentConfig = {
+                            type,
+                            startDate: prev.paymentConfig.startDate,
+                            ...(type === 'weekly' 
+                              ? { weeklyInterval: 1 } 
+                              : { monthlyOption: 'first' })
+                          };
+                          
+                          return {
+                            ...prev,
+                            paymentConfig
+                          };
+                        });
+                      }}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
                   </div>
                   <div>
-                    <label className={styles.form.label}>
-                      {t.endDate} <span className="text-gray-500 font-normal">({t.optional})</span>
-                    </label>
+                    <label className={styles.form.label}>{t.paymentStartDate || "Payment Start Date"}</label>
                     <DatePicker
-                      selected={editingClass.endDate}
-                      onChange={(date: Date | null) => setEditingClass(prev => ({ ...prev!, endDate: date }))}
+                      selected={new Date(editingClass.paymentConfig.startDate)}
+                      onChange={(date: Date | null) => {
+                        if (date) {
+                          const dateStr = date.toISOString().split('T')[0];
+                          setEditingClass(prev => {
+                            if (!prev) return prev;
+                            
+                            // Create a properly structured payment config
+                            const paymentConfig: PaymentConfig = {
+                              type: prev.paymentConfig.type,
+                              startDate: dateStr,
+                              ...(prev.paymentConfig.type === 'weekly' 
+                                ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 } 
+                                : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' })
+                            };
+                            
+                            return {
+                              ...prev,
+                              paymentConfig
+                            };
+                          });
+                        }
+                      }}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      isClearable
+                      dateFormat="MMMM d, yyyy"
                     />
                   </div>
                 </div>
+
+                {editingClass.paymentConfig.type === 'weekly' && (
+                  <div>
+                    <label htmlFor="edit-weeklyInterval" className={styles.form.label}>
+                      {t.weeklyInterval || "Payment Frequency"}
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        id="edit-weeklyInterval"
+                        min="1"
+                        value={editingClass.paymentConfig.weeklyInterval || 1}
+                        onChange={(e) => {
+                          const weeklyInterval = parseInt(e.target.value) || 1;
+                          setEditingClass(prev => {
+                            if (!prev) return prev;
+                            
+                            // Create a properly structured payment config
+                            const paymentConfig: PaymentConfig = {
+                              type: 'weekly',
+                              startDate: prev.paymentConfig.startDate,
+                              weeklyInterval
+                            };
+                            
+                            return {
+                              ...prev,
+                              paymentConfig
+                            };
+                          });
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <span className="ml-2">weeks</span>
+                    </div>
+                  </div>
+                )}
+
+                {editingClass.paymentConfig.type === 'monthly' && (
+                  <div>
+                    <label htmlFor="edit-monthlyOption" className={styles.form.label}>
+                      {t.selectPaymentDay || "Payment Day"}
+                    </label>
+                    <select
+                      id="edit-monthlyOption"
+                      value={editingClass.paymentConfig.monthlyOption || 'first'}
+                      onChange={(e) => {
+                        const monthlyOption = e.target.value as 'first' | 'fifteen' | 'last';
+                        setEditingClass(prev => {
+                          if (!prev) return prev;
+                          
+                          // Create a properly structured payment config
+                          const paymentConfig: PaymentConfig = {
+                            type: 'monthly',
+                            startDate: prev.paymentConfig.startDate,
+                            monthlyOption
+                          };
+                          
+                          return {
+                            ...prev,
+                            paymentConfig
+                          };
+                        });
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="first">{t.firstDayMonth}</option>
+                      <option value="fifteen">{t.fifteenthDayMonth}</option>
+                      <option value="last">{t.lastDayMonth}</option>
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className={styles.form.label}>{t.notes}</label>
