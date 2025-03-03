@@ -84,6 +84,7 @@ interface Translation {
   noMaterialsFound: string;
   downloadSlides: string;
   noMaterialsAvailable: string;
+  addMaterials: string;
   
   // Common
   save: string;
@@ -253,6 +254,7 @@ const translations: Record<Language, Translation> = {
     noMaterialsFound: 'No materials found',
     downloadSlides: 'Download Slides',
     noMaterialsAvailable: 'No materials available',
+    addMaterials: 'Add materials',
     
     // Common
     save: 'Save',
@@ -420,6 +422,7 @@ const translations: Record<Language, Translation> = {
     noMaterialsFound: 'Nenhum material encontrado',
     downloadSlides: 'Baixar Slides',
     noMaterialsAvailable: 'Nenhum material disponível',
+    addMaterials: 'Adicionar materiais',
     
     // Common
     save: 'Salvar',

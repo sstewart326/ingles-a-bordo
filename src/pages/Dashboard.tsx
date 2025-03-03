@@ -15,7 +15,7 @@ import {
 } from '../utils/scheduleUtils';
 import { styles } from '../styles/styleUtils';
 import { getClassMaterials } from '../utils/classMaterialsUtils';
-import { FaFilePdf, FaLink } from 'react-icons/fa';
+import { FaFilePdf, FaLink, FaPlus } from 'react-icons/fa';
 import { ClassMaterial } from '../types/interfaces';
 
 interface TimeDisplay {
@@ -660,7 +660,17 @@ export const Dashboard = () => {
                           {/* Materials Section */}
                           {selectedDayDetails.materials[classSession.id] && selectedDayDetails.materials[classSession.id].length > 0 && (
                             <div className="mt-3">
-                              <div className={styles.card.label}>{t.materials || "Materials"}</div>
+                              <div className="flex justify-between items-center">
+                                <div className={styles.card.label}>{t.materials || "Materials"}</div>
+                                {isAdmin && (
+                                  <a 
+                                    href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${selectedDayDetails.date.toISOString()}`}
+                                    className="text-sm text-blue-600 hover:text-blue-800"
+                                  >
+                                    {t.addMaterials}
+                                  </a>
+                                )}
+                              </div>
                               <div className="mt-1 space-y-2">
                                 {selectedDayDetails.materials[classSession.id].map((material, index) => (
                                   <div key={index} className="flex flex-col space-y-2">
@@ -695,6 +705,19 @@ export const Dashboard = () => {
                                   </div>
                                 ))}
                               </div>
+                            </div>
+                          )}
+                          
+                          {/* Add materials link when no materials exist */}
+                          {isAdmin && (!selectedDayDetails.materials[classSession.id] || selectedDayDetails.materials[classSession.id].length === 0) && (
+                            <div className="mt-3">
+                              <a 
+                                href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${selectedDayDetails.date.toISOString()}`}
+                                className="flex items-center text-blue-600 hover:text-blue-800"
+                              >
+                                <FaPlus className="mr-2" />
+                                <span className="text-sm">{t.addMaterials}</span>
+                              </a>
                             </div>
                           )}
                         </div>

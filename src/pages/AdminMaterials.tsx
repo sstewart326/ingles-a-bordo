@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent, FormEvent, useCallback } from 'react';
+import { useState, useEffect, ChangeEvent, FormEvent, useCallback, useRef } from 'react';
 import { getCachedCollection } from '../utils/firebaseUtils';
 import { addClassMaterials, validateFile, getClassMaterials } from '../utils/classMaterialsUtils';
 import { FaPlus, FaTrash } from 'react-icons/fa';
@@ -10,6 +10,7 @@ import { useTranslation } from '../translations';
 import { where } from 'firebase/firestore';
 import { styles, classNames } from '../styles/styleUtils';
 import { ClassMaterial, Class, User } from '../types/interfaces';
+import { useSearchParams } from 'react-router-dom';
 
 const getNextClassDate = (classes: Class[]): Date => {
   const now = new Date();
@@ -74,6 +75,9 @@ const AdminMaterials = () => {
   const [existingMaterials, setExistingMaterials] = useState<ClassMaterial[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'view' | 'upload'>('view');
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
 
   const fetchMaterialsAndStudents = useCallback(async () => {
     if (!selectedClass || !selectedClass.id) {
@@ -148,61 +152,57 @@ const AdminMaterials = () => {
         setUsers(usersData);
         
         // Validate that we have IDs and proper time format
-        const invalidClasses = classesData.filter(c => {
-          // Check for missing ID
-          if (!c.id) return true;
-          
-          // Check time format
-          if (!c.startTime || !c.endTime) return true;
-          
-          // Validate time format (both 12-hour and 24-hour)
-          const validateTime = (timeStr: string) => {
-            timeStr = timeStr.trim().toUpperCase();
-            // 12-hour format (HH:MM AM/PM)
-            if (timeStr.includes('AM') || timeStr.includes('PM')) {
-              return /^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)$/.test(timeStr);
-            }
-            // 24-hour format (HH:MM)
-            return /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr);
-          };
-
-          if (!validateTime(c.startTime) || !validateTime(c.endTime)) {
-            console.error('Invalid time format for class:', { 
-              id: c.id, 
-              startTime: c.startTime, 
-              endTime: c.endTime 
-            });
-            return true;
-          }
-          
-          return false;
-        });
-
-        if (invalidClasses.length > 0) {
-          console.error('Invalid classes found:', invalidClasses);
-          toast.error(t.invalidField);
-          return;
-        }
-
-        setClasses(classesData);
+        const validClasses = classesData.filter(c => c.id && c.startTime);
+        setClasses(validClasses);
         
-        if (classesData.length === 0) {
-          setLoading(false);
-          return;
+        // Check for date parameter
+        const dateParam = searchParams.get('date');
+        if (dateParam) {
+          try {
+            const date = new Date(dateParam);
+            if (!isNaN(date.getTime())) {
+              setSelectedDate(date);
+            }
+          } catch (error) {
+            console.error('Invalid date parameter:', error);
+          }
         }
-
-        // Set the initial date to the next class date
-        setSelectedDate(getNextClassDate(classesData));
+        
+        // Check for classId in URL parameters
+        const classIdParam = searchParams.get('classId');
+        if (classIdParam) {
+          const classFromParam = validClasses.find(c => c.id === classIdParam);
+          if (classFromParam) {
+            setSelectedClass(classFromParam);
+          }
+        }
+        
+        // Check for tab parameter
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'upload') {
+          setActiveTab('upload');
+        }
+        
+        setLoading(false);
       } catch (error) {
-        console.error('Failed to load classes:', error);
-        toast.error(t.failedToLoad);
-      } finally {
+        console.error('Error fetching classes:', error);
+        toast.error('Failed to load classes');
         setLoading(false);
       }
     };
 
     fetchClasses();
-  }, []);
+  }, [searchParams]);
+
+  // Effect to scroll to upload section when tab is set to upload
+  useEffect(() => {
+    if (activeTab === 'upload' && uploadSectionRef.current) {
+      // Add a small delay to ensure the component is rendered
+      setTimeout(() => {
+        uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [activeTab, selectedClass]);
 
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
@@ -369,8 +369,8 @@ const AdminMaterials = () => {
   }
 
   return (
-    <div className="flex-1 bg-white">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+    <div className="min-h-screen bg-white">
+      <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className={classNames(styles.headings.h1)}>{t.classMaterialsTitle}</h1>
         
         {/* Date Selection */}
@@ -436,131 +436,157 @@ const AdminMaterials = () => {
               </div>
             )}
 
-            {selectedClass ? (
+            {selectedClass && (
               <>
-                {/* Materials Upload */}
-                <div className="mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t.uploadMaterials}</h2>
-                  
-                  <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
-                    {/* File Upload */}
-                    <div className="mb-4">
-                      <input
-                        type="file"
-                        onChange={handleFileChange}
-                        accept=".pdf,.doc,.docx,.ppt,.pptx"
-                        className="block w-full text-sm text-gray-500
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-full file:border-0
-                          file:text-sm file:font-semibold
-                          file:bg-blue-50 file:text-blue-700
-                          hover:file:bg-blue-100"
-                      />
-                    </div>
+                {/* Tabs */}
+                <div className="max-w-2xl mx-auto mb-6">
+                  <div className="flex gap-2">
+                    <button
+                      className={`py-2 px-4 font-medium text-sm rounded-md bg-[var(--brand-color)] text-[var(--header-bg)] hover:bg-[var(--brand-color-dark)] hover:text-white transition-colors`}
+                      onClick={() => setActiveTab('view')}
+                    >
+                      {t.existingMaterials || "View Materials"}
+                    </button>
+                    <button
+                      className={`py-2 px-4 font-medium text-sm rounded-md bg-[var(--brand-color)] text-[var(--header-bg)] hover:bg-[var(--brand-color-dark)] hover:text-white transition-colors`}
+                      onClick={() => setActiveTab('upload')}
+                    >
+                      {t.uploadMaterials || "Upload Materials"}
+                    </button>
+                  </div>
+                </div>
 
-                    {/* Links Management */}
-                    <div className="space-y-4 mb-6">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newLink}
-                          onChange={(e) => setNewLink(e.target.value)}
-                          placeholder={t.addLinkPlaceholder}
-                          className="flex-1 p-2 border rounded"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddLink}
-                          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                        >
-                          <FaPlus />
-                        </button>
-                      </div>
+                {activeTab === 'upload' && (
+                  /* Materials Upload */
+                  <div className="max-w-2xl mx-auto" ref={uploadSectionRef}>
+                    <h2 className="text-xl font-semibold mb-6">{t.uploadMaterials}</h2>
+                    
+                    <div className="bg-white rounded-lg p-6 border border-gray-200">
+                      <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* File Upload */}
+                        <div className="mb-4">
+                          <input
+                            type="file"
+                            onChange={handleFileChange}
+                            accept=".pdf,.doc,.docx,.ppt,.pptx"
+                            className="block w-full text-sm text-gray-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-full file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-[var(--brand-color-light)] file:text-[var(--header-bg)]
+                              hover:file:bg-[var(--brand-color-hover)]"
+                          />
+                        </div>
 
-                      {/* Links List */}
-                      <div className="space-y-2">
-                        {links.map((link, index) => (
-                          <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                            <span className="flex-1 truncate text-gray-800">{link}</span>
+                        {/* Links Management */}
+                        <div className="space-y-4">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={newLink}
+                              onChange={(e) => setNewLink(e.target.value)}
+                              placeholder={t.addLinkPlaceholder}
+                              className="flex-1 p-2 border rounded"
+                            />
                             <button
                               type="button"
-                              onClick={() => handleRemoveLink(index)}
-                              className="text-red-500 hover:text-red-600"
+                              onClick={handleAddLink}
+                              className="px-4 py-2 bg-[var(--brand-color)] text-[var(--header-bg)] rounded hover:bg-[var(--brand-color-dark)]"
                             >
-                              <FaTrash />
+                              <FaPlus />
                             </button>
+                          </div>
+
+                          {/* Links List */}
+                          <div className="space-y-2">
+                            {links.map((link, index) => (
+                              <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                                <span className="flex-1 truncate text-gray-800">{link}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveLink(index)}
+                                  className="text-red-500 hover:text-red-600"
+                                >
+                                  <FaTrash />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Submit Button */}
+                        <button
+                          type="submit"
+                          disabled={uploading || (!selectedFile && links.length === 0)}
+                          className="w-full bg-[var(--brand-color)] text-[var(--header-bg)] py-3 px-6 rounded-lg font-semibold
+                            hover:bg-[var(--brand-color-dark)] hover:text-white disabled:bg-gray-400 disabled:cursor-not-allowed
+                            transition duration-200"
+                        >
+                          {uploading ? t.uploading : t.uploadMaterials}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'view' && (
+                  /* Existing Materials */
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold mb-4">{t.existingMaterials}</h2>
+                    {existingMaterials.length > 0 ? (
+                      <div className="space-y-4">
+                        {existingMaterials.map((material, index) => (
+                          <div key={index} className="p-4 border rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-medium">{t.materialsForDate} {new Date(material.classDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}</h3>
+                              {material.slides && (
+                                <a
+                                  href={material.slides}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 text-blue-500 hover:text-blue-600"
+                                >
+                                  {t.downloadSlides}
+                                </a>
+                              )}
+                            </div>
+                            {material.links && material.links.length > 0 && (
+                              <div className="mt-2">
+                                <p className="font-medium mb-2">{t.usefulLinks}:</p>
+                                <ul className="space-y-2">
+                                  {material.links.map((link, linkIndex) => (
+                                    <li key={linkIndex} className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100">
+                                      <a
+                                        href={link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 break-all"
+                                      >
+                                        {link}
+                                      </a>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
-                    </div>
-
-                    {/* Submit Button */}
-                    <button
-                      type="submit"
-                      disabled={uploading || (!selectedFile && links.length === 0)}
-                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold
-                        hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed
-                        transition duration-200"
-                    >
-                      {uploading ? t.uploading : t.uploadMaterials}
-                    </button>
-                  </form>
-                </div>
-
-                {/* Existing Materials */}
-                {existingMaterials.length > 0 ? (
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold mb-4">{t.existingMaterials}</h2>
-                    <div className="space-y-4">
-                      {existingMaterials.map((material, index) => (
-                        <div key={index} className="p-4 border rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-medium">{t.materialsForDate} {new Date(material.classDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}</h3>
-                            {material.slides && (
-                              <a
-                                href={material.slides}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-blue-500 hover:text-blue-600"
-                              >
-                                {t.downloadSlides}
-                              </a>
-                            )}
-                          </div>
-                          {material.links && material.links.length > 0 && (
-                            <div className="mt-2">
-                              <p className="font-medium mb-2">{t.usefulLinks}:</p>
-                              <ul className="space-y-2">
-                                {material.links.map((link, linkIndex) => (
-                                  <li key={linkIndex} className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100">
-                                    <a
-                                      href={link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:text-blue-800 break-all"
-                                    >
-                                      {link}
-                                    </a>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-600">
-                    {t.noMaterialsFound}
+                    ) : (
+                      <div className="text-center py-8 text-gray-600">
+                        {t.noMaterialsFound}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
-            ) : (
+            )}
+            
+            {!selectedClass && (
               <div className="text-center py-8 text-gray-600">
                 {t.selectDateWithClass}
               </div>
