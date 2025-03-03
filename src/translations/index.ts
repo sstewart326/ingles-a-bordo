@@ -44,6 +44,12 @@ interface Translation {
   students: string;
   pair: string;
   group: string;
+  calendar: string;
+  previous: string;
+  next: string;
+  noUpcomingClasses: string;
+  paymentsDue: string;
+  classOn: string;
   
   // Schedule
   courseSchedule: string;
@@ -75,6 +81,7 @@ interface Translation {
   usefulLinks: string;
   noMaterialsFound: string;
   downloadSlides: string;
+  noMaterialsAvailable: string;
   
   // Common
   save: string;
@@ -204,6 +211,12 @@ const translations: Record<Language, Translation> = {
     students: 'Students',
     pair: 'Pair Class',
     group: 'Group Class',
+    calendar: 'Calendar',
+    previous: 'Previous',
+    next: 'Next',
+    noUpcomingClasses: 'No upcoming classes',
+    paymentsDue: 'Payments Due',
+    classOn: 'Class on',
     
     // Schedule
     courseSchedule: 'Course Schedule',
@@ -235,6 +248,7 @@ const translations: Record<Language, Translation> = {
     usefulLinks: 'Useful Links',
     noMaterialsFound: 'No materials found',
     downloadSlides: 'Download Slides',
+    noMaterialsAvailable: 'No materials available',
     
     // Common
     save: 'Save',
@@ -345,23 +359,29 @@ const translations: Record<Language, Translation> = {
     // Dashboard
     quickActions: 'Ações Rápidas',
     manageScheduleDesc: 'Criar ou editar sessões de aula',
-    classMaterialsDesc: 'Enviar e gerenciar materiais',
+    classMaterialsDesc: 'Carregar e gerenciar materiais',
     upcomingClasses: 'Próximas Aulas',
     pastClasses: 'Aulas Passadas',
     viewAll: 'Ver Tudo',
     yourUpcomingClasses: 'Suas Próximas Aulas',
     sunday: 'Domingo',
-    monday: 'Segunda',
-    tuesday: 'Terça',
-    wednesday: 'Quarta',
-    thursday: 'Quinta',
-    friday: 'Sexta',
+    monday: 'Segunda-feira',
+    tuesday: 'Terça-feira',
+    wednesday: 'Quarta-feira',
+    thursday: 'Quinta-feira',
+    friday: 'Sexta-feira',
     saturday: 'Sábado',
     class: 'Aula',
-    noClassesScheduled: 'Não há aulas agendadas para este dia',
+    noClassesScheduled: 'Nenhuma aula agendada para este dia',
     students: 'Alunos',
-    pair: 'Aula em Par',
+    pair: 'Aula em Dupla',
     group: 'Aula em Grupo',
+    calendar: 'Calendário',
+    previous: 'Anterior',
+    next: 'Próximo',
+    noUpcomingClasses: 'Sem aulas futuras',
+    paymentsDue: 'Pagamentos Pendentes',
+    classOn: 'Aula em',
     
     // Schedule
     courseSchedule: 'Agenda de Aulas',
@@ -378,21 +398,22 @@ const translations: Record<Language, Translation> = {
     availableClassDates: 'Datas de aula disponíveis',
     
     // Class Materials
-    classMaterialsTitle: 'Gerenciamento de Materiais',
+    classMaterialsTitle: 'Gerenciamento de Materiais de Aula',
     selectMonthLabel: 'Selecionar Mês',
     selectDateLabel: 'Selecionar Data',
     selectClass: 'Selecionar Aula em',
-    uploadMaterials: 'Enviar Materiais',
-    addLinkPlaceholder: 'Adicionar um link para materiais de aprendizagem',
-    uploading: 'Enviando...',
+    uploadMaterials: 'Carregar Materiais',
+    addLinkPlaceholder: 'Adicionar um link para materiais de aprendizado',
+    uploading: 'Carregando...',
     existingMaterials: 'Materiais Existentes',
     materialsForDate: 'Materiais para',
-    selectDateWithClass: 'Selecione uma data com aula agendada para gerenciar materiais',
+    selectDateWithClass: 'Selecione uma data com uma aula agendada para gerenciar materiais',
     pleaseLogin: 'Por favor, faça login para ver seus materiais de aula.',
-    failedToLoad: 'Falha ao carregar materiais',
+    failedToLoad: 'Falha ao carregar materiais de aula',
     usefulLinks: 'Links Úteis',
     noMaterialsFound: 'Nenhum material encontrado',
     downloadSlides: 'Baixar Slides',
+    noMaterialsAvailable: 'Nenhum material disponível',
     
     // Common
     save: 'Salvar',

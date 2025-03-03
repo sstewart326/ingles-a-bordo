@@ -7,6 +7,7 @@ import { FaFilePdf, FaLink } from 'react-icons/fa';
 import { useTranslation } from '../translations';
 import { formatDateWithTime } from '../utils/dateUtils';
 import toast from 'react-hot-toast';
+import { styles } from '../styles/styleUtils';
 
 interface Class {
   id: string;
@@ -247,7 +248,7 @@ export const ClassMaterials = () => {
       <div className="min-h-screen py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="card">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">{t.classMaterialsTitle}</h1>
+            <h1 className={styles.headings.h1}>{t.classMaterialsTitle}</h1>
             <p className="text-gray-500 text-center py-4">{t.noMaterialsFound}</p>
           </div>
         </div>
@@ -256,105 +257,171 @@ export const ClassMaterials = () => {
   }
 
   return (
-    <div className="min-h-screen py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="card">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">{t.classMaterialsTitle}</h1>
-
-          {/* Month and Date Selection */}
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-8">
-            {/* Month Selection */}
-            <div className="w-full sm:w-48">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.selectMonthLabel}
-              </label>
-              <select
-                value={`${selectedMonthYear.year}-${selectedMonthYear.month}`}
-                onChange={(e) => handleMonthChange(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-              >
-                {availableMonths.map(({ month, year }) => (
-                  <option key={`${year}-${month}`} value={`${year}-${month}`}>
-                    {MONTHS[month]} {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date Selection */}
-            <div className="w-full sm:w-80">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.selectDateLabel}
-              </label>
-              <select
-                value={selectedMaterial?.classDate.toISOString() || ''}
-                onChange={(e) => handleDateChange(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-              >
-                {filteredMaterials.map((material) => {
-                  const classInfo = classesInfo[material.classId];
-                  return (
-                    <option key={material.classDate.toISOString()} value={material.classDate.toISOString()}>
-                      {formatDateWithTime(
-                        material.classDate,
-                        classInfo?.startTime,
-                        classInfo?.endTime
-                      )}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
+    <div className="flex-1 bg-gray-50">
+      <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 className={styles.headings.h1}>{t.classMaterialsTitle}</h1>
+        
+        {/* Month and Date Selection */}
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-8">
+          {/* Month Selection */}
+          <div className="w-full sm:w-48">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t.selectMonthLabel}
+            </label>
+            <select
+              value={`${selectedMonthYear.year}-${selectedMonthYear.month}`}
+              onChange={(e) => handleMonthChange(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+            >
+              {availableMonths.map(({ month, year }) => (
+                <option key={`${year}-${month}`} value={`${year}-${month}`}>
+                  {MONTHS[month]} {year}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Selected Material Content */}
-          {selectedMaterial && (
-            <div className="space-y-6">
-              {/* Slides */}
-              {selectedMaterial.slides && (
-                <div>
-                  {loadingSlides ? (
-                    <div className="animate-pulse h-10 bg-gray-200 rounded"></div>
-                  ) : slidesUrl ? (
+          {/* Date Selection */}
+          <div className="w-full sm:w-80">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t.selectDateLabel}
+            </label>
+            <select
+              value={selectedMaterial?.classDate.toISOString() || ''}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+            >
+              {filteredMaterials.map((material) => {
+                const classInfo = classesInfo[material.classId];
+                return (
+                  <option key={material.classDate.toISOString()} value={material.classDate.toISOString()}>
+                    {formatDateWithTime(
+                      material.classDate,
+                      classInfo?.startTime,
+                      classInfo?.endTime
+                    )}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
+
+        {/* Selected Material Content */}
+        {selectedMaterial && (
+          <div className="space-y-6">
+            {/* Slides */}
+            {selectedMaterial.slides && (
+              <div>
+                {loadingSlides ? (
+                  <div className="animate-pulse h-10 bg-gray-200 rounded"></div>
+                ) : slidesUrl ? (
+                  <a
+                    href={slidesUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    <FaFilePdf className="mr-2" />
+                    {t.downloadSlides}
+                  </a>
+                ) : null}
+              </div>
+            )}
+
+            {/* Links */}
+            {selectedMaterial.links && selectedMaterial.links.length > 0 && (
+              <div>
+                <h3 className={styles.headings.h3}>{t.usefulLinks}</h3>
+                <div className="space-y-2">
+                  {selectedMaterial.links.map((link, index) => (
                     <a
-                      href={slidesUrl}
+                      key={index}
+                      href={link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      className="inline-flex items-center text-indigo-600 hover:text-indigo-900"
                     >
-                      <FaFilePdf className="mr-2" />
-                      {t.downloadSlides}
+                      <FaLink className="mr-2" />
+                      {link}
                     </a>
-                  ) : null}
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Links */}
-              {selectedMaterial.links && selectedMaterial.links.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">{t.usefulLinks}</h3>
-                  <div className="space-y-2">
-                    {selectedMaterial.links.map((link, index) => (
+            {/* No Materials Message */}
+            {!selectedMaterial.slides && (!selectedMaterial.links || selectedMaterial.links.length === 0) && (
+              <p className="text-gray-500 italic">{t.noMaterialsFound}</p>
+            )}
+          </div>
+        )}
+
+        {/* Materials List */}
+        <div className="mt-8 space-y-8">
+          {filteredMaterials.length === 0 ? (
+            <div className="bg-white shadow-md rounded-lg p-6 text-center">
+              <p className="text-gray-500">{t.noMaterialsAvailable}</p>
+            </div>
+          ) : (
+            filteredMaterials.map((material) => (
+              <div key={material.classId} className="bg-white shadow-md rounded-lg p-6">
+                <div className="mb-4">
+                  <h2 className={styles.headings.h2}>
+                    {material.classDate.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </h2>
+                  <p className="text-gray-600 text-sm">
+                    {material.classId}
+                  </p>
+                </div>
+                
+                {/* Slides */}
+                {material.slides && (
+                  <div>
+                    {loadingSlides ? (
+                      <div className="animate-pulse h-10 bg-gray-200 rounded"></div>
+                    ) : slidesUrl ? (
                       <a
-                        key={index}
-                        href={link}
+                        href={material.slides}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center text-indigo-600 hover:text-indigo-900"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
-                        <FaLink className="mr-2" />
-                        {link}
+                        <FaFilePdf className="mr-2" />
+                        {t.downloadSlides}
                       </a>
-                    ))}
+                    ) : null}
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* No Materials Message */}
-              {!selectedMaterial.slides && (!selectedMaterial.links || selectedMaterial.links.length === 0) && (
-                <p className="text-gray-500 italic">{t.noMaterialsFound}</p>
-              )}
-            </div>
+                {/* Links */}
+                {material.links && material.links.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className={styles.headings.h3}>{t.usefulLinks}</h3>
+                    <ul className="mt-2 space-y-2">
+                      {material.links.map((link, index) => (
+                        <li key={index}>
+                          <a
+                            href={link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-600 hover:text-indigo-900 flex items-center"
+                          >
+                            <FaLink className="mr-2" />
+                            {link}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))
           )}
         </div>
       </div>

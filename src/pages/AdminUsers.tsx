@@ -11,6 +11,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { cache } from '../utils/cache';
 import { PencilIcon } from '@heroicons/react/24/outline';
+import { styles } from '../styles/styleUtils';
 
 interface User {
   id: string;
@@ -445,7 +446,7 @@ export const AdminUsers = () => {
     <div className="flex-1">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-black">{t.manageUsers}</h1>
+          <h1 className={styles.headings.h1}>{t.manageUsers}</h1>
           <div className="relative">
             <button
               onClick={() => {
@@ -478,7 +479,7 @@ export const AdminUsers = () => {
             </button>
             <div id="addUserForm" className="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg p-4 z-10 border border-gray-200">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">{t.addNewUser}</h2>
+                <h2 className={styles.headings.h2}>{t.addNewUser}</h2>
                 <button
                   onClick={() => {
                     setShowAddForm(false);
@@ -487,9 +488,9 @@ export const AdminUsers = () => {
                       form.classList.add('hidden');
                     }
                   }}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 w-8 h-8 rounded-md text-xl font-medium flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  className="text-gray-400 hover:text-gray-500"
                 >
-                  &times;
+                  <span className="text-xl">&times;</span>
                 </button>
               </div>
               <form onSubmit={handleNewUserSubmit} className="space-y-3">
@@ -583,16 +584,16 @@ export const AdminUsers = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={styles.table.header}>
                         {t.name}
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={styles.table.header}>
                         {t.email}
                       </th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={styles.table.header}>
                         {t.userStatus}
                       </th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={styles.table.header}>
                         {t.actions}
                       </th>
                     </tr>

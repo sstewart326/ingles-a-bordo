@@ -231,6 +231,7 @@ nav.header-nav .header-dropdown .header-dropdown-item:hover {
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
   background-color: #E5E7EB;
+  border: 1px solid #E5E7EB;
   border-radius: 0.5rem;
   overflow: hidden;
   width: 100%;
@@ -238,32 +239,36 @@ nav.header-nav .header-dropdown .header-dropdown-item:hover {
 
 .calendar-day {
   background-color: white;
-  padding: 0.5rem;
-  min-height: 0;
+  min-height: 120px;
   height: auto;
   position: relative;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  aspect-ratio: 1;
+  border-right: 1px solid #E5E7EB;
+  border-bottom: 1px solid #E5E7EB;
 }
 
 .calendar-day:hover {
-  background-color: var(--brand-color-light);
+  background-color: #F3F4F6;
 }
 
 .calendar-day.selected {
-  background-color: var(--brand-color-light) !important;
+  background-color: #EEF2FF !important;
+  border: 1px solid #6366F1;
 }
 
 .calendar-day > div {
-  position: absolute;
-  inset: 0.5rem;
+  position: relative;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  padding: 0.5rem;
 }
 
-.calendar-day .font-semibold {
+.calendar-day .date-number {
   text-align: center;
+  font-size: 1rem;
+  color: #1a1a1a;
   margin-bottom: 0.25rem;
 }
 
@@ -271,15 +276,51 @@ nav.header-nav .header-dropdown .header-dropdown-item:hover {
   display: flex;
   gap: 0.25rem;
   justify-content: center;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-day-indicators .indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.calendar-day-indicators .class-indicator {
+  background-color: #6366f1;
+}
+
+.calendar-day-indicators .payment-indicator {
+  background-color: #f59e0b;
+}
+
+.calendar-day-indicators .payment-soon-indicator {
+  background-color: #ef4444;
+}
+
+.payment-due-label {
+  font-size: 0.6rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  text-align: center;
+  margin-top: 0.25rem;
+}
+
+.payment-due-label.soon {
+  background-color: #fef2f2;
+  color: #ef4444;
+}
+
+.payment-due-label.normal {
+  background-color: #fffbeb;
+  color: #f59e0b;
 }
 
 /* Class details styling */
 .class-details {
   flex: 1;
   overflow-y: hidden;
-  margin-top: 0.25rem;
-  min-height: 100px;
+  margin-top: 0.5rem;
+  min-height: 60px;
 }
 
 .time-slots-container {
@@ -292,6 +333,25 @@ nav.header-nav .header-dropdown .header-dropdown-item:hover {
   height: 100%;
   min-height: inherit;
   position: relative;
+}
+
+.time-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background-color: #6366f1;
+  color: white;
+  font-size: 0.7rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.time-slot.more {
+  background-color: #818cf8;
 }
 
 .time-markers {
@@ -488,7 +548,7 @@ nav.header-nav .header-dropdown .header-dropdown-item:hover {
   }
 
   /* Adjust day number size */
-  .calendar-day .font-semibold {
+  .calendar-day .date-number {
     font-size: 0.875rem;
   }
 

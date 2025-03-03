@@ -8,6 +8,7 @@ import { cache } from '../utils/cache';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { where } from 'firebase/firestore';
+import { styles, classNames } from '../styles/styleUtils';
 
 interface User {
   id: string;
@@ -399,7 +400,7 @@ const AdminMaterials = () => {
   return (
     <div className="flex-1 bg-white">
       <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <h1 className="text-2xl font-bold mb-6">{t.classMaterialsTitle}</h1>
+        <h1 className={classNames(styles.headings.h1)}>{t.classMaterialsTitle}</h1>
         
         {/* Date Selection */}
         <div className="mb-8">

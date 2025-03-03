@@ -5,7 +5,6 @@ import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { getCachedCollection } from '../utils/firebaseUtils';
-import { getDaysInMonth } from '../utils/dateUtils';
 import { getStudentClassMaterials } from '../utils/classMaterialsUtils';
 import { FaFilePdf, FaLink, FaFileAlt } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -15,6 +14,8 @@ import {
   getClassesForDay,
   getNextPaymentDates,
 } from '../utils/scheduleUtils';
+import { styles } from '../styles/styleUtils';
+import { Calendar } from '../components/Calendar';
 
 interface ClassMaterial {
   classId: string;
@@ -49,7 +50,6 @@ export const Schedule = () => {
   const t = useTranslation(language);
 
   // Class Materials Modal State
-  const [showMaterialsModal, setShowMaterialsModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState<ClassWithStudents | null>(null);
   const [selectedMaterial, setSelectedMaterial] = useState<ClassMaterial | null>(null);
   const [loadingMaterial, setLoadingMaterial] = useState(false);
@@ -57,7 +57,6 @@ export const Schedule = () => {
   const [classesWithMaterials, setClassesWithMaterials] = useState<Set<string>>(new Set());
   const [materialsInfo, setMaterialsInfo] = useState<Map<string, { hasSlides: boolean; hasLinks: boolean }>>(new Map());
 
-  const DAYS_OF_WEEK = [t.sundayShort, t.mondayShort, t.tuesdayShort, t.wednesdayShort, t.thursdayShort, t.fridayShort, t.saturdayShort];
   const DAYS_OF_WEEK_FULL = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
 
   // Update time formatting to handle undefined values
@@ -209,7 +208,6 @@ export const Schedule = () => {
 
     setSelectedClass(classItem);
     setLoadingMaterial(true);
-    setShowMaterialsModal(true);
 
     try {
       if (!currentUser?.email) return;
@@ -249,139 +247,89 @@ export const Schedule = () => {
     });
   };
 
-  const renderCalendar = () => {
-    const { days, firstDay } = getDaysInMonth(selectedDate);
+  const renderCalendarDay = (date: Date, isToday: boolean) => {
+    const dayOfWeek = date.getDay();
+    const dayClasses = getClassesForDay(classes, dayOfWeek, date);
+    
+    // Calculate payment dates
+    const paymentDates = classes.length > 0 ? 
+      classes.flatMap(classItem => {
+        if (!classItem.startDate) return [];
+        return getNextPaymentDates(classItem.paymentConfig, classItem, selectedDate);
+      }) : [];
+
+    const isPaymentDay = paymentDates.some(paymentDate => 
+      date.getFullYear() === paymentDate.getFullYear() &&
+      date.getMonth() === paymentDate.getMonth() &&
+      date.getDate() === paymentDate.getDate()
+    );
+
+    const daysUntilPayment = isPaymentDay ? 
+      Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
     return (
-      <div className="calendar-grid bg-white rounded-2xl shadow-sm border border-[#f0f0f0]">
-        {DAYS_OF_WEEK.map((day) => (
-          <div
-            key={day}
-            className="calendar-day-header text-center text-sm font-medium text-[#666666] py-4"
-          >
-            {day}
+      <div className="h-full flex flex-col">
+        {/* Indicators */}
+        <div className="calendar-day-indicators">
+          {dayClasses.length > 0 && (
+            <div className="indicator class-indicator" title="Has classes" />
+          )}
+          {isPaymentDay && (
+            <div 
+              className={`indicator ${isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'}`}
+              title={isPaymentSoon ? 'Payment due soon' : 'Payment due'}
+            />
+          )}
+        </div>
+
+        {/* Date and Payment Label */}
+        <div className="flex flex-col items-center">
+          <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
+            {date.getDate()}
           </div>
-        ))}
-        {Array.from({ length: firstDay }).map((_, index) => (
-          <div key={`empty-${index}`} className="calendar-day" />
-        ))}
-        {Array.from({ length: days }).map((_, index) => {
-          const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), index + 1);
-          const dayOfWeek = date.getDay();
-          const dayClasses = getClassesForDay(classes, dayOfWeek, date);
-          const isToday =
-            date.getDate() === new Date().getDate() &&
-            date.getMonth() === new Date().getMonth() &&
-            date.getFullYear() === new Date().getFullYear();
+          {isPaymentDay && (
+            <div className={`payment-due-label ${isPaymentSoon ? 'soon' : 'normal'}`}>
+              {t.paymentDue}
+            </div>
+          )}
+        </div>
 
-          const paymentDates = classes.length > 0 ? 
-            classes.flatMap(classItem => {
-              if (!classItem.startDate) return [];
-              console.log('Calculating payment dates for class:', {
-                classId: classItem.id,
-                classStartDate: classItem.startDate.toDate().toISOString(),
-                classEndDate: classItem.endDate?.toDate().toISOString(),
-                paymentConfig: classItem.paymentConfig
-              });
-              const dates = getNextPaymentDates(classItem.paymentConfig, classItem, selectedDate);
-              console.log('Payment dates for class:', classItem.id, dates.map(d => d.toISOString()));
-              return dates;
-            }) : [];
+        {/* Class details */}
+        {dayClasses.length > 0 && (
+          <div className="class-details">
+            <div className="time-slots-container">
+              <div className="time-slots">
+                {dayClasses.slice(0, 3).map((classItem) => {
+                  const dateStr = date.toISOString().split('T')[0];
+                  const key = `${classItem.id}_${dateStr}`;
+                  const materialInfo = materialsInfo.get(key);
+                  const hasMaterials = !!materialInfo;
+                  const timeDisplay = formatTimeDisplay(classItem);
 
-          const isPaymentDay = paymentDates.some(paymentDate => {
-            const matches = date.getFullYear() === paymentDate.getFullYear() &&
-                   date.getMonth() === paymentDate.getMonth() &&
-                   date.getDate() === paymentDate.getDate();
-            if (matches) {
-              console.log('Found payment day match:', {
-                date: date.toISOString(),
-                paymentDate: paymentDate.toISOString()
-              });
-            }
-            return matches;
-          });
-
-          const daysUntilPayment = isPaymentDay ? 
-            Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-          const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
-
-          return (
-            <div
-              key={index}
-              onClick={() => handleDayClick(date, dayClasses, isPaymentDay, isPaymentSoon)}
-              className={`calendar-day hover:bg-[#f8f8f8] transition-colors
-                ${isToday ? 'bg-[#f8f8f8]' : ''} 
-                ${selectedDayDetails?.date.toDateString() === date.toDateString() ? 'bg-[#f0f0f0]' : ''}`}
-            >
-              <div className="h-full flex flex-col p-2">
-                {/* Indicators */}
-                <div className="calendar-day-indicators flex justify-center gap-1 mb-1">
-                  {dayClasses.length > 0 && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#6366f1]" title="Has classes" />
-                  )}
-                  {isPaymentDay && (
-                    <div 
-                      className={`w-1.5 h-1.5 rounded-full ${isPaymentSoon ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`}
-                      title={isPaymentSoon ? 'Payment due soon' : 'Payment due'}
-                    />
-                  )}
-                </div>
-                {/* Date and Payment Pill */}
-                <div className="flex flex-col items-center">
-                  <div className={`font-medium text-center ${isToday ? 'text-[#6366f1]' : 'text-[#1a1a1a]'} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
-                    <span>{index + 1}</span>
-                  </div>
-                  {isPaymentDay && (
-                    <div className={`text-[0.6rem] px-1 py-0.5 rounded mt-1 ${
-                      isPaymentSoon 
-                        ? 'bg-[#fef2f2] text-[#ef4444]' 
-                        : 'bg-[#fffbeb] text-[#f59e0b]'
-                    }`}>
-                      {t.paymentDue}
+                  return timeDisplay ? (
+                    <div
+                      key={classItem.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasMaterials) handleClassClick(classItem, date);
+                      }}
+                      className={`time-slot ${hasMaterials ? 'cursor-pointer hover:bg-[#4f46e5]' : ''}`}
+                      style={{ top: `${timeDisplay.position}%` }}
+                    >
+                      {timeDisplay.timeStr}
                     </div>
-                  )}
-                </div>
-                {/* Class details (hidden on mobile) */}
-                {dayClasses.length > 0 && (
-                  <div className="class-details mt-1">
-                    <div className="time-slots-container relative flex-1">
-                      {/* Class slots */}
-                      <div className="time-slots relative h-full">
-                        {dayClasses.map(classItem => {
-                          const dateStr = date.toISOString().split('T')[0];
-                          const key = `${classItem.id}_${dateStr}`;
-                          const materialInfo = materialsInfo.get(key);
-                          const hasMaterials = !!materialInfo;
-                          const timeDisplay = formatTimeDisplay(classItem);
-
-                          return timeDisplay ? (
-                            <div
-                              key={classItem.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (hasMaterials) handleClassClick(classItem, date);
-                              }}
-                              className={`absolute right-0 left-0 transform -translate-y-1/2 rounded-md py-0.5 px-1 transition-all ${
-                                hasMaterials 
-                                  ? 'bg-[#6366f1] cursor-pointer hover:bg-[#4f46e5]' 
-                                  : 'bg-[#818cf8]'
-                              }`}
-                              style={{ top: `${timeDisplay.position}%` }}
-                            >
-                              <span className="text-[0.6rem] leading-none text-white font-medium block text-center truncate">
-                                {timeDisplay.timeStr}
-                              </span>
-                            </div>
-                          ) : null;
-                        })}
-                      </div>
-                    </div>
+                  ) : null;
+                })}
+                {dayClasses.length > 3 && (
+                  <div className="time-slot more">
+                    +{dayClasses.length - 3} more
                   </div>
                 )}
               </div>
             </div>
-          );
-        })}
+          </div>
+        )}
       </div>
     );
   };
@@ -402,7 +350,7 @@ export const Schedule = () => {
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="md:flex md:items-center md:justify-between">
           <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold text-[#1a1a1a]">{t.courseSchedule}</h1>
+            <h1 className={styles.headings.h1}>{t.courseSchedule}</h1>
             <p className="mt-2 text-sm text-black">
             </p>
           </div>
@@ -412,39 +360,44 @@ export const Schedule = () => {
         <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">
           {/* Calendar section */}
           <div>
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <button
-                onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1))}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--brand-color)] hover:bg-[var(--brand-color-dark)] text-[var(--header-bg)] transition-colors text-xl"
-              >
-                ‹
-              </button>
-              <h2 className="text-2xl font-semibold text-[#1a1a1a] min-w-[200px] text-center">
-                {selectedDate.toLocaleString(language === 'pt-BR' ? 'pt-BR' : 'en', { month: 'long', year: 'numeric' })}
-              </h2>
-              <button
-                onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1))}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--brand-color)] hover:bg-[var(--brand-color-dark)] text-[var(--header-bg)] transition-colors text-xl"
-              >
-                ›
-              </button>
-            </div>
-            {renderCalendar()}
+            <Calendar
+              selectedDate={selectedDate}
+              onDateSelect={(date) => {
+                const dayClasses = getClassesForDay(classes, date.getDay(), date);
+                const paymentDates = classes.length > 0 ? 
+                  classes.flatMap(classItem => {
+                    if (!classItem.startDate) return [];
+                    return getNextPaymentDates(classItem.paymentConfig, classItem, selectedDate);
+                  }) : [];
+
+                const isPaymentDay = paymentDates.some(paymentDate => 
+                  date.getFullYear() === paymentDate.getFullYear() &&
+                  date.getMonth() === paymentDate.getMonth() &&
+                  date.getDate() === paymentDate.getDate()
+                );
+
+                const daysUntilPayment = isPaymentDay ? 
+                  Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+                const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+
+                handleDayClick(date, dayClasses, isPaymentDay, isPaymentSoon);
+              }}
+              onMonthChange={setSelectedDate}
+              renderDay={renderCalendarDay}
+            />
           </div>
 
-          {/* Details section - Now always visible on larger screens */}
-          <div className="mt-8 lg:mt-[3.75rem]"> {/* Align with calendar grid */}
+          {/* Details section */}
+          <div>
             {selectedDayDetails ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-[#f0f0f0] p-6 lg:sticky lg:top-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="text-lg font-medium text-[#1a1a1a]">
-                    {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </h3>
-                </div>
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h3 className={styles.headings.h3}>
+                  {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
+                    weekday: 'long', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </h3>
 
                 {selectedDayDetails.isPaymentDay && (
                   <div className="flex items-center gap-2 bg-[#fffbeb] p-3 rounded-lg mb-4">
@@ -524,32 +477,27 @@ export const Schedule = () => {
                 ) : null}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl shadow-sm border border-[#f0f0f0] p-6 lg:sticky lg:top-8">
-                <p className="text-gray-500 text-center">{t.selectDayToViewDetails}</p>
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6 text-center text-gray-500">
+                {t.selectDayToViewDetails}
               </div>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Class Materials Modal */}
-      {showMaterialsModal && selectedClass && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-semibold text-gray-900">
-                {t.classMaterialsTitle}
-              </h3>
+        {/* Class Materials Section */}
+        {selectedClass && (
+          <div className="bg-white rounded-lg shadow-md p-6 mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={styles.headings.h3}>{t.classMaterials}</h3>
               <button
                 onClick={() => {
-                  setShowMaterialsModal(false);
                   setSelectedClass(null);
                   setSelectedMaterial(null);
                   setSlidesUrl(null);
                 }}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-black hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                className="text-gray-400 hover:text-gray-600"
               >
-                X
+                &times;
               </button>
             </div>
 
@@ -578,22 +526,22 @@ export const Schedule = () => {
 
                 {/* Links */}
                 {selectedMaterial.links && selectedMaterial.links.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-3">{t.usefulLinks}</h3>
-                    <div className="space-y-2">
+                  <div className="mt-6">
+                    <h3 className={styles.headings.h3}>{t.usefulLinks}</h3>
+                    <ul className="mt-2 space-y-2">
                       {selectedMaterial.links.map((link, index) => (
-                        <a
-                          key={index}
-                          href={link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center text-indigo-600 hover:text-indigo-900"
-                        >
-                          <FaLink className="mr-2" />
-                          {link}
-                        </a>
+                        <li key={index}>
+                          <a
+                            href={link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            {link}
+                          </a>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
                 )}
               </div>
@@ -603,8 +551,8 @@ export const Schedule = () => {
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }; 
