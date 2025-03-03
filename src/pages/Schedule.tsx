@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { where } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
-import { useAdmin } from '../hooks/useAdmin';
-import { useLanguage } from '../hooks/useLanguage';
-import { useTranslation } from '../translations';
-import { getCachedCollection } from '../utils/firebaseUtils';
+import { Calendar } from '../components/Calendar';
+import '../styles/calendar.css';
 import { getStudentClassMaterials } from '../utils/classMaterialsUtils';
+import { styles } from '../styles/styleUtils';
+import { ClassMaterial } from '../types/interfaces';
 import { FaFilePdf, FaLink, FaFileAlt } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import {
@@ -14,19 +14,10 @@ import {
   getClassesForDay,
   getNextPaymentDates,
 } from '../utils/scheduleUtils';
-import { styles } from '../styles/styleUtils';
-import { Calendar } from '../components/Calendar';
-
-interface ClassMaterial {
-  classId: string;
-  slides?: string;
-  links?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  classDate: Date;
-  studentEmails: string[];
-  studentIds?: string[];
-}
+import { useAdmin } from '../hooks/useAdmin';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
+import { getCachedCollection } from '../utils/firebaseUtils';
 
 const logSchedule = (message: string, data?: any) => {
   if (process.env.NODE_ENV === 'development') {
@@ -362,7 +353,7 @@ export const Schedule = () => {
           <div>
             <Calendar
               selectedDate={selectedDate}
-              onDateSelect={(date) => {
+              onDateSelect={(date: Date) => {
                 const dayClasses = getClassesForDay(classes, date.getDay(), date);
                 const paymentDates = classes.length > 0 ? 
                   classes.flatMap(classItem => {

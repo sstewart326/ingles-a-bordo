@@ -50,6 +50,8 @@ interface Translation {
   noUpcomingClasses: string;
   paymentsDue: string;
   classOn: string;
+  materials: string;
+  slides: string;
   
   // Schedule
   courseSchedule: string;
@@ -217,6 +219,8 @@ const translations: Record<Language, Translation> = {
     noUpcomingClasses: 'No upcoming classes',
     paymentsDue: 'Payments Due',
     classOn: 'Class on',
+    materials: 'Materials',
+    slides: 'Slides',
     
     // Schedule
     courseSchedule: 'Course Schedule',
@@ -382,6 +386,8 @@ const translations: Record<Language, Translation> = {
     noUpcomingClasses: 'Sem aulas futuras',
     paymentsDue: 'Pagamentos Pendentes',
     classOn: 'Aula em',
+    materials: 'Materiais',
+    slides: 'Slides',
     
     // Schedule
     courseSchedule: 'Agenda de Aulas',

@@ -15,17 +15,7 @@ import {
   getDownloadURL
 } from 'firebase/storage';
 import { getCached, setCached, invalidateCache } from './cacheUtils';
-
-interface ClassMaterial {
-  classId: string;
-  slides?: string; // URL to slides
-  links?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  classDate: Date; // The specific date this material is for
-  studentEmails: string[]; // The specific students these materials are for
-  studentIds?: string[]; // Keep for backward compatibility
-}
+import { ClassMaterial } from '../types/interfaces';
 
 const COLLECTION_PATH = 'classMaterials';
 const MAX_FILE_SIZE_MB = 10; // Maximum file size in megabytes

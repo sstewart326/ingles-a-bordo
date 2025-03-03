@@ -9,36 +9,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { where } from 'firebase/firestore';
 import { styles, classNames } from '../styles/styleUtils';
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-}
-
-interface Class {
-  id: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  courseType: string;
-  notes?: string;
-  studentEmails: string[];
-  studentIds?: string[]; // Keep for backward compatibility
-  startDate: { toDate: () => Date }; // Required Firebase Timestamp
-  endDate?: { toDate: () => Date }; // Optional Firebase Timestamp
-}
-
-interface ClassMaterial {
-  classId: string;
-  slides?: string;
-  links?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  classDate: Date;
-  studentEmails: string[];
-  studentIds?: string[]; // Keep for backward compatibility
-}
+import { ClassMaterial, Class, User } from '../types/interfaces';
 
 const getNextClassDate = (classes: Class[]): Date => {
   const now = new Date();
@@ -409,7 +380,10 @@ const AdminMaterials = () => {
             <ClassDatePicker
               selectedDate={selectedDate}
               onDateSelect={handleDateSelect}
-              classInfo={selectedClass || { 
+              classInfo={selectedClass ? {
+                ...selectedClass,
+                startDate: selectedClass.startDate || { toDate: () => new Date() }
+              } : { 
                 id: '', 
                 dayOfWeek: 0, 
                 startTime: '', 
@@ -418,7 +392,10 @@ const AdminMaterials = () => {
                 courseType: '',
                 startDate: { toDate: () => new Date() }
               }}
-              availableClasses={classes}
+              availableClasses={classes.map(cls => ({
+                ...cls,
+                startDate: cls.startDate || { toDate: () => new Date() }
+              }))}
               allowPastDates={true}
             />
           </div>

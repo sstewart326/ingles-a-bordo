@@ -8,33 +8,7 @@ import { useTranslation } from '../translations';
 import { formatDateWithTime } from '../utils/dateUtils';
 import toast from 'react-hot-toast';
 import { styles } from '../styles/styleUtils';
-
-interface Class {
-  id: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  courseType: string;
-  notes?: string;
-  studentEmails: string[];
-  studentIds?: string[]; // Keep for backward compatibility
-}
-
-interface ClassMaterial {
-  classId: string;
-  slides?: string;
-  links?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  classDate: Date;
-  studentEmails: string[];
-  studentIds?: string[]; // Keep for backward compatibility
-}
-
-interface MonthYear {
-  month: number;
-  year: number;
-}
+import { ClassMaterial, Class, MonthYear } from '../types/interfaces';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -311,23 +285,7 @@ export const ClassMaterials = () => {
         {selectedMaterial && (
           <div className="space-y-6">
             {/* Slides */}
-            {selectedMaterial.slides && (
-              <div>
-                {loadingSlides ? (
-                  <div className="animate-pulse h-10 bg-gray-200 rounded"></div>
-                ) : slidesUrl ? (
-                  <a
-                    href={slidesUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    <FaFilePdf className="mr-2" />
-                    {t.downloadSlides}
-                  </a>
-                ) : null}
-              </div>
-            )}
+            
 
             {/* Links */}
             {selectedMaterial.links && selectedMaterial.links.length > 0 && (

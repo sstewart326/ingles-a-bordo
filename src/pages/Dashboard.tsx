@@ -14,6 +14,9 @@ import {
   isClassUpcoming
 } from '../utils/scheduleUtils';
 import { styles } from '../styles/styleUtils';
+import { getClassMaterials } from '../utils/classMaterialsUtils';
+import { FaFilePdf, FaLink } from 'react-icons/fa';
+import { ClassMaterial } from '../types/interfaces';
 
 interface TimeDisplay {
   timeStr: string;
@@ -27,9 +30,12 @@ export const Dashboard = () => {
     date: Date;
     classes: ClassSession[];
     paymentsDue: { user: User; classSession: ClassSession }[];
+    materials: Record<string, ClassMaterial[]>;
   } | null>(null);
   const [userNames, setUserNames] = useState<{[email: string]: string}>({});
   const [users, setUsers] = useState<User[]>([]);
+  const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
+  const [loadedMaterialMonths, setLoadedMaterialMonths] = useState<Set<string>>(new Set());
   const { currentUser } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { language } = useLanguage();
@@ -50,10 +56,64 @@ export const Dashboard = () => {
     return `${t.group}: ${names.join(', ')}`;
   };
 
-  const fetchClasses = useCallback(async () => {
+  // Utility function to check if a date is within the relevant month range
+  const isDateInRelevantMonthRange = (date: Date): boolean => {
+    const dateMonth = date.getMonth();
+    const dateYear = date.getFullYear();
+    const currentMonth = selectedDate.getMonth();
+    const currentYear = selectedDate.getFullYear();
+    
+    return (
+      (dateMonth === currentMonth && dateYear === currentYear) || // Current month
+      (dateMonth === currentMonth - 1 && dateYear === currentYear) || // Previous month
+      (dateMonth === currentMonth + 1 && dateYear === currentYear) || // Next month
+      // Handle year boundary cases
+      (dateMonth === 11 && currentMonth === 0 && dateYear === currentYear - 1) || // December of previous year
+      (dateMonth === 0 && currentMonth === 11 && dateYear === currentYear + 1)    // January of next year
+    );
+  };
+
+  // Utility function to generate month keys for tracking loaded data
+  const getMonthKey = (date: Date, offset: number = 0): string => {
+    const year = date.getFullYear();
+    const month = date.getMonth() + offset;
+    
+    // Handle year boundaries
+    if (month < 0) {
+      return `${year - 1}-${11}`; // December of previous year
+    } else if (month > 11) {
+      return `${year + 1}-${0}`; // January of next year
+    }
+    
+    return `${year}-${month}`;
+  };
+
+  // Utility function to get the three relevant month keys (previous, current, next)
+  const getRelevantMonthKeys = (date: Date): string[] => {
+    return [
+      getMonthKey(date, -1), // Previous month
+      getMonthKey(date, 0),  // Current month
+      getMonthKey(date, 1)   // Next month
+    ];
+  };
+
+  const fetchClasses = useCallback(async (targetDate: Date = selectedDate) => {
     if (!currentUser || adminLoading) return;
 
     try {
+      // Get the current month and adjacent months
+      const monthsToLoad = getRelevantMonthKeys(targetDate);
+      
+      // Check if we've already loaded these months
+      const newMonthsToLoad = monthsToLoad.filter(monthKey => !loadedMonths.has(monthKey));
+      
+      if (newMonthsToLoad.length === 0) {
+        console.log('All required months already loaded');
+        return;
+      }
+      
+      console.log('Loading classes for months:', newMonthsToLoad);
+
       const queryConstraints = isAdmin 
         ? [] 
         : [where('studentEmails', 'array-contains', currentUser.email)];
@@ -118,14 +178,25 @@ export const Dashboard = () => {
       });
 
       setUpcomingClasses(upcoming);
+      
+      // Update loaded months
+      const updatedLoadedMonths = new Set(loadedMonths);
+      newMonthsToLoad.forEach(month => updatedLoadedMonths.add(month));
+      setLoadedMonths(updatedLoadedMonths);
+      
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
-  }, [currentUser, adminLoading, isAdmin]);
+  }, [currentUser, adminLoading, isAdmin, loadedMonths, selectedDate]);
 
   useEffect(() => {
     fetchClasses();
   }, [fetchClasses]);
+  
+  // Add an effect to fetch classes when the month changes
+  useEffect(() => {
+    fetchClasses(selectedDate);
+  }, [selectedDate.getMonth(), selectedDate.getFullYear()]);
 
   useEffect(() => {
     const handleMouseMove = () => {
@@ -270,11 +341,62 @@ export const Dashboard = () => {
   };
 
   const handleDayClick = (date: Date, classes: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => {
+    // Check if we've already loaded materials for this month
+    const monthKey = getMonthKey(date);
+    const materialsAlreadyLoaded = loadedMaterialMonths.has(monthKey);
+    
+    // Fetch materials for each class on this date
+    const fetchMaterials = async () => {
+      const materialsMap: Record<string, ClassMaterial[]> = {};
+      
+      for (const classSession of classes) {
+        try {
+          // Only fetch if we haven't loaded materials for this month yet
+          if (!materialsAlreadyLoaded) {
+            const materials = await getClassMaterials(classSession.id, date);
+            if (materials.length > 0) {
+              materialsMap[classSession.id] = materials;
+            }
+          } else {
+            // If we've already loaded materials for this month, use cached data
+            // This is handled by the getClassMaterials function which checks the cache
+            const materials = await getClassMaterials(classSession.id, date);
+            if (materials.length > 0) {
+              materialsMap[classSession.id] = materials;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching materials for class:', classSession.id, error);
+        }
+      }
+      
+      // If we've loaded materials for this month before, use the existing data
+      if (materialsAlreadyLoaded) {
+        console.log('Using cached materials for month:', monthKey);
+      } else {
+        // Update the set of months for which we've loaded materials
+        const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
+        updatedLoadedMaterialMonths.add(monthKey);
+        setLoadedMaterialMonths(updatedLoadedMaterialMonths);
+      }
+      
+      setSelectedDayDetails({
+        date,
+        classes,
+        paymentsDue,
+        materials: materialsMap
+      });
+    };
+
+    // Initialize with empty materials while fetching
     setSelectedDayDetails({
       date,
       classes,
-      paymentsDue
+      paymentsDue,
+      materials: {}
     });
+
+    fetchMaterials();
 
     // Check if we're on mobile (screen width less than 1024px - lg breakpoint in Tailwind)
     if (window.innerWidth < 1024 && detailsRef.current) {
@@ -290,6 +412,12 @@ export const Dashboard = () => {
     today.setHours(0, 0, 0, 0);
     const calendarDate = new Date(date);
     calendarDate.setHours(0, 0, 0, 0);
+    
+    // Check if the date is within the current month or adjacent months
+    if (!isDateInRelevantMonthRange(date)) {
+      console.log(`Skipping classes for date outside relevant range: ${date.toISOString()}`);
+      return [];
+    }
     
     return upcomingClasses.filter(classItem => {
       if (classItem.dayOfWeek !== dayOfWeek) return false;
@@ -423,6 +551,11 @@ export const Dashboard = () => {
   };
 
   const getPaymentsDueForDay = (date: Date): { user: User; classSession: ClassSession }[] => {
+    // Check if the date is within the current month or adjacent months
+    if (!isDateInRelevantMonthRange(date)) {
+      return [];
+    }
+    
     const paymentsDue: { user: User; classSession: ClassSession }[] = [];
     
     upcomingClasses.forEach(classSession => {
@@ -446,6 +579,19 @@ export const Dashboard = () => {
     });
     
     return paymentsDue;
+  };
+
+  const handleMonthChange = (newDate: Date) => {
+    setSelectedDate(newDate);
+    
+    // Check if we need to load data for the new month and adjacent months
+    const monthsToCheck = getRelevantMonthKeys(newDate);
+    
+    const needToLoadNewMonths = monthsToCheck.some(monthKey => !loadedMonths.has(monthKey));
+    
+    if (needToLoadNewMonths) {
+      fetchClasses(newDate);
+    }
   };
 
   if (adminLoading) {
@@ -475,7 +621,7 @@ export const Dashboard = () => {
           <Calendar
             selectedDate={selectedDate}
             onDateSelect={(date) => handleDayClick(date, getClassesForDay(date.getDay(), date), getPaymentsDueForDay(date))}
-            onMonthChange={setSelectedDate}
+            onMonthChange={handleMonthChange}
             renderDay={renderCalendarDay}
           />
         </div>
@@ -508,6 +654,47 @@ export const Dashboard = () => {
                             <div className="mt-2">
                               <div className={styles.card.label}>{t.notes}</div>
                               <div className="text-gray-700 text-sm mt-1">{classSession.notes}</div>
+                            </div>
+                          )}
+                          
+                          {/* Materials Section */}
+                          {selectedDayDetails.materials[classSession.id] && selectedDayDetails.materials[classSession.id].length > 0 && (
+                            <div className="mt-3">
+                              <div className={styles.card.label}>{t.materials || "Materials"}</div>
+                              <div className="mt-1 space-y-2">
+                                {selectedDayDetails.materials[classSession.id].map((material, index) => (
+                                  <div key={index} className="flex flex-col space-y-2">
+                                    {material.slides && (
+                                      <a 
+                                        href={material.slides} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center text-blue-600 hover:text-blue-800"
+                                      >
+                                        <FaFilePdf className="mr-2" />
+                                        <span className="text-sm">{t.slides || "Slides"}</span>
+                                      </a>
+                                    )}
+                                    
+                                    {material.links && material.links.length > 0 && (
+                                      <div className="space-y-1">
+                                        {material.links.map((link, linkIndex) => (
+                                          <a 
+                                            key={linkIndex}
+                                            href={link} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="flex items-center text-blue-600 hover:text-blue-800"
+                                          >
+                                            <FaLink className="mr-2" />
+                                            <span className="text-sm truncate">{link}</span>
+                                          </a>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>

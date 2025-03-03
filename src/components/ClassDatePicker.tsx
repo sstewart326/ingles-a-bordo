@@ -14,17 +14,7 @@ import {
 import { FaUsers, FaClock } from 'react-icons/fa';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-
-interface ClassInfo {
-  id: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  studentEmails: string[];
-  studentIds?: string[]; // Keep for backward compatibility
-  startDate: { toDate: () => Date }; // Firebase Timestamp
-  endDate?: { toDate: () => Date }; // Firebase Timestamp
-}
+import { ClassInfo } from '../types/interfaces';
 
 interface ClassDatePickerProps {
   selectedDate: Date;
