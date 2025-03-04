@@ -7,7 +7,8 @@ import {
   getDocs,
   doc,
   updateDoc,
-  Timestamp
+  Timestamp,
+  deleteDoc
 } from 'firebase/firestore';
 import { 
   ref, 
@@ -201,6 +202,50 @@ export const updateClassMaterials = async (
     invalidateCache(COLLECTION_PATH);
   } catch (error) {
     console.error('Error updating class materials:', error);
+    throw error;
+  }
+};
+
+export const deleteClassMaterial = async (
+  classId: string,
+  classDate: Date
+): Promise<void> => {
+  try {
+    if (!classId || !classDate) {
+      throw new Error('Invalid parameters: classId and classDate are required');
+    }
+
+    // Create date range for the query
+    const startOfDay = new Date(classDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(classDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Query to find the exact document
+    const materialsQuery = query(
+      collection(db, COLLECTION_PATH),
+      where('classId', '==', classId),
+      where('classDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('classDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+    
+    const querySnapshot = await getDocs(materialsQuery);
+    
+    if (querySnapshot.empty) {
+      throw new Error('Material not found');
+    }
+    
+    // Delete the document
+    const docId = querySnapshot.docs[0].id;
+    await deleteDoc(doc(db, COLLECTION_PATH, docId));
+    
+    // Invalidate cache after deleting material
+    invalidateCache(COLLECTION_PATH);
+    
+    logMaterialsUtil('Material deleted successfully', { classId, classDate });
+  } catch (error) {
+    console.error('Error deleting class material:', error);
     throw error;
   }
 };

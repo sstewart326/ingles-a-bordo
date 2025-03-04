@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { where, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { where } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { getCachedCollection, getCachedDocument } from '../utils/firebaseUtils';
+import { getCachedCollection } from '../utils/firebaseUtils';
 import { Calendar } from '../components/Calendar';
 import '../styles/calendar.css';
 import {
@@ -14,15 +14,13 @@ import {
   isClassUpcoming
 } from '../utils/scheduleUtils';
 import { styles } from '../styles/styleUtils';
-import { getClassMaterials } from '../utils/classMaterialsUtils';
-import { FaFilePdf, FaLink, FaPlus } from 'react-icons/fa';
+import { getClassMaterials, deleteClassMaterial } from '../utils/classMaterialsUtils';
+import { FaFilePdf, FaLink, FaPlus, FaTrash } from 'react-icons/fa';
 import { ClassMaterial } from '../types/interfaces';
 import { toast } from 'react-hot-toast';
 import { Timestamp } from 'firebase/firestore';
 import { updateCachedDocument } from '../utils/firebaseUtils';
 import { PencilIcon } from '@heroicons/react/24/outline';
-import { db } from '../config/firebase';
-import { cache } from '../utils/cache';
 
 interface TimeDisplay {
   timeStr: string;
@@ -34,8 +32,6 @@ export const Dashboard = () => {
   const [pastClasses, setPastClasses] = useState<ClassSession[]>([]);
   const [upcomingClassesPage, setUpcomingClassesPage] = useState(0);
   const [pastClassesPage, setPastClassesPage] = useState(0);
-  const [hasMoreUpcoming, setHasMoreUpcoming] = useState(false);
-  const [hasMorePast, setHasMorePast] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedDayDetails, setSelectedDayDetails] = useState<{
     date: Date;
@@ -50,6 +46,7 @@ export const Dashboard = () => {
   const [editingNotes, setEditingNotes] = useState<{[classId: string]: string}>({});
   const [savingNotes, setSavingNotes] = useState<{[classId: string]: boolean}>({});
   const [classMaterials, setClassMaterials] = useState<Record<string, ClassMaterial[]>>({});
+  const [deletingMaterial, setDeletingMaterial] = useState<{[materialId: string]: boolean}>({});
   const { currentUser } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { language } = useLanguage();
@@ -208,8 +205,6 @@ export const Dashboard = () => {
 
       setUpcomingClasses(upcoming);
       setPastClasses(past);
-      setHasMoreUpcoming(upcoming.length > 5);
-      setHasMorePast(past.length > 5);
       
       // Reset pagination when fetching new data
       setUpcomingClassesPage(0);
@@ -704,10 +699,23 @@ export const Dashboard = () => {
                                     href={material.slides} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="flex items-center text-blue-600 hover:text-blue-800"
+                                    className="flex items-center text-blue-600 hover:text-blue-800 group"
                                   >
                                     <FaFilePdf className="mr-2" />
                                     <span className="text-sm">{t.slides || "Slides"}</span>
+                                    {isAdmin && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleDeleteMaterial(material, index, classSession.id);
+                                        }}
+                                        disabled={deletingMaterial[material.classId + index]}
+                                        className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                        title="Delete material"
+                                      >
+                                        <FaTrash className="h-2.5 w-2.5" />
+                                      </button>
+                                    )}
                                   </a>
                                 )}
                                 
@@ -719,10 +727,23 @@ export const Dashboard = () => {
                                         href={link} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="flex items-center text-blue-600 hover:text-blue-800"
+                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
                                       >
                                         <FaLink className="mr-2" />
                                         <span className="text-sm truncate">{link}</span>
+                                        {isAdmin && linkIndex === 0 && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleDeleteMaterial(material, index, classSession.id);
+                                            }}
+                                            disabled={deletingMaterial[material.classId + index]}
+                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                            title="Delete material"
+                                          >
+                                            <FaTrash className="h-2.5 w-2.5" />
+                                          </button>
+                                        )}
                                       </a>
                                     ))}
                                   </div>
@@ -882,10 +903,23 @@ export const Dashboard = () => {
                                     href={material.slides} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="flex items-center text-blue-600 hover:text-blue-800"
+                                    className="flex items-center text-blue-600 hover:text-blue-800 group"
                                   >
                                     <FaFilePdf className="mr-2" />
                                     <span className="text-sm">{t.slides || "Slides"}</span>
+                                    {isAdmin && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleDeleteMaterial(material, index, classSession.id);
+                                        }}
+                                        disabled={deletingMaterial[material.classId + index]}
+                                        className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                        title="Delete material"
+                                      >
+                                        <FaTrash className="h-2.5 w-2.5" />
+                                      </button>
+                                    )}
                                   </a>
                                 )}
                                 
@@ -897,10 +931,23 @@ export const Dashboard = () => {
                                         href={link} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="flex items-center text-blue-600 hover:text-blue-800"
+                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
                                       >
                                         <FaLink className="mr-2" />
                                         <span className="text-sm truncate">{link}</span>
+                                        {isAdmin && linkIndex === 0 && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleDeleteMaterial(material, index, classSession.id);
+                                            }}
+                                            disabled={deletingMaterial[material.classId + index]}
+                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                            title="Delete material"
+                                          >
+                                            <FaTrash className="h-2.5 w-2.5" />
+                                          </button>
+                                        )}
                                       </a>
                                     ))}
                                   </div>
@@ -1096,15 +1143,6 @@ export const Dashboard = () => {
     }));
   }, []);
 
-  // Function to handle notes change
-  const handleNotesChange = useCallback((classId: string, event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = event.target.value;
-    setEditingNotes(prev => ({
-      ...prev,
-      [classId]: value
-    }));
-  }, []);
-
   // Function to save notes
   const handleSaveNotes = useCallback(async (classSession: ClassSession) => {
     try {
@@ -1165,6 +1203,61 @@ export const Dashboard = () => {
       return newState;
     });
   }, []);
+
+  // Function to handle material deletion
+  const handleDeleteMaterial = useCallback(async (material: ClassMaterial, index: number, classId: string) => {
+    if (!currentUser || !isAdmin) {
+      toast.error('Not authorized');
+      return;
+    }
+
+    try {
+      // Set deleting state
+      setDeletingMaterial(prev => ({ ...prev, [material.classId + index]: true }));
+
+      // Call the utility function to delete the material
+      await deleteClassMaterial(material.classId, material.classDate);
+      
+      // Update local state
+      const updatedMaterials = { ...classMaterials };
+      
+      if (updatedMaterials[classId]) {
+        updatedMaterials[classId] = updatedMaterials[classId].filter((_, i) => i !== index);
+        
+        // If no materials left, remove the entry
+        if (updatedMaterials[classId].length === 0) {
+          delete updatedMaterials[classId];
+        }
+      }
+      
+      setClassMaterials(updatedMaterials);
+      
+      // Update selected day details if needed
+      if (selectedDayDetails && selectedDayDetails.materials[classId]) {
+        const updatedDayDetails = { ...selectedDayDetails };
+        updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_, i) => i !== index);
+        
+        // If no materials left, remove the entry
+        if (updatedDayDetails.materials[classId].length === 0) {
+          delete updatedDayDetails.materials[classId];
+        }
+        
+        setSelectedDayDetails(updatedDayDetails);
+      }
+      
+      toast.success('Material deleted successfully');
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      toast.error('Error deleting material');
+    } finally {
+      // Clear deleting state
+      setDeletingMaterial(prev => {
+        const newState = { ...prev };
+        delete newState[material.classId + index];
+        return newState;
+      });
+    }
+  }, [currentUser, isAdmin, classMaterials, selectedDayDetails]);
 
   if (adminLoading) {
     return (
@@ -1301,10 +1394,23 @@ export const Dashboard = () => {
                                         href={material.slides} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="flex items-center text-blue-600 hover:text-blue-800"
+                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
                                       >
                                         <FaFilePdf className="mr-2" />
                                         <span className="text-sm">{t.slides || "Slides"}</span>
+                                        {isAdmin && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleDeleteMaterial(material, index, classSession.id);
+                                            }}
+                                            disabled={deletingMaterial[material.classId + index]}
+                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                            title="Delete material"
+                                          >
+                                            <FaTrash className="h-2.5 w-2.5" />
+                                          </button>
+                                        )}
                                       </a>
                                     )}
                                     
@@ -1316,10 +1422,23 @@ export const Dashboard = () => {
                                             href={link} 
                                             target="_blank" 
                                             rel="noopener noreferrer"
-                                            className="flex items-center text-blue-600 hover:text-blue-800"
+                                            className="flex items-center text-blue-600 hover:text-blue-800 group"
                                           >
                                             <FaLink className="mr-2" />
                                             <span className="text-sm truncate">{link}</span>
+                                            {isAdmin && linkIndex === 0 && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  handleDeleteMaterial(material, index, classSession.id);
+                                                }}
+                                                disabled={deletingMaterial[material.classId + index]}
+                                                className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                                title="Delete material"
+                                              >
+                                                <FaTrash className="h-2.5 w-2.5" />
+                                              </button>
+                                            )}
                                           </a>
                                         ))}
                                       </div>
