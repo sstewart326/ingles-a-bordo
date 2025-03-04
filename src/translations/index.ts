@@ -48,6 +48,7 @@ interface Translation {
   previous: string;
   next: string;
   noUpcomingClasses: string;
+  noPastClasses: string;
   paymentsDue: string;
   classOn: string;
   materials: string;
@@ -95,6 +96,7 @@ interface Translation {
   loading: string;
   error: string;
   success: string;
+  of: string;
 
   // Payment Configuration
   paymentConfiguration: string;
@@ -218,6 +220,7 @@ const translations: Record<Language, Translation> = {
     previous: 'Previous',
     next: 'Next',
     noUpcomingClasses: 'No upcoming classes',
+    noPastClasses: 'No past classes',
     paymentsDue: 'Payments Due',
     classOn: 'Class on',
     materials: 'Materials',
@@ -265,6 +268,7 @@ const translations: Record<Language, Translation> = {
     loading: 'Loading...',
     error: 'Error',
     success: 'Success',
+    of: 'of',
 
     // Payment Configuration
     paymentConfiguration: 'Payment Configuration',
@@ -386,6 +390,7 @@ const translations: Record<Language, Translation> = {
     previous: 'Anterior',
     next: 'Próximo',
     noUpcomingClasses: 'Sem aulas futuras',
+    noPastClasses: 'Sem aulas passadas',
     paymentsDue: 'Pagamentos Pendentes',
     classOn: 'Aula em',
     materials: 'Materiais',
@@ -433,6 +438,7 @@ const translations: Record<Language, Translation> = {
     loading: 'Carregando...',
     error: 'Erro',
     success: 'Sucesso',
+    of: 'de',
 
     // Payment Configuration
     paymentConfiguration: 'Configuração de Pagamento',

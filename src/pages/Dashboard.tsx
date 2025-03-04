@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { where } from 'firebase/firestore';
+import { where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { getCachedCollection } from '../utils/firebaseUtils';
+import { getCachedCollection, getCachedDocument } from '../utils/firebaseUtils';
 import { Calendar } from '../components/Calendar';
 import '../styles/calendar.css';
 import {
@@ -17,6 +17,12 @@ import { styles } from '../styles/styleUtils';
 import { getClassMaterials } from '../utils/classMaterialsUtils';
 import { FaFilePdf, FaLink, FaPlus } from 'react-icons/fa';
 import { ClassMaterial } from '../types/interfaces';
+import { toast } from 'react-hot-toast';
+import { Timestamp } from 'firebase/firestore';
+import { updateCachedDocument } from '../utils/firebaseUtils';
+import { PencilIcon } from '@heroicons/react/24/outline';
+import { db } from '../config/firebase';
+import { cache } from '../utils/cache';
 
 interface TimeDisplay {
   timeStr: string;
@@ -25,6 +31,11 @@ interface TimeDisplay {
 
 export const Dashboard = () => {
   const [upcomingClasses, setUpcomingClasses] = useState<ClassSession[]>([]);
+  const [pastClasses, setPastClasses] = useState<ClassSession[]>([]);
+  const [upcomingClassesPage, setUpcomingClassesPage] = useState(0);
+  const [pastClassesPage, setPastClassesPage] = useState(0);
+  const [hasMoreUpcoming, setHasMoreUpcoming] = useState(false);
+  const [hasMorePast, setHasMorePast] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedDayDetails, setSelectedDayDetails] = useState<{
     date: Date;
@@ -36,6 +47,9 @@ export const Dashboard = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
   const [loadedMaterialMonths, setLoadedMaterialMonths] = useState<Set<string>>(new Set());
+  const [editingNotes, setEditingNotes] = useState<{[classId: string]: string}>({});
+  const [savingNotes, setSavingNotes] = useState<{[classId: string]: boolean}>({});
+  const [classMaterials, setClassMaterials] = useState<Record<string, ClassMaterial[]>>({});
   const { currentUser } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { language } = useLanguage();
@@ -46,6 +60,7 @@ export const Dashboard = () => {
   } | null>(null);
   const hoverTimeoutRef = useRef<number | null>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
+  const textareaRefs = useRef<{[key: string]: HTMLTextAreaElement | null}>({});
 
   const formatStudentNames = (studentEmails: string[]) => {
     const names = studentEmails.map(email => userNames[email] || email);
@@ -177,17 +192,77 @@ export const Dashboard = () => {
         }
       });
 
+      // Sort upcoming classes by day of week and time
+      upcoming.sort((a, b) => {
+        const dayDiff = (a.dayOfWeek || 0) - (b.dayOfWeek || 0);
+        if (dayDiff !== 0) return dayDiff;
+        return (a.startTime || '').localeCompare(b.startTime || '');
+      });
+
+      // Sort past classes by day of week and time in reverse order (most recent first)
+      past.sort((a, b) => {
+        const dayDiff = (b.dayOfWeek || 0) - (a.dayOfWeek || 0);
+        if (dayDiff !== 0) return dayDiff;
+        return (b.startTime || '').localeCompare(a.startTime || '');
+      });
+
       setUpcomingClasses(upcoming);
+      setPastClasses(past);
+      setHasMoreUpcoming(upcoming.length > 5);
+      setHasMorePast(past.length > 5);
+      
+      // Reset pagination when fetching new data
+      setUpcomingClassesPage(0);
+      setPastClassesPage(0);
       
       // Update loaded months
       const updatedLoadedMonths = new Set(loadedMonths);
       newMonthsToLoad.forEach(month => updatedLoadedMonths.add(month));
       setLoadedMonths(updatedLoadedMonths);
       
+      // Fetch materials for all classes
+      const fetchMaterialsForClasses = async () => {
+        const materialsMap: Record<string, ClassMaterial[]> = {...classMaterials};
+        
+        // Fetch materials for upcoming classes
+        for (const classSession of upcoming) {
+          try {
+            const nextDate = getNextClassDate(classSession);
+            if (nextDate) {
+              const materials = await getClassMaterials(classSession.id, nextDate);
+              if (materials.length > 0) {
+                materialsMap[classSession.id] = materials;
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching materials for upcoming class:', classSession.id, error);
+          }
+        }
+        
+        // Fetch materials for past classes
+        for (const classSession of past) {
+          try {
+            const prevDate = getPreviousClassDate(classSession);
+            if (prevDate) {
+              const materials = await getClassMaterials(classSession.id, prevDate);
+              if (materials.length > 0) {
+                materialsMap[classSession.id] = materials;
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching materials for past class:', classSession.id, error);
+          }
+        }
+        
+        setClassMaterials(materialsMap);
+      };
+      
+      fetchMaterialsForClasses();
+      
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
-  }, [currentUser, adminLoading, isAdmin, loadedMonths, selectedDate]);
+  }, [currentUser, adminLoading, isAdmin, loadedMonths, selectedDate, classMaterials]);
 
   useEffect(() => {
     fetchClasses();
@@ -439,37 +514,456 @@ export const Dashboard = () => {
     });
   };
 
-  const renderUpcomingClassesSection = () => (
-    <div>
-      <h2 className={styles.headings.h2}>{t.upcomingClasses}</h2>
-      <div className="mt-4 space-y-4">
-        {upcomingClasses.length === 0 ? (
-          <p className="text-gray-500">{t.noUpcomingClasses}</p>
-        ) : (
-          upcomingClasses.map((classSession) => (
-            <div key={classSession.id} className={styles.card.container}>
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className={styles.card.title}>
-                    {formatStudentNames(classSession.studentEmails)}
-                  </div>
-                  <div className={styles.card.subtitle}>
-                    {formatClassTime(classSession)}
-                  </div>
-                  {classSession.notes && (
-                    <div className="mt-2">
-                      <div className={styles.card.label}>{t.notes}</div>
-                      <div className="text-gray-700 text-sm mt-1">{classSession.notes}</div>
+  // Function to get the next occurrence date of a class
+  const getNextClassDate = (classSession: ClassSession): Date | null => {
+    if (!classSession.dayOfWeek && classSession.dayOfWeek !== 0) return null;
+    
+    const today = new Date();
+    const currentDayOfWeek = today.getDay();
+    const targetDayOfWeek = classSession.dayOfWeek;
+    
+    // Calculate days until next occurrence
+    let daysUntilNext = targetDayOfWeek - currentDayOfWeek;
+    if (daysUntilNext <= 0) {
+      // If today or earlier in the week, move to next week
+      daysUntilNext += 7;
+    }
+    
+    // If it's the same day, check if the class has already passed
+    if (daysUntilNext === 0 && classSession.startTime) {
+      const [hours, minutes] = classSession.startTime.split(':');
+      let hour = parseInt(hours);
+      if (classSession.startTime.toLowerCase().includes('pm') && hour !== 12) {
+        hour += 12;
+      } else if (classSession.startTime.toLowerCase().includes('am') && hour === 12) {
+        hour = 0;
+      }
+      
+      const classTime = new Date();
+      classTime.setHours(hour, parseInt(minutes), 0, 0);
+      
+      // If the class time has passed, move to next week
+      if (today > classTime) {
+        daysUntilNext = 7;
+      }
+    }
+    
+    // Create the next class date
+    const nextDate = new Date();
+    nextDate.setDate(today.getDate() + daysUntilNext);
+    nextDate.setHours(0, 0, 0, 0);
+    
+    return nextDate;
+  };
+  
+  // Function to get the previous occurrence date of a class
+  const getPreviousClassDate = (classSession: ClassSession): Date | null => {
+    if (!classSession.dayOfWeek && classSession.dayOfWeek !== 0) return null;
+    
+    const today = new Date();
+    const currentDayOfWeek = today.getDay();
+    const targetDayOfWeek = classSession.dayOfWeek;
+    
+    // Calculate days since last occurrence
+    let daysSinceLast = currentDayOfWeek - targetDayOfWeek;
+    if (daysSinceLast < 0) {
+      // If later in the week, get from previous week
+      daysSinceLast += 7;
+    }
+    
+    // If it's the same day, check if the class has already passed
+    if (daysSinceLast === 0 && classSession.startTime) {
+      const [hours, minutes] = classSession.startTime.split(':');
+      let hour = parseInt(hours);
+      if (classSession.startTime.toLowerCase().includes('pm') && hour !== 12) {
+        hour += 12;
+      } else if (classSession.startTime.toLowerCase().includes('am') && hour === 12) {
+        hour = 0;
+      }
+      
+      const classTime = new Date();
+      classTime.setHours(hour, parseInt(minutes), 0, 0);
+      
+      // If the class time hasn't passed yet, get from previous week
+      if (today < classTime) {
+        daysSinceLast = 7;
+      }
+    }
+    
+    // Create the previous class date
+    const prevDate = new Date();
+    prevDate.setDate(today.getDate() - daysSinceLast);
+    prevDate.setHours(0, 0, 0, 0);
+    
+    return prevDate;
+  };
+
+  // Function to format date based on language
+  const formatClassDate = (date: Date | null): string => {
+    if (!date) return '';
+    
+    return date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const renderUpcomingClassesSection = () => {
+    const pageSize = 5;
+    const startIndex = upcomingClassesPage * pageSize;
+    const displayedClasses = upcomingClasses.slice(startIndex, startIndex + pageSize);
+    const hasMore = startIndex + pageSize < upcomingClasses.length;
+    
+    return (
+      <div className="max-w-2xl">
+        <h2 className={styles.headings.h2}>{t.upcomingClasses}</h2>
+        <div className="mt-4 space-y-4">
+          {displayedClasses.length === 0 ? (
+            <p className="text-gray-500">{t.noUpcomingClasses}</p>
+          ) : (
+            <>
+              {displayedClasses.map((classSession) => (
+                <div key={classSession.id} className={styles.card.container}>
+                  <div className="flex justify-between items-start w-full">
+                    <div className="w-full">
+                      <div className="text-sm font-bold text-black mb-2">
+                        {formatClassDate(getNextClassDate(classSession))}
+                      </div>
+                      <div className={styles.card.title}>
+                        {formatStudentNames(classSession.studentEmails)}
+                      </div>
+                      <div className={styles.card.subtitle}>
+                        {formatClassTime(classSession)}
+                      </div>
+                      
+                      {/* Notes section */}
+                      <div className="mt-2 w-full">
+                        <div className={styles.card.label}>{t.notes || 'Notes'}</div>
+                        
+                        {editingNotes[classSession.id] !== undefined ? (
+                          <div className="mt-1 w-full">
+                            <textarea
+                              ref={(el) => { textareaRefs.current[classSession.id] = el; }}
+                              defaultValue={editingNotes[classSession.id]}
+                              className="w-full p-2 border border-gray-300 rounded text-sm"
+                              rows={3}
+                            />
+                            <div className="flex justify-end mt-2 space-x-2">
+                              <button
+                                onClick={() => handleCancelEditNotes(classSession.id)}
+                                className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                disabled={savingNotes[classSession.id]}
+                              >
+                                {t.cancel || 'Cancel'}
+                              </button>
+                              <button
+                                onClick={() => handleSaveNotes(classSession)}
+                                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                disabled={savingNotes[classSession.id]}
+                              >
+                                {savingNotes[classSession.id] 
+                                  ? 'Saving...' 
+                                  : 'Save'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-gray-700 text-sm mt-1 flex items-center">
+                            <span>{classSession.notes || (t.noNotes || 'No notes available')}</span>
+                            {!editingNotes[classSession.id] && (
+                              <PencilIcon
+                                onClick={() => handleEditNotes(classSession)}
+                                className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
+                                title={t.edit || 'Edit'}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Materials Section */}
+                      {classMaterials[classSession.id] && classMaterials[classSession.id].length > 0 && (
+                        <div className="mt-3">
+                          <div className="flex justify-between items-center">
+                            <div className={styles.card.label}>{t.materials || "Materials"}</div>
+                            {isAdmin && (
+                              <a 
+                                href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${getNextClassDate(classSession)?.toISOString() || new Date().toISOString()}`}
+                                className="text-sm text-blue-600 hover:text-blue-800"
+                              >
+                                {t.addMaterials}
+                              </a>
+                            )}
+                          </div>
+                          <div className="mt-1 space-y-2">
+                            {classMaterials[classSession.id].map((material, index) => (
+                              <div key={index} className="flex flex-col space-y-2">
+                                {material.slides && (
+                                  <a 
+                                    href={material.slides} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center text-blue-600 hover:text-blue-800"
+                                  >
+                                    <FaFilePdf className="mr-2" />
+                                    <span className="text-sm">{t.slides || "Slides"}</span>
+                                  </a>
+                                )}
+                                
+                                {material.links && material.links.length > 0 && (
+                                  <div className="space-y-1">
+                                    {material.links.map((link, linkIndex) => (
+                                      <a 
+                                        key={linkIndex}
+                                        href={link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center text-blue-600 hover:text-blue-800"
+                                      >
+                                        <FaLink className="mr-2" />
+                                        <span className="text-sm truncate">{link}</span>
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Add Materials Link */}
+                      {isAdmin && (!classMaterials[classSession.id] || classMaterials[classSession.id].length === 0) && (
+                        <div className="mt-3">
+                          <a 
+                            href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${getNextClassDate(classSession)?.toISOString() || new Date().toISOString()}`}
+                            className="flex items-center text-blue-600 hover:text-blue-800"
+                          >
+                            <FaPlus className="mr-2" />
+                            <span className="text-sm">{t.addMaterials || 'Add Materials'}</span>
+                          </a>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
+              ))}
+              
+              {/* Pagination controls */}
+              <div className="flex justify-between items-center mt-4">
+                <button
+                  onClick={() => setUpcomingClassesPage(prev => Math.max(0, prev - 1))}
+                  disabled={upcomingClassesPage === 0}
+                  className={`px-3 py-1 rounded ${
+                    upcomingClassesPage === 0
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  {t.previous || 'Previous'}
+                </button>
+                
+                <span className="text-sm text-gray-600">
+                  {startIndex + 1}-{Math.min(startIndex + pageSize, upcomingClasses.length)} {t.of} {upcomingClasses.length}
+                </span>
+                
+                <button
+                  onClick={() => setUpcomingClassesPage(prev => prev + 1)}
+                  disabled={!hasMore}
+                  className={`px-3 py-1 rounded ${
+                    !hasMore
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  {t.next || 'Next'}
+                </button>
               </div>
-            </div>
-          ))
-        )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const renderPastClassesSection = () => {
+    const pageSize = 5;
+    const startIndex = pastClassesPage * pageSize;
+    const displayedClasses = pastClasses.slice(startIndex, startIndex + pageSize);
+    const hasMore = startIndex + pageSize < pastClasses.length;
+    
+    return (
+      <div className="max-w-2xl">
+        <h2 className={styles.headings.h2}>{t.pastClasses}</h2>
+        <div className="mt-4 space-y-4">
+          {displayedClasses.length === 0 ? (
+            <p className="text-gray-500">{t.noPastClasses}</p>
+          ) : (
+            <>
+              {displayedClasses.map((classSession) => (
+                <div key={classSession.id} className={styles.card.container}>
+                  <div className="flex justify-between items-start w-full">
+                    <div className="w-full">
+                      <div className="text-sm font-bold text-black mb-2">
+                        {formatClassDate(getPreviousClassDate(classSession))}
+                      </div>
+                      <div className={styles.card.title}>
+                        {formatStudentNames(classSession.studentEmails)}
+                      </div>
+                      <div className={styles.card.subtitle}>
+                        {formatClassTime(classSession)}
+                      </div>
+                      
+                      {/* Notes section */}
+                      <div className="mt-2 w-full">
+                        <div className={styles.card.label}>{t.notes || 'Notes'}</div>
+                        
+                        {editingNotes[classSession.id] !== undefined ? (
+                          <div className="mt-1 w-full">
+                            <textarea
+                              ref={(el) => { textareaRefs.current[classSession.id] = el; }}
+                              defaultValue={editingNotes[classSession.id]}
+                              className="w-full p-2 border border-gray-300 rounded text-sm"
+                              rows={3}
+                            />
+                            <div className="flex justify-end mt-2 space-x-2">
+                              <button
+                                onClick={() => handleCancelEditNotes(classSession.id)}
+                                className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                disabled={savingNotes[classSession.id]}
+                              >
+                                {t.cancel || 'Cancel'}
+                              </button>
+                              <button
+                                onClick={() => handleSaveNotes(classSession)}
+                                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                disabled={savingNotes[classSession.id]}
+                              >
+                                {savingNotes[classSession.id] 
+                                  ? 'Saving...' 
+                                  : 'Save'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-gray-700 text-sm mt-1 flex items-center">
+                            <span>{classSession.notes || (t.noNotes || 'No notes available')}</span>
+                            {!editingNotes[classSession.id] && (
+                              <PencilIcon
+                                onClick={() => handleEditNotes(classSession)}
+                                className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
+                                title={t.edit || 'Edit'}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Materials Section */}
+                      {classMaterials[classSession.id] && classMaterials[classSession.id].length > 0 && (
+                        <div className="mt-3">
+                          <div className="flex justify-between items-center">
+                            <div className={styles.card.label}>{t.materials || "Materials"}</div>
+                            {isAdmin && (
+                              <a 
+                                href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${getPreviousClassDate(classSession)?.toISOString() || new Date().toISOString()}`}
+                                className="text-sm text-blue-600 hover:text-blue-800"
+                              >
+                                {t.addMaterials}
+                              </a>
+                            )}
+                          </div>
+                          <div className="mt-1 space-y-2">
+                            {classMaterials[classSession.id].map((material, index) => (
+                              <div key={index} className="flex flex-col space-y-2">
+                                {material.slides && (
+                                  <a 
+                                    href={material.slides} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center text-blue-600 hover:text-blue-800"
+                                  >
+                                    <FaFilePdf className="mr-2" />
+                                    <span className="text-sm">{t.slides || "Slides"}</span>
+                                  </a>
+                                )}
+                                
+                                {material.links && material.links.length > 0 && (
+                                  <div className="space-y-1">
+                                    {material.links.map((link, linkIndex) => (
+                                      <a 
+                                        key={linkIndex}
+                                        href={link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center text-blue-600 hover:text-blue-800"
+                                      >
+                                        <FaLink className="mr-2" />
+                                        <span className="text-sm truncate">{link}</span>
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Add Materials Link */}
+                      {isAdmin && (!classMaterials[classSession.id] || classMaterials[classSession.id].length === 0) && (
+                        <div className="mt-3">
+                          <a 
+                            href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${getPreviousClassDate(classSession)?.toISOString() || new Date().toISOString()}`}
+                            className="flex items-center text-blue-600 hover:text-blue-800"
+                          >
+                            <FaPlus className="mr-2" />
+                            <span className="text-sm">{t.addMaterials || 'Add Materials'}</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Pagination controls */}
+              <div className="flex justify-between items-center mt-4">
+                <button
+                  onClick={() => setPastClassesPage(prev => Math.max(0, prev - 1))}
+                  disabled={pastClassesPage === 0}
+                  className={`px-3 py-1 rounded ${
+                    pastClassesPage === 0
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  {t.previous || 'Previous'}
+                </button>
+                
+                <span className="text-sm text-gray-600">
+                  {startIndex + 1}-{Math.min(startIndex + pageSize, pastClasses.length)} {t.of} {pastClasses.length}
+                </span>
+                
+                <button
+                  onClick={() => setPastClassesPage(prev => prev + 1)}
+                  disabled={!hasMore}
+                  className={`px-3 py-1 rounded ${
+                    !hasMore
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  {t.next || 'Next'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderCalendarDay = (date: Date, isToday: boolean) => {
     const dayOfWeek = date.getDay();
@@ -594,6 +1088,84 @@ export const Dashboard = () => {
     }
   };
 
+  // Function to handle editing notes
+  const handleEditNotes = useCallback((classSession: ClassSession) => {
+    setEditingNotes(prev => ({
+      ...prev,
+      [classSession.id]: classSession.notes || ''
+    }));
+  }, []);
+
+  // Function to handle notes change
+  const handleNotesChange = useCallback((classId: string, event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.target.value;
+    setEditingNotes(prev => ({
+      ...prev,
+      [classId]: value
+    }));
+  }, []);
+
+  // Function to save notes
+  const handleSaveNotes = useCallback(async (classSession: ClassSession) => {
+    try {
+      setSavingNotes(prev => ({ ...prev, [classSession.id]: true }));
+      
+      // Get the value directly from the textarea ref
+      const textareaValue = textareaRefs.current[classSession.id]?.value || '';
+      
+      // Update in Firebase
+      await updateCachedDocument('classes', classSession.id, {
+        notes: textareaValue,
+        updatedAt: Timestamp.now()
+      }, { userId: currentUser?.uid });
+      
+      // Update local state
+      const updateClassList = (classes: ClassSession[]) => 
+        classes.map(c => 
+          c.id === classSession.id 
+            ? { ...c, notes: textareaValue } 
+            : c
+        );
+      
+      setUpcomingClasses(updateClassList);
+      setPastClasses(updateClassList);
+      
+      if (selectedDayDetails && selectedDayDetails.classes) {
+        setSelectedDayDetails({
+          ...selectedDayDetails,
+          classes: updateClassList(selectedDayDetails.classes)
+        });
+      }
+      
+      // Clear editing state for this class
+      setEditingNotes(prev => {
+        const newState = { ...prev };
+        delete newState[classSession.id];
+        return newState;
+      });
+      
+      toast.success('Notes saved successfully');
+    } catch (error) {
+      console.error('Error in handleSaveNotes:', error);
+      toast.error('Error saving notes');
+    } finally {
+      setSavingNotes(prev => {
+        const newState = { ...prev };
+        delete newState[classSession.id];
+        return newState;
+      });
+    }
+  }, [selectedDayDetails, t, currentUser]);
+
+  // Function to cancel editing notes
+  const handleCancelEditNotes = useCallback((classId: string) => {
+    setEditingNotes(prev => {
+      const newState = { ...prev };
+      delete newState[classId];
+      return newState;
+    });
+  }, []);
+
   if (adminLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -615,6 +1187,11 @@ export const Dashboard = () => {
         {renderUpcomingClassesSection()}
       </div>
 
+      {/* Past Classes section */}
+      <div className="mt-8">
+        {renderPastClassesSection()}
+      </div>
+
       <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">
         {/* Calendar section */}
         <div>
@@ -629,8 +1206,8 @@ export const Dashboard = () => {
         {/* Details section */}
         <div className="lg:col-span-1" ref={detailsRef}>
           {selectedDayDetails ? (
-            <div className="bg-white shadow-md rounded-lg p-4">
-              <h2 className={styles.headings.h2}>
+            <div className="bg-white shadow-md rounded-lg p-4 max-w-md">
+              <h2 className={`${styles.headings.h2} text-black`}>
                 {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
                   weekday: 'long', 
                   month: 'long', 
@@ -642,20 +1219,65 @@ export const Dashboard = () => {
                 <div className="mt-4 space-y-4">
                   {selectedDayDetails.classes.map((classSession) => (
                     <div key={classSession.id} className={styles.card.container}>
-                      <div className="flex justify-between items-start">
-                        <div>
+                      <div className="flex justify-between items-start w-full">
+                        <div className="w-full">
+                          <div className="text-sm font-bold text-black mb-2">
+                            {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
+                              weekday: 'long', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </div>
                           <div className={styles.card.title}>
                             {formatStudentNames(classSession.studentEmails)}
                           </div>
                           <div className={styles.card.subtitle}>
                             {formatClassTime(classSession)}
                           </div>
-                          {classSession.notes && (
-                            <div className="mt-2">
-                              <div className={styles.card.label}>{t.notes}</div>
-                              <div className="text-gray-700 text-sm mt-1">{classSession.notes}</div>
-                            </div>
-                          )}
+                          
+                          {/* Notes section */}
+                          <div className="mt-2 w-full">
+                            <div className={styles.card.label}>{t.notes || 'Notes'}</div>
+                            
+                            {editingNotes[classSession.id] !== undefined ? (
+                              <div className="mt-1 w-full">
+                                <textarea
+                                  ref={(el) => { textareaRefs.current[classSession.id] = el; }}
+                                  defaultValue={editingNotes[classSession.id]}
+                                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                                  rows={3}
+                                />
+                                <div className="flex justify-end mt-2 space-x-2">
+                                  <button
+                                    onClick={() => handleCancelEditNotes(classSession.id)}
+                                    className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                    disabled={savingNotes[classSession.id]}
+                                  >
+                                    {t.cancel || 'Cancel'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleSaveNotes(classSession)}
+                                    className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                    disabled={savingNotes[classSession.id]}
+                                  >
+                                    {savingNotes[classSession.id] 
+                                      ? 'Saving...' 
+                                      : 'Save'}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-gray-700 text-sm mt-1 flex items-center">                                <span>{classSession.notes || (t.noNotes || 'No notes available')}</span>
+                                {!editingNotes[classSession.id] && (
+                                  <PencilIcon
+                                    onClick={() => handleEditNotes(classSession)}
+                                    className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
+                                    title={t.edit || 'Edit'}
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
                           
                           {/* Materials Section */}
                           {selectedDayDetails.materials[classSession.id] && selectedDayDetails.materials[classSession.id].length > 0 && (
