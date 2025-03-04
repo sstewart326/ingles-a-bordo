@@ -14,13 +14,15 @@ import {
   isClassUpcoming
 } from '../utils/scheduleUtils';
 import { styles } from '../styles/styleUtils';
-import { getClassMaterials, deleteClassMaterial } from '../utils/classMaterialsUtils';
+import { getClassMaterials, updateClassMaterialItem } from '../utils/classMaterialsUtils';
 import { FaFilePdf, FaLink, FaPlus, FaTrash } from 'react-icons/fa';
 import { ClassMaterial } from '../types/interfaces';
 import { toast } from 'react-hot-toast';
 import { Timestamp } from 'firebase/firestore';
 import { updateCachedDocument } from '../utils/firebaseUtils';
 import { PencilIcon } from '@heroicons/react/24/outline';
+import { UploadMaterialsForm } from '../components/UploadMaterialsForm';
+import Modal from '../components/Modal';
 
 interface TimeDisplay {
   timeStr: string;
@@ -58,6 +60,8 @@ export const Dashboard = () => {
   const hoverTimeoutRef = useRef<number | null>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
   const textareaRefs = useRef<{[key: string]: HTMLTextAreaElement | null}>({});
+  const [visibleUploadForm, setVisibleUploadForm] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const formatStudentNames = (studentEmails: string[]) => {
     const names = studentEmails.map(email => userNames[email] || email);
@@ -119,105 +123,106 @@ export const Dashboard = () => {
       // Check if we've already loaded these months
       const newMonthsToLoad = monthsToLoad.filter(monthKey => !loadedMonths.has(monthKey));
       
+      let upcoming: ClassSession[] = [...upcomingClasses];
+      let past: ClassSession[] = [...pastClasses];
+      
       if (newMonthsToLoad.length === 0) {
         console.log('All required months already loaded');
-        return;
-      }
-      
-      console.log('Loading classes for months:', newMonthsToLoad);
+        // Even if months are loaded, we still need to fetch materials
+      } else {
+        console.log('Loading classes for months:', newMonthsToLoad);
 
-      const queryConstraints = isAdmin 
-        ? [] 
-        : [where('studentEmails', 'array-contains', currentUser.email)];
+        const queryConstraints = isAdmin 
+          ? [] 
+          : [where('studentEmails', 'array-contains', currentUser.email)];
 
-      const allClasses = await getCachedCollection<ClassSession>(
-        'classes',
-        queryConstraints,
-        { userId: currentUser.uid }
-      );
+        const allClasses = await getCachedCollection<ClassSession>(
+          'classes',
+          queryConstraints,
+          { userId: currentUser.uid }
+        );
 
-      // Transform the classes to include the required fields
-      const transformedClasses: ClassSession[] = allClasses.map(classDoc => ({
-        ...classDoc,
-        paymentConfig: classDoc.paymentConfig || {
-          type: 'monthly',
-          monthlyOption: 'first',
-          startDate: classDoc.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
-        }
-      }));
+        // Transform the classes to include the required fields
+        const transformedClasses: ClassSession[] = allClasses.map(classDoc => ({
+          ...classDoc,
+          paymentConfig: classDoc.paymentConfig || {
+            type: 'monthly',
+            monthlyOption: 'first',
+            startDate: classDoc.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+          }
+        }));
 
-      console.log('Fetched classes:', transformedClasses);
+        console.log('Fetched classes:', transformedClasses);
 
-      // Fetch all unique student emails
-      const uniqueEmails = new Set<string>();
-      transformedClasses.forEach(classSession => {
-        classSession.studentEmails.forEach(email => uniqueEmails.add(email));
-      });
-
-      // Fetch user data for all students
-      const userDocs = await getCachedCollection<User>('users', [
-        where('email', 'in', Array.from(uniqueEmails))
-      ], { userId: currentUser.uid });
-
-      // Create a map of email to user data
-      const userMap = new Map<string, User>();
-      userDocs.forEach(user => {
-        userMap.set(user.email, user);
-        userNames[user.email] = user.name;
-      });
-      setUserNames(userNames);
-      setUsers(userDocs);
-
-      const upcoming: ClassSession[] = [];
-      const past: ClassSession[] = [];
-
-      transformedClasses.forEach(classSession => {
-        console.log('Processing class:', {
-          id: classSession.id,
-          dayOfWeek: classSession.dayOfWeek,
-          startTime: classSession.startTime,
-          endTime: classSession.endTime,
-          startDate: classSession.startDate?.toDate().toISOString(),
-          endDate: classSession.endDate?.toDate().toISOString(),
-          paymentConfig: classSession.paymentConfig
+        // Fetch all unique student emails
+        const uniqueEmails = new Set<string>();
+        transformedClasses.forEach(classSession => {
+          classSession.studentEmails.forEach(email => uniqueEmails.add(email));
         });
 
-        if (isClassPastToday(classSession.dayOfWeek || 0, classSession.startTime)) {
-          past.push(classSession);
-        } else if (isClassUpcoming(classSession.dayOfWeek || 0, classSession.startTime)) {
-          upcoming.push(classSession);
-        }
-      });
+        // Fetch user data for all students
+        const userDocs = await getCachedCollection<User>('users', [
+          where('email', 'in', Array.from(uniqueEmails))
+        ], { userId: currentUser.uid });
 
-      // Sort upcoming classes by day of week and time
-      upcoming.sort((a, b) => {
-        const dayDiff = (a.dayOfWeek || 0) - (b.dayOfWeek || 0);
-        if (dayDiff !== 0) return dayDiff;
-        return (a.startTime || '').localeCompare(b.startTime || '');
-      });
+        // Create a map of email to user data
+        const userMap = new Map<string, User>();
+        userDocs.forEach(user => {
+          userMap.set(user.email, user);
+          userNames[user.email] = user.name;
+        });
+        setUserNames(userNames);
+        setUsers(userDocs);
 
-      // Sort past classes by day of week and time in reverse order (most recent first)
-      past.sort((a, b) => {
-        const dayDiff = (b.dayOfWeek || 0) - (a.dayOfWeek || 0);
-        if (dayDiff !== 0) return dayDiff;
-        return (b.startTime || '').localeCompare(a.startTime || '');
-      });
+        transformedClasses.forEach(classSession => {
+          console.log('Processing class:', {
+            id: classSession.id,
+            dayOfWeek: classSession.dayOfWeek,
+            startTime: classSession.startTime,
+            endTime: classSession.endTime,
+            startDate: classSession.startDate?.toDate().toISOString(),
+            endDate: classSession.endDate?.toDate().toISOString(),
+            paymentConfig: classSession.paymentConfig
+          });
 
-      setUpcomingClasses(upcoming);
-      setPastClasses(past);
+          if (isClassPastToday(classSession.dayOfWeek || 0, classSession.startTime)) {
+            past.push(classSession);
+          } else if (isClassUpcoming(classSession.dayOfWeek || 0, classSession.startTime)) {
+            upcoming.push(classSession);
+          }
+        });
+
+        // Sort upcoming classes by day of week and time
+        upcoming.sort((a, b) => {
+          const dayDiff = (a.dayOfWeek || 0) - (b.dayOfWeek || 0);
+          if (dayDiff !== 0) return dayDiff;
+          return (a.startTime || '').localeCompare(b.startTime || '');
+        });
+
+        // Sort past classes by day of week and time in reverse order (most recent first)
+        past.sort((a, b) => {
+          const dayDiff = (b.dayOfWeek || 0) - (a.dayOfWeek || 0);
+          if (dayDiff !== 0) return dayDiff;
+          return (b.startTime || '').localeCompare(a.startTime || '');
+        });
+
+        setUpcomingClasses(upcoming);
+        setPastClasses(past);
+        
+        // Reset pagination when fetching new data
+        setUpcomingClassesPage(0);
+        setPastClassesPage(0);
+        
+        // Update loaded months
+        const updatedLoadedMonths = new Set(loadedMonths);
+        newMonthsToLoad.forEach(month => updatedLoadedMonths.add(month));
+        setLoadedMonths(updatedLoadedMonths);
+      }
       
-      // Reset pagination when fetching new data
-      setUpcomingClassesPage(0);
-      setPastClassesPage(0);
-      
-      // Update loaded months
-      const updatedLoadedMonths = new Set(loadedMonths);
-      newMonthsToLoad.forEach(month => updatedLoadedMonths.add(month));
-      setLoadedMonths(updatedLoadedMonths);
-      
-      // Fetch materials for all classes
+      // Always fetch materials, regardless of whether new months were loaded
       const fetchMaterialsForClasses = async () => {
-        const materialsMap: Record<string, ClassMaterial[]> = {...classMaterials};
+        // Create a new materials map instead of spreading the existing one
+        const materialsMap: Record<string, ClassMaterial[]> = {};
         
         // Fetch materials for upcoming classes
         for (const classSession of upcoming) {
@@ -257,7 +262,7 @@ export const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
-  }, [currentUser, adminLoading, isAdmin, loadedMonths, selectedDate, classMaterials]);
+  }, [currentUser, adminLoading, isAdmin, loadedMonths, selectedDate, upcomingClasses, pastClasses]);
 
   useEffect(() => {
     fetchClasses();
@@ -604,6 +609,48 @@ export const Dashboard = () => {
     });
   };
 
+  const openModal = (classId: string) => {
+    setVisibleUploadForm(classId);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setVisibleUploadForm(null);
+  };
+
+  const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (
+    <Modal isOpen={isModalOpen && visibleUploadForm === classSession.id} onClose={closeModal}>
+      <UploadMaterialsForm
+        classId={classSession.id}
+        classDate={date}
+        studentEmails={classSession.studentEmails}
+        onUploadSuccess={async () => {
+          // First close the modal
+          closeModal();
+          
+          // Then fetch the updated materials specifically for this class
+          try {
+            const nextDate = getNextClassDate(classSession);
+            if (nextDate) {
+              const materials = await getClassMaterials(classSession.id, nextDate);
+              // Update the materials state directly
+              setClassMaterials(prevMaterials => ({
+                ...prevMaterials,
+                [classSession.id]: materials
+              }));
+            }
+          } catch (error) {
+            console.error('Error fetching updated materials:', error);
+          }
+          
+          // Also refresh all classes to ensure everything is up to date
+          fetchClasses();
+        }}
+      />
+    </Modal>
+  );
+
   const renderUpcomingClassesSection = () => {
     const pageSize = 5;
     const startIndex = upcomingClassesPage * pageSize;
@@ -684,7 +731,11 @@ export const Dashboard = () => {
                             <div className={styles.card.label}>{t.materials || "Materials"}</div>
                             {isAdmin && (
                               <a 
-                                href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${getNextClassDate(classSession)?.toISOString() || new Date().toISOString()}`}
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  openModal(classSession.id);
+                                }}
                                 className="text-sm text-blue-600 hover:text-blue-800"
                               >
                                 {t.addMaterials}
@@ -707,7 +758,7 @@ export const Dashboard = () => {
                                       <button
                                         onClick={(e) => {
                                           e.preventDefault();
-                                          handleDeleteMaterial(material, index, classSession.id);
+                                          handleDeleteMaterial(material, index, classSession.id, 'slides');
                                         }}
                                         disabled={deletingMaterial[material.classId + index]}
                                         className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
@@ -731,15 +782,15 @@ export const Dashboard = () => {
                                       >
                                         <FaLink className="mr-2" />
                                         <span className="text-sm truncate">{link}</span>
-                                        {isAdmin && linkIndex === 0 && (
+                                        {isAdmin && (
                                           <button
                                             onClick={(e) => {
                                               e.preventDefault();
-                                              handleDeleteMaterial(material, index, classSession.id);
+                                              handleDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
                                             }}
-                                            disabled={deletingMaterial[material.classId + index]}
+                                            disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
                                             className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                            title="Delete material"
+                                            title="Delete link"
                                           >
                                             <FaTrash className="h-2.5 w-2.5" />
                                           </button>
@@ -758,7 +809,11 @@ export const Dashboard = () => {
                       {isAdmin && (!classMaterials[classSession.id] || classMaterials[classSession.id].length === 0) && (
                         <div className="mt-3">
                           <a 
-                            href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${getNextClassDate(classSession)?.toISOString() || new Date().toISOString()}`}
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              openModal(classSession.id);
+                            }}
                             className="flex items-center text-blue-600 hover:text-blue-800"
                           >
                             <FaPlus className="mr-2" />
@@ -766,6 +821,7 @@ export const Dashboard = () => {
                           </a>
                         </div>
                       )}
+                      {isAdmin && renderUploadMaterialsSection(classSession, getNextClassDate(classSession) || new Date())}
                     </div>
                   </div>
                 </div>
@@ -888,7 +944,11 @@ export const Dashboard = () => {
                             <div className={styles.card.label}>{t.materials || "Materials"}</div>
                             {isAdmin && (
                               <a 
-                                href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${getPreviousClassDate(classSession)?.toISOString() || new Date().toISOString()}`}
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  openModal(classSession.id);
+                                }}
                                 className="text-sm text-blue-600 hover:text-blue-800"
                               >
                                 {t.addMaterials}
@@ -911,7 +971,7 @@ export const Dashboard = () => {
                                       <button
                                         onClick={(e) => {
                                           e.preventDefault();
-                                          handleDeleteMaterial(material, index, classSession.id);
+                                          handleDeleteMaterial(material, index, classSession.id, 'slides');
                                         }}
                                         disabled={deletingMaterial[material.classId + index]}
                                         className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
@@ -935,15 +995,15 @@ export const Dashboard = () => {
                                       >
                                         <FaLink className="mr-2" />
                                         <span className="text-sm truncate">{link}</span>
-                                        {isAdmin && linkIndex === 0 && (
+                                        {isAdmin && (
                                           <button
                                             onClick={(e) => {
                                               e.preventDefault();
-                                              handleDeleteMaterial(material, index, classSession.id);
+                                              handleDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
                                             }}
-                                            disabled={deletingMaterial[material.classId + index]}
+                                            disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
                                             className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                            title="Delete material"
+                                            title="Delete link"
                                           >
                                             <FaTrash className="h-2.5 w-2.5" />
                                           </button>
@@ -962,7 +1022,11 @@ export const Dashboard = () => {
                       {isAdmin && (!classMaterials[classSession.id] || classMaterials[classSession.id].length === 0) && (
                         <div className="mt-3">
                           <a 
-                            href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${getPreviousClassDate(classSession)?.toISOString() || new Date().toISOString()}`}
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              openModal(classSession.id);
+                            }}
                             className="flex items-center text-blue-600 hover:text-blue-800"
                           >
                             <FaPlus className="mr-2" />
@@ -970,6 +1034,7 @@ export const Dashboard = () => {
                           </a>
                         </div>
                       )}
+                      {isAdmin && renderUploadMaterialsSection(classSession, getPreviousClassDate(classSession) || new Date())}
                     </div>
                   </div>
                 </div>
@@ -1205,7 +1270,7 @@ export const Dashboard = () => {
   }, []);
 
   // Function to handle material deletion
-  const handleDeleteMaterial = useCallback(async (material: ClassMaterial, index: number, classId: string) => {
+  const handleDeleteMaterial = useCallback(async (material: ClassMaterial, index: number, classId: string, type: 'slides' | 'link' = 'slides', linkIndex?: number) => {
     if (!currentUser || !isAdmin) {
       toast.error('Not authorized');
       return;
@@ -1213,16 +1278,58 @@ export const Dashboard = () => {
 
     try {
       // Set deleting state
-      setDeletingMaterial(prev => ({ ...prev, [material.classId + index]: true }));
+      if (type === 'slides') {
+        setDeletingMaterial(prev => ({ ...prev, [material.classId + index]: true }));
+      } else if (type === 'link') {
+        setDeletingMaterial(prev => ({ ...prev, [material.classId + index + '_link_' + linkIndex]: true }));
+      }
 
-      // Call the utility function to delete the material
-      await deleteClassMaterial(material.classId, material.classDate);
+      // Call the utility function to update the material
+      if (type === 'slides') {
+        await updateClassMaterialItem(material.classId, material.classDate, 'removeSlides');
+      } else if (type === 'link' && typeof linkIndex === 'number') {
+        await updateClassMaterialItem(material.classId, material.classDate, 'removeLink', linkIndex);
+      }
       
       // Update local state
       const updatedMaterials = { ...classMaterials };
       
+      // Check if we need to update or remove the material from local state
       if (updatedMaterials[classId]) {
-        updatedMaterials[classId] = updatedMaterials[classId].filter((_, i) => i !== index);
+        // If we're removing slides, update the material
+        if (type === 'slides') {
+          updatedMaterials[classId] = updatedMaterials[classId].map((m, i) => {
+            if (i === index) {
+              return { ...m, slides: '' };
+            }
+            return m;
+          });
+          
+          // If this material now has no slides and no links, remove it
+          const materialToCheck = updatedMaterials[classId][index];
+          if ((!materialToCheck.slides || materialToCheck.slides === '') && 
+              (!materialToCheck.links || materialToCheck.links.length === 0)) {
+            updatedMaterials[classId] = updatedMaterials[classId].filter((_, i) => i !== index);
+          }
+        } 
+        // If we're removing a link, update the material
+        else if (type === 'link' && typeof linkIndex === 'number') {
+          updatedMaterials[classId] = updatedMaterials[classId].map((m, i) => {
+            if (i === index && m.links) {
+              const updatedLinks = [...m.links];
+              updatedLinks.splice(linkIndex, 1);
+              return { ...m, links: updatedLinks };
+            }
+            return m;
+          });
+          
+          // If this material now has no slides and no links, remove it
+          const materialToCheck = updatedMaterials[classId][index];
+          if ((!materialToCheck.slides || materialToCheck.slides === '') && 
+              (!materialToCheck.links || materialToCheck.links.length === 0)) {
+            updatedMaterials[classId] = updatedMaterials[classId].filter((_, i) => i !== index);
+          }
+        }
         
         // If no materials left, remove the entry
         if (updatedMaterials[classId].length === 0) {
@@ -1235,7 +1342,40 @@ export const Dashboard = () => {
       // Update selected day details if needed
       if (selectedDayDetails && selectedDayDetails.materials[classId]) {
         const updatedDayDetails = { ...selectedDayDetails };
-        updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_, i) => i !== index);
+        
+        // Apply the same logic to selectedDayDetails
+        if (type === 'slides') {
+          updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].map((m, i) => {
+            if (i === index) {
+              return { ...m, slides: '' };
+            }
+            return m;
+          });
+          
+          // If this material now has no slides and no links, remove it
+          const materialToCheck = updatedDayDetails.materials[classId][index];
+          if ((!materialToCheck.slides || materialToCheck.slides === '') && 
+              (!materialToCheck.links || materialToCheck.links.length === 0)) {
+            updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_, i) => i !== index);
+          }
+        } 
+        else if (type === 'link' && typeof linkIndex === 'number') {
+          updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].map((m, i) => {
+            if (i === index && m.links) {
+              const updatedLinks = [...m.links];
+              updatedLinks.splice(linkIndex, 1);
+              return { ...m, links: updatedLinks };
+            }
+            return m;
+          });
+          
+          // If this material now has no slides and no links, remove it
+          const materialToCheck = updatedDayDetails.materials[classId][index];
+          if ((!materialToCheck.slides || materialToCheck.slides === '') && 
+              (!materialToCheck.links || materialToCheck.links.length === 0)) {
+            updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_, i) => i !== index);
+          }
+        }
         
         // If no materials left, remove the entry
         if (updatedDayDetails.materials[classId].length === 0) {
@@ -1245,17 +1385,25 @@ export const Dashboard = () => {
         setSelectedDayDetails(updatedDayDetails);
       }
       
-      toast.success('Material deleted successfully');
+      toast.success('Material updated successfully');
     } catch (error) {
-      console.error('Error deleting material:', error);
-      toast.error('Error deleting material');
+      console.error('Error updating material:', error);
+      toast.error('Error updating material');
     } finally {
       // Clear deleting state
-      setDeletingMaterial(prev => {
-        const newState = { ...prev };
-        delete newState[material.classId + index];
-        return newState;
-      });
+      if (type === 'slides') {
+        setDeletingMaterial(prev => {
+          const newState = { ...prev };
+          delete newState[material.classId + index];
+          return newState;
+        });
+      } else if (type === 'link') {
+        setDeletingMaterial(prev => {
+          const newState = { ...prev };
+          delete newState[material.classId + index + '_link_' + linkIndex];
+          return newState;
+        });
+      }
     }
   }, [currentUser, isAdmin, classMaterials, selectedDayDetails]);
 
@@ -1379,7 +1527,11 @@ export const Dashboard = () => {
                                 <div className={styles.card.label}>{t.materials || "Materials"}</div>
                                 {isAdmin && (
                                   <a 
-                                    href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${selectedDayDetails.date.toISOString()}`}
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      openModal(classSession.id);
+                                    }}
                                     className="text-sm text-blue-600 hover:text-blue-800"
                                   >
                                     {t.addMaterials}
@@ -1402,7 +1554,7 @@ export const Dashboard = () => {
                                           <button
                                             onClick={(e) => {
                                               e.preventDefault();
-                                              handleDeleteMaterial(material, index, classSession.id);
+                                              handleDeleteMaterial(material, index, classSession.id, 'slides');
                                             }}
                                             disabled={deletingMaterial[material.classId + index]}
                                             className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
@@ -1426,15 +1578,15 @@ export const Dashboard = () => {
                                           >
                                             <FaLink className="mr-2" />
                                             <span className="text-sm truncate">{link}</span>
-                                            {isAdmin && linkIndex === 0 && (
+                                            {isAdmin && (
                                               <button
                                                 onClick={(e) => {
                                                   e.preventDefault();
-                                                  handleDeleteMaterial(material, index, classSession.id);
+                                                  handleDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
                                                 }}
-                                                disabled={deletingMaterial[material.classId + index]}
+                                                disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
                                                 className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                                title="Delete material"
+                                                title="Delete link"
                                               >
                                                 <FaTrash className="h-2.5 w-2.5" />
                                               </button>
@@ -1453,7 +1605,11 @@ export const Dashboard = () => {
                           {isAdmin && (!selectedDayDetails.materials[classSession.id] || selectedDayDetails.materials[classSession.id].length === 0) && (
                             <div className="mt-3">
                               <a 
-                                href={`/admin/materials?classId=${classSession.id}&tab=upload&date=${selectedDayDetails.date.toISOString()}`}
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  openModal(classSession.id);
+                                }}
                                 className="flex items-center text-blue-600 hover:text-blue-800"
                               >
                                 <FaPlus className="mr-2" />
@@ -1461,6 +1617,7 @@ export const Dashboard = () => {
                               </a>
                             </div>
                           )}
+                          {isAdmin && renderUploadMaterialsSection(classSession, selectedDayDetails.date)}
                         </div>
                       </div>
                     </div>

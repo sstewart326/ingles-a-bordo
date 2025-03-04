@@ -101,7 +101,19 @@ export const addClassMaterials = async (
     };
 
     await addDoc(collection(db, COLLECTION_PATH), materialData);
+    
+    // Invalidate all caches related to this class
     invalidateCache(COLLECTION_PATH);
+    
+    // Also invalidate the specific class cache
+    const cacheKey = `${COLLECTION_PATH}_${classId}_${classDate.toISOString()}`;
+    invalidateCache(cacheKey);
+    
+    // And invalidate the "all" cache for this class
+    const allCacheKey = `${COLLECTION_PATH}_${classId}_all`;
+    invalidateCache(allCacheKey);
+    
+    logMaterialsUtil('Added class materials successfully', { classId, classDate });
   } catch (error) {
     console.error('Error adding class materials:', error);
     throw error;
@@ -314,5 +326,77 @@ export const getStudentClassMaterials = async (studentEmail: string): Promise<Cl
     }
     // Return empty array instead of throwing
     return [];
+  }
+};
+
+export const updateClassMaterialItem = async (
+  classId: string,
+  classDate: Date,
+  updateType: 'removeSlides' | 'removeLink',
+  linkIndex?: number
+): Promise<void> => {
+  try {
+    if (!classId || !classDate) {
+      throw new Error('Invalid parameters: classId and classDate are required');
+    }
+
+    // Create date range for the query
+    const startOfDay = new Date(classDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(classDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Query to find the exact document
+    const materialsQuery = query(
+      collection(db, COLLECTION_PATH),
+      where('classId', '==', classId),
+      where('classDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('classDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+    
+    const querySnapshot = await getDocs(materialsQuery);
+    
+    if (querySnapshot.empty) {
+      throw new Error('Material not found');
+    }
+    
+    const docId = querySnapshot.docs[0].id;
+    const docRef = doc(db, COLLECTION_PATH, docId);
+    const materialData = querySnapshot.docs[0].data() as ClassMaterial;
+    
+    const updates: Partial<ClassMaterial> = {
+      updatedAt: new Date()
+    };
+    
+    if (updateType === 'removeSlides') {
+      updates.slides = '';
+    } else if (updateType === 'removeLink' && typeof linkIndex === 'number' && materialData.links) {
+      // Remove the specific link at the given index
+      const updatedLinks = [...materialData.links];
+      updatedLinks.splice(linkIndex, 1);
+      updates.links = updatedLinks;
+    }
+    
+    // Check if this would leave the document empty (no slides and no links)
+    const wouldBeEmpty = 
+      (updateType === 'removeSlides' && (!materialData.links || materialData.links.length === 0)) ||
+      (updateType === 'removeLink' && !materialData.slides && materialData.links && materialData.links.length === 1);
+    
+    if (wouldBeEmpty) {
+      // If removing this item would leave the document empty, delete the entire document
+      await deleteDoc(docRef);
+    } else {
+      // Otherwise, update the document with the changes
+      await updateDoc(docRef, updates);
+    }
+    
+    // Invalidate cache after updating material
+    invalidateCache(COLLECTION_PATH);
+    
+    logMaterialsUtil('Material item updated successfully', { classId, classDate, updateType });
+  } catch (error) {
+    console.error('Error updating class material item:', error);
+    throw error;
   }
 }; 

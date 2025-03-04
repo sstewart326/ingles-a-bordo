@@ -653,19 +653,19 @@ export const AdminSchedule = () => {
             <div className="mt-2">
               <div className={styles.card.label}>Payment Type</div>
               <div className="text-gray-800">
-                {classItem.paymentConfig.type === 'weekly' ? 'Weekly' : 'Monthly'}
+                {classItem.paymentConfig?.type === 'weekly' ? 'Weekly' : 'Monthly'}
               </div>
             </div>
             <div className="mt-2">
               <div className={styles.card.label}>Payment Details</div>
               <div className="text-gray-800">
-                {classItem.paymentConfig.type === 'weekly' 
+                {classItem.paymentConfig?.type === 'weekly' 
                   ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
                       ? 'Every week' 
                       : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
-                  : classItem.paymentConfig.monthlyOption === 'first' 
+                  : classItem.paymentConfig?.monthlyOption === 'first' 
                     ? 'First day of month'
-                    : classItem.paymentConfig.monthlyOption === 'fifteen'
+                    : classItem.paymentConfig?.monthlyOption === 'fifteen'
                       ? '15th day of month'
                       : 'Last day of month'
                 }
@@ -674,7 +674,7 @@ export const AdminSchedule = () => {
             <div className="mt-2">
               <div className={styles.card.label}>{t.paymentStartDate || "Payment Start Date"}</div>
               <div className="text-gray-800">
-                {new Date(classItem.paymentConfig.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+                {new Date(classItem.paymentConfig?.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
               </div>
             </div>
             <div className="mt-2">
@@ -1001,16 +1001,16 @@ export const AdminSchedule = () => {
                         </div>
                       </td>
                       <td className={styles.table.cell}>
-                        {classItem.paymentConfig.type === 'weekly' ? 'Weekly' : 'Monthly'}
+                        {classItem.paymentConfig?.type === 'weekly' ? 'Weekly' : 'Monthly'}
                       </td>
                       <td className={styles.table.cell}>
-                        {classItem.paymentConfig.type === 'weekly' 
+                        {classItem.paymentConfig?.type === 'weekly' 
                           ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
                               ? 'Every week' 
                               : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
-                          : classItem.paymentConfig.monthlyOption === 'first' 
+                          : classItem.paymentConfig?.monthlyOption === 'first' 
                             ? 'First day of month'
-                            : classItem.paymentConfig.monthlyOption === 'fifteen'
+                            : classItem.paymentConfig?.monthlyOption === 'fifteen'
                               ? '15th day of month'
                               : 'Last day of month'
                         }
