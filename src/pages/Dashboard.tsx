@@ -29,12 +29,21 @@ interface TimeDisplay {
   position: number;
 }
 
+// Add a new interface for the class time modal
+interface ClassTimeModal {
+  isOpen: boolean;
+  position: { x: number, y: number };
+  classes: ClassSession[];
+  date: Date;
+}
+
 export const Dashboard = () => {
   const [upcomingClasses, setUpcomingClasses] = useState<ClassSession[]>([]);
   const [pastClasses, setPastClasses] = useState<ClassSession[]>([]);
   const [upcomingClassesPage, setUpcomingClassesPage] = useState(0);
   const [pastClassesPage, setPastClassesPage] = useState(0);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const [selectedDayDetails, setSelectedDayDetails] = useState<{
     date: Date;
     classes: ClassSession[];
@@ -59,9 +68,22 @@ export const Dashboard = () => {
   } | null>(null);
   const hoverTimeoutRef = useRef<number | null>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
+  const upcomingClassesSectionRef = useRef<HTMLDivElement>(null);
+  const pastClassesSectionRef = useRef<HTMLDivElement>(null);
   const textareaRefs = useRef<{[key: string]: HTMLTextAreaElement | null}>({});
   const [visibleUploadForm, setVisibleUploadForm] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Add state for the class time modal
+  const [classTimeModal, setClassTimeModal] = useState<ClassTimeModal>({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    classes: [],
+    date: new Date()
+  });
+  
+  // Add a ref for detecting clicks outside the modal
+  const classTimeModalRef = useRef<HTMLDivElement>(null);
 
   const formatStudentNames = (studentEmails: string[]) => {
     const names = studentEmails.map(email => userNames[email] || email);
@@ -266,7 +288,27 @@ export const Dashboard = () => {
 
   useEffect(() => {
     fetchClasses();
-  }, [fetchClasses]);
+    
+    // Add resize event listener to update mobile view state
+    const handleResize = () => {
+      const newIsMobileView = window.innerWidth < 768;
+      
+      // If view mode changed (mobile to desktop or desktop to mobile)
+      if (newIsMobileView !== isMobileView) {
+        // Reset pagination to avoid showing empty pages
+        setUpcomingClassesPage(0);
+        setPastClassesPage(0);
+        setIsMobileView(newIsMobileView);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    // Clean up event listener on component unmount
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [fetchClasses, isMobileView]);
   
   // Add an effect to fetch classes when the month changes
   useEffect(() => {
@@ -651,14 +693,30 @@ export const Dashboard = () => {
     </Modal>
   );
 
+  const handleUpcomingClassesPagination = (newPage: number) => {
+    setUpcomingClassesPage(newPage);
+    // Add a small delay to ensure the state is updated before scrolling
+    setTimeout(() => {
+      upcomingClassesSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  const handlePastClassesPagination = (newPage: number) => {
+    setPastClassesPage(newPage);
+    // Add a small delay to ensure the state is updated before scrolling
+    setTimeout(() => {
+      pastClassesSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
   const renderUpcomingClassesSection = () => {
-    const pageSize = 5;
+    const pageSize = isMobileView ? 2 : 5; // Show 2 classes on mobile, 5 on desktop
     const startIndex = upcomingClassesPage * pageSize;
     const displayedClasses = upcomingClasses.slice(startIndex, startIndex + pageSize);
     const hasMore = startIndex + pageSize < upcomingClasses.length;
     
     return (
-      <div className="max-w-2xl">
+      <div className="max-w-2xl" ref={upcomingClassesSectionRef}>
         <h2 className={styles.headings.h2}>{t.upcomingClasses}</h2>
         <div className="mt-4 space-y-4">
           {displayedClasses.length === 0 ? (
@@ -830,7 +888,7 @@ export const Dashboard = () => {
               {/* Pagination controls */}
               <div className="flex justify-between items-center mt-4">
                 <button
-                  onClick={() => setUpcomingClassesPage(prev => Math.max(0, prev - 1))}
+                  onClick={() => handleUpcomingClassesPagination(Math.max(0, upcomingClassesPage - 1))}
                   disabled={upcomingClassesPage === 0}
                   className={`px-3 py-1 rounded ${
                     upcomingClassesPage === 0
@@ -846,7 +904,7 @@ export const Dashboard = () => {
                 </span>
                 
                 <button
-                  onClick={() => setUpcomingClassesPage(prev => prev + 1)}
+                  onClick={() => handleUpcomingClassesPagination(upcomingClassesPage + 1)}
                   disabled={!hasMore}
                   className={`px-3 py-1 rounded ${
                     !hasMore
@@ -865,13 +923,13 @@ export const Dashboard = () => {
   };
 
   const renderPastClassesSection = () => {
-    const pageSize = 5;
+    const pageSize = isMobileView ? 2 : 3; // Show 2 classes on mobile, 5 on desktop
     const startIndex = pastClassesPage * pageSize;
     const displayedClasses = pastClasses.slice(startIndex, startIndex + pageSize);
     const hasMore = startIndex + pageSize < pastClasses.length;
     
     return (
-      <div className="max-w-2xl">
+      <div className="max-w-2xl" ref={pastClassesSectionRef}>
         <h2 className={styles.headings.h2}>{t.pastClasses}</h2>
         <div className="mt-4 space-y-4">
           {displayedClasses.length === 0 ? (
@@ -1043,7 +1101,7 @@ export const Dashboard = () => {
               {/* Pagination controls */}
               <div className="flex justify-between items-center mt-4">
                 <button
-                  onClick={() => setPastClassesPage(prev => Math.max(0, prev - 1))}
+                  onClick={() => handlePastClassesPagination(Math.max(0, pastClassesPage - 1))}
                   disabled={pastClassesPage === 0}
                   className={`px-3 py-1 rounded ${
                     pastClassesPage === 0
@@ -1059,7 +1117,7 @@ export const Dashboard = () => {
                 </span>
                 
                 <button
-                  onClick={() => setPastClassesPage(prev => prev + 1)}
+                  onClick={() => handlePastClassesPagination(pastClassesPage + 1)}
                   disabled={!hasMore}
                   className={`px-3 py-1 rounded ${
                     !hasMore
@@ -1086,6 +1144,32 @@ export const Dashboard = () => {
       Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
     const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
+    // Function to handle click on the class count pill
+    const handleClassCountClick = (e: React.MouseEvent) => {
+      e.stopPropagation(); // Prevent triggering the calendar day click
+      
+      // Calculate position for the modal
+      const rect = e.currentTarget.getBoundingClientRect();
+      
+      setClassTimeModal({
+        isOpen: true,
+        position: { 
+          x: rect.left + (rect.width / 2), 
+          y: rect.bottom + 5
+        },
+        classes: dayClasses,
+        date: date
+      });
+    };
+
+    // Function to handle click on the payment due pill
+    const handlePaymentPillClick = (e: React.MouseEvent) => {
+      e.stopPropagation(); // Prevent triggering the calendar day click
+      
+      // Handle payment due click - for now just show the day details
+      handleDayClick(date, dayClasses, paymentsDue);
+    };
+
     return (
       <div className="h-full flex flex-col">
         {/* Indicators */}
@@ -1101,44 +1185,35 @@ export const Dashboard = () => {
           )}
         </div>
 
-        {/* Date and Payment Label */}
+        {/* Date */}
         <div className="flex flex-col items-center">
           <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
             {date.getDate()}
           </div>
-          {isPaymentDay && (
-            <div className={`payment-due-label ${isPaymentSoon ? 'soon' : 'normal'}`}>
-              {t.paymentDue}
-            </div>
-          )}
         </div>
 
-        {/* Class details */}
-        {dayClasses.length > 0 && (
-          <div className="class-details">
-            <div className="time-slots-container">
-              <div className="time-slots">
-                {dayClasses.slice(0, 3).map((classItem) => {
-                  const timeDisplay = formatTimeDisplay(classItem);
-                  return timeDisplay ? (
-                    <div
-                      key={classItem.id}
-                      className="time-slot"
-                      style={{ top: `${timeDisplay.position}%` }}
-                    >
-                      {timeDisplay.timeStr}
-                    </div>
-                  ) : null;
-                })}
-                {dayClasses.length > 3 && (
-                  <div className="time-slot more">
-                    +{dayClasses.length - 3} more
-                  </div>
-                )}
+        {/* Class count and payment pills */}
+        <div className="class-details">
+          <div className="flex flex-col items-center gap-2">
+            {dayClasses.length > 0 && (
+              <div 
+                className="calendar-pill class-count-pill"
+                onClick={handleClassCountClick}
+              >
+                {dayClasses.length} {dayClasses.length === 1 ? t.class || 'class' : t.class || 'classes'}
               </div>
-            </div>
+            )}
+            
+            {isPaymentDay && (
+              <div 
+                className={`calendar-pill payment-pill ${isPaymentSoon ? 'soon' : 'normal'}`}
+                onClick={handlePaymentPillClick}
+              >
+                {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue || 'payment' : t.paymentDue || 'payments'}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     );
   };
@@ -1407,6 +1482,20 @@ export const Dashboard = () => {
     }
   }, [currentUser, isAdmin, classMaterials, selectedDayDetails]);
 
+  // Add a useEffect to handle clicks outside the modal
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (classTimeModalRef.current && !classTimeModalRef.current.contains(event.target as Node)) {
+        setClassTimeModal(prev => ({ ...prev, isOpen: false }));
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   if (adminLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -1423,25 +1512,79 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* Upcoming Classes section */}
-      <div className="mt-8">
-        {renderUpcomingClassesSection()}
-      </div>
+      {/* Classes sections - grid layout on desktop */}
+      <div className="mt-8 lg:grid lg:grid-cols-2 lg:gap-8">
+        {/* Upcoming Classes section */}
+        <div>
+          {renderUpcomingClassesSection()}
+        </div>
 
-      {/* Past Classes section */}
-      <div className="mt-8">
-        {renderPastClassesSection()}
+        {/* Past Classes section */}
+        <div className="mt-8 lg:mt-0">
+          {renderPastClassesSection()}
+        </div>
       </div>
 
       <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">
         {/* Calendar section */}
-        <div>
+        <div className="relative">
           <Calendar
             selectedDate={selectedDate}
             onDateSelect={(date) => handleDayClick(date, getClassesForDay(date.getDay(), date), getPaymentsDueForDay(date))}
             onMonthChange={handleMonthChange}
             renderDay={renderCalendarDay}
           />
+          
+          {/* Class Time Modal */}
+          {classTimeModal.isOpen && (
+            <div 
+              ref={classTimeModalRef}
+              className="class-time-modal"
+              style={{
+                position: 'fixed',
+                left: `${classTimeModal.position.x}px`,
+                top: `${classTimeModal.position.y}px`,
+                transform: 'translateX(-50%)',
+                zIndex: 50,
+                backgroundColor: 'white',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                padding: '0.75rem',
+                minWidth: '200px',
+                maxWidth: '300px'
+              }}
+            >
+              <div className="text-sm font-medium mb-2">
+                {classTimeModal.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
+                  weekday: 'short', 
+                  month: 'short', 
+                  day: 'numeric' 
+                })}
+              </div>
+              <div className="space-y-2">
+                {classTimeModal.classes.map((classItem) => {
+                  return (
+                    <div 
+                      key={classItem.id}
+                      className="time-pill"
+                      style={{
+                        backgroundColor: '#6366f1',
+                        color: 'white',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.75rem'
+                      }}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span>{classItem.startTime}</span>
+                        <span className="text-xs">{formatStudentNames(classItem.studentEmails)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Details section */}

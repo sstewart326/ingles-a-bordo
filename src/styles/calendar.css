@@ -100,10 +100,68 @@
   min-height: 60px;
 }
 
+/* Common Pill Base */
+.calendar-pill {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
+  transition: background-color 0.2s ease;
+  color: white;
+  min-width: 80px;
+  height: 20px;
+  white-space: nowrap;
+}
+
+/* Class Count Pill */
+.class-count-pill {
+  background-color: #6366f1;
+}
+
+.class-count-pill:hover {
+  background-color: #4f46e5;
+}
+
+/* Payment Pill */
+.payment-pill.normal {
+  background-color: #f59e0b;
+}
+
+.payment-pill.normal:hover {
+  background-color: #d97706;
+}
+
+.payment-pill.soon {
+  background-color: #ef4444;
+}
+
+.payment-pill.soon:hover {
+  background-color: #dc2626;
+}
+
 .time-slots-container {
   height: 100%;
   min-height: inherit;
   position: relative;
+}
+
+/* Time Pills in Modal */
+.time-pill {
+  background-color: #6366f1;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.time-pill:last-child {
+  margin-bottom: 0;
 }
 
 .time-slots {
