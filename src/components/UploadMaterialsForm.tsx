@@ -1,5 +1,5 @@
 import React, { useState, ChangeEvent } from 'react';
-import { addClassMaterials } from '../utils/classMaterialsUtils';
+import { addClassMaterials, getClassMaterials } from '../utils/classMaterialsUtils';
 import toast from 'react-hot-toast';
 import { FaTrash } from 'react-icons/fa';
 import { useLanguage } from '../hooks/useLanguage';
@@ -10,13 +10,15 @@ interface UploadMaterialsFormProps {
   classDate: Date;
   studentEmails: string[];
   onUploadSuccess?: () => void;
+  onMaterialsUpdate?: (materials: any[]) => void;
 }
 
 export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
   classId,
   classDate,
   studentEmails,
-  onUploadSuccess
+  onUploadSuccess,
+  onMaterialsUpdate
 }) => {
   const [slideFiles, setSlideFiles] = useState<File[]>([]);
   const [links, setLinks] = useState<string[]>([]);
@@ -68,6 +70,15 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
 
     try {
       await addClassMaterials(classId, classDate, studentEmails, slideFiles, links);
+      
+      // Fetch updated materials after successful upload
+      const updatedMaterials = await getClassMaterials(classId, classDate);
+      
+      // Update parent component with new materials
+      if (onMaterialsUpdate) {
+        onMaterialsUpdate(updatedMaterials);
+      }
+      
       toast.success('Materials uploaded successfully');
       onUploadSuccess?.();
     } catch (error) {

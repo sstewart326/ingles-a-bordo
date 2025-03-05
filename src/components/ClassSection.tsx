@@ -33,6 +33,7 @@ interface ClassSectionProps {
   currentPage: number;
   onPageChange: (newPage: number) => void;
   sectionRef: React.RefObject<HTMLDivElement | null>;
+  onMaterialsUpdate?: (classId: string, materials: ClassMaterial[]) => void;
 }
 
 export const ClassSection = ({
@@ -59,13 +60,20 @@ export const ClassSection = ({
   pageSize,
   currentPage,
   onPageChange,
-  sectionRef
+  sectionRef,
+  onMaterialsUpdate
 }: ClassSectionProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
   const startIndex = currentPage * pageSize;
   const displayedClasses = classes.slice(startIndex, startIndex + pageSize);
   const hasMore = startIndex + pageSize < classes.length;
+
+  const handleMaterialsUpdate = (classId: string, materials: ClassMaterial[]) => {
+    if (onMaterialsUpdate) {
+      onMaterialsUpdate(classId, materials);
+    }
+  };
 
   const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (
     <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
@@ -74,6 +82,7 @@ export const ClassSection = ({
         classDate={date}
         studentEmails={classSession.studentEmails}
         onUploadSuccess={onCloseUploadForm}
+        onMaterialsUpdate={(materials) => handleMaterialsUpdate(classSession.id, materials)}
       />
     </Modal>
   );

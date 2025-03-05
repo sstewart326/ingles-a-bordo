@@ -373,6 +373,39 @@ export const Dashboard = () => {
     return prevDate;
   };
 
+  const handleMaterialsUpdate = (classId: string, materials: ClassMaterial[]) => {
+    // Update classMaterials state
+    const updatedClassMaterials = { ...classMaterials, [classId]: materials };
+    setClassMaterials(updatedClassMaterials);
+
+    // Update selected day details if they exist and match the current class
+    if (selectedDayDetails && selectedDayDetails.classes.some(c => c.id === classId)) {
+      const updatedDayDetails = {
+        ...selectedDayDetails,
+        materials: {
+          ...selectedDayDetails.materials,
+          [classId]: materials
+        }
+      };
+      setSelectedDayDetails(updatedDayDetails);
+    }
+
+    // Update upcoming and past classes to include the new materials
+    const updatedUpcomingClasses = upcomingClasses.map(c => 
+      c.id === classId 
+        ? { ...c, materials } 
+        : c
+    );
+    setUpcomingClasses(updatedUpcomingClasses);
+
+    const updatedPastClasses = pastClasses.map(c => 
+      c.id === classId 
+        ? { ...c, materials } 
+        : c
+    );
+    setPastClasses(updatedPastClasses);
+  };
+
   if (adminLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -417,6 +450,7 @@ export const Dashboard = () => {
           textareaRefs={textareaRefs.current}
           onUpcomingClassesPageChange={handleUpcomingClassesPagination}
           onPastClassesPageChange={handlePastClassesPagination}
+          onMaterialsUpdate={handleMaterialsUpdate}
           t={{
             upcomingClasses: t.upcomingClasses,
             pastClasses: t.pastClasses
@@ -457,6 +491,7 @@ export const Dashboard = () => {
             onCloseUploadForm={closeModal}
             visibleUploadForm={visibleUploadForm}
             textareaRefs={textareaRefs.current}
+            onMaterialsUpdate={handleMaterialsUpdate}
           />
         </div>
       </div>

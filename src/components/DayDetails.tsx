@@ -30,6 +30,7 @@ interface DayDetailsProps {
   onCloseUploadForm: () => void;
   visibleUploadForm: string | null;
   textareaRefs: { [key: string]: HTMLTextAreaElement | null };
+  onMaterialsUpdate: (classId: string, materials: ClassMaterial[]) => void;
 }
 
 export const DayDetails = ({
@@ -47,7 +48,8 @@ export const DayDetails = ({
   onOpenUploadForm,
   onCloseUploadForm,
   visibleUploadForm,
-  textareaRefs
+  textareaRefs,
+  onMaterialsUpdate
 }: DayDetailsProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -59,6 +61,7 @@ export const DayDetails = ({
         classDate={date}
         studentEmails={classSession.studentEmails}
         onUploadSuccess={onCloseUploadForm}
+        onMaterialsUpdate={(materials) => onMaterialsUpdate(classSession.id, materials)}
       />
     </Modal>
   );
