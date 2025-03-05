@@ -179,11 +179,8 @@ export const Dashboard = () => {
       let past: ClassSession[] = [];
       
       if (newMonthsToLoad.length === 0) {
-        console.log('All required months already loaded');
         // Even if months are loaded, we still need to fetch materials
       } else {
-        console.log('Loading classes for months:', newMonthsToLoad);
-
         const queryConstraints = isAdmin 
           ? [] 
           : [where('studentEmails', 'array-contains', currentUser.email)];
@@ -203,8 +200,6 @@ export const Dashboard = () => {
             startDate: classDoc.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
           }
         }));
-
-        console.log('Fetched classes:', transformedClasses);
 
         // Fetch all unique student emails
         const uniqueEmails = new Set<string>();
@@ -227,16 +222,6 @@ export const Dashboard = () => {
         setUsers(userDocs);
 
         transformedClasses.forEach(classSession => {
-          console.log('Processing class:', {
-            id: classSession.id,
-            dayOfWeek: classSession.dayOfWeek,
-            startTime: classSession.startTime,
-            endTime: classSession.endTime,
-            startDate: classSession.startDate?.toDate().toISOString(),
-            endDate: classSession.endDate?.toDate().toISOString(),
-            paymentConfig: classSession.paymentConfig
-          });
-
           if (isClassPastToday(classSession.dayOfWeek || 0, classSession.startTime)) {
             past.push(classSession);
           } else if (isClassUpcoming(classSession.dayOfWeek || 0, classSession.startTime)) {
@@ -378,17 +363,7 @@ export const Dashboard = () => {
   };
 
   const getNextPaymentDates = (paymentConfig: User['paymentConfig'], classSession: ClassSession, selectedDate: Date) => {
-    console.log('Calculating payment dates:', {
-      paymentConfig,
-      classSession: {
-        id: classSession.id,
-        startDate: classSession.startDate?.toDate(),
-        endDate: classSession.endDate?.toDate()
-      }
-    });
-
     if (!paymentConfig || !classSession.startDate) {
-      console.log('No payment config or start date, returning empty array');
       return [];
     }
     
@@ -407,19 +382,12 @@ export const Dashboard = () => {
     monthStart.setHours(0, 0, 0, 0);
     const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
-
-    console.log('Date ranges:', {
-      paymentStartDate: paymentStartDate.toISOString().split('T')[0],
-      monthStart: monthStart.toISOString().split('T')[0],
-      monthEnd: monthEnd.toISOString().split('T')[0]
-    });
     
     // If class has ended, no payments
     if (classSession.endDate) {
       const endDate = classSession.endDate.toDate();
       endDate.setHours(23, 59, 59, 999);
       if (endDate < monthStart) {
-        console.log('Class has ended before month start, returning empty array');
         return [];
       }
     }
@@ -427,28 +395,16 @@ export const Dashboard = () => {
     if (paymentConfig.type === 'weekly') {
       const interval = paymentConfig.weeklyInterval || 1;
       let currentPaymentDate = new Date(paymentStartDate);
-      
-      console.log('Processing weekly payments:', {
-        interval,
-        startingFrom: currentPaymentDate.toISOString()
-      });
 
       while (currentPaymentDate <= monthEnd) {
         if (currentPaymentDate >= monthStart) {
           dates.push(new Date(currentPaymentDate));
-          console.log('Added weekly payment date:', currentPaymentDate.toISOString());
         }
         currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * interval));
       }
     } else if (paymentConfig.type === 'monthly') {
       const year = selectedDate.getFullYear();
       const month = selectedDate.getMonth();
-      
-      console.log('Processing monthly payment:', {
-        option: paymentConfig.monthlyOption,
-        year,
-        month
-      });
 
       let paymentDate: Date;
       switch (paymentConfig.monthlyOption) {
@@ -462,18 +418,15 @@ export const Dashboard = () => {
           paymentDate = new Date(year, month + 1, 0);
           break;
         default:
-          console.log('Invalid monthly option:', paymentConfig.monthlyOption);
           return dates;
       }
       
       if (paymentDate >= paymentStartDate && 
           (!classSession.endDate || paymentDate <= classSession.endDate.toDate())) {
         dates.push(paymentDate);
-        console.log('Added monthly payment date:', paymentDate.toISOString());
       }
     }
     
-    console.log('Final payment dates:', dates.map(d => d.toISOString()));
     return dates;
   };
 
@@ -552,7 +505,6 @@ export const Dashboard = () => {
     
     // Check if the date is within the current month or adjacent months
     if (!isDateInRelevantMonthRange(date)) {
-      console.log(`Skipping classes for date outside relevant range: ${date.toISOString()}`);
       return [];
     }
     
