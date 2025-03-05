@@ -170,6 +170,9 @@ interface Translation {
   nameUpdated: string;
   failedToUpdateName: string;
   copy: string;
+
+  // URL Validation
+  invalidUrl: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -343,6 +346,9 @@ const translations: Record<Language, Translation> = {
     nameUpdated: 'Name updated successfully',
     failedToUpdateName: 'Failed to update name',
     copy: 'Copy',
+
+    // URL Validation
+    invalidUrl: 'URL must start with http:// or https://',
   },
   'pt-BR': {
     // Auth & Profile
@@ -514,6 +520,9 @@ const translations: Record<Language, Translation> = {
     nameUpdated: 'Nome atualizado com sucesso',
     failedToUpdateName: 'Falha ao atualizar nome',
     copy: 'Copiar',
+
+    // URL Validation
+    invalidUrl: 'URL deve começar com http:// ou https://',
   }
 };
 

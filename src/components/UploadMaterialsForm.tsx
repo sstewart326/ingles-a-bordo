@@ -1,7 +1,9 @@
 import React, { useState, ChangeEvent } from 'react';
-import { addClassMaterials, validateFile } from '../utils/classMaterialsUtils';
+import { addClassMaterials } from '../utils/classMaterialsUtils';
 import toast from 'react-hot-toast';
 import { FaTrash } from 'react-icons/fa';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
 
 interface UploadMaterialsFormProps {
   classId: string;
@@ -20,6 +22,18 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
   const [links, setLinks] = useState<string[]>([]);
   const [newLink, setNewLink] = useState('');
   const [uploading, setUploading] = useState(false);
+  const { language } = useLanguage();
+  const t = useTranslation(language);
+
+  // Add URL validation function
+  const isValidUrl = (url: string): boolean => {
+    try {
+      const parsedUrl = new URL(url);
+      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
 
   const handleSlideChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -33,8 +47,13 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
   };
 
   const handleAddLink = () => {
-    if (newLink.trim()) {
-      setLinks(prev => [...prev, newLink.trim()]);
+    const trimmedLink = newLink.trim();
+    if (trimmedLink) {
+      if (!isValidUrl(trimmedLink)) {
+        toast.error(t.invalidUrl);
+        return;
+      }
+      setLinks(prev => [...prev, trimmedLink]);
       setNewLink('');
     }
   };

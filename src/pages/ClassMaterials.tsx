@@ -176,7 +176,7 @@ export const ClassMaterials = () => {
         logMaterials('Selected material:', selectedMaterial);
         
         // The slides field already contains the full download URL
-        setSlidesUrl(selectedMaterial.slides);
+        setSlidesUrl(selectedMaterial.slides?.[0] || null);
       } catch (error) {
         console.error('Error setting slides URL:', error);
         if (error instanceof Error) {
@@ -345,7 +345,7 @@ export const ClassMaterials = () => {
                       <div className="animate-pulse h-10 bg-gray-200 rounded"></div>
                     ) : slidesUrl ? (
                       <a
-                        href={material.slides}
+                        href={material.slides?.[0] || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"

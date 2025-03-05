@@ -271,7 +271,7 @@ const AdminMaterials = () => {
         selectedClass.id,
         classDateTime,
         selectedClass.studentEmails,
-        selectedFile || undefined,
+        selectedFile ? [selectedFile] : undefined,
         links
       );
       toast.success('Materials uploaded successfully');
@@ -497,7 +497,7 @@ const AdminMaterials = () => {
                               })}</h3>
                               {material.slides && (
                                 <a
-                                  href={material.slides}
+                                  href={material.slides[0]}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="flex items-center gap-2 text-blue-500 hover:text-blue-600"

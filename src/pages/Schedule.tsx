@@ -188,7 +188,7 @@ export const Schedule = () => {
       if (material) {
         setSelectedMaterial(material);
         if (material.slides) {
-          setSlidesUrl(material.slides);
+          setSlidesUrl(material.slides[0]);
         }
       } else {
         setSelectedMaterial(null);
