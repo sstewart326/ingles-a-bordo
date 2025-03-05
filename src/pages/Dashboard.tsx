@@ -80,6 +80,40 @@ export const Dashboard = () => {
   // Add a ref for detecting clicks outside the modal
   const classTimeModalRef = useRef<HTMLDivElement>(null);
 
+  // Add shared utility function at the top of the component
+  const parseTimeToMinutes = (time: string): number => {
+    if (!time) return 0;
+    
+    // Remove any AM/PM and spaces
+    const cleanTime = time.toLowerCase().replace(/[ap]m\s*/g, '');
+    const [hours, minutes] = cleanTime.split(':').map(Number);
+    
+    let totalMinutes = hours * 60 + minutes;
+    
+    // Handle AM/PM
+    if (time.toLowerCase().includes('pm') && hours !== 12) {
+      totalMinutes += 12 * 60;
+    } else if (time.toLowerCase().includes('am') && hours === 12) {
+      totalMinutes = minutes;
+    }
+    
+    return totalMinutes;
+  };
+
+  const sortClassesByTime = (classes: ClassSession[]) => {
+    return [...classes].sort((a, b) => {
+      // First sort by day of week
+      const dayDiff = (a.dayOfWeek || 0) - (b.dayOfWeek || 0);
+      if (dayDiff !== 0) return dayDiff;
+      
+      // Then sort by time
+      const timeA = a.startTime || '';
+      const timeB = b.startTime || '';
+      
+      return parseTimeToMinutes(timeA) - parseTimeToMinutes(timeB);
+    });
+  };
+
   const formatStudentNames = (studentEmails: string[]) => {
     const names = studentEmails.map(email => userNames[email] || email);
 
@@ -210,19 +244,9 @@ export const Dashboard = () => {
           }
         });
 
-        // Sort upcoming classes by day of week and time
-        upcoming.sort((a, b) => {
-          const dayDiff = (a.dayOfWeek || 0) - (b.dayOfWeek || 0);
-          if (dayDiff !== 0) return dayDiff;
-          return (a.startTime || '').localeCompare(b.startTime || '');
-        });
-
-        // Sort past classes by day of week and time in reverse order (most recent first)
-        past.sort((a, b) => {
-          const dayDiff = (b.dayOfWeek || 0) - (a.dayOfWeek || 0);
-          if (dayDiff !== 0) return dayDiff;
-          return (b.startTime || '').localeCompare(a.startTime || '');
-        });
+        // Sort both arrays using the shared function
+        upcoming = sortClassesByTime(upcoming);
+        past = sortClassesByTime(past);
 
         setUpcomingClasses(upcoming);
         setPastClasses(past);
@@ -532,7 +556,7 @@ export const Dashboard = () => {
       return [];
     }
     
-    return upcomingClasses.filter(classItem => {
+    const classes = upcomingClasses.filter(classItem => {
       if (classItem.dayOfWeek !== dayOfWeek) return false;
       
       // Check if the class has started (startDate has passed)
@@ -550,6 +574,9 @@ export const Dashboard = () => {
       endDate.setHours(0, 0, 0, 0);
       return endDate >= calendarDate;
     });
+
+    // Use the shared sorting function
+    return sortClassesByTime(classes);
   };
 
   // Function to get the next occurrence date of a class
@@ -706,7 +733,7 @@ export const Dashboard = () => {
   };
 
   const renderUpcomingClassesSection = () => {
-    const pageSize = isMobileView ? 2 : 5; // Show 2 classes on mobile, 5 on desktop
+    const pageSize = isMobileView ? 2 : 3; // Show 2 classes on mobile, 5 on desktop
     const startIndex = upcomingClassesPage * pageSize;
     const displayedClasses = upcomingClasses.slice(startIndex, startIndex + pageSize);
     const hasMore = startIndex + pageSize < upcomingClasses.length;
@@ -799,29 +826,34 @@ export const Dashboard = () => {
                           <div className="mt-1 space-y-2">
                             {classMaterials[classSession.id].map((material, index) => (
                               <div key={index} className="flex flex-col space-y-2">
-                                {material.slides && (
-                                  <a 
-                                    href={material.slides} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center text-blue-600 hover:text-blue-800 group"
-                                  >
-                                    <FaFilePdf className="mr-2" />
-                                    <span className="text-sm">{t.slides || "Slides"}</span>
-                                    {isAdmin && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          handleDeleteMaterial(material, index, classSession.id, 'slides');
-                                        }}
-                                        disabled={deletingMaterial[material.classId + index]}
-                                        className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                        title="Delete material"
+                                {material.slides && material.slides.length > 0 && (
+                                  <div className="space-y-1">
+                                    {material.slides.map((slideUrl, slideIndex) => (
+                                      <a 
+                                        key={slideIndex}
+                                        href={slideUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
                                       >
-                                        <FaTrash className="h-2.5 w-2.5" />
-                                      </button>
-                                    )}
-                                  </a>
+                                        <FaFilePdf className="mr-2" />
+                                        <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
+                                        {isAdmin && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
+                                            }}
+                                            disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
+                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                            title="Delete material"
+                                          >
+                                            <FaTrash className="h-2.5 w-2.5" />
+                                          </button>
+                                        )}
+                                      </a>
+                                    ))}
+                                  </div>
                                 )}
                                 
                                 {material.links && material.links.length > 0 && (
@@ -1012,29 +1044,34 @@ export const Dashboard = () => {
                           <div className="mt-1 space-y-2">
                             {classMaterials[classSession.id].map((material, index) => (
                               <div key={index} className="flex flex-col space-y-2">
-                                {material.slides && (
-                                  <a 
-                                    href={material.slides} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center text-blue-600 hover:text-blue-800 group"
-                                  >
-                                    <FaFilePdf className="mr-2" />
-                                    <span className="text-sm">{t.slides || "Slides"}</span>
-                                    {isAdmin && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          handleDeleteMaterial(material, index, classSession.id, 'slides');
-                                        }}
-                                        disabled={deletingMaterial[material.classId + index]}
-                                        className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                        title="Delete material"
+                                {material.slides && material.slides.length > 0 && (
+                                  <div className="space-y-1">
+                                    {material.slides.map((slideUrl, slideIndex) => (
+                                      <a 
+                                        key={slideIndex}
+                                        href={slideUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
                                       >
-                                        <FaTrash className="h-2.5 w-2.5" />
-                                      </button>
-                                    )}
-                                  </a>
+                                        <FaFilePdf className="mr-2" />
+                                        <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
+                                        {isAdmin && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
+                                            }}
+                                            disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
+                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                            title="Delete material"
+                                          >
+                                            <FaTrash className="h-2.5 w-2.5" />
+                                          </button>
+                                        )}
+                                      </a>
+                                    ))}
+                                  </div>
                                 )}
                                 
                                 {material.links && material.links.length > 0 && (
@@ -1328,7 +1365,7 @@ export const Dashboard = () => {
   }, []);
 
   // Function to handle material deletion
-  const handleDeleteMaterial = useCallback(async (material: ClassMaterial, index: number, classId: string, type: 'slides' | 'link' = 'slides', linkIndex?: number) => {
+  const handleDeleteMaterial = useCallback(async (material: ClassMaterial, index: number, classId: string, type: 'slides' | 'link' = 'slides', itemIndex?: number) => {
     if (!currentUser || !isAdmin) {
       toast.error('Not authorized');
       return;
@@ -1337,16 +1374,16 @@ export const Dashboard = () => {
     try {
       // Set deleting state
       if (type === 'slides') {
-        setDeletingMaterial(prev => ({ ...prev, [material.classId + index]: true }));
+        setDeletingMaterial(prev => ({ ...prev, [material.classId + index + '_slide_' + itemIndex]: true }));
       } else if (type === 'link') {
-        setDeletingMaterial(prev => ({ ...prev, [material.classId + index + '_link_' + linkIndex]: true }));
+        setDeletingMaterial(prev => ({ ...prev, [material.classId + index + '_link_' + itemIndex]: true }));
       }
 
       // Call the utility function to update the material
-      if (type === 'slides') {
-        await updateClassMaterialItem(material.classId, material.classDate, 'removeSlides');
-      } else if (type === 'link' && typeof linkIndex === 'number') {
-        await updateClassMaterialItem(material.classId, material.classDate, 'removeLink', linkIndex);
+      if (type === 'slides' && typeof itemIndex === 'number') {
+        await updateClassMaterialItem(material.classId, material.classDate, 'removeSlides', undefined, itemIndex);
+      } else if (type === 'link' && typeof itemIndex === 'number') {
+        await updateClassMaterialItem(material.classId, material.classDate, 'removeLink', itemIndex);
       }
       
       // Update local state
@@ -1355,27 +1392,29 @@ export const Dashboard = () => {
       // Check if we need to update or remove the material from local state
       if (updatedMaterials[classId]) {
         // If we're removing slides, update the material
-        if (type === 'slides') {
+        if (type === 'slides' && typeof itemIndex === 'number' && material.slides) {
           updatedMaterials[classId] = updatedMaterials[classId].map((m, i) => {
-            if (i === index) {
-              return { ...m, slides: '' };
+            if (i === index && m.slides) {
+              const updatedSlides = [...m.slides];
+              updatedSlides.splice(itemIndex, 1);
+              return { ...m, slides: updatedSlides };
             }
             return m;
           });
           
           // If this material now has no slides and no links, remove it
           const materialToCheck = updatedMaterials[classId][index];
-          if ((!materialToCheck.slides || materialToCheck.slides === '') && 
+          if ((!materialToCheck.slides || materialToCheck.slides.length === 0) && 
               (!materialToCheck.links || materialToCheck.links.length === 0)) {
             updatedMaterials[classId] = updatedMaterials[classId].filter((_, i) => i !== index);
           }
         } 
         // If we're removing a link, update the material
-        else if (type === 'link' && typeof linkIndex === 'number') {
+        else if (type === 'link' && typeof itemIndex === 'number') {
           updatedMaterials[classId] = updatedMaterials[classId].map((m, i) => {
             if (i === index && m.links) {
               const updatedLinks = [...m.links];
-              updatedLinks.splice(linkIndex, 1);
+              updatedLinks.splice(itemIndex, 1);
               return { ...m, links: updatedLinks };
             }
             return m;
@@ -1383,7 +1422,7 @@ export const Dashboard = () => {
           
           // If this material now has no slides and no links, remove it
           const materialToCheck = updatedMaterials[classId][index];
-          if ((!materialToCheck.slides || materialToCheck.slides === '') && 
+          if ((!materialToCheck.slides || materialToCheck.slides.length === 0) && 
               (!materialToCheck.links || materialToCheck.links.length === 0)) {
             updatedMaterials[classId] = updatedMaterials[classId].filter((_, i) => i !== index);
           }
@@ -1402,26 +1441,28 @@ export const Dashboard = () => {
         const updatedDayDetails = { ...selectedDayDetails };
         
         // Apply the same logic to selectedDayDetails
-        if (type === 'slides') {
+        if (type === 'slides' && typeof itemIndex === 'number' && material.slides) {
           updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].map((m, i) => {
-            if (i === index) {
-              return { ...m, slides: '' };
+            if (i === index && m.slides) {
+              const updatedSlides = [...m.slides];
+              updatedSlides.splice(itemIndex, 1);
+              return { ...m, slides: updatedSlides };
             }
             return m;
           });
           
           // If this material now has no slides and no links, remove it
           const materialToCheck = updatedDayDetails.materials[classId][index];
-          if ((!materialToCheck.slides || materialToCheck.slides === '') && 
+          if ((!materialToCheck.slides || materialToCheck.slides.length === 0) && 
               (!materialToCheck.links || materialToCheck.links.length === 0)) {
             updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_, i) => i !== index);
           }
         } 
-        else if (type === 'link' && typeof linkIndex === 'number') {
+        else if (type === 'link' && typeof itemIndex === 'number') {
           updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].map((m, i) => {
             if (i === index && m.links) {
               const updatedLinks = [...m.links];
-              updatedLinks.splice(linkIndex, 1);
+              updatedLinks.splice(itemIndex, 1);
               return { ...m, links: updatedLinks };
             }
             return m;
@@ -1429,7 +1470,7 @@ export const Dashboard = () => {
           
           // If this material now has no slides and no links, remove it
           const materialToCheck = updatedDayDetails.materials[classId][index];
-          if ((!materialToCheck.slides || materialToCheck.slides === '') && 
+          if ((!materialToCheck.slides || materialToCheck.slides.length === 0) && 
               (!materialToCheck.links || materialToCheck.links.length === 0)) {
             updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_, i) => i !== index);
           }
@@ -1452,13 +1493,13 @@ export const Dashboard = () => {
       if (type === 'slides') {
         setDeletingMaterial(prev => {
           const newState = { ...prev };
-          delete newState[material.classId + index];
+          delete newState[material.classId + index + '_slide_' + itemIndex];
           return newState;
         });
       } else if (type === 'link') {
         setDeletingMaterial(prev => {
           const newState = { ...prev };
-          delete newState[material.classId + index + '_link_' + linkIndex];
+          delete newState[material.classId + index + '_link_' + itemIndex];
           return newState;
         });
       }
@@ -1667,29 +1708,34 @@ export const Dashboard = () => {
                               <div className="mt-1 space-y-2">
                                 {selectedDayDetails.materials[classSession.id].map((material, index) => (
                                   <div key={index} className="flex flex-col space-y-2">
-                                    {material.slides && (
-                                      <a 
-                                        href={material.slides} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
-                                      >
-                                        <FaFilePdf className="mr-2" />
-                                        <span className="text-sm">{t.slides || "Slides"}</span>
-                                        {isAdmin && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              handleDeleteMaterial(material, index, classSession.id, 'slides');
-                                            }}
-                                            disabled={deletingMaterial[material.classId + index]}
-                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                            title="Delete material"
+                                    {material.slides && material.slides.length > 0 && (
+                                      <div className="space-y-1">
+                                        {material.slides.map((slideUrl, slideIndex) => (
+                                          <a 
+                                            key={slideIndex}
+                                            href={slideUrl} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="flex items-center text-blue-600 hover:text-blue-800 group"
                                           >
-                                            <FaTrash className="h-2.5 w-2.5" />
-                                          </button>
-                                        )}
-                                      </a>
+                                            <FaFilePdf className="mr-2" />
+                                            <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
+                                            {isAdmin && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  handleDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
+                                                }}
+                                                disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
+                                                className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                                title="Delete material"
+                                              >
+                                                <FaTrash className="h-2.5 w-2.5" />
+                                              </button>
+                                            )}
+                                          </a>
+                                        ))}
+                                      </div>
                                     )}
                                     
                                     {material.links && material.links.length > 0 && (

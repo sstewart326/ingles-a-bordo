@@ -14,119 +14,133 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
   classId,
   classDate,
   studentEmails,
-  onUploadSuccess,
+  onUploadSuccess
 }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [slideFiles, setSlideFiles] = useState<File[]>([]);
   const [links, setLinks] = useState<string[]>([]);
   const [newLink, setNewLink] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) setSelectedFile(file);
+  const handleSlideChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setSlideFiles(prev => [...prev, ...files]);
+    }
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const trimmedLink = newLink.trim();
-    if (!selectedFile && trimmedLink === '') {
-      toast.error('Please upload a file or add a link');
-      return;
+  const handleRemoveSlide = (index: number) => {
+    setSlideFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddLink = () => {
+    if (newLink.trim()) {
+      setLinks(prev => [...prev, newLink.trim()]);
+      setNewLink('');
     }
+  };
+
+  const handleRemoveLink = (index: number) => {
+    setLinks(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
 
     try {
-      setUploading(true);
-      if (selectedFile) {
-        const validationError = await validateFile(selectedFile);
-        if (validationError) {
-          toast.error(validationError);
-          return;
-        }
-      }
-
-      const linksToUpload = trimmedLink ? [trimmedLink] : [];
-      await addClassMaterials(
-        classId,
-        classDate,
-        studentEmails,
-        selectedFile || undefined,
-        linksToUpload
-      );
-      toast.success('Materials uploaded successfully!');
-      setSelectedFile(null);
-      setNewLink('');
-
-      if (onUploadSuccess) onUploadSuccess();
+      await addClassMaterials(classId, classDate, studentEmails, slideFiles, links);
+      toast.success('Materials uploaded successfully');
+      onUploadSuccess?.();
     } catch (error) {
-      console.error('Failed to upload materials:', error);
+      console.error('Error uploading materials:', error);
       toast.error('Failed to upload materials');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleRemoveLink = (index: number) => {
-    const newLinks = links.filter((_, i) => i !== index);
-    setLinks(newLinks);
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="mb-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Slides Upload */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Upload Slides
+        </label>
         <input
           type="file"
-          onChange={handleFileChange}
-          accept=".pdf,.doc,.docx,.ppt,.pptx"
+          accept=".pdf,.ppt,.pptx"
+          onChange={handleSlideChange}
           className="block w-full text-sm text-gray-500
             file:mr-4 file:py-2 file:px-4
-            file:rounded-full file:border-0
+            file:rounded-md file:border-0
             file:text-sm file:font-semibold
-            file:bg-[var(--brand-color-light)] file:text-[var(--header-bg)]
-            hover:file:bg-[var(--brand-color-hover)]"
+            file:bg-indigo-50 file:text-indigo-700
+            hover:file:bg-indigo-100"
+          multiple
         />
+        {slideFiles.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {slideFiles.map((file, index) => (
+              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                <span className="text-sm text-gray-700">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSlide(index)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <FaTrash />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="space-y-4">
+      {/* Links */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Add Links
+        </label>
         <div className="flex gap-2">
           <input
-            type="text"
+            type="url"
             value={newLink}
             onChange={(e) => setNewLink(e.target.value)}
-            placeholder="Add a link to learning materials"
-            className="flex-1 p-2 border rounded"
+            placeholder="Enter URL"
+            className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           />
+          <button
+            type="button"
+            onClick={handleAddLink}
+            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Add
+          </button>
         </div>
-
-        <div className="space-y-2">
-          {links.map((link, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-              <span className="flex-1 truncate text-gray-800">{link}</span>
-              <button
-                type="button"
-                onClick={() => handleRemoveLink(index)}
-                className="text-red-500 hover:text-red-600"
-              >
-                <FaTrash />
-              </button>
-            </div>
-          ))}
-        </div>
+        {links.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {links.map((link, index) => (
+              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                <span className="text-sm text-gray-700 truncate">{link}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveLink(index)}
+                  className="text-red-500 hover:text-red-700 ml-2"
+                >
+                  <FaTrash />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="flex justify-end space-x-4">
-        <button
-          type="button"
-          onClick={onUploadSuccess}
-          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-        >
-          Cancel
-        </button>
+      {/* Submit Button */}
+      <div className="flex justify-end">
         <button
           type="submit"
-          disabled={uploading || (!selectedFile && newLink.trim() === '')}
-          className="bg-[var(--brand-color)] text-[var(--header-bg)] py-3 px-6 rounded-lg font-semibold
-            hover:bg-[var(--brand-color-dark)] hover:text-white disabled:bg-gray-400 disabled:cursor-not-allowed
-            transition duration-200"
+          disabled={uploading || (slideFiles.length === 0 && links.length === 0)}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {uploading ? 'Uploading...' : 'Upload Materials'}
         </button>

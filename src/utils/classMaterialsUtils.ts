@@ -51,48 +51,51 @@ export const addClassMaterials = async (
   classId: string,
   classDate: Date,
   studentEmails: string[],
-  slideFile?: File,
+  slideFiles?: File[],
   links?: string[]
 ): Promise<void> => {
   try {
-    let slidesUrl = '';
+    let slidesUrls: string[] = [];
     
-    if (slideFile) {
-      const validationError = validateFile(slideFile);
-      if (validationError) {
-        throw new Error(validationError);
-      }
+    if (slideFiles && slideFiles.length > 0) {
+      for (const slideFile of slideFiles) {
+        const validationError = validateFile(slideFile);
+        if (validationError) {
+          throw new Error(validationError);
+        }
 
-      // Create a clean filename with date
-      const dateStr = classDate.toISOString().split('T')[0];
-      const cleanFileName = slideFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const timestamp = Date.now();
-      const finalFileName = `${dateStr}_${timestamp}_${cleanFileName}`;
+        // Create a clean filename with date
+        const dateStr = classDate.toISOString().split('T')[0];
+        const cleanFileName = slideFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const timestamp = Date.now();
+        const finalFileName = `${dateStr}_${timestamp}_${cleanFileName}`;
 
-      // Create storage reference with cleaned filename
-      const storageRef = ref(storage, `slides/${classId}/${finalFileName}`);
-      
-      try {
-        // Upload with metadata
-        const metadata = {
-          contentType: slideFile.type,
-          customMetadata: {
-            originalName: slideFile.name,
-            uploadedAt: new Date().toISOString()
-          }
-        };
+        // Create storage reference with cleaned filename
+        const storageRef = ref(storage, `slides/${classId}/${finalFileName}`);
         
-        await uploadBytes(storageRef, slideFile, metadata);
-        slidesUrl = await getDownloadURL(storageRef);
-      } catch (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        throw new Error('Failed to upload file to storage. Please try again.');
+        try {
+          // Upload with metadata
+          const metadata = {
+            contentType: slideFile.type,
+            customMetadata: {
+              originalName: slideFile.name,
+              uploadedAt: new Date().toISOString()
+            }
+          };
+          
+          await uploadBytes(storageRef, slideFile, metadata);
+          const downloadUrl = await getDownloadURL(storageRef);
+          slidesUrls.push(downloadUrl);
+        } catch (uploadError) {
+          console.error('Storage upload error:', uploadError);
+          throw new Error('Failed to upload file to storage. Please try again.');
+        }
       }
     }
 
     const materialData: ClassMaterial = {
       classId,
-      slides: slidesUrl || '',
+      slides: slidesUrls,
       links: links || [],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -113,7 +116,7 @@ export const addClassMaterials = async (
     const allCacheKey = `${COLLECTION_PATH}_${classId}_all`;
     invalidateCache(allCacheKey);
     
-    logMaterialsUtil('Added class materials successfully', { classId, classDate });
+    logMaterialsUtil('Materials added successfully', { classId, classDate });
   } catch (error) {
     console.error('Error adding class materials:', error);
     throw error;
@@ -185,7 +188,7 @@ export const getClassMaterials = async (classId: string, classDate?: Date): Prom
 
 export const updateClassMaterials = async (
   materialId: string,
-  slideFile?: File,
+  slideFiles?: File[],
   links?: string[]
 ): Promise<void> => {
   try {
@@ -194,15 +197,22 @@ export const updateClassMaterials = async (
       updatedAt: new Date(),
     };
 
-    if (slideFile) {
-      const validationError = validateFile(slideFile);
-      if (validationError) {
-        throw new Error(validationError);
-      }
+    if (slideFiles && slideFiles.length > 0) {
+      const slidesUrls: string[] = [];
+      
+      for (const slideFile of slideFiles) {
+        const validationError = validateFile(slideFile);
+        if (validationError) {
+          throw new Error(validationError);
+        }
 
-      const storageRef = ref(storage, `slides/${materialId}/${slideFile.name}`);
-      await uploadBytes(storageRef, slideFile);
-      updates.slides = await getDownloadURL(storageRef);
+        const storageRef = ref(storage, `slides/${materialId}/${slideFile.name}`);
+        await uploadBytes(storageRef, slideFile);
+        const downloadUrl = await getDownloadURL(storageRef);
+        slidesUrls.push(downloadUrl);
+      }
+      
+      updates.slides = slidesUrls;
     }
 
     if (links) {
@@ -333,7 +343,8 @@ export const updateClassMaterialItem = async (
   classId: string,
   classDate: Date,
   updateType: 'removeSlides' | 'removeLink',
-  linkIndex?: number
+  linkIndex?: number,
+  slideIndex?: number
 ): Promise<void> => {
   try {
     if (!classId || !classDate) {
@@ -369,8 +380,11 @@ export const updateClassMaterialItem = async (
       updatedAt: new Date()
     };
     
-    if (updateType === 'removeSlides') {
-      updates.slides = '';
+    if (updateType === 'removeSlides' && typeof slideIndex === 'number' && materialData.slides) {
+      // Remove the specific slide at the given index
+      const updatedSlides = [...materialData.slides];
+      updatedSlides.splice(slideIndex, 1);
+      updates.slides = updatedSlides;
     } else if (updateType === 'removeLink' && typeof linkIndex === 'number' && materialData.links) {
       // Remove the specific link at the given index
       const updatedLinks = [...materialData.links];
@@ -380,8 +394,8 @@ export const updateClassMaterialItem = async (
     
     // Check if this would leave the document empty (no slides and no links)
     const wouldBeEmpty = 
-      (updateType === 'removeSlides' && (!materialData.links || materialData.links.length === 0)) ||
-      (updateType === 'removeLink' && !materialData.slides && materialData.links && materialData.links.length === 1);
+      (updateType === 'removeSlides' && materialData.slides && materialData.slides.length === 1 && (!materialData.links || materialData.links.length === 0)) ||
+      (updateType === 'removeLink' && (!materialData.slides || materialData.slides.length === 0) && materialData.links && materialData.links.length === 1);
     
     if (wouldBeEmpty) {
       // If removing this item would leave the document empty, delete the entire document
