@@ -360,24 +360,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const loginWithGoogle = async (signupData?: { token: string, validation: Record<string, unknown> }) => {
     try {
-      const debugId = Date.now();
-      localStorage.setItem('auth_debug_id', debugId.toString());
-      localStorage.setItem('auth_debug_start', new Date().toISOString());
-      
-      logAuth('AUTH-DEBUG', `${debugId} === Starting Google Login Flow ===`);
-      logAuth('AUTH-DEBUG', `${debugId} Sign up data:`, {
-        hasToken: !!signupData?.token,
-        hasValidation: !!signupData?.validation,
-        email: signupData?.validation?.email
-      });
-
-      logAuth('AUTH-DEBUG', `${debugId} Auth Configuration:`, {
-        authDomain: auth.config.authDomain,
-        currentUrl: window.location.href,
-        origin: window.location.origin,
-        hostname: window.location.hostname
-      });
-
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
@@ -388,36 +370,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      logAuth('AUTH-DEBUG', `${debugId} Device detection:`, { 
-        isMobile,
-        userAgent: navigator.userAgent 
-      });
 
       if (signupData) {
-        logAuth('AUTH-DEBUG', `${debugId} Storing signup data`);
         localStorage.setItem('pendingSignupToken', signupData.token);
         localStorage.setItem('pendingSignupValidation', JSON.stringify(signupData.validation));
-        localStorage.setItem('auth_debug_stored', new Date().toISOString());
       }
 
       if (isMobile) {
-        logAuth('AUTH-DEBUG', `${debugId} Initiating redirect flow`);
-        localStorage.setItem('auth_debug_redirect_start', new Date().toISOString());
         await signInWithRedirect(auth, provider);
-        logAuth('AUTH-DEBUG', `${debugId} Redirect initiated`);
         return null;
       } else {
-        logAuth('AUTH-DEBUG', `${debugId} Initiating popup flow`);
         const result = await signInWithPopup(auth, provider);
-        logAuth('AUTH-DEBUG', `${debugId} Popup completed`);
         return result;
       }
     } catch (error) {
-      logAuth('AUTH-DEBUG', 'Error in Google login:', error);
-      localStorage.setItem('auth_debug_error', JSON.stringify({
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }));
+      logAuth('ERROR', 'Google login error:', error);
       localStorage.removeItem('pendingSignupToken');
       localStorage.removeItem('pendingSignupValidation');
       throw error;
@@ -425,18 +392,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const login = async (email: string, password: string) => {
-    logAuth('FLOW', 'Starting login attempt:', { 
-      email,
-      timestamp: new Date().toISOString()
-    });
-    
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      logAuth('FLOW', 'Login successful:', {
-        email: userCredential.user.email,
-        uid: userCredential.user.uid,
-        timestamp: new Date().toISOString()
-      });
 
       // Check user status immediately after successful login
       const usersRef = collection(db, 'users');
@@ -447,29 +404,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       );
       
       const querySnapshot = await getDocs(q);
-      logAuth('FLOW', 'User status check result:', {
-        empty: querySnapshot.empty,
-        email: userCredential.user.email,
-        timestamp: new Date().toISOString()
-      });
 
       if (querySnapshot.empty) {
-        logAuth('FLOW', 'No active user found, signing out');
         await signOut(auth);
         throw new Error('No active user found');
       } else {
-        logAuth('FLOW', 'Active user found, setting current user');
         setCurrentUser(userCredential.user);
         navigate('/dashboard');
       }
     } catch (error) {
-      logAuth('FLOW', 'Login error:', error);
+      logAuth('ERROR', 'Login error:', error);
       throw error;
     }
   };
 
   const logout = async () => {
-    logAuth('FLOW', 'Logging out');
     await signOut(auth);
     setCurrentUser(null);
   };

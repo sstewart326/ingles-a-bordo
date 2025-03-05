@@ -330,9 +330,7 @@ export const getStudentClassMaterials = async (studentEmail: string): Promise<Cl
   } catch (error) {
     // Only log as error if it's not a permission issue
     if (error instanceof Error && !error.message.includes('permission')) {
-      console.error('Error getting student class materials:', error);
-    } else {
-      logMaterialsUtil('No classes or materials found:', error);
+      logMaterialsUtil('Error getting student class materials:', error);
     }
     // Return empty array instead of throwing
     return [];

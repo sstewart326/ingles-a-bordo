@@ -62,37 +62,26 @@ export const createSignupLink = async (studentEmail: string, studentName: string
 // Validate a signup token
 export const validateSignupToken = async (token?: string): Promise<ValidationResult> => {
   if (!token) {
-    logSignup('No token provided for validation');
     return { valid: false };
   }
 
   try {
     const tokenDoc = await getDoc(doc(db, 'signupTokens', token));
-    logSignup('Token document exists:', tokenDoc.exists());
     
     if (!tokenDoc.exists()) {
-      logSignup('Token document does not exist');
       return { valid: false };
     }
     
     const data = tokenDoc.data();
-    logSignup('Token document data:', data);
     
     if (data.used) {
-      logSignup('Token is already used');
       return { valid: false };
     }
 
     const now = new Date();
     const tokenExpiry = new Date(data.expiresAt);
-    logSignup('Token expiry check:', {
-      now: now.toISOString(),
-      expiresAt: data.expiresAt,
-      isExpired: tokenExpiry < now
-    });
     
     if (tokenExpiry < now) {
-      logSignup('Token has expired');
       return { valid: false };
     }
 
@@ -103,14 +92,7 @@ export const validateSignupToken = async (token?: string): Promise<ValidationRes
       token 
     };
   } catch (error) {
-    logSignup('Error in validateSignupToken:', error);
-    if (error instanceof Error) {
-      logSignup('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-    }
+    logSignup('Token validation error:', error);
     return { valid: false };
   }
 };

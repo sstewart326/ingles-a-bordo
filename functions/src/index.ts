@@ -69,71 +69,30 @@ export const deleteAuthUser = onCall({
 // Create new HTTP-based functions
 export const deleteAuthUserHttp = onRequest({
   region: REGION,
-  maxInstances: 10
+  cors: true
 }, async (request, response) => {
   // Handle CORS
-  await new Promise((resolve) => corsHandler(request, response, resolve));
-
-  try {
-    // Only allow POST requests
-    if (request.method !== 'POST') {
-      response.status(405).json({ error: 'Method not allowed' });
-      return;
-    }
-
-    // Get the auth token from the Authorization header
-    const authHeader = request.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      response.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
-    const idToken = authHeader.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-
-    // Check if the user is authenticated
-    if (!decodedToken) {
-      response.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
-    // Get the caller's UID and check if they are an admin
-    const callerUid = decodedToken.uid;
-    const callerQuery = await admin.firestore().collection('users')
-      .where('uid', '==', callerUid)
-      .where('status', '==', 'active')
-      .limit(1)
-      .get();
-
-    if (callerQuery.empty || !callerQuery.docs[0].data()?.isAdmin) {
-      response.status(403).json({ error: 'Only admin users can delete other users.' });
-      return;
-    }
-
-    const { userId } = request.body;
-    if (!userId) {
-      response.status(400).json({ error: 'The function must be called with userId.' });
-      return;
-    }
-
-    // Don't allow admin to delete themselves
-    if (userId === callerUid) {
-      response.status(400).json({ error: 'Admin cannot delete their own account.' });
-      return;
-    }
-
+  corsHandler(request, response, async () => {
     try {
-      await admin.auth().deleteUser(userId);
-      logger.info("User deleted successfully", { userId });
-      response.status(200).json({ success: true });
+      const { userId } = request.body;
+
+      if (!userId) {
+        response.status(400).json({ error: 'User ID is required' });
+        return;
+      }
+
+      try {
+        await admin.auth().deleteUser(userId);
+        response.status(200).json({ success: true });
+      } catch (error) {
+        logger.error("Error deleting user:", error);
+        response.status(500).json({ error: 'Failed to delete user from Authentication.' });
+      }
     } catch (error) {
-      logger.error("Error deleting user:", error);
-      response.status(500).json({ error: 'Failed to delete user from Authentication.' });
+      logger.error("Error in deleteAuthUser:", error);
+      response.status(500).json({ error: 'Internal server error' });
     }
-  } catch (error) {
-    logger.error("Error in deleteAuthUser:", error);
-    response.status(500).json({ error: 'Internal server error' });
-  }
+  });
 });
 
 // Keep the original checkUserExists but mark it as deprecated
@@ -157,68 +116,32 @@ export const checkUserExists = onCall({
 // Create new HTTP-based function for checking user existence
 export const checkUserExistsHttp = onRequest({
   region: REGION,
-  maxInstances: 10
+  cors: true
 }, async (request, response) => {
   // Handle CORS
-  await new Promise((resolve) => corsHandler(request, response, resolve));
-
-  try {
-    // Only allow POST requests
-    if (request.method !== 'POST') {
-      response.status(405).json({ error: 'Method not allowed' });
-      return;
-    }
-
-    // Get the auth token from the Authorization header
-    const authHeader = request.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      response.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
-    const idToken = authHeader.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-
-    // Check if the user is authenticated
-    if (!decodedToken) {
-      response.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
-    // Get the caller's UID and check if they are an admin
-    const callerUid = decodedToken.uid;
-    const callerQuery = await admin.firestore().collection('users')
-      .where('uid', '==', callerUid)
-      .where('status', '==', 'active')
-      .limit(1)
-      .get();
-
-    if (callerQuery.empty || !callerQuery.docs[0].data()?.isAdmin) {
-      response.status(403).json({ error: 'Only admin users can check user existence.' });
-      return;
-    }
-
-    const { userId } = request.body;
-    if (!userId) {
-      response.status(400).json({ error: 'The function must be called with userId.' });
-      return;
-    }
-
+  corsHandler(request, response, async () => {
     try {
-      await admin.auth().getUser(userId);
-      logger.info("User exists", { userId });
-      response.status(200).json({ exists: true });
-    } catch (error: unknown) {
-      if (isFirebaseAuthError(error) && error.code === 'auth/user-not-found') {
-        logger.info("User does not exist", { userId });
-        response.status(200).json({ exists: false });
-      } else {
-        logger.error("Error checking user existence:", error);
-        response.status(500).json({ error: 'Error checking user existence.' });
+      const { userId } = request.body;
+
+      if (!userId) {
+        response.status(400).json({ error: 'User ID is required' });
+        return;
       }
+
+      try {
+        await admin.auth().getUser(userId);
+        response.status(200).json({ exists: true });
+      } catch (error: unknown) {
+        if (isFirebaseAuthError(error) && error.code === 'auth/user-not-found') {
+          response.status(200).json({ exists: false });
+        } else {
+          logger.error("Error checking user existence:", error);
+          response.status(500).json({ error: 'Error checking user existence.' });
+        }
+      }
+    } catch (error) {
+      logger.error("Error in checkUserExists:", error);
+      response.status(500).json({ error: 'Internal server error' });
     }
-  } catch (error) {
-    logger.error("Error in checkUserExists:", error);
-    response.status(500).json({ error: 'Internal server error' });
-  }
+  });
 });

@@ -648,21 +648,51 @@ export const Dashboard = () => {
           
           // Then fetch the updated materials specifically for this class
           try {
-            const nextDate = getNextClassDate(classSession);
-            if (nextDate) {
-              const materials = await getClassMaterials(classSession.id, nextDate);
-              // Update the materials state directly
-              setClassMaterials(prevMaterials => ({
-                ...prevMaterials,
-                [classSession.id]: materials
-              }));
+            const materials = await getClassMaterials(classSession.id, date);
+            
+            // Update the materials state for all relevant sections
+            setClassMaterials(prevMaterials => ({
+              ...prevMaterials,
+              [classSession.id]: materials
+            }));
+
+            // Update selected day details if they exist and match the current class
+            if (selectedDayDetails && selectedDayDetails.classes.some(c => c.id === classSession.id)) {
+              setSelectedDayDetails({
+                ...selectedDayDetails,
+                materials: {
+                  ...selectedDayDetails.materials,
+                  [classSession.id]: materials
+                }
+              });
             }
+
+            // Update upcoming and past classes to include the new materials
+            setUpcomingClasses(prevClasses => 
+              prevClasses.map(c => 
+                c.id === classSession.id 
+                  ? { ...c, materials } 
+                  : c
+              )
+            );
+
+            setPastClasses(prevClasses => 
+              prevClasses.map(c => 
+                c.id === classSession.id 
+                  ? { ...c, materials } 
+                  : c
+              )
+            );
+
+            // Update the loaded material months to ensure we don't reload unnecessarily
+            const monthKey = getMonthKey(date);
+            setLoadedMaterialMonths(prev => new Set([...prev, monthKey]));
+            
+            toast.success('Materials uploaded successfully');
           } catch (error) {
             console.error('Error fetching updated materials:', error);
+            toast.error('Error updating materials');
           }
-          
-          // Also refresh all classes to ensure everything is up to date
-          fetchClasses();
         }}
       />
     </Modal>
