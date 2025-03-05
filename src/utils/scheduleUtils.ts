@@ -28,6 +28,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  birthdate?: string; // Format: "MM-DD"
   paymentConfig?: {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;  // for weekly payments, number of weeks
@@ -138,6 +139,11 @@ export const getNextPaymentDates = (
     }
   }
 
+  // If we're viewing a month before the payment start date, return no dates
+  if (monthEnd < paymentStartDate) {
+    return [];
+  }
+
   // Add the payment start date if it falls within the current month
   if (paymentStartDate >= monthStart && paymentStartDate <= monthEnd) {
     const newPaymentDate = new Date(paymentStartDate);
@@ -163,7 +169,7 @@ export const getNextPaymentDates = (
     
     // Add all payment dates in this month
     while (currentPaymentDate <= monthEnd) {
-      if (currentPaymentDate >= monthStart) {
+      if (currentPaymentDate >= monthStart && currentPaymentDate >= paymentStartDate) {
         // Create new date object to avoid modifying the current one
         const paymentDate = new Date(currentPaymentDate);
         dates.push(paymentDate);

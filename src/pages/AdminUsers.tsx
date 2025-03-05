@@ -10,7 +10,7 @@ import { getCachedCollection, deleteCachedDocument, setCachedDocument, updateCac
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { cache } from '../utils/cache';
-import { PencilIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 
 interface User {
@@ -60,6 +60,8 @@ export const AdminUsers = () => {
   const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: string}>({});
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [editingBirthdate, setEditingBirthdate] = useState('');
+  const [editingField, setEditingField] = useState<'name' | 'birthdate' | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -316,11 +318,44 @@ export const AdminUsers = () => {
 
       await fetchUsers();
       setEditingUserId(null);
+      setEditingField(null);
       setEditingName('');
       toast.success(t.nameUpdated);
     } catch (error) {
       console.error('Error updating user name:', error);
       toast.error(t.failedToUpdateName);
+    }
+  };
+
+  const handleUpdateBirthdate = async (userId: string) => {
+    if (!currentUser || !isAdmin) {
+      toast.error(t.unauthorizedAction);
+      return;
+    }
+
+    try {
+      const userToUpdate = users.find(user => user.id === userId);
+      if (!userToUpdate) {
+        toast.error(t.userNotFound);
+        return;
+      }
+
+      // Allow empty birthdate (optional field)
+      const birthdate = editingBirthdate.trim();
+      
+      await updateCachedDocument('users', userId, { 
+        birthdate: birthdate || undefined,
+        updatedAt: new Date().toISOString()
+      }, { userId: currentUser.uid });
+
+      await fetchUsers();
+      setEditingUserId(null);
+      setEditingField(null);
+      setEditingBirthdate('');
+      toast.success(t.birthdateUpdated);
+    } catch (error) {
+      console.error('Error updating user birthdate:', error);
+      toast.error(t.failedToUpdateBirthdate);
     }
   };
 
@@ -340,47 +375,63 @@ export const AdminUsers = () => {
     <div key={user.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
       <div className="flex justify-between items-start mb-3">
         <div>
-          {editingUserId === user.id ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
-                placeholder={t.enterName}
-              />
-              <button
-                onClick={() => handleUpdateName(user.id)}
-                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm"
-              >
-                {t.save}
-              </button>
-              <button
-                onClick={() => {
-                  setEditingUserId(null);
-                  setEditingName('');
-                }}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
-              >
-                {t.cancel}
-              </button>
+          {editingUserId === user.id && editingField === 'name' ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  placeholder={t.enterName}
+                />
+                <button
+                  onClick={() => handleUpdateName(user.id)}
+                  className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm"
+                >
+                  {t.save}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingUserId(null);
+                    setEditingField(null);
+                    setEditingName('');
+                  }}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
+                >
+                  {t.cancel}
+                </button>
+              </div>
             </div>
           ) : (
             <>
               <div className="font-semibold text-gray-900 flex items-center gap-2">
                 {user.name}
-                {user.status === 'active' && (
-                  <PencilIcon
-                    className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
-                    title={t.edit}
-                    onClick={() => {
-                      setEditingUserId(user.id);
-                      setEditingName(user.name);
-                    }}
-                  />
-                )}
+                <PencilIcon
+                  className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  title={t.edit}
+                  onClick={() => {
+                    setEditingUserId(user.id);
+                    setEditingField('name');
+                    setEditingName(user.name);
+                  }}
+                />
               </div>
-              <div className="text-sm text-gray-600">{user.email}</div>
+              <div className="text-sm text-gray-600 flex items-center gap-1">
+                <div className="flex items-center gap-1">
+                  {user.email}
+                  <div className="group relative">
+                    <InformationCircleIcon className="h-4 w-4 text-gray-400" />
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-normal">
+                      {t.emailNotEditable}
+                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {user.birthdate && (
+                <div className="text-sm text-gray-600">{t.birthdate}: {user.birthdate}</div>
+              )}
             </>
           )}
         </div>
@@ -627,6 +678,9 @@ export const AdminUsers = () => {
                       <th scope="col" className={styles.table.header}>
                         {t.email}
                       </th>
+                      <th scope="col" className={styles.table.header}>
+                        {t.birthdate}
+                      </th>
                       <th scope="col" className={`${styles.table.header} text-center`}>
                         {t.userStatus}
                       </th>
@@ -639,7 +693,7 @@ export const AdminUsers = () => {
                     {allUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {editingUserId === user.id ? (
+                          {editingUserId === user.id && editingField === 'name' ? (
                             <div className="flex items-center gap-2">
                               <input
                                 type="text"
@@ -657,6 +711,7 @@ export const AdminUsers = () => {
                               <button
                                 onClick={() => {
                                   setEditingUserId(null);
+                                  setEditingField(null);
                                   setEditingName('');
                                 }}
                                 className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
@@ -667,20 +722,103 @@ export const AdminUsers = () => {
                           ) : (
                             <div className="flex items-center gap-2">
                               {user.name}
-                              {user.status === 'active' && (
-                                <PencilIcon
-                                  className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
-                                  title={t.edit}
-                                  onClick={() => {
-                                    setEditingUserId(user.id);
-                                    setEditingName(user.name);
-                                  }}
-                                />
-                              )}
+                              <PencilIcon
+                                className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                title={t.edit}
+                                onClick={() => {
+                                  setEditingUserId(user.id);
+                                  setEditingField('name');
+                                  setEditingName(user.name);
+                                }}
+                              />
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div className="flex items-center gap-1">
+                            {user.email}
+                            <div className="group relative">
+                              <InformationCircleIcon className="h-4 w-4 text-gray-400" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-normal">
+                                {t.emailNotEditable}
+                                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {editingUserId === user.id && editingField === 'birthdate' ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingBirthdate}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  // Allow empty value for optional field
+                                  if (value === '') {
+                                    setEditingBirthdate('');
+                                    return;
+                                  }
+                                  
+                                  // Only allow digits and hyphen
+                                  if (!/^[\d-]*$/.test(value)) return;
+                                  
+                                  // Auto-add hyphen after MM
+                                  let formattedValue = value;
+                                  if (value.length === 2 && !value.includes('-')) {
+                                    formattedValue = value + '-';
+                                  }
+                                  
+                                  // Limit to MM-DD format
+                                  if (formattedValue.length > 5) return;
+                                  
+                                  // Validate month and day
+                                  if (formattedValue.includes('-')) {
+                                    const [month, day] = formattedValue.split('-');
+                                    const monthNum = parseInt(month);
+                                    const dayNum = parseInt(day);
+                                    
+                                    if (monthNum < 1 || monthNum > 12) return;
+                                    if (dayNum < 1 || dayNum > 31) return;
+                                  }
+                                  
+                                  setEditingBirthdate(formattedValue);
+                                }}
+                                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder={t.birthdateFormat}
+                              />
+                              <button
+                                onClick={() => handleUpdateBirthdate(user.id)}
+                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm"
+                              >
+                                {t.save}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingUserId(null);
+                                  setEditingField(null);
+                                  setEditingBirthdate('');
+                                }}
+                                className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
+                              >
+                                {t.cancel}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              {user.birthdate || '-'}
+                              <PencilIcon
+                                className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                title={t.edit}
+                                onClick={() => {
+                                  setEditingUserId(user.id);
+                                  setEditingField('birthdate');
+                                  setEditingBirthdate(user.birthdate || '');
+                                }}
+                              />
+                            </div>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           {user.status === 'active' ? (
                             <span className={`inline-flex items-center px-4 py-1 rounded-full text-sm font-medium ${

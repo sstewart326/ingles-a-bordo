@@ -107,6 +107,11 @@
   background-color: #ef4444;
 }
 
+.calendar-day-indicators .birthday-indicator {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
 .calendar-day-indicators .material-indicator {
   background-color: #4f46e5;
 }
@@ -128,6 +133,15 @@
 .payment-due-label.normal {
   background-color: #fffbeb;
   color: #f59e0b;
+}
+
+/* Birthday Pill */
+.birthday-pill {
+  background-color: #ec4899;
+}
+
+.birthday-pill:hover {
+  background-color: #db2777;
 }
 
 /* Class Details */

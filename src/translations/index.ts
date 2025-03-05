@@ -16,6 +16,9 @@ interface Translation {
   language: string;
   birthdate: string;
   birthdateFormat: string;
+  birthday: string;
+  birthdays: string;
+  emailNotEditable: string;
   
   // Navigation
   dashboard: string;
@@ -171,6 +174,8 @@ interface Translation {
   enterName: string;
   nameUpdated: string;
   failedToUpdateName: string;
+  birthdateUpdated: string;
+  failedToUpdateBirthdate: string;
   copy: string;
 
   // URL Validation
@@ -194,6 +199,9 @@ const translations: Record<Language, Translation> = {
     language: 'Language',
     birthdate: 'Birthdate',
     birthdateFormat: 'MM-DD',
+    birthday: 'Birthday',
+    birthdays: 'Birthdays',
+    emailNotEditable: 'Email cannot be edited. To change the email, the user must be deleted and recreated with the correct email.',
     
     // Navigation
     dashboard: 'Dashboard',
@@ -208,8 +216,8 @@ const translations: Record<Language, Translation> = {
     quickActions: 'Quick Actions',
     manageScheduleDesc: 'Create or edit class sessions',
     classMaterialsDesc: 'Upload and manage materials',
-    upcomingClasses: 'Upcoming Classes',
-    pastClasses: 'Past Classes',
+    upcomingClasses: "This Week's Upcoming Classes",
+    pastClasses: "This Week's Past Classes",
     viewAll: 'View All',
     yourUpcomingClasses: 'Your Upcoming Classes',
     sunday: 'Sunday',
@@ -349,6 +357,8 @@ const translations: Record<Language, Translation> = {
     enterName: 'Enter name',
     nameUpdated: 'Name updated successfully',
     failedToUpdateName: 'Failed to update name',
+    birthdateUpdated: 'Birthdate updated successfully',
+    failedToUpdateBirthdate: 'Failed to update birthdate',
     copy: 'Copy',
 
     // URL Validation
@@ -370,6 +380,9 @@ const translations: Record<Language, Translation> = {
     language: 'Idioma',
     birthdate: 'Data de Nascimento',
     birthdateFormat: 'MM-DD',
+    birthday: 'Aniversário',
+    birthdays: 'Aniversários',
+    emailNotEditable: 'O email não pode ser editado. Para alterar o email, o usuário deve ser excluído e recriado com o email correto.',
     
     // Navigation
     dashboard: 'Painel',
@@ -384,8 +397,8 @@ const translations: Record<Language, Translation> = {
     quickActions: 'Ações Rápidas',
     manageScheduleDesc: 'Criar ou editar sessões de aula',
     classMaterialsDesc: 'Carregar e gerenciar materiais',
-    upcomingClasses: 'Próximas Aulas',
-    pastClasses: 'Aulas Passadas',
+    upcomingClasses: "Próximas Aulas desta Semana",
+    pastClasses: "Aulas Passadas desta Semana",
     viewAll: 'Ver Tudo',
     yourUpcomingClasses: 'Suas Próximas Aulas',
     sunday: 'Domingo',
@@ -525,6 +538,8 @@ const translations: Record<Language, Translation> = {
     enterName: 'Digite o nome',
     nameUpdated: 'Nome atualizado com sucesso',
     failedToUpdateName: 'Falha ao atualizar nome',
+    birthdateUpdated: 'Data de nascimento atualizada com sucesso',
+    failedToUpdateBirthdate: 'Falha ao atualizar data de nascimento',
     copy: 'Copiar',
 
     // URL Validation

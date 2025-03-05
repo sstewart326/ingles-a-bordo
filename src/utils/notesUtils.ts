@@ -1,0 +1,130 @@
+import { ClassSession, User } from './scheduleUtils';
+import { updateCachedDocument } from './firebaseUtils';
+import { Timestamp } from 'firebase/firestore';
+import { toast } from 'react-hot-toast';
+import { User as FirebaseUser } from 'firebase/auth';
+import { ClassMaterial } from '../types/interfaces';
+
+interface NotesState {
+  editingNotes: { [classId: string]: string };
+  savingNotes: { [classId: string]: boolean };
+  textareaRefs: { [key: string]: HTMLTextAreaElement | null };
+}
+
+interface UpdateNotesParams {
+  classSession: ClassSession;
+  state: NotesState;
+  setState: (updates: Partial<NotesState>) => void;
+  currentUser: FirebaseUser | null;
+  selectedDayDetails: {
+    date: Date;
+    classes: ClassSession[];
+    paymentsDue: { user: User; classSession: ClassSession }[];
+    materials: Record<string, ClassMaterial[]>;
+  } | null;
+  setSelectedDayDetails: (details: any) => void;
+  upcomingClasses: ClassSession[];
+  pastClasses: ClassSession[];
+  setUpcomingClasses: (classes: ClassSession[]) => void;
+  setPastClasses: (classes: ClassSession[]) => void;
+}
+
+export const handleEditNotes = (
+  classSession: ClassSession,
+  state: NotesState,
+  setEditingNotes: (updates: { [classId: string]: string }) => void
+) => {
+  setEditingNotes({
+    ...state.editingNotes,
+    [classSession.id]: classSession.notes || ''
+  });
+};
+
+export const handleSaveNotes = async ({
+  classSession,
+  state,
+  setState,
+  currentUser,
+  selectedDayDetails,
+  setSelectedDayDetails,
+  upcomingClasses,
+  pastClasses,
+  setUpcomingClasses,
+  setPastClasses
+}: UpdateNotesParams) => {
+  try {
+    setState({
+      savingNotes: {
+        ...state.savingNotes,
+        [classSession.id]: true
+      }
+    });
+    
+    // Get the value directly from the textarea ref
+    const textareaValue = state.textareaRefs[classSession.id]?.value || '';
+    
+    // Convert Firebase Auth User to our custom User type
+    const customUser = currentUser ? {
+      id: currentUser.uid,
+      email: currentUser.email || '',
+      name: currentUser.displayName || currentUser.email || '',
+      paymentConfig: undefined
+    } : null;
+    
+    // Update in Firebase
+    await updateCachedDocument('classes', classSession.id, {
+      notes: textareaValue,
+      updatedAt: Timestamp.now()
+    }, { userId: customUser?.id });
+    
+    // Update local state
+    const updateClassList = (classes: ClassSession[]) => 
+      classes.map(c => 
+        c.id === classSession.id 
+          ? { ...c, notes: textareaValue } 
+          : c
+      );
+    
+    setUpcomingClasses(updateClassList(upcomingClasses));
+    setPastClasses(updateClassList(pastClasses));
+    
+    if (selectedDayDetails && selectedDayDetails.classes) {
+      setSelectedDayDetails({
+        ...selectedDayDetails,
+        classes: updateClassList(selectedDayDetails.classes)
+      });
+    }
+    
+    // Clear editing state for this class
+    const newEditingNotes = { ...state.editingNotes };
+    delete newEditingNotes[classSession.id];
+    setState({
+      editingNotes: newEditingNotes,
+      savingNotes: {
+        ...state.savingNotes,
+        [classSession.id]: false
+      }
+    });
+    
+    toast.success('Notes saved successfully');
+  } catch (error) {
+    console.error('Error in handleSaveNotes:', error);
+    toast.error('Error saving notes');
+    setState({
+      savingNotes: {
+        ...state.savingNotes,
+        [classSession.id]: false
+      }
+    });
+  }
+};
+
+export const handleCancelEditNotes = (
+  classId: string,
+  state: NotesState,
+  setEditingNotes: (updates: { [classId: string]: string }) => void
+) => {
+  const newEditingNotes = { ...state.editingNotes };
+  delete newEditingNotes[classId];
+  setEditingNotes(newEditingNotes);
+}; 
