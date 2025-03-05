@@ -73,6 +73,10 @@
   background-color: #ef4444;
 }
 
+.calendar-day-indicators .material-indicator {
+  background-color: #4f46e5;
+}
+
 /* Payment Due Label */
 .payment-due-label {
   font-size: 0.6rem;
@@ -125,6 +129,13 @@
 
 .class-count-pill:hover {
   background-color: #4f46e5;
+}
+
+.class-count-pill .material-icon {
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Payment Pill */

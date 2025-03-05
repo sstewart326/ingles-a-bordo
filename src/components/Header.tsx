@@ -34,8 +34,7 @@ export const Header = () => {
       { name: t.manageUsers, href: '/admin/users', current: location.pathname === '/admin/users' },
       { name: t.manageSchedules, href: '/admin/schedule', current: location.pathname === '/admin/schedule' }
     ] : [
-      { name: t.schedule, href: '/schedule', current: location.pathname === '/schedule' },
-      { name: t.classMaterials, href: '/materials', current: location.pathname === '/materials' }
+      { name: t.schedule, href: '/schedule', current: location.pathname === '/schedule' }
     ])
   ];
 

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { where } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { Calendar } from '../components/Calendar';
+import { CalendarDay } from '../components/CalendarDay';
+import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';
 import '../styles/calendar.css';
 import { getStudentClassMaterials } from '../utils/classMaterialsUtils';
 import { styles } from '../styles/styleUtils';
@@ -255,73 +257,35 @@ export const Schedule = () => {
       date.getDate() === paymentDate.getDate()
     );
 
+    // Handle class count click
+    const handleClassCountClick = (e: React.MouseEvent, classes: ClassWithStudents[], date: Date) => {
+      e.stopPropagation();
+      // For Schedule, we'll just show the day details when clicking on class count
+      handleDayClick(date, classes, isPaymentDay, isPaymentDay && daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0);
+    };
+
+    // Handle payment pill click
+    const handlePaymentPillClick = (e: React.MouseEvent, date: Date, classes: ClassWithStudents[]) => {
+      e.stopPropagation();
+      // For Schedule, we'll just show the day details when clicking on payment pill
+      handleDayClick(date, classes, isPaymentDay, isPaymentDay && daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0);
+    };
+
     const daysUntilPayment = isPaymentDay ? 
       Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
     const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
     return (
-      <div className="h-full flex flex-col">
-        {/* Indicators */}
-        <div className="calendar-day-indicators">
-          {dayClasses.length > 0 && (
-            <div className="indicator class-indicator" title="Has classes" />
-          )}
-          {isPaymentDay && (
-            <div 
-              className={`indicator ${isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'}`}
-              title={isPaymentSoon ? 'Payment due soon' : 'Payment due'}
-            />
-          )}
-        </div>
-
-        {/* Date and Payment Label */}
-        <div className="flex flex-col items-center">
-          <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
-            {date.getDate()}
-          </div>
-          {isPaymentDay && (
-            <div className={`payment-due-label ${isPaymentSoon ? 'soon' : 'normal'}`}>
-              {t.paymentDue}
-            </div>
-          )}
-        </div>
-
-        {/* Class details */}
-        {dayClasses.length > 0 && (
-          <div className="class-details">
-            <div className="time-slots-container">
-              <div className="time-slots">
-                {dayClasses.slice(0, 3).map((classItem) => {
-                  const dateStr = date.toISOString().split('T')[0];
-                  const key = `${classItem.id}_${dateStr}`;
-                  const materialInfo = materialsInfo.get(key);
-                  const hasMaterials = !!materialInfo;
-                  const timeDisplay = formatTimeDisplay(classItem);
-
-                  return timeDisplay ? (
-                    <div
-                      key={classItem.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (hasMaterials) handleClassClick(classItem, date);
-                      }}
-                      className={`time-slot ${hasMaterials ? 'cursor-pointer hover:bg-[#4f46e5]' : ''}`}
-                      style={{ top: `${timeDisplay.position}%` }}
-                    >
-                      {timeDisplay.timeStr}
-                    </div>
-                  ) : null;
-                })}
-                {dayClasses.length > 3 && (
-                  <div className="time-slot more">
-                    +{dayClasses.length - 3} more
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <ScheduleCalendarDay<ClassWithStudents>
+        date={date}
+        isToday={isToday}
+        classes={dayClasses}
+        paymentsDue={isPaymentDay}
+        onClassCountClick={handleClassCountClick}
+        onPaymentPillClick={handlePaymentPillClick}
+        onDayClick={(date, classes) => handleDayClick(date, classes, isPaymentDay, isPaymentSoon)}
+        materialsInfo={materialsInfo}
+      />
     );
   };
 

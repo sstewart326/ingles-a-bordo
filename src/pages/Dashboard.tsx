@@ -145,8 +145,9 @@ export const Dashboard = () => {
       // Check if we've already loaded these months
       const newMonthsToLoad = monthsToLoad.filter(monthKey => !loadedMonths.has(monthKey));
       
-      let upcoming: ClassSession[] = [...upcomingClasses];
-      let past: ClassSession[] = [...pastClasses];
+      // Initialize empty arrays instead of spreading existing arrays
+      let upcoming: ClassSession[] = [];
+      let past: ClassSession[] = [];
       
       if (newMonthsToLoad.length === 0) {
         console.log('All required months already loaded');
@@ -284,7 +285,7 @@ export const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
-  }, [currentUser, adminLoading, isAdmin, loadedMonths, selectedDate, upcomingClasses, pastClasses]);
+  }, [currentUser, adminLoading, isAdmin, loadedMonths, selectedDate]);
 
   useEffect(() => {
     fetchClasses();
@@ -1216,19 +1217,6 @@ export const Dashboard = () => {
         </div>
       </div>
     );
-  };
-
-  const formatTimeDisplay = (classItem: ClassSession): TimeDisplay | null => {
-    if (!classItem.startTime) return null;
-    
-    const [hours, minutes] = classItem.startTime.split(':').map(Number);
-    const totalMinutes = hours * 60 + minutes;
-    const position = ((totalMinutes - 8 * 60) / (14 * 60)) * 100; // Assuming 8 AM to 10 PM range
-    
-    return {
-      timeStr: classItem.startTime,
-      position: Math.max(0, Math.min(100, position))
-    };
   };
 
   const getPaymentsDueForDay = (date: Date): { user: User; classSession: ClassSession }[] => {
