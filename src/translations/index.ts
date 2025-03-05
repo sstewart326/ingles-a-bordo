@@ -53,6 +53,7 @@ interface Translation {
   classOn: string;
   materials: string;
   slides: string;
+  dayDetails: string;
   
   // Schedule
   courseSchedule: string;
@@ -225,6 +226,7 @@ const translations: Record<Language, Translation> = {
     classOn: 'Class on',
     materials: 'Materials',
     slides: 'Slides',
+    dayDetails: 'Day Details',
     
     // Schedule
     courseSchedule: 'Course Schedule',
@@ -395,6 +397,7 @@ const translations: Record<Language, Translation> = {
     classOn: 'Aula em',
     materials: 'Materiais',
     slides: 'Slides',
+    dayDetails: 'Detalhes do Dia',
     
     // Schedule
     courseSchedule: 'Agenda de Aulas',

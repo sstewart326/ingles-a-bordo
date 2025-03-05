@@ -70,7 +70,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
         {/* Empty cells for days before the first of the month */}
         {Array.from({ length: firstDay }).map((_, index) => (
-          <div key={`empty-${index}`} className="calendar-day" />
+          <div key={`empty-${index}`} className="calendar-day empty" />
         ))}
 
         {/* Calendar days */}
@@ -80,17 +80,26 @@ export const Calendar: React.FC<CalendarProps> = ({
             date.getDate() === new Date().getDate() &&
             date.getMonth() === new Date().getMonth() &&
             date.getFullYear() === new Date().getFullYear();
+          const isSelected = 
+            date.getDate() === selectedDate.getDate() &&
+            date.getMonth() === selectedDate.getMonth() &&
+            date.getFullYear() === selectedDate.getFullYear();
 
           return (
             <div
               key={index}
               onClick={() => onDateSelect(date)}
-              className={`calendar-day ${isToday ? 'bg-[#f8f8f8]' : ''}`}
+              className={`calendar-day ${isToday ? 'bg-[#f8f8f8]' : ''} ${isSelected ? 'selected' : ''}`}
             >
               {renderDay(date, isToday)}
             </div>
           );
         })}
+
+        {/* Empty cells for remaining days in the last week */}
+        {Array.from({ length: (7 - ((firstDay + days) % 7)) % 7 }).map((_, index) => (
+          <div key={`empty-end-${index}`} className="calendar-day empty" />
+        ))}
       </div>
     </div>
   );

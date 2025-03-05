@@ -431,6 +431,9 @@ export const Dashboard = () => {
   };
 
   const handleDayClick = (date: Date, classes: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => {
+    // Update the selected date
+    setSelectedDate(date);
+    
     // Check if we've already loaded materials for this month
     const monthKey = getMonthKey(date);
     const materialsAlreadyLoaded = loadedMaterialMonths.has(monthKey);
@@ -1597,13 +1600,16 @@ export const Dashboard = () => {
         <div className="lg:col-span-1" ref={detailsRef}>
           {selectedDayDetails ? (
             <div className="bg-white shadow-md rounded-lg p-4 max-w-md">
-              <h2 className={`${styles.headings.h2} text-black`}>
+              <h2 className={`${styles.headings.h2} text-black mb-4`}>
+                {t.dayDetails || 'Day Details'}
+              </h2>
+              <h3 className={`${styles.headings.h3} text-black`}>
                 {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
                   weekday: 'long', 
                   month: 'long', 
                   day: 'numeric' 
                 })}
-              </h2>
+              </h3>
               
               {selectedDayDetails.classes.length > 0 ? (
                 <div className="mt-4 space-y-4">

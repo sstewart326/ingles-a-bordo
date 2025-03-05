@@ -2,8 +2,8 @@
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 1px;
-  background-color: #E5E7EB;
+  gap: 0;
+  background-color: white;
   border: 1px solid #E5E7EB;
   border-radius: 0.5rem;
   overflow: hidden;
@@ -20,6 +20,40 @@
   transition: background-color 0.2s ease;
   border-right: 1px solid #E5E7EB;
   border-bottom: 1px solid #E5E7EB;
+}
+
+/* Remove right border for last day in each row */
+.calendar-day:nth-child(7n) {
+  border-right: none;
+}
+
+/* Remove bottom border for last row */
+.calendar-day:nth-child(n+36) {
+  border-bottom: none;
+}
+
+/* Empty day styling */
+.calendar-day.empty {
+  background-color: #E5E7EB;
+  cursor: default;
+  border: none;
+}
+
+.calendar-day.empty:hover {
+  background-color: #E5E7EB;
+}
+
+/* Remove borders between empty days */
+.calendar-day.empty + .calendar-day.empty {
+  border-left: none;
+}
+
+.calendar-day.empty + .calendar-day:not(.empty) {
+  border-left: 1px solid #E5E7EB;
+}
+
+.calendar-day:not(.empty) + .calendar-day.empty {
+  border-left: none;
 }
 
 .calendar-day:hover {
