@@ -86,12 +86,16 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
+    // Allow any future date
+    if (dateYear > currentYear || (dateYear === currentYear && dateMonth > currentMonth)) {
+      return true;
+    }
+    
+    // For past dates, only show one month back
     return (
       (dateMonth === currentMonth && dateYear === currentYear) ||
       (dateMonth === currentMonth - 1 && dateYear === currentYear) ||
-      (dateMonth === currentMonth + 1 && dateYear === currentYear) ||
-      (dateMonth === 11 && currentMonth === 0 && dateYear === currentYear - 1) ||
-      (dateMonth === 0 && currentMonth === 11 && dateYear === currentYear + 1)
+      (dateMonth === 11 && currentMonth === 0 && dateYear === currentYear - 1)
     );
   };
 
