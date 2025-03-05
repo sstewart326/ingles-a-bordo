@@ -1,8 +1,8 @@
 import React from 'react';
-import { ClassSession, ClassWithStudents, User, formatClassTime } from '../utils/scheduleUtils';
+import { ClassSession, User } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { FaFileAlt, FaLink } from 'react-icons/fa';
+import { FaFileAlt } from 'react-icons/fa';
 
 export interface ScheduleCalendarDayProps<T extends ClassSession> {
   date: Date;
@@ -80,7 +80,6 @@ export function ScheduleCalendarDay<T extends ClassSession>({
       
       let [_, hours, minutes, period] = match;
       let hour = parseInt(hours);
-      let is24HourFormat = false;
       
       // If period is specified
       if (period) {
@@ -93,11 +92,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
         if (period === 'AM' && hour === 12) {
           hour = 0;
         }
-      } else {
-        // If no period is specified, assume 24-hour format
-        is24HourFormat = true;
       }
-      
       // Convert to 12-hour format for display
       const displayHour = hour % 12 || 12;
       

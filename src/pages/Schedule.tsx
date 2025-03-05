@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { where } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { Calendar } from '../components/Calendar';
-import { CalendarDay } from '../components/CalendarDay';
 import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';
 import '../styles/calendar.css';
 import { getStudentClassMaterials } from '../utils/classMaterialsUtils';
@@ -51,34 +50,6 @@ export const Schedule = () => {
   const [materialsInfo, setMaterialsInfo] = useState<Map<string, { hasSlides: boolean; hasLinks: boolean }>>(new Map());
 
   const DAYS_OF_WEEK_FULL = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
-
-  // Update time formatting to handle undefined values
-  const formatTimeDisplay = (classItem: ClassWithStudents) => {
-    if (!classItem.startTime || !classItem.endTime) return null;
-    
-    // Convert time to position
-    const startHour = parseInt(classItem.startTime.match(/(\d+):/)?.[1] || '0');
-    const startMinutes = parseInt(classItem.startTime.match(/:(\d+)/)?.[1] || '0');
-    const startPeriod = classItem.startTime.includes('PM');
-    const startTime24 = startPeriod && startHour !== 12 ? startHour + 12 : startHour;
-
-    const endHour = parseInt(classItem.endTime.match(/(\d+):/)?.[1] || '0');
-    const endMinutes = parseInt(classItem.endTime.match(/:(\d+)/)?.[1] || '0');
-    const endPeriod = classItem.endTime.includes('PM');
-    
-    // Calculate position (6am = 0%, 6pm = 100%)
-    const position = ((startTime24 - 6) / 12) * 100;
-
-    // Format time string
-    const startTimeStr = `${startHour}${startMinutes > 0 ? `:${startMinutes}` : ''}`;
-    const endTimeStr = `${endHour}${endMinutes > 0 ? `:${endMinutes}` : ''}`;
-    const timeStr = `${startTimeStr}-${endTimeStr}${startPeriod === endPeriod ? endPeriod ? 'pm' : 'am' : ''}`;
-
-    return {
-      position,
-      timeStr
-    };
-  };
 
   useEffect(() => {
     const fetchData = async () => {

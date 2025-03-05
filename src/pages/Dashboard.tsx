@@ -24,11 +24,6 @@ import { PencilIcon } from '@heroicons/react/24/outline';
 import { UploadMaterialsForm } from '../components/UploadMaterialsForm';
 import Modal from '../components/Modal';
 
-interface TimeDisplay {
-  timeStr: string;
-  position: number;
-}
-
 // Add a new interface for the class time modal
 interface ClassTimeModal {
   isOpen: boolean;

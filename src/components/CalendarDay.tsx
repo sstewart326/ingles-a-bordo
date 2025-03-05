@@ -1,5 +1,5 @@
 import React from 'react';
-import { ClassSession, ClassWithStudents, User } from '../utils/scheduleUtils';
+import { ClassSession, User } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 
