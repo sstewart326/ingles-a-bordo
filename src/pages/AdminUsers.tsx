@@ -578,10 +578,10 @@ export const AdminUsers = () => {
                       <th scope="col" className={styles.table.header}>
                         {t.email}
                       </th>
-                      <th scope="col" className={styles.table.header}>
+                      <th scope="col" className={`${styles.table.header} text-center`}>
                         {t.userStatus}
                       </th>
-                      <th scope="col" className={styles.table.header}>
+                      <th scope="col" className={`${styles.table.header} text-center`}>
                         {t.actions}
                       </th>
                     </tr>
@@ -650,7 +650,7 @@ export const AdminUsers = () => {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="flex flex-col justify-center items-center space-y-2">
+                          <div className="flex flex-col items-center space-y-2">
                             {user.status === 'active' && (
                               <button
                                 onClick={() => deleteUser(user.id)}

@@ -1166,25 +1166,45 @@ export const Dashboard = () => {
     const handleClassCountClick = (e: React.MouseEvent) => {
       e.stopPropagation(); // Prevent triggering the calendar day click
       
-      // Calculate position for the modal
+      // Calculate position for the modal - now using viewport-relative positioning
       const rect = e.currentTarget.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Calculate position to keep modal within viewport
+      let x = rect.left + (rect.width / 2);
+      let y = rect.bottom + 5;
+      
+      // Adjust x position if modal would go off screen
+      const modalWidth = 300; // maxWidth of modal
+      if (x + (modalWidth / 2) > viewportWidth) {
+        x = viewportWidth - (modalWidth / 2);
+      } else if (x - (modalWidth / 2) < 0) {
+        x = modalWidth / 2;
+      }
+      
+      // Adjust y position if modal would go off screen
+      const modalHeight = 200; // approximate height
+      if (y + modalHeight > viewportHeight) {
+        y = rect.top - modalHeight - 5; // position above the pill
+      }
       
       setClassTimeModal({
         isOpen: true,
-        position: { 
-          x: rect.left + (rect.width / 2), 
-          y: rect.bottom + 5
-        },
+        position: { x, y },
         classes: dayClasses,
         date: date
       });
+
+      // Also open the details section
+      handleDayClick(date, dayClasses, paymentsDue);
     };
 
     // Function to handle click on the payment due pill
     const handlePaymentPillClick = (e: React.MouseEvent) => {
       e.stopPropagation(); // Prevent triggering the calendar day click
       
-      // Handle payment due click - for now just show the day details
+      // Open the details section
       handleDayClick(date, dayClasses, paymentsDue);
     };
 
@@ -1491,7 +1511,7 @@ export const Dashboard = () => {
     }
   }, [currentUser, isAdmin, classMaterials, selectedDayDetails]);
 
-  // Add a useEffect to handle clicks outside the modal
+  // Add a useEffect to handle clicks outside the modal and scroll events
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (classTimeModalRef.current && !classTimeModalRef.current.contains(event.target as Node)) {
@@ -1499,9 +1519,16 @@ export const Dashboard = () => {
       }
     };
     
+    const handleScroll = () => {
+      setClassTimeModal(prev => ({ ...prev, isOpen: false }));
+    };
+    
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('scroll', handleScroll, { passive: true });
+    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
@@ -1560,7 +1587,10 @@ export const Dashboard = () => {
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                 padding: '0.75rem',
                 minWidth: '200px',
-                maxWidth: '300px'
+                maxWidth: '300px',
+                maxHeight: '80vh',
+                overflowY: 'auto',
+                pointerEvents: 'auto'
               }}
             >
               <div className="text-sm font-medium mb-2">
