@@ -123,40 +123,28 @@ export const addClassMaterials = async (
   }
 };
 
-export const getClassMaterials = async (classId: string, classDate?: Date): Promise<ClassMaterial[]> => {
+export const getClassMaterials = async (
+  classId: string,
+  classDate?: Date
+): Promise<ClassMaterial[]> => {
   try {
     if (!classId) {
-      console.error('Invalid classId provided to getClassMaterials');
+      console.error('No class ID provided to getClassMaterials');
       return [];
     }
 
     // Check cache first
-    const cacheKey = `${COLLECTION_PATH}_${classId}_${classDate?.toISOString() || 'all'}`;
+    const cacheKey = `${COLLECTION_PATH}_${classId}_all`;
     const cachedData = getCached<ClassMaterial[]>(cacheKey);
     if (cachedData) {
       return cachedData;
     }
 
-    let q = query(
+    // Always query by classId only, without date filtering
+    const q = query(
       collection(db, COLLECTION_PATH),
       where('classId', '==', classId)
     );
-    
-    // If a specific date is provided, add date filter
-    if (classDate && !isNaN(classDate.getTime())) {
-      const startOfDay = new Date(classDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      
-      const endOfDay = new Date(classDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      
-      q = query(
-        collection(db, COLLECTION_PATH),
-        where('classId', '==', classId),
-        where('classDate', '>=', Timestamp.fromDate(startOfDay)),
-        where('classDate', '<=', Timestamp.fromDate(endOfDay))
-      );
-    }
     
     const querySnapshot = await getDocs(q);
     const materials = querySnapshot.docs.map(doc => {
@@ -168,10 +156,11 @@ export const getClassMaterials = async (classId: string, classDate?: Date): Prom
       
       return {
         ...data,
+        id: doc.id,
         createdAt,
         updatedAt,
         classDate,
-      } as ClassMaterial;
+      } as unknown as ClassMaterial;
     });
 
     // Sort by date descending
@@ -179,10 +168,11 @@ export const getClassMaterials = async (classId: string, classDate?: Date): Prom
 
     // Cache the result
     setCached(cacheKey, materials, COLLECTION_PATH);
+    
     return materials;
   } catch (error) {
     console.error('Error getting class materials:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to fetch class materials');
+    return [];
   }
 };
 

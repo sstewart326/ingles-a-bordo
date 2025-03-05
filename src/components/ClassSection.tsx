@@ -1,3 +1,4 @@
+import React from 'react';
 import { ClassSession } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
@@ -5,8 +6,9 @@ import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
 import { FaFilePdf, FaLink, FaPlus, FaTrash } from 'react-icons/fa';
 import { PencilIcon } from '@heroicons/react/24/outline';
-import { UploadMaterialsForm } from './UploadMaterialsForm';
 import Modal from './Modal';
+import { UploadMaterialsForm } from './UploadMaterialsForm';
+import { debugLog, debugMaterials, debugClassSession } from '../utils/debugUtils';
 
 interface ClassSectionProps {
   title: string;
@@ -33,7 +35,6 @@ interface ClassSectionProps {
   currentPage: number;
   onPageChange: (newPage: number) => void;
   sectionRef: React.RefObject<HTMLDivElement | null>;
-  onMaterialsUpdate?: (classId: string, materials: ClassMaterial[]) => void;
 }
 
 export const ClassSection = ({
@@ -60,20 +61,30 @@ export const ClassSection = ({
   pageSize,
   currentPage,
   onPageChange,
-  sectionRef,
-  onMaterialsUpdate
+  sectionRef
 }: ClassSectionProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
-  const startIndex = currentPage * pageSize;
-  const displayedClasses = classes.slice(startIndex, startIndex + pageSize);
-  const hasMore = startIndex + pageSize < classes.length;
 
-  const handleMaterialsUpdate = (classId: string, materials: ClassMaterial[]) => {
-    if (onMaterialsUpdate) {
-      onMaterialsUpdate(classId, materials);
-    }
-  };
+  // Add debugging logs
+  debugLog(`ClassSection rendering: ${title}`);
+  debugLog(`Classes count: ${classes.length}`);
+  
+  // Calculate pagination
+  const startIndex = currentPage * pageSize;
+  const endIndex = startIndex + pageSize;
+  const displayedClasses = classes.slice(startIndex, endIndex);
+  const hasMore = startIndex + pageSize < classes.length;
+  
+  // More debugging logs
+  debugLog(`Displayed classes count: ${displayedClasses.length}`);
+  
+  // Log materials for each class
+  displayedClasses.forEach((classSession, index) => {
+    debugClassSession(classSession, index);
+    debugMaterials(classSession.id, classMaterials[classSession.id], 'classMaterials prop');
+    debugMaterials(classSession.id, classSession.materials, 'class.materials property');
+  });
 
   const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (
     <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
@@ -82,7 +93,6 @@ export const ClassSection = ({
         classDate={date}
         studentEmails={classSession.studentEmails}
         onUploadSuccess={onCloseUploadForm}
-        onMaterialsUpdate={(materials) => handleMaterialsUpdate(classSession.id, materials)}
       />
     </Modal>
   );
@@ -95,172 +105,187 @@ export const ClassSection = ({
           <p className="text-gray-500">{title === t.upcomingClasses ? t.noUpcomingClasses : t.noPastClasses}</p>
         ) : (
           <>
-            {displayedClasses.map((classSession) => (
-              <div key={classSession.id} className={styles.card.container}>
-                <div className="flex justify-between items-start w-full">
-                  <div className="w-full">
-                    <div className="text-sm font-bold text-black mb-2">
-                      {formatClassDate(title === t.upcomingClasses ? getNextClassDate(classSession) : getPreviousClassDate(classSession))}
-                    </div>
-                    <div className={styles.card.title}>
-                      {formatStudentNames(classSession.studentEmails)}
-                    </div>
-                    <div className={styles.card.subtitle}>
-                      {formatClassTime(classSession)}
-                    </div>
-                    
-                    {/* Notes section */}
-                    <div className="mt-2 w-full">
-                      <div className={styles.card.label}>{t.notes || 'Notes'}</div>
+            {displayedClasses.map((classSession) => {
+              // Debug each class session
+              debugClassSession(classSession, displayedClasses.indexOf(classSession));
+              debugMaterials(classSession.id, classMaterials[classSession.id], 'classMaterials prop');
+              debugMaterials(classSession.id, classSession.materials, 'class.materials property');
+              
+              const date = title === t.upcomingClasses 
+                ? getNextClassDate(classSession) 
+                : getPreviousClassDate(classSession);
+              
+              return (
+                <div key={classSession.id} className={styles.card.container}>
+                  <div className="flex justify-between items-start w-full">
+                    <div className="w-full">
+                      <div className="text-sm font-bold text-black mb-2">
+                        {formatClassDate(date)}
+                      </div>
+                      <div className={styles.card.title}>
+                        {formatStudentNames(classSession.studentEmails)}
+                      </div>
+                      <div className={styles.card.subtitle}>
+                        {formatClassTime(classSession)}
+                      </div>
                       
-                      {editingNotes[classSession.id] !== undefined ? (
-                        <div className="mt-1 w-full">
-                          <textarea
-                            ref={(el) => { textareaRefs[classSession.id] = el; }}
-                            defaultValue={editingNotes[classSession.id]}
-                            className="w-full p-2 border border-gray-300 rounded text-sm"
-                            rows={3}
-                          />
-                          <div className="flex justify-end mt-2 space-x-2">
-                            <button
-                              onClick={() => onCancelEditNotes(classSession.id)}
-                              className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                              disabled={savingNotes[classSession.id]}
-                            >
-                              {t.cancel || 'Cancel'}
-                            </button>
-                            <button
-                              onClick={() => onSaveNotes(classSession)}
-                              className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                              disabled={savingNotes[classSession.id]}
-                            >
-                              {savingNotes[classSession.id] 
-                                ? 'Saving...' 
-                                : 'Save'}
-                            </button>
+                      {/* Notes section */}
+                      <div className="mt-2 w-full">
+                        <div className={styles.card.label}>{t.notes || 'Notes'}</div>
+                        
+                        {editingNotes[classSession.id] !== undefined ? (
+                          <div className="mt-1 w-full">
+                            <textarea
+                              ref={(el) => { textareaRefs[classSession.id] = el; }}
+                              defaultValue={editingNotes[classSession.id]}
+                              className="w-full p-2 border border-gray-300 rounded text-sm"
+                              rows={3}
+                            />
+                            <div className="flex justify-end mt-2 space-x-2">
+                              <button
+                                onClick={() => onCancelEditNotes(classSession.id)}
+                                className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                disabled={savingNotes[classSession.id]}
+                              >
+                                {t.cancel || 'Cancel'}
+                              </button>
+                              <button
+                                onClick={() => onSaveNotes(classSession)}
+                                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                disabled={savingNotes[classSession.id]}
+                              >
+                                {savingNotes[classSession.id] 
+                                  ? 'Saving...' 
+                                  : 'Save'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-gray-700 text-sm mt-1 flex items-center">
+                            <span>{classSession.notes || (t.noNotes || 'No notes available')}</span>
+                            {!editingNotes[classSession.id] && (
+                              <PencilIcon
+                                onClick={() => onEditNotes(classSession)}
+                                className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
+                                title={t.edit || 'Edit'}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Materials Section */}
+                      {(classMaterials[classSession.id]?.length > 0 || (classSession.materials && classSession.materials.length > 0)) && (
+                        <div className="mt-3">
+                          <div className="flex justify-between items-center">
+                            <div className={styles.card.label}>{t.materials || "Materials"}</div>
+                            {isAdmin && (
+                              <a 
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  onOpenUploadForm(classSession.id);
+                                }}
+                                className="text-sm text-blue-600 hover:text-blue-800"
+                              >
+                                {t.addMaterials}
+                              </a>
+                            )}
+                          </div>
+                          <div className="mt-1 space-y-2">
+                            {/* Display materials - prioritize class.materials, fall back to classMaterials */}
+                            {((classSession.materials && classSession.materials.length > 0) 
+                              ? classSession.materials 
+                              : classMaterials[classSession.id] || []
+                            ).map((material, index) => (
+                              <div key={`material-${index}`} className="flex flex-col space-y-2">
+                                {material.slides && material.slides.length > 0 && (
+                                  <div className="space-y-1">
+                                    {material.slides.map((slideUrl: string, slideIndex: number) => (
+                                      <a 
+                                        key={slideIndex}
+                                        href={slideUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
+                                      >
+                                        <FaFilePdf className="mr-2" />
+                                        <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
+                                        {isAdmin && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              onDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
+                                            }}
+                                            disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
+                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                            title="Delete material"
+                                          >
+                                            <FaTrash className="h-2.5 w-2.5" />
+                                          </button>
+                                        )}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                {material.links && material.links.length > 0 && (
+                                  <div className="space-y-1">
+                                    {material.links.map((link: string, linkIndex: number) => (
+                                      <a 
+                                        key={linkIndex}
+                                        href={link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
+                                      >
+                                        <FaLink className="mr-2" />
+                                        <span className="text-sm truncate max-w-[200px]">{link}</span>
+                                        {isAdmin && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              onDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
+                                            }}
+                                            disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
+                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                            title="Delete link"
+                                          >
+                                            <FaTrash className="h-2.5 w-2.5" />
+                                          </button>
+                                        )}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ) : (
-                        <div className="text-gray-700 text-sm mt-1 flex items-center">
-                          <span>{classSession.notes || (t.noNotes || 'No notes available')}</span>
-                          {!editingNotes[classSession.id] && (
-                            <PencilIcon
-                              onClick={() => onEditNotes(classSession)}
-                              className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
-                              title={t.edit || 'Edit'}
-                            />
-                          )}
+                      )}
+                      
+                      {/* Add Materials Link */}
+                      {isAdmin && (!classMaterials[classSession.id] || classMaterials[classSession.id].length === 0) && (
+                        <div className="mt-3">
+                          <a 
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              onOpenUploadForm(classSession.id);
+                            }}
+                            className="flex items-center text-blue-600 hover:text-blue-800"
+                          >
+                            <FaPlus className="mr-2" />
+                            <span className="text-sm">{t.addMaterials || 'Add Materials'}</span>
+                          </a>
                         </div>
                       )}
+                      {isAdmin && renderUploadMaterialsSection(classSession, title === t.upcomingClasses ? getNextClassDate(classSession) || new Date() : getPreviousClassDate(classSession) || new Date())}
                     </div>
-                    
-                    {/* Materials Section */}
-                    {classMaterials[classSession.id] && classMaterials[classSession.id].length > 0 && (
-                      <div className="mt-3">
-                        <div className="flex justify-between items-center">
-                          <div className={styles.card.label}>{t.materials || "Materials"}</div>
-                          {isAdmin && (
-                            <a 
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                onOpenUploadForm(classSession.id);
-                              }}
-                              className="text-sm text-blue-600 hover:text-blue-800"
-                            >
-                              {t.addMaterials}
-                            </a>
-                          )}
-                        </div>
-                        <div className="mt-1 space-y-2">
-                          {classMaterials[classSession.id].map((material, index) => (
-                            <div key={index} className="flex flex-col space-y-2">
-                              {material.slides && material.slides.length > 0 && (
-                                <div className="space-y-1">
-                                  {material.slides.map((slideUrl: string, slideIndex: number) => (
-                                    <a 
-                                      key={slideIndex}
-                                      href={slideUrl} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="flex items-center text-blue-600 hover:text-blue-800 group"
-                                    >
-                                      <FaFilePdf className="mr-2" />
-                                      <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
-                                      {isAdmin && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            onDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
-                                          }}
-                                          disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
-                                          className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                          title="Delete material"
-                                        >
-                                          <FaTrash className="h-2.5 w-2.5" />
-                                        </button>
-                                      )}
-                                    </a>
-                                  ))}
-                                </div>
-                              )}
-                              
-                              {material.links && material.links.length > 0 && (
-                                <div className="space-y-1">
-                                  {material.links.map((link: string, linkIndex: number) => (
-                                    <a 
-                                      key={linkIndex}
-                                      href={link} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="flex items-center text-blue-600 hover:text-blue-800 group"
-                                    >
-                                      <FaLink className="mr-2" />
-                                      <span className="text-sm truncate">{link}</span>
-                                      {isAdmin && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            onDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
-                                          }}
-                                          disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
-                                          className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                          title="Delete link"
-                                        >
-                                          <FaTrash className="h-2.5 w-2.5" />
-                                        </button>
-                                      )}
-                                    </a>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Add Materials Link */}
-                    {isAdmin && (!classMaterials[classSession.id] || classMaterials[classSession.id].length === 0) && (
-                      <div className="mt-3">
-                        <a 
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            onOpenUploadForm(classSession.id);
-                          }}
-                          className="flex items-center text-blue-600 hover:text-blue-800"
-                        >
-                          <FaPlus className="mr-2" />
-                          <span className="text-sm">{t.addMaterials || 'Add Materials'}</span>
-                        </a>
-                      </div>
-                    )}
-                    {isAdmin && renderUploadMaterialsSection(classSession, title === t.upcomingClasses ? getNextClassDate(classSession) || new Date() : getPreviousClassDate(classSession) || new Date())}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {/* Pagination controls */}
             <div className="flex justify-between items-center mt-4">

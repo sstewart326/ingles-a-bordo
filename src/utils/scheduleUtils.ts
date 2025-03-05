@@ -22,6 +22,7 @@ export interface ClassSession {
     monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
     startDate: string;  // YYYY-MM-DD date string
   };
+  materials?: any[];
 }
 
 export interface User {

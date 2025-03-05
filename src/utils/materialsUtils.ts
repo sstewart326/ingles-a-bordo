@@ -104,6 +104,10 @@ interface DeleteMaterialParams {
   setState: (updates: Partial<MaterialsState>) => void;
   selectedDayDetails: any;
   setSelectedDayDetails: (details: any) => void;
+  upcomingClasses?: ClassSession[];
+  pastClasses?: ClassSession[];
+  setUpcomingClasses?: (classes: ClassSession[]) => void;
+  setPastClasses?: (classes: ClassSession[]) => void;
 }
 
 export const handleDeleteMaterial = async ({
@@ -117,7 +121,11 @@ export const handleDeleteMaterial = async ({
   state,
   setState,
   selectedDayDetails,
-  setSelectedDayDetails
+  setSelectedDayDetails,
+  upcomingClasses,
+  pastClasses,
+  setUpcomingClasses,
+  setPastClasses
 }: DeleteMaterialParams) => {
   if (!currentUser || !isAdmin) {
     toast.error('Not authorized');
@@ -215,7 +223,7 @@ export const handleDeleteMaterial = async ({
             (!materialToCheck.links || materialToCheck.links.length === 0)) {
           updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_: ClassMaterial, i: number) => i !== index);
         }
-      } 
+      }
       else if (type === 'link' && typeof itemIndex === 'number') {
         updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].map((m: ClassMaterial, i: number) => {
           if (i === index && m.links) {
@@ -240,6 +248,42 @@ export const handleDeleteMaterial = async ({
       }
       
       setSelectedDayDetails(updatedDayDetails);
+    }
+    
+    // Update upcoming classes if provided
+    if (upcomingClasses && setUpcomingClasses) {
+      const updatedUpcomingClasses = upcomingClasses.map(c => {
+        if (c.id === classId) {
+          // If we have updated materials for this class, use them
+          if (updatedMaterials[classId]) {
+            return { ...c, materials: updatedMaterials[classId] };
+          } 
+          // If we've deleted all materials for this class, set materials to empty array
+          else {
+            return { ...c, materials: [] };
+          }
+        }
+        return c;
+      });
+      setUpcomingClasses(updatedUpcomingClasses);
+    }
+    
+    // Update past classes if provided
+    if (pastClasses && setPastClasses) {
+      const updatedPastClasses = pastClasses.map(c => {
+        if (c.id === classId) {
+          // If we have updated materials for this class, use them
+          if (updatedMaterials[classId]) {
+            return { ...c, materials: updatedMaterials[classId] };
+          } 
+          // If we've deleted all materials for this class, set materials to empty array
+          else {
+            return { ...c, materials: [] };
+          }
+        }
+        return c;
+      });
+      setPastClasses(updatedPastClasses);
     }
     
     toast.success('Material updated successfully');

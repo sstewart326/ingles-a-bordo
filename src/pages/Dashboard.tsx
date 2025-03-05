@@ -24,6 +24,7 @@ import {
 import { CalendarSection } from '../components/CalendarSection';
 import { ClassesSection } from '../components/ClassesSection';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { debugLog, debugMaterials } from '../utils/debugUtils';
 
 export const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -232,7 +233,11 @@ export const Dashboard = () => {
         if (updates.loadedMaterialMonths) setLoadedMaterialMonths(updates.loadedMaterialMonths);
       },
       selectedDayDetails,
-      setSelectedDayDetails
+      setSelectedDayDetails,
+      upcomingClasses,
+      pastClasses,
+      setUpcomingClasses,
+      setPastClasses
     });
   };
 
@@ -240,7 +245,65 @@ export const Dashboard = () => {
     setVisibleUploadForm(classId);
   };
 
-  const closeModal = () => {
+  const closeModal = async () => {
+    // If we have a visible upload form (meaning a class ID), refresh the materials for that class
+    if (visibleUploadForm && selectedDayDetails) {
+      try {
+        debugLog('closeModal - Starting refresh of materials');
+        debugLog('visibleUploadForm: ' + visibleUploadForm);
+        
+        // Fetch updated materials for this class without date filtering
+        const updatedMaterials = await getClassMaterials(visibleUploadForm);
+        debugMaterials(visibleUploadForm, updatedMaterials, 'updatedMaterials');
+        
+        // Update the materials in the selectedDayDetails
+        const updatedMaterialsMap = {
+          ...selectedDayDetails.materials,
+          [visibleUploadForm]: updatedMaterials
+        };
+        
+        // Update the selected day details with the new materials
+        setSelectedDayDetails({
+          ...selectedDayDetails,
+          materials: updatedMaterialsMap
+        });
+        
+        // Update the class materials state
+        setClassMaterials({
+          ...classMaterials,
+          [visibleUploadForm]: updatedMaterials
+        });
+        
+        // Update the upcoming classes with the new materials
+        const updatedUpcomingClasses = upcomingClasses.map(c => 
+          c.id === visibleUploadForm 
+            ? { ...c, materials: updatedMaterials } 
+            : c
+        );
+        debugLog('Updated upcoming classes with materials');
+        setUpcomingClasses(updatedUpcomingClasses);
+        
+        // Update the past classes with the new materials
+        const updatedPastClasses = pastClasses.map(c => 
+          c.id === visibleUploadForm 
+            ? { ...c, materials: updatedMaterials } 
+            : c
+        );
+        debugLog('Updated past classes with materials');
+        setPastClasses(updatedPastClasses);
+        
+        // Invalidate the loaded material months to force a refresh on next load
+        const monthKey = getMonthKey(selectedDayDetails.date);
+        const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
+        updatedLoadedMaterialMonths.delete(monthKey); // Remove this month to force refresh on next load
+        setLoadedMaterialMonths(updatedLoadedMaterialMonths);
+        
+      } catch (error) {
+        console.error('Error refreshing materials after upload:', error);
+      }
+    }
+    
+    // Close the modal
     setVisibleUploadForm(null);
   };
 
@@ -373,39 +436,6 @@ export const Dashboard = () => {
     return prevDate;
   };
 
-  const handleMaterialsUpdate = (classId: string, materials: ClassMaterial[]) => {
-    // Update classMaterials state
-    const updatedClassMaterials = { ...classMaterials, [classId]: materials };
-    setClassMaterials(updatedClassMaterials);
-
-    // Update selected day details if they exist and match the current class
-    if (selectedDayDetails && selectedDayDetails.classes.some(c => c.id === classId)) {
-      const updatedDayDetails = {
-        ...selectedDayDetails,
-        materials: {
-          ...selectedDayDetails.materials,
-          [classId]: materials
-        }
-      };
-      setSelectedDayDetails(updatedDayDetails);
-    }
-
-    // Update upcoming and past classes to include the new materials
-    const updatedUpcomingClasses = upcomingClasses.map(c => 
-      c.id === classId 
-        ? { ...c, materials } 
-        : c
-    );
-    setUpcomingClasses(updatedUpcomingClasses);
-
-    const updatedPastClasses = pastClasses.map(c => 
-      c.id === classId 
-        ? { ...c, materials } 
-        : c
-    );
-    setPastClasses(updatedPastClasses);
-  };
-
   if (adminLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -450,7 +480,6 @@ export const Dashboard = () => {
           textareaRefs={textareaRefs.current}
           onUpcomingClassesPageChange={handleUpcomingClassesPagination}
           onPastClassesPageChange={handlePastClassesPagination}
-          onMaterialsUpdate={handleMaterialsUpdate}
           t={{
             upcomingClasses: t.upcomingClasses,
             pastClasses: t.pastClasses
@@ -491,7 +520,6 @@ export const Dashboard = () => {
             onCloseUploadForm={closeModal}
             visibleUploadForm={visibleUploadForm}
             textareaRefs={textareaRefs.current}
-            onMaterialsUpdate={handleMaterialsUpdate}
           />
         </div>
       </div>

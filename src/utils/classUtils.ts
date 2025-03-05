@@ -57,6 +57,17 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
     return date.getDay();
   });
 
+  // Create a map of existing classes with their materials
+  const existingUpcomingClassesMap = new Map();
+  upcomingClasses.forEach(c => {
+    existingUpcomingClassesMap.set(c.id, c);
+  });
+
+  const existingPastClassesMap = new Map();
+  pastClasses.forEach(c => {
+    existingPastClassesMap.set(c.id, c);
+  });
+
   // Filter classes based on their day of week and start date
   const newUpcomingClasses = classes
     .filter(c => {
@@ -75,6 +86,11 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
         (c.startTime && new Date().getHours() < parseInt(c.startTime.split(':')[0]));
       
       return isThisWeek && hasntHappenedToday;
+    })
+    .map(c => {
+      // Preserve materials from existing classes
+      const existingClass = existingUpcomingClassesMap.get(c.id);
+      return existingClass ? { ...c, materials: existingClass.materials } : c;
     })
     .sort((a, b) => {
       // Skip sorting if dayOfWeek is undefined
@@ -106,6 +122,11 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       
       return isThisWeek && hasHappenedToday;
     })
+    .map(c => {
+      // Preserve materials from existing classes
+      const existingClass = existingPastClassesMap.get(c.id);
+      return existingClass ? { ...c, materials: existingClass.materials } : c;
+    })
     .sort((a, b) => {
       // Skip sorting if dayOfWeek is undefined
       if (a.dayOfWeek === undefined || b.dayOfWeek === undefined) return 0;
@@ -121,12 +142,8 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
         }
         return date;
       };
-
-      const dateA = getDateForClass(a);
-      const dateB = getDateForClass(b);
       
-      // Sort in reverse chronological order (most recent first)
-      return dateB.getTime() - dateA.getTime();
+      return getDateForClass(b).getTime() - getDateForClass(a).getTime();
     });
 
   setUpcomingClasses(newUpcomingClasses);
@@ -202,29 +219,58 @@ export const fetchMaterialsForClasses = async ({
   setSelectedDayDetails
 }: FetchMaterialsForClassesParams) => {
   const promises = classes.map(async (classSession) => {
-    const nextDate = getNextClassDate(classSession);
-    const prevDate = getPreviousClassDate(classSession);
+    // Get materials for this class without date filtering
+    const materials = await getClassMaterials(classSession.id);
     
-    if (nextDate) {
-      await fetchMaterialsForClass({
-        classId: classSession.id,
-        date: nextDate,
-        state,
-        setState,
-        selectedDayDetails,
-        setSelectedDayDetails
+    if (materials && materials.length > 0) {
+      console.log(`Found ${materials.length} materials for class ${classSession.id}`);
+      
+      // Update the classMaterials state
+      setState({
+        classMaterials: {
+          ...state.classMaterials,
+          [classSession.id]: materials
+        }
       });
-    }
-    
-    if (prevDate) {
-      await fetchMaterialsForClass({
-        classId: classSession.id,
-        date: prevDate,
-        state,
-        setState,
-        selectedDayDetails,
-        setSelectedDayDetails
-      });
+      
+      // Update the upcoming classes with the materials
+      const upcomingClassIndex = state.upcomingClasses.findIndex(c => c.id === classSession.id);
+      if (upcomingClassIndex !== -1) {
+        const updatedUpcomingClasses = [...state.upcomingClasses];
+        updatedUpcomingClasses[upcomingClassIndex] = {
+          ...updatedUpcomingClasses[upcomingClassIndex],
+          materials: materials
+        };
+        console.log(`Updating upcoming class ${classSession.id} with materials`);
+        setState({
+          upcomingClasses: updatedUpcomingClasses
+        });
+      }
+      
+      // Update the past classes with the materials
+      const pastClassIndex = state.pastClasses.findIndex(c => c.id === classSession.id);
+      if (pastClassIndex !== -1) {
+        const updatedPastClasses = [...state.pastClasses];
+        updatedPastClasses[pastClassIndex] = {
+          ...updatedPastClasses[pastClassIndex],
+          materials: materials
+        };
+        console.log(`Updating past class ${classSession.id} with materials`);
+        setState({
+          pastClasses: updatedPastClasses
+        });
+      }
+      
+      // Update selected day details if they exist and match the current class
+      if (selectedDayDetails && selectedDayDetails.classes.some((c: ClassSession) => c.id === classSession.id)) {
+        setSelectedDayDetails({
+          ...selectedDayDetails,
+          materials: {
+            ...selectedDayDetails.materials,
+            [classSession.id]: materials
+          }
+        });
+      }
     }
   });
 
