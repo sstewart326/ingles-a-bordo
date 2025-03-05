@@ -14,6 +14,8 @@ interface Translation {
   updateProfile: string;
   profileUpdated: string;
   language: string;
+  birthdate: string;
+  birthdateFormat: string;
   
   // Navigation
   dashboard: string;
@@ -190,6 +192,8 @@ const translations: Record<Language, Translation> = {
     updateProfile: 'Update Profile',
     profileUpdated: 'Profile updated successfully',
     language: 'Language',
+    birthdate: 'Birthdate',
+    birthdateFormat: 'MM-DD',
     
     // Navigation
     dashboard: 'Dashboard',
@@ -364,6 +368,8 @@ const translations: Record<Language, Translation> = {
     updateProfile: 'Atualizar Perfil',
     profileUpdated: 'Perfil atualizado com sucesso',
     language: 'Idioma',
+    birthdate: 'Data de Nascimento',
+    birthdateFormat: 'MM-DD',
     
     // Navigation
     dashboard: 'Painel',

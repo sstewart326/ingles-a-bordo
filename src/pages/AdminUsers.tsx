@@ -22,6 +22,7 @@ interface User {
   isTeacher?: boolean;
   status?: 'active' | 'pending';
   createdAt: string | Date;
+  birthdate?: string;  // Add birthdate to User interface
 }
 
 interface NewUser {
@@ -29,6 +30,7 @@ interface NewUser {
   name: string;
   isTeacher: boolean;
   isAdmin: boolean;
+  birthdate?: string;  // Optional birthdate field
   paymentConfig?: any;
 }
 
@@ -52,7 +54,8 @@ export const AdminUsers = () => {
     email: '', 
     name: '',
     isTeacher: false,
-    isAdmin: false
+    isAdmin: false,
+    birthdate: ''  // Initialize birthdate field
   });
   const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: string}>({});
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -253,6 +256,7 @@ export const AdminUsers = () => {
         isTeacher: newUser.isTeacher,
         status: 'pending',
         createdAt: new Date().toISOString(),
+        birthdate: newUser.birthdate || undefined  // Include birthdate in newUserData
       };
       
       // Use setCachedDocument to properly handle caching
@@ -268,7 +272,8 @@ export const AdminUsers = () => {
         email: '', 
         name: '', 
         isTeacher: false,
-        isAdmin: false
+        isAdmin: false,
+        birthdate: ''  // Reset birthdate field
       }); // Reset form
       
       // Hide the form
@@ -494,6 +499,50 @@ export const AdminUsers = () => {
                     placeholder={t.enterFullName}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="birthdate" className="block text-sm font-medium text-gray-700">
+                    {t.birthdate} <span className="text-gray-500">({t.optional})</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="birthdate"
+                    value={newUser.birthdate}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow empty value for optional field
+                      if (value === '') {
+                        setNewUser(prev => ({ ...prev, birthdate: '' }));
+                        return;
+                      }
+                      
+                      // Only allow digits and hyphen
+                      if (!/^[\d-]*$/.test(value)) return;
+                      
+                      // Auto-add hyphen after MM
+                      let formattedValue = value;
+                      if (value.length === 2 && !value.includes('-')) {
+                        formattedValue = value + '-';
+                      }
+                      
+                      // Limit to MM-DD format
+                      if (formattedValue.length > 5) return;
+                      
+                      // Validate month and day
+                      if (formattedValue.includes('-')) {
+                        const [month, day] = formattedValue.split('-');
+                        const monthNum = parseInt(month);
+                        const dayNum = parseInt(day);
+                        
+                        if (monthNum < 1 || monthNum > 12) return;
+                        if (dayNum < 1 || dayNum > 31) return;
+                      }
+                      
+                      setNewUser(prev => ({ ...prev, birthdate: formattedValue }));
+                    }}
+                    placeholder={t.birthdateFormat}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
                 <div>
