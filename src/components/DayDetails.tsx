@@ -69,7 +69,6 @@ export const DayDetails = ({
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [completedPayments, setCompletedPayments] = useState<Record<string, Payment[]>>({});
-  const [loading, setLoading] = useState(false);
   const CLASSES_PER_PAGE = 3;
   const detailsContainerRef = useRef<HTMLDivElement>(null);
   
@@ -85,7 +84,6 @@ export const DayDetails = ({
     const fetchCompletedPayments = async () => {
       if (!selectedDayDetails?.date || !selectedDayDetails.paymentsDue.length) return;
       
-      setLoading(true);
       const payments: Record<string, Payment[]> = {};
       
       for (const { classSession } of selectedDayDetails.paymentsDue) {
@@ -96,7 +94,6 @@ export const DayDetails = ({
       }
       
       setCompletedPayments(payments);
-      setLoading(false);
     };
 
     fetchCompletedPayments();
@@ -145,10 +142,6 @@ export const DayDetails = ({
     } catch (error) {
       console.error('Error marking payment as incomplete:', error);
     }
-  };
-
-  const isPaymentCompleted = (userId: string, classSessionId: string) => {
-    return completedPayments[classSessionId]?.some(payment => payment.userId === userId) ?? false;
   };
 
   const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (

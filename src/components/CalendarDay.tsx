@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
 import { ClassSession, User } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { Payment } from '../types/payment';
-import { getPaymentsForDates } from '../services/paymentService';
 
 export interface CalendarDayProps<T extends ClassSession> {
   date: Date;

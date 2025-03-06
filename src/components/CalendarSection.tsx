@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Calendar } from './Calendar';
-import { ClassTimeModal } from './CalendarComponents';
 import { CalendarDay } from './CalendarDay';
 import { ClassSession, User } from '../utils/scheduleUtils';
-import { useLanguage } from '../hooks/useLanguage';
-import { useTranslation } from '../translations';
 import { getPaymentsDueForDay } from '../utils/paymentUtils';
 import { getPaymentsForDates } from '../services/paymentService';
 import { Payment } from '../types/payment';
@@ -25,7 +22,6 @@ export const CalendarSection = ({
   upcomingClasses,
   onMonthChange,
   onDayClick,
-  formatStudentNames,
   isDateInRelevantMonthRange,
   getClassesForDay,
   users
@@ -33,8 +29,6 @@ export const CalendarSection = ({
   const [completedPayments, setCompletedPayments] = useState<Payment[]>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
   const previousMonthRef = useRef<string>('');
-  const { language } = useLanguage();
-  const t = useTranslation(language);
 
   // Pre-calculate all payment due dates for the month
   const getMonthPaymentDueDates = () => {
