@@ -781,188 +781,323 @@ export const AdminSchedule = () => {
         </div>
 
         {showAddForm && (
-          <div className="bg-white shadow-md rounded-lg p-4 mb-6">
-            <h2 className={styles.headings.h2}>{t.createNewClass}</h2>
-            <form onSubmit={handleCreateClass} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={styles.form.label}>{t.dayOfWeek}</label>
-                  <select
-                    value={newClass.dayOfWeek}
-                    onChange={(e) => {
-                      const newDayOfWeek = parseInt(e.target.value);
-                      const nextOccurrence = getNextDayOccurrence(newDayOfWeek);
-                      setNewClass(prev => ({ 
-                        ...prev, 
-                        dayOfWeek: newDayOfWeek,
-                        startDate: nextOccurrence
-                      }));
-                    }}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  >
-                    {DAYS_OF_WEEK.map((day, index) => (
-                      <option key={day} value={index}>{day}</option>
-                    ))}
-                  </select>
+          <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">{t.addNewClass}</h2>
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form onSubmit={handleCreateClass}>
+              {/* Class Configuration Section */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
+                  {"Class Configuration"}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={styles.form.label}>{t.students}</label>
+                    <Select
+                      isMulti
+                      value={studentOptions.filter(option => 
+                        newClass.studentEmails.includes(option.value)
+                      )}
+                      onChange={handleStudentChange}
+                      options={studentOptions}
+                      className="mt-1"
+                      classNamePrefix="select"
+                      placeholder={t.selectStudents}
+                      isClearable={true}
+                      closeMenuOnSelect={false}
+                      hideSelectedOptions={false}
+                      styles={customSelectStyles}
+                      menuPlacement="auto"
+                      maxMenuHeight={300}
+                    />
+                  </div>
+                  <div>
+                    <label className={styles.form.label}>{t.courseType}</label>
+                    <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
+                      {newClass.courseType}
+                      <span className="ml-2 text-gray-500 text-xs">
+                        (auto-determined by number of students)
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={styles.form.label}>{t.dayOfWeek}</label>
+                    <select
+                      value={newClass.dayOfWeek}
+                      onChange={(e) => {
+                        const newDayOfWeek = parseInt(e.target.value);
+                        const nextOccurrence = getNextDayOccurrence(newDayOfWeek);
+                        
+                        // Only update the start date if the day of week has changed
+                        const previousNextOccurrence = getNextDayOccurrence(newClass.dayOfWeek);
+                        const shouldUpdateStartDate = 
+                          newClass.startDate.getTime() === previousNextOccurrence.getTime();
+                        
+                        setNewClass(prev => ({ 
+                          ...prev, 
+                          dayOfWeek: newDayOfWeek,
+                          ...(shouldUpdateStartDate ? { 
+                            startDate: nextOccurrence,
+                            // Reset end date if it's now before the start date
+                            ...(prev.endDate && prev.endDate < nextOccurrence ? { endDate: null } : {})
+                          } : {})
+                        }));
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      {DAYS_OF_WEEK.map((day, index) => (
+                        <option key={day} value={index}>{day}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex space-x-4 md:col-span-1">
+                    <div className="flex-1">
+                      <label className={styles.form.label}>{"Start Time"}</label>
+                      <select
+                        value={newClass.startTime}
+                        onChange={(e) => handleStartTimeChange(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        {timeOptions.map(time => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className={styles.form.label}>{"End Time"}</label>
+                      <select
+                        value={newClass.endTime}
+                        onChange={(e) => handleEndTimeChange(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        {timeOptions.map(time => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
+                    <DatePicker
+                      selected={newClass.startDate}
+                      onChange={(date: Date | null) => {
+                        if (date) {
+                          setNewClass(prev => ({
+                            ...prev,
+                            startDate: date,
+                            // Reset end date if it's now before the start date
+                            ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
+                          }));
+                        }
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      showTimeSelect={false}
+                      dateFormat="MMMM d, yyyy"
+                      minDate={new Date()}
+                    />
+                  </div>
+                  <div>
+                    <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
+                    <DatePicker
+                      selected={newClass.endDate}
+                      onChange={(date: Date | null) => {
+                        setNewClass(prev => ({
+                          ...prev,
+                          endDate: date
+                        }));
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      showTimeSelect={false}
+                      dateFormat="MMMM d, yyyy"
+                      minDate={newClass.startDate}
+                      isClearable={true}
+                      placeholderText={t.noEndDate || "No end date"}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className={styles.form.label}>{t.notes}</label>
+                    <textarea
+                      value={newClass.notes}
+                      onChange={(e) => setNewClass(prev => ({ ...prev, notes: e.target.value }))}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      rows={3}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className={styles.form.label}>Payment Type</label>
-                  <select
-                    value={newClass.paymentConfig.type}
-                    onChange={(e) => {
-                      const type = e.target.value as 'weekly' | 'monthly';
-                      setNewClass(prev => {
-                        if (type === 'monthly') {
-                          // If switching to monthly, adjust the start date to a valid day (1, 15, or last day)
-                          const currentDate = (() => {
-                            const [year, month, day] = prev.paymentConfig.startDate.split('-').map(Number);
-                            const date = new Date();
-                            date.setFullYear(year);
-                            date.setMonth(month - 1); // Month is 0-indexed in JavaScript
-                            date.setDate(day);
-                            return date;
-                          })();
-                          
-                          const day = currentDate.getDate();
-                          const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-                          
-                          // Determine the closest valid day (1, 15, or last day)
-                          let newDay: number;
-                          if (day <= 8) {
-                            newDay = 1;
-                          } else if (day <= 23) {
-                            newDay = 15;
-                          } else {
-                            newDay = lastDayOfMonth;
+              </div>
+
+              {/* Payment Configuration Section */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
+                  {"Payment Configuration"}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={styles.form.label}>{"Payment Type"}</label>
+                    <select
+                      value={newClass.paymentConfig.type}
+                      onChange={(e) => {
+                        const type = e.target.value as 'weekly' | 'monthly';
+                        setNewClass(prev => {
+                          if (type === 'monthly') {
+                            // If switching to monthly, adjust the start date to a valid day (1, 15, or last day)
+                            const currentDate = (() => {
+                              const [year, month, day] = prev.paymentConfig.startDate.split('-').map(Number);
+                              const date = new Date();
+                              date.setFullYear(year);
+                              date.setMonth(month - 1); // Month is 0-indexed in JavaScript
+                              date.setDate(day);
+                              return date;
+                            })();
+                            
+                            const day = currentDate.getDate();
+                            const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+                            
+                            // Determine the closest valid day (1, 15, or last day)
+                            let newDay: number;
+                            if (day <= 8) {
+                              newDay = 1;
+                            } else if (day <= 23) {
+                              newDay = 15;
+                            } else {
+                              newDay = lastDayOfMonth;
+                            }
+                            
+                            // Determine the corresponding monthlyOption
+                            let monthlyOption: 'first' | 'fifteen' | 'last';
+                            if (newDay === 1) {
+                              monthlyOption = 'first';
+                            } else if (newDay === 15) {
+                              monthlyOption = 'fifteen';
+                            } else {
+                              monthlyOption = 'last';
+                            }
+                            
+                            // Create new date string with adjusted day
+                            const year = currentDate.getFullYear();
+                            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                            const adjustedDateStr = `${year}-${month}-${String(newDay).padStart(2, '0')}`;
+                            
+                            return {
+                              ...prev,
+                              paymentConfig: {
+                                type,
+                                startDate: adjustedDateStr,
+                                monthlyOption: monthlyOption,
+                                weeklyInterval: null
+                              }
+                            };
                           }
-                          
-                          // Determine the corresponding monthlyOption
-                          let monthlyOption: 'first' | 'fifteen' | 'last';
-                          if (newDay === 1) {
-                            monthlyOption = 'first';
-                          } else if (newDay === 15) {
-                            monthlyOption = 'fifteen';
-                          } else {
-                            monthlyOption = 'last';
-                          }
-                          
-                          // Create new date string with adjusted day
-                          const year = currentDate.getFullYear();
-                          const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-                          const adjustedDateStr = `${year}-${month}-${String(newDay).padStart(2, '0')}`;
                           
                           return {
                             ...prev,
                             paymentConfig: {
                               type,
-                              startDate: adjustedDateStr,
-                              monthlyOption: monthlyOption,
-                              weeklyInterval: null
+                              startDate: prev.paymentConfig.startDate,
+                              ...(type === 'weekly' 
+                                ? { weeklyInterval: 1, monthlyOption: null } 
+                                : { monthlyOption: 'first', weeklyInterval: null })
                             }
                           };
-                        }
-                        
-                        return {
-                          ...prev,
-                          paymentConfig: {
-                            type,
-                            startDate: prev.paymentConfig.startDate,
-                            ...(type === 'weekly' 
-                              ? { weeklyInterval: 1, monthlyOption: null } 
-                              : { monthlyOption: 'first', weeklyInterval: null })
-                          }
-                        };
-                      });
-                    }}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  >
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={styles.form.label}>{t.paymentStartDate || "Payment Start Date"}</label>
-                  <DatePicker
-                    selected={(() => {
-                      // Fix: Parse the date string correctly to avoid timezone issues
-                      const [year, month, day] = newClass.paymentConfig.startDate.split('-').map(Number);
-                      const date = new Date();
-                      date.setFullYear(year);
-                      date.setMonth(month - 1); // Month is 0-indexed in JavaScript
-                      date.setDate(day);
-                      date.setHours(12, 0, 0, 0); // Set to noon to avoid any timezone issues
-                      return date;
-                    })()}
-                    onChange={(date: Date | null) => {
-                      if (date) {
-                        // Validate date for monthly payment type
-                        if (newClass.paymentConfig.type === 'monthly') {
-                          const day = date.getDate();
-                          const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-                          
-                          // Only allow 1st, 15th, or last day of month for monthly payments
-                          if (day !== 1 && day !== 15 && day !== lastDayOfMonth) {
-                            toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+                        });
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={styles.form.label}>{t.paymentStartDate || "Payment Start Date"}</label>
+                    <DatePicker
+                      selected={(() => {
+                        // Fix: Parse the date string correctly to avoid timezone issues
+                        const [year, month, day] = newClass.paymentConfig.startDate.split('-').map(Number);
+                        const date = new Date();
+                        date.setFullYear(year);
+                        date.setMonth(month - 1); // Month is 0-indexed in JavaScript
+                        date.setDate(day);
+                        date.setHours(12, 0, 0, 0); // Set to noon to avoid any timezone issues
+                        return date;
+                      })()}
+                      onChange={(date: Date | null) => {
+                        if (date) {
+                          // Validate date for monthly payment type
+                          if (newClass.paymentConfig.type === 'monthly') {
+                            const day = date.getDate();
+                            const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                            
+                            // Only allow 1st, 15th, or last day of month for monthly payments
+                            if (day !== 1 && day !== 15 && day !== lastDayOfMonth) {
+                              toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+                              return;
+                            }
+                            
+                            // Automatically set the monthlyOption based on the selected date
+                            let monthlyOption: 'first' | 'fifteen' | 'last';
+                            if (day === 1) {
+                              monthlyOption = 'first';
+                            } else if (day === 15) {
+                              monthlyOption = 'fifteen';
+                            } else {
+                              monthlyOption = 'last';
+                            }
+                            
+                            // Fix: Use local date string to prevent timezone issues
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
+                            
+                            setNewClass(prev => ({
+                              ...prev,
+                              paymentConfig: {
+                                ...prev.paymentConfig,
+                                startDate: dateStr,
+                                monthlyOption: monthlyOption
+                              }
+                            }));
                             return;
                           }
                           
-                          // Automatically set the monthlyOption based on the selected date
-                          let monthlyOption: 'first' | 'fifteen' | 'last';
-                          if (day === 1) {
-                            monthlyOption = 'first';
-                          } else if (day === 15) {
-                            monthlyOption = 'fifteen';
-                          } else {
-                            monthlyOption = 'last';
-                          }
-                          
+                          // For weekly payments, just update the date
                           // Fix: Use local date string to prevent timezone issues
                           const year = date.getFullYear();
                           const month = String(date.getMonth() + 1).padStart(2, '0');
-                          const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const dateStr = `${year}-${month}-${day}`;
                           
                           setNewClass(prev => ({
                             ...prev,
                             paymentConfig: {
                               ...prev.paymentConfig,
-                              startDate: dateStr,
-                              monthlyOption: monthlyOption
+                              startDate: dateStr
                             }
                           }));
-                          return;
                         }
-                        
-                        // For weekly payments, just update the date
-                        // Fix: Use local date string to prevent timezone issues
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        const dateStr = `${year}-${month}-${day}`;
-                        
-                        setNewClass(prev => ({
-                          ...prev,
-                          paymentConfig: {
-                            ...prev.paymentConfig,
-                            startDate: dateStr
-                          }
-                        }));
-                      }
-                    }}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    showTimeSelect={false}
-                    dateFormat="MMMM d, yyyy"
-                    filterDate={(date) => {
-                      // For monthly payments, only allow selecting 1st, 15th, or last day of month
-                      if (newClass.paymentConfig.type === 'monthly') {
-                        const day = date.getDate();
-                        const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-                        return day === 1 || day === 15 || day === lastDayOfMonth;
-                      }
-                      return true; // No filter for weekly payments
-                    }}
-                  />
-                </div>
-                <div>
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      showTimeSelect={false}
+                      dateFormat="MMMM d, yyyy"
+                      filterDate={(date) => {
+                        // For monthly payments, only allow selecting 1st, 15th, or last day of month
+                        if (newClass.paymentConfig.type === 'monthly') {
+                          const day = date.getDate();
+                          const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                          return day === 1 || day === 15 || day === lastDayOfMonth;
+                        }
+                        return true; // No filter for weekly payments
+                      }}
+                    />
+                  </div>
                   {newClass.paymentConfig.type === 'weekly' ? (
                     <div>
                       <label htmlFor="weeklyInterval" className={styles.form.label}>
@@ -1007,72 +1142,16 @@ export const AdminSchedule = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex space-x-4 md:col-span-2">
-                  <div className="flex-1">
-                    <label className={styles.form.label}>{t.time}</label>
-                    <select
-                      value={newClass.startTime}
-                      onChange={(e) => handleStartTimeChange(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      {timeOptions.map(time => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex-1">
-                    <label className={styles.form.label}>{t.time}</label>
-                    <select
-                      value={newClass.endTime}
-                      onChange={(e) => handleEndTimeChange(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      {timeOptions.map(time => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className={styles.form.label}>{t.students}</label>
-                  <Select
-                    isMulti
-                    value={studentOptions.filter(option => 
-                      newClass.studentEmails.includes(option.value)
-                    )}
-                    onChange={handleStudentChange}
-                    options={studentOptions}
-                    className="mt-1"
-                    classNamePrefix="select"
-                    placeholder={t.selectStudents}
-                    isClearable={true}
-                    closeMenuOnSelect={false}
-                    hideSelectedOptions={false}
-                    styles={customSelectStyles}
-                    menuPlacement="auto"
-                    maxMenuHeight={300}
-                  />
-                </div>
-                <div>
-                  <label className={styles.form.label}>{t.courseType}</label>
-                  <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
-                    {newClass.courseType}
-                    <span className="ml-2 text-gray-500 text-xs">
-                      (auto-determined by number of students)
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className={styles.form.label}>{t.notes}</label>
-                  <textarea
-                    value={newClass.notes}
-                    onChange={(e) => setNewClass(prev => ({ ...prev, notes: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    rows={3}
-                  />
-                </div>
               </div>
+
               <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="mr-3 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  {t.cancel || "Cancel"}
+                </button>
                 <button
                   type="submit"
                   className={styles.buttons.primary}
@@ -1193,124 +1272,143 @@ export const AdminSchedule = () => {
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className={styles.form.label}>{t.dayOfWeek}</label>
-                  <select
-                    value={editingClass.dayOfWeek}
-                    onChange={(e) => setEditingClass(prev => ({ ...prev!, dayOfWeek: parseInt(e.target.value) }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  >
-                    {DAYS_OF_WEEK.map((day, index) => (
-                      <option key={day} value={index}>{day}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={styles.form.label}>{t.time}</label>
-                    <select
-                      value={editingClass.startTime}
-                      onChange={(e) => handleEditStartTimeChange(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      {timeOptions.map(time => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={styles.form.label}>{t.time}</label>
-                    <select
-                      value={editingClass.endTime}
-                      onChange={(e) => handleEditEndTimeChange(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      {timeOptions.map(time => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className={styles.form.label}>{t.courseType}</label>
-                  <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
-                    {editingClass.courseType}
-                    <span className="ml-2 text-gray-500 text-xs">
-                      (auto-determined by number of students)
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className={styles.form.label}>{t.students}</label>
-                  <Select
-                    isMulti
-                    value={studentOptions.filter(option => editingClass.studentEmails.includes(option.value))}
-                    onChange={(selected: MultiValue<SelectOption>) => {
-                      const selectedEmails = selected ? selected.map(option => option.value) : [];
-                      // Automatically determine course type based on number of students
-                      const courseType = selectedEmails.length === 1 ? 'Individual' : 
-                                         selectedEmails.length === 2 ? 'Pair' : 'Group';
-                      setEditingClass(prev => ({ 
-                        ...prev!, 
-                        studentEmails: selectedEmails,
-                        courseType: courseType
-                      }));
-                    }}
-                    options={studentOptions}
-                    className="mt-1"
-                    classNamePrefix="select"
-                    styles={customSelectStyles}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={styles.form.label}>{t.startDate || "Class Start Date"}</label>
-                    <DatePicker
-                      selected={editingClass.startDate}
-                      onChange={(date: Date | null) => {
-                        if (date) {
+              {/* Class Configuration Section */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
+                  {"Class Configuration"}
+                </h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={styles.form.label}>{t.students}</label>
+                      <Select
+                        isMulti
+                        value={studentOptions.filter(option => editingClass.studentEmails.includes(option.value))}
+                        onChange={(selected: MultiValue<SelectOption>) => {
+                          const selectedEmails = selected ? selected.map(option => option.value) : [];
+                          // Automatically determine course type based on number of students
+                          const courseType = selectedEmails.length === 1 ? 'Individual' : 
+                                            selectedEmails.length === 2 ? 'Pair' : 'Group';
+                          setEditingClass(prev => ({ 
+                            ...prev!, 
+                            studentEmails: selectedEmails,
+                            courseType: courseType
+                          }));
+                        }}
+                        options={studentOptions}
+                        className="mt-1"
+                        classNamePrefix="select"
+                        styles={customSelectStyles}
+                      />
+                    </div>
+                    <div>
+                      <label className={styles.form.label}>{t.courseType}</label>
+                      <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
+                        {editingClass.courseType}
+                        <span className="ml-2 text-gray-500 text-xs">
+                          (auto-determined by number of students)
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={styles.form.label}>{t.dayOfWeek}</label>
+                      <select
+                        value={editingClass.dayOfWeek}
+                        onChange={(e) => setEditingClass(prev => ({ ...prev!, dayOfWeek: parseInt(e.target.value) }))}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        {DAYS_OF_WEEK.map((day, index) => (
+                          <option key={day} value={index}>{day}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex space-x-4">
+                      <div className="flex-1">
+                        <label className={styles.form.label}>{"Start Time"}</label>
+                        <select
+                          value={editingClass.startTime}
+                          onChange={(e) => handleEditStartTimeChange(e.target.value)}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          {timeOptions.map(time => (
+                            <option key={time} value={time}>{time}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className={styles.form.label}>{"End Time"}</label>
+                        <select
+                          value={editingClass.endTime}
+                          onChange={(e) => handleEditEndTimeChange(e.target.value)}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          {timeOptions.map(time => (
+                            <option key={time} value={time}>{time}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={styles.form.label}>{t.startDate || "Class Start Date"}</label>
+                      <DatePicker
+                        selected={editingClass.startDate}
+                        onChange={(date: Date | null) => {
+                          if (date) {
+                            setEditingClass(prev => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                startDate: date,
+                                // Reset end date if it's now before the start date
+                                ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
+                              };
+                            });
+                          }
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        dateFormat="MMMM d, yyyy"
+                      />
+                    </div>
+                    <div>
+                      <label className={styles.form.label}>{t.endDate || "Class End Date"}</label>
+                      <DatePicker
+                        selected={editingClass.endDate}
+                        onChange={(date: Date | null) => {
                           setEditingClass(prev => {
                             if (!prev) return prev;
                             return {
                               ...prev,
-                              startDate: date
+                              endDate: date
                             };
                           });
-                        }
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      dateFormat="MMMM d, yyyy"
-                    />
-                  </div>
-                  <div>
-                    <label className={styles.form.label}>{t.endDate || "Class End Date"}</label>
-                    <DatePicker
-                      selected={editingClass.endDate}
-                      onChange={(date: Date | null) => {
-                        setEditingClass(prev => {
-                          if (!prev) return prev;
-                          return {
-                            ...prev,
-                            endDate: date
-                          };
-                        });
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      dateFormat="MMMM d, yyyy"
-                      isClearable={true}
-                      placeholderText="No end date"
-                    />
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        dateFormat="MMMM d, yyyy"
+                        isClearable={true}
+                        placeholderText="No end date"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={styles.form.label}>{t.notes}</label>
+                      <textarea
+                        value={editingClass.notes}
+                        onChange={(e) => setEditingClass(prev => ({ ...prev!, notes: e.target.value }))}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        rows={3}
+                      />
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
+              {/* Payment Configuration Section */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
+                  {"Payment Configuration"}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={styles.form.label}>Payment Type</label>
+                    <label className={styles.form.label}>{"Payment Type"}</label>
                     <select
                       value={editingClass.paymentConfig.type}
                       onChange={(e) => {
@@ -1489,92 +1587,80 @@ export const AdminSchedule = () => {
                       }}
                     />
                   </div>
-                </div>
-
-                {editingClass.paymentConfig.type === 'weekly' && (
-                  <div>
-                    <label htmlFor="edit-weeklyInterval" className={styles.form.label}>
-                      {t.weeklyInterval || "Payment Frequency"}
-                    </label>
-                    <div className="flex items-center">
-                      <input
-                        type="number"
-                        id="edit-weeklyInterval"
-                        min="1"
-                        value={editingClass.paymentConfig.weeklyInterval || 1}
-                        onChange={(e) => {
-                          const weeklyInterval = parseInt(e.target.value) || 1;
-                          setEditingClass(prev => {
-                            if (!prev) return prev;
-                            
-                            // Create a properly structured payment config
-                            const paymentConfig: PaymentConfig = {
-                              type: 'weekly',
-                              startDate: prev.paymentConfig.startDate,
-                              weeklyInterval
-                            };
-                            
-                            return {
-                              ...prev,
-                              paymentConfig
-                            };
-                          });
-                        }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      />
-                      <span className="ml-2">weeks</span>
-                    </div>
-                  </div>
-                )}
-
-                {editingClass.paymentConfig.type === 'monthly' && (
-                  <div>
-                    <label htmlFor="edit-monthlyOption" className={styles.form.label}>
-                      {t.selectPaymentDay || "Payment Day"}
-                      <span className="ml-1 text-gray-500 text-xs">
-                        (auto-set)
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-500 px-3 py-2 sm:text-sm flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        {editingClass.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
-                        {editingClass.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
-                        {editingClass.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                  {editingClass.paymentConfig.type === 'weekly' && (
+                    <div>
+                      <label htmlFor="edit-weeklyInterval" className={styles.form.label}>
+                        {t.weeklyInterval || "Payment Frequency"}
+                      </label>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          id="edit-weeklyInterval"
+                          min="1"
+                          value={editingClass.paymentConfig.weeklyInterval || 1}
+                          onChange={(e) => {
+                            const weeklyInterval = parseInt(e.target.value) || 1;
+                            setEditingClass(prev => {
+                              if (!prev) return prev;
+                              
+                              // Create a properly structured payment config
+                              const paymentConfig: PaymentConfig = {
+                                type: 'weekly',
+                                startDate: prev.paymentConfig.startDate,
+                                weeklyInterval
+                              };
+                              
+                              return {
+                                ...prev,
+                                paymentConfig
+                              };
+                            });
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        />
+                        <span className="ml-2">weeks</span>
                       </div>
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Payment day is automatically set based on the selected payment start date.
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <label className={styles.form.label}>{t.notes}</label>
-                  <textarea
-                    value={editingClass.notes}
-                    onChange={(e) => setEditingClass(prev => ({ ...prev!, notes: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    rows={3}
-                  />
+                  )}
+                  {editingClass.paymentConfig.type === 'monthly' && (
+                    <div>
+                      <label htmlFor="edit-monthlyOption" className={styles.form.label}>
+                        {t.selectPaymentDay || "Payment Day"}
+                        <span className="ml-1 text-gray-500 text-xs">
+                          (auto-set)
+                        </span>
+                      </label>
+                      <div className="relative">
+                        <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-500 px-3 py-2 sm:text-sm flex items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                          {editingClass.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
+                          {editingClass.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
+                          {editingClass.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                        </div>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Payment day is automatically set based on the selected payment start date.
+                      </p>
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                <div className="flex justify-end gap-2 mt-6">
-                  <button
-                    onClick={() => setEditingClass(null)}
-                    className={styles.buttons.cancel}
-                  >
-                    {t.cancel}
-                  </button>
-                  <button
-                    onClick={handleSaveChanges}
-                    className={styles.buttons.primary}
-                  >
-                    {t.save}
-                  </button>
-                </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => setEditingClass(null)}
+                  className={styles.buttons.cancel}
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  onClick={handleSaveChanges}
+                  className={styles.buttons.primary}
+                >
+                  {t.save}
+                </button>
               </div>
             </div>
           </div>

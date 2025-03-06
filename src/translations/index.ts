@@ -142,6 +142,7 @@ interface Translation {
   courseType: string;
   startDate: string;
   endDate: string;
+  classStartDate: string;
   actions: string;
   optional: string;
   selectStudents: string;
@@ -337,6 +338,7 @@ const translations: Record<Language, Translation> = {
     courseType: 'Course Type',
     startDate: 'Start Date',
     endDate: 'End Date',
+    classStartDate: 'Class Start Date',
     actions: 'Actions',
     optional: 'Optional',
     selectStudents: 'Select students...',
@@ -530,6 +532,7 @@ const translations: Record<Language, Translation> = {
     courseType: 'Tipo de Aula',
     startDate: 'Data de Início',
     endDate: 'Data de Término',
+    classStartDate: 'Data de Início da Aula',
     actions: 'Ações',
     optional: 'Opcional',
     selectStudents: 'Selecionar alunos...',
