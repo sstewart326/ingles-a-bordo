@@ -15,6 +15,7 @@ import { useTranslation } from '../translations';
 import { db } from '../config/firebase';
 import { getDocs, collection } from 'firebase/firestore';
 import { styles, classNames } from '../styles/styleUtils';
+import { getDayName } from '../utils/dateUtils';
 
 interface User {
   id: string;
@@ -742,12 +743,26 @@ export const AdminSchedule = () => {
               </div>
             </div>
             <div className="mt-2">
-              <span className="font-medium">Payment Amount:</span> {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
+              <div className={styles.card.label}>Payment Amount</div>
+              <div className="text-gray-800">
+                {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
+              </div>
             </div>
             <div className="mt-2">
-              <div className={styles.card.label}>{t.paymentStartDate || "Payment Start Date"}</div>
+              <div className={styles.card.label}>Payment Day</div>
               <div className="text-gray-800">
-                {new Date(classItem.paymentConfig?.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+                {classItem.paymentConfig?.type === 'weekly'
+                  ? (() => {
+                      const [year, month, day] = classItem.paymentConfig.startDate.split('-').map(Number);
+                      const date = new Date(year, month - 1, day);
+                      return getDayName(date.getDay(), t);
+                    })()
+                  : classItem.paymentConfig?.monthlyOption === 'first'
+                    ? '1st day of month'
+                    : classItem.paymentConfig?.monthlyOption === 'fifteen'
+                      ? '15th day of month'
+                      : 'Last day of month'
+                }
               </div>
             </div>
             <div className="mt-2">
@@ -1301,7 +1316,10 @@ export const AdminSchedule = () => {
                       Payment Type
                     </th>
                     <th scope="col" className={styles.table.header}>
-                      Payment Details
+                      Payment Amount
+                    </th>
+                    <th scope="col" className={styles.table.header}>
+                      Payment Day
                     </th>
                     <th scope="col" className={`${styles.table.header} text-center`}>
                       {t.actions}
@@ -1310,71 +1328,60 @@ export const AdminSchedule = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {classes.map((classItem) => (
-                    <tr key={classItem.id} className={styles.table.row}>
+                    <tr key={classItem.id}>
                       <td className={styles.table.cell}>
-                        <div className={styles.card.title}>{DAYS_OF_WEEK[classItem.dayOfWeek]}</div>
-                        <div className={styles.card.subtitle}>{classItem.startTime} - {classItem.endTime}</div>
+                        {getDayName(classItem.dayOfWeek, t)}<br />
+                        {classItem.startTime} - {classItem.endTime}
                       </td>
                       <td className={styles.table.cell}>
                         {classItem.courseType}
                       </td>
-                      <td className={`${styles.table.cell} whitespace-normal`}>
-                        <div className="max-h-24 overflow-y-auto">
-                          {classItem.studentEmails?.map(email => {
-                            const student = users.find(u => u.email === email);
-                            return student ? (
-                              <div key={`${classItem.id}-${email}`} className="mb-1">
-                                {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
-                              </div>
-                            ) : (
-                              <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
-                                {t.unknownEmail}: {email}
-                              </div>
-                            );
-                          })}
-                        </div>
+                      <td className={styles.table.cell}>
+                        {classItem.studentEmails.join(', ')}
                       </td>
                       <td className={styles.table.cell}>
-                        {classItem.paymentConfig?.type === 'weekly' ? 'Weekly' : 'Monthly'}
+                        {classItem.paymentConfig?.type === 'weekly'
+                          ? ((classItem.paymentConfig.weeklyInterval || 1) === 1
+                            ? 'Weekly'
+                            : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
+                          : classItem.paymentConfig?.monthlyOption === 'first'
+                            ? 'Monthly (1st day)'
+                            : classItem.paymentConfig?.monthlyOption === 'fifteen'
+                              ? 'Monthly (15th day)'
+                              : 'Monthly (last day)'
+                        }
+                        {classItem.paymentConfig?.paymentLink && (
+                          <div className="mt-1">
+                            <a 
+                              href={classItem.paymentConfig.paymentLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              Payment Link
+                            </a>
+                          </div>
+                        )}
                       </td>
                       <td className={styles.table.cell}>
-                        <div className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium">Payment:</span> {classItem.paymentConfig?.type === 'weekly'
-                            ? ((classItem.paymentConfig.weeklyInterval || 1) === 1
-                              ? 'Weekly'
-                              : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
-                            : classItem.paymentConfig?.monthlyOption === 'first'
-                              ? 'Monthly (1st day)'
-                              : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                                ? 'Monthly (15th day)'
-                                : 'Monthly (last day)'
-                          }
-                          {classItem.paymentConfig?.paymentLink && (
-                            <div className="mt-1">
-                              <a 
-                                href={classItem.paymentConfig.paymentLink} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                                Payment Link
-                              </a>
-                            </div>
-                          )}
-                        </div>
+                        {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
                       </td>
                       <td className={styles.table.cell}>
-                        <div className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium">Payment Amount:</span> {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
-                        </div>
-                      </td>
-                      <td className={styles.table.cell}>
-                        <div className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium">Payment Start Date:</span> {new Date(classItem.paymentConfig?.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
-                        </div>
+                        {classItem.paymentConfig?.type === 'weekly'
+                          ? (() => {
+                              const [year, month, day] = classItem.paymentConfig.startDate.split('-').map(Number);
+                              const date = new Date(year, month - 1, day);
+                              return getDayName(date.getDay(), t);
+                            })()
+                          : classItem.paymentConfig?.monthlyOption === 'first'
+                            ? '1st day of month'
+                            : classItem.paymentConfig?.monthlyOption === 'fifteen'
+                              ? '15th day of month'
+                              : 'Last day of month'
+                        }
                       </td>
                       <td className={`${styles.table.cell} text-center`}>
                         <div className="flex justify-center gap-2">
@@ -1421,7 +1428,7 @@ export const AdminSchedule = () => {
                 </h3>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                    <div className="md:col-span-2">
                       <label className={styles.form.label}>{t.students}</label>
                       <Select
                         isMulti

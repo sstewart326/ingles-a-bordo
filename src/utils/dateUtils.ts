@@ -41,6 +41,22 @@ export const getLocalDateString = (date: Date): string => {
   return localDate.toISOString().split('T')[0];
 };
 
+export const getDayName = (dayOfWeek: number | undefined, t: any): string => {
+  if (dayOfWeek === undefined) return '';
+  
+  const days = [
+    t.sunday || 'Sunday',
+    t.monday || 'Monday', 
+    t.tuesday || 'Tuesday', 
+    t.wednesday || 'Wednesday', 
+    t.thursday || 'Thursday', 
+    t.friday || 'Friday', 
+    t.saturday || 'Saturday'
+  ];
+  
+  return days[dayOfWeek];
+};
+
 export const startOfDay = (date: Date): Date => {
   const newDate = new Date(date);
   newDate.setHours(0, 0, 0, 0);
