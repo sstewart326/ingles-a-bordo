@@ -258,8 +258,12 @@ export const AdminUsers = () => {
         isTeacher: newUser.isTeacher,
         status: 'pending',
         createdAt: new Date().toISOString(),
-        birthdate: newUser.birthdate || undefined  // Include birthdate in newUserData
       };
+      
+      // Only add birthdate field if it's not empty
+      if (newUser.birthdate && newUser.birthdate.trim() !== '') {
+        newUserData.birthdate = newUser.birthdate.trim();
+      }
       
       // Use setCachedDocument to properly handle caching
       await setCachedDocument('users', tempId, newUserData, { userId: currentUser?.uid });
@@ -340,13 +344,22 @@ export const AdminUsers = () => {
         return;
       }
 
-      // Allow empty birthdate (optional field)
-      const birthdate = editingBirthdate.trim();
-      
-      await updateCachedDocument('users', userId, { 
-        birthdate: birthdate || undefined,
+      // Create update object
+      const updateData: any = {
         updatedAt: new Date().toISOString()
-      }, { userId: currentUser.uid });
+      };
+      
+      // Only add birthdate field if it's not empty
+      if (editingBirthdate.trim() !== '') {
+        updateData.birthdate = editingBirthdate.trim();
+      } else {
+        // If birthdate is empty and the user had a birthdate before,
+        // we need to remove it using Firebase's field deletion
+        // For now, we'll just set it to null which Firestore accepts
+        updateData.birthdate = null;
+      }
+      
+      await updateCachedDocument('users', userId, updateData, { userId: currentUser.uid });
 
       await fetchUsers();
       setEditingUserId(null);

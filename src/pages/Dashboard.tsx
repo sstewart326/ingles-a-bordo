@@ -44,8 +44,6 @@ export const Dashboard = () => {
   const t = useTranslation(language);
   const detailsRef = useRef<HTMLDivElement>(null);
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
-  const upcomingClassesSectionRef = useRef<HTMLDivElement | null>(null);
-  const pastClassesSectionRef = useRef<HTMLDivElement | null>(null);
 
   const {
     upcomingClasses,

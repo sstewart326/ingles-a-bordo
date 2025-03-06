@@ -80,12 +80,8 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       // For upcoming classes, we want to show them even if they haven't started yet
       // Only filter out if they have an end date that's passed
       if (c.endDate && c.endDate.toDate() < today) return false;
+      else return isThisWeek;
       
-      // Check if the class hasn't happened yet today
-      const hasntHappenedToday = c.dayOfWeek !== today.getDay() || 
-        (c.startTime && new Date().getHours() < parseInt(c.startTime.split(':')[0]));
-      
-      return isThisWeek && hasntHappenedToday;
     })
     .map(c => {
       // Preserve materials from existing classes
@@ -96,8 +92,20 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       // Skip sorting if dayOfWeek is undefined
       if (a.dayOfWeek === undefined || b.dayOfWeek === undefined) return 0;
       
-      // Sort by day of week first
-      const dayDiff = a.dayOfWeek - b.dayOfWeek;
+      const today = new Date().getDay();
+      
+      // Calculate days until each class (considering week wraparound)
+      const getDaysUntil = (dayOfWeek: number): number => {
+        const daysUntil = dayOfWeek - today;
+        // If the day is earlier in the week or today, it's next week
+        return daysUntil <= 0 ? daysUntil + 7 : daysUntil;
+      };
+      
+      const daysUntilA = getDaysUntil(a.dayOfWeek);
+      const daysUntilB = getDaysUntil(b.dayOfWeek);
+      
+      // Sort by days until first
+      const dayDiff = daysUntilA - daysUntilB;
       if (dayDiff !== 0) return dayDiff;
       
       // Then by start time
@@ -115,12 +123,7 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       // Check if the class has started based on start date
       const hasStarted = !c.startDate || c.startDate.toDate() <= today;
       if (!hasStarted) return false;
-      
-      // Check if the class has already happened today
-      const hasHappenedToday = c.dayOfWeek !== today.getDay() || 
-        (c.startTime && new Date().getHours() >= parseInt(c.startTime.split(':')[0]));
-      
-      return isThisWeek && hasHappenedToday;
+      else return isThisWeek;
     })
     .map(c => {
       // Preserve materials from existing classes

@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ClassSession, User } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
-import { FaFilePdf, FaLink, FaPlus, FaTrash, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaFilePdf, FaLink, FaPlus, FaTrash } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { UploadMaterialsForm } from './UploadMaterialsForm';
 import Modal from './Modal';
