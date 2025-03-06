@@ -106,6 +106,7 @@ interface Translation {
   error: string;
   success: string;
   of: string;
+  page: string;
 
   // Payment Configuration
   paymentConfiguration: string;
@@ -292,6 +293,7 @@ const translations: Record<Language, Translation> = {
     error: 'Error',
     success: 'Success',
     of: 'of',
+    page: 'Page',
 
     // Payment Configuration
     paymentConfiguration: 'Payment Configuration',
@@ -476,6 +478,7 @@ const translations: Record<Language, Translation> = {
     error: 'Erro',
     success: 'Sucesso',
     of: 'de',
+    page: 'Página',
 
     // Payment Configuration
     paymentConfiguration: 'Configuração de Pagamento',

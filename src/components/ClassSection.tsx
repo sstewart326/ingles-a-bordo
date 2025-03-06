@@ -98,9 +98,15 @@ export const ClassSection = ({
   // Log materials for each class
   displayedClasses.forEach((classSession, index) => {
     debugClassSession(classSession, index);
-    debugMaterials(classSession.id, classMaterials[classSession.id], 'classMaterials prop');
-    debugMaterials(classSession.id, classSession.materials, 'class.materials property');
+    if (classMaterials[classSession.id]) {
+      debugMaterials(classSession.id, classMaterials[classSession.id], 'classMaterials prop');
+    }
   });
+
+  const handlePageChange = (newPage: number) => {
+    onPageChange(newPage);
+    // No need to scroll here as the parent component will handle it
+  };
 
   const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (
     <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
@@ -375,7 +381,7 @@ export const ClassSection = ({
             {/* Pagination controls */}
             <div className="flex justify-between items-center mt-4">
               <button
-                onClick={() => onPageChange(Math.max(0, currentPage - 1))}
+                onClick={() => handlePageChange(Math.max(0, currentPage - 1))}
                 disabled={currentPage === 0}
                 className={`px-3 py-1 rounded ${
                   currentPage === 0
@@ -391,7 +397,7 @@ export const ClassSection = ({
               </span>
               
               <button
-                onClick={() => onPageChange(currentPage + 1)}
+                onClick={() => handlePageChange(currentPage + 1)}
                 disabled={!hasMore}
                 className={`px-3 py-1 rounded ${
                   !hasMore

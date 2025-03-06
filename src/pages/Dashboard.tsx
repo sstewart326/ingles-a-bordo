@@ -379,15 +379,21 @@ export const Dashboard = () => {
   const handleUpcomingClassesPagination = (newPage: number) => {
     setUpcomingClassesPage(newPage);
     setTimeout(() => {
-      upcomingClassesSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+      const upcomingSection = document.getElementById('upcoming-classes-section');
+      if (upcomingSection) {
+        upcomingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
   };
 
   const handlePastClassesPagination = (newPage: number) => {
     setPastClassesPage(newPage);
     setTimeout(() => {
-      pastClassesSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+      const pastSection = document.getElementById('past-classes-section');
+      if (pastSection) {
+        pastSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
   };
 
   const formatStudentNames = (studentEmails: string[]) => {

@@ -79,7 +79,7 @@ export const ClassesSection = ({
   return (
     <>
       {/* Past Classes section */}
-      <div>
+      <div ref={pastClassesSectionRef} id="past-classes-section">
         <ClassSection
           title={t.pastClasses}
           classes={pastClasses}
@@ -115,7 +115,7 @@ export const ClassesSection = ({
       </div>
 
       {/* Upcoming Classes section */}
-      <div className="mt-8 lg:mt-0">
+      <div className="mt-8 lg:mt-0" ref={upcomingClassesSectionRef} id="upcoming-classes-section">
         <ClassSection
           title={t.upcomingClasses}
           classes={upcomingClasses}

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ClassSession, User } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
-import { FaFilePdf, FaLink, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaFilePdf, FaLink, FaPlus, FaTrash, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { UploadMaterialsForm } from './UploadMaterialsForm';
 import Modal from './Modal';
@@ -63,6 +63,9 @@ export const DayDetails = ({
   const { language } = useLanguage();
   const t = useTranslation(language);
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
+  const [currentPage, setCurrentPage] = useState(0);
+  const CLASSES_PER_PAGE = 3;
+  const detailsContainerRef = useRef<HTMLDivElement>(null);
   
   const toggleTooltip = (key: string) => {
     setActiveTooltips(prev => ({
@@ -82,6 +85,37 @@ export const DayDetails = ({
     </Modal>
   );
 
+  // Reset pagination when selected day changes
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [selectedDayDetails?.date]);
+
+  // Calculate pagination values
+  const totalClasses = selectedDayDetails?.classes.length || 0;
+  const totalPages = Math.ceil(totalClasses / CLASSES_PER_PAGE);
+  const startIndex = currentPage * CLASSES_PER_PAGE;
+  const endIndex = Math.min(startIndex + CLASSES_PER_PAGE, totalClasses);
+  const paginatedClasses = selectedDayDetails?.classes.slice(startIndex, endIndex) || [];
+
+  const scrollToTop = () => {
+    const detailsSection = document.getElementById('day-details-section');
+    if (detailsSection) {
+      detailsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentPage(prev => Math.max(0, prev - 1));
+    // Use setTimeout to ensure the state has updated before scrolling
+    setTimeout(scrollToTop, 150);
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
+    // Use setTimeout to ensure the state has updated before scrolling
+    setTimeout(scrollToTop, 150);
+  };
+
   if (!selectedDayDetails) {
     return (
       <div className="bg-white shadow-md rounded-lg p-4">
@@ -91,7 +125,7 @@ export const DayDetails = ({
   }
 
   return (
-    <div className="bg-white shadow-md rounded-lg p-4 max-w-md">
+    <div className="bg-white shadow-md rounded-lg p-4 max-w-md" ref={detailsContainerRef} id="day-details-section">
       <h2 className={`${styles.headings.h2} text-black mb-4`}>
         {t.dayDetails || 'Day Details'}
       </h2>
@@ -124,7 +158,7 @@ export const DayDetails = ({
       
       {selectedDayDetails.classes.length > 0 ? (
         <div className="mt-4 space-y-4">
-          {selectedDayDetails.classes.map((classSession) => (
+          {paginatedClasses.map((classSession) => (
             <div key={classSession.id} className={styles.card.container}>
               <div className="flex justify-between items-start w-full">
                 <div className="w-full">
@@ -363,6 +397,39 @@ export const DayDetails = ({
               </div>
             </div>
           ))}
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4">
+              <button 
+                onClick={handlePreviousPage}
+                disabled={currentPage === 0}
+                className={`px-3 py-1 rounded ${
+                  currentPage === 0
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+              >
+                {t.previous || 'Previous'}
+              </button>
+              
+              <span className="text-sm text-gray-600">
+                {startIndex + 1}-{Math.min(endIndex, totalClasses)} {t.of || 'of'} {totalClasses}
+              </span>
+              
+              <button 
+                onClick={handleNextPage}
+                disabled={currentPage >= totalPages - 1}
+                className={`px-3 py-1 rounded ${
+                  currentPage >= totalPages - 1
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+              >
+                {t.next || 'Next'}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <p className="mt-2 text-gray-500">{t.noClassesScheduled}</p>
