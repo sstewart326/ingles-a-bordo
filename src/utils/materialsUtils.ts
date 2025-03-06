@@ -1,6 +1,6 @@
 import { ClassSession } from './scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
-import { getClassMaterials, updateClassMaterialItem } from './classMaterialsUtils';
+import { updateClassMaterialItem } from './classMaterialsUtils';
 import { getMonthKey } from './calendarUtils';
 import { toast } from 'react-hot-toast';
 

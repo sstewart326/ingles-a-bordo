@@ -1,6 +1,6 @@
-import { ClassSession, sortClassesByTime } from './scheduleUtils';
+import { ClassSession } from './scheduleUtils';
 import { getClassMaterials } from './classMaterialsUtils';
-import { getMonthKey, getNextClassDate, getPreviousClassDate } from './calendarUtils';
+import { getMonthKey } from './calendarUtils';
 import { toast } from 'react-hot-toast';
 import { ClassMaterial } from '../types/interfaces';
 
@@ -168,7 +168,7 @@ export const fetchMaterialsForClass = async ({
   setSelectedDayDetails
 }: FetchMaterialsParams) => {
   try {
-    const materials = await getClassMaterials(classId, date);
+    const materials = await getClassMaterials(classId);
     
     // Update the materials state
     setState({

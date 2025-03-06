@@ -23,9 +23,7 @@ interface RenderCalendarDayParams {
   dayClasses: ClassSession[];
   paymentsDue: { user: User; classSession: ClassSession }[];
   state: CalendarDayState;
-  formatStudentNames: (studentEmails: string[]) => string;
   t: { [key: string]: string };
-  language: string;
   users: User[];
 }
 
@@ -35,9 +33,7 @@ export const renderCalendarDay = ({
   dayClasses,
   paymentsDue,
   state,
-  formatStudentNames,
   t,
-  language,
   users
 }: RenderCalendarDayParams) => {
   const isPaymentDay = paymentsDue.length > 0;

@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { ClassSession } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
-import { useTranslation } from '../translations';
-import { useLanguage } from '../hooks/useLanguage';
 import { FaFilePdf, FaLink, FaPlus, FaTrash } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
@@ -75,7 +73,6 @@ export const ClassSection = ({
   sectionRef,
   t
 }: ClassSectionProps) => {
-  const { language } = useLanguage();
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
   
   const toggleTooltip = (key: string) => {

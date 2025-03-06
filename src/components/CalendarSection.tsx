@@ -10,8 +10,6 @@ import { getPaymentsDueForDay } from '../utils/paymentUtils';
 interface CalendarSectionProps {
   selectedDate: Date;
   upcomingClasses: ClassSession[];
-  loadedMonths: Set<string>;
-  setLoadedMonths: (months: Set<string>) => void;
   onMonthChange: (date: Date) => void;
   onDayClick: (date: Date, classes: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
   formatStudentNames: (studentEmails: string[]) => string;
@@ -23,8 +21,6 @@ interface CalendarSectionProps {
 export const CalendarSection = ({
   selectedDate,
   upcomingClasses,
-  loadedMonths,
-  setLoadedMonths,
   onMonthChange,
   onDayClick,
   formatStudentNames,
@@ -87,14 +83,12 @@ export const CalendarSection = ({
         setClassTimeModal,
         handleDayClick: onDayClick
       },
-      formatStudentNames,
       t: {
         class: t.class,
         paymentDue: t.paymentDue,
         birthday: t.birthday,
         birthdays: t.birthdays
       },
-      language,
       users
     });
 
@@ -188,7 +182,6 @@ export const CalendarSection = ({
           classes={classTimeModal.classes}
           date={classTimeModal.date}
           formatStudentNames={formatStudentNames}
-          onClose={() => setClassTimeModal(prev => ({ ...prev, isOpen: false }))}
         />
       )}
     </div>

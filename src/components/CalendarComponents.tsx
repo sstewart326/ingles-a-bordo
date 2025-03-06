@@ -9,7 +9,6 @@ interface CalendarDayProps {
   paymentsDue: { user: User; classSession: ClassSession }[];
   onClassCountClick: (e: React.MouseEvent, date: Date, dayClasses: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
   onPaymentPillClick: (e: React.MouseEvent, date: Date, dayClasses: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
-  formatStudentNames: (studentEmails: string[]) => string;
 }
 
 export const CalendarDay = ({
@@ -18,8 +17,7 @@ export const CalendarDay = ({
   dayClasses,
   paymentsDue,
   onClassCountClick,
-  onPaymentPillClick,
-  formatStudentNames
+  onPaymentPillClick
 }: CalendarDayProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -82,7 +80,6 @@ interface ClassTimeModalProps {
   classes: ClassSession[];
   date: Date;
   formatStudentNames: (studentEmails: string[]) => string;
-  onClose: () => void;
 }
 
 export const ClassTimeModal = ({
@@ -90,11 +87,9 @@ export const ClassTimeModal = ({
   position,
   classes,
   date,
-  formatStudentNames,
-  onClose
+  formatStudentNames
 }: ClassTimeModalProps) => {
   const { language } = useLanguage();
-  const t = useTranslation(language);
 
   if (!isOpen) return null;
 

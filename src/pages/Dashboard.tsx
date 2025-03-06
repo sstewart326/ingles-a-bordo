@@ -58,7 +58,6 @@ export const Dashboard = () => {
     selectedDayDetails,
     setUpcomingClasses,
     setPastClasses,
-    setLoadedMonths,
     setLoadedMaterialMonths,
     setSelectedDayDetails,
     setClassMaterials,
@@ -116,7 +115,7 @@ export const Dashboard = () => {
       
       for (const classSession of classes) {
         try {
-          const materials = await getClassMaterials(classSession.id, date);
+          const materials = await getClassMaterials(classSession.id);
           if (materials.length > 0) {
             materialsMap[classSession.id] = materials;
           }
@@ -566,8 +565,6 @@ export const Dashboard = () => {
         <CalendarSection
           selectedDate={selectedDate}
           upcomingClasses={upcomingClasses}
-          loadedMonths={loadedMonths}
-          setLoadedMonths={setLoadedMonths}
           onMonthChange={handleMonthChange}
           onDayClick={handleDayClick}
           formatStudentNames={formatStudentNames}

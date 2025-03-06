@@ -124,8 +124,7 @@ export const addClassMaterials = async (
 };
 
 export const getClassMaterials = async (
-  classId: string,
-  classDate?: Date
+  classId: string
 ): Promise<ClassMaterial[]> => {
   try {
     if (!classId) {

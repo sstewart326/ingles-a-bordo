@@ -43,7 +43,7 @@ const AdminMaterials = () => {
       setLoading(true);
 
       // Fetch materials for the selected date
-      const materials = await getClassMaterials(selectedClass.id, date);
+      const materials = await getClassMaterials(selectedClass.id);
       // Convert materials to include studentEmails if they don't have it
       const updatedMaterials = materials.map(material => ({
         ...material,
