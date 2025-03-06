@@ -9,6 +9,8 @@ interface ClassesSectionProps {
   classMaterials: Record<string, ClassMaterial[]>;
   editingNotes: { [classId: string]: string };
   savingNotes: { [classId: string]: boolean };
+  editingPrivateNotes: { [classId: string]: string };
+  savingPrivateNotes: { [classId: string]: boolean };
   deletingMaterial: { [materialId: string]: boolean };
   isAdmin: boolean;
   isMobileView: boolean;
@@ -22,6 +24,9 @@ interface ClassesSectionProps {
   onEditNotes: (classSession: ClassSession) => void;
   onSaveNotes: (classSession: ClassSession) => void;
   onCancelEditNotes: (classId: string) => void;
+  onEditPrivateNotes: (classSession: ClassSession) => void;
+  onSavePrivateNotes: (classSession: ClassSession) => void;
+  onCancelEditPrivateNotes: (classId: string) => void;
   onDeleteMaterial: (material: ClassMaterial, index: number, classId: string, type?: 'slides' | 'link', itemIndex?: number) => void;
   onOpenUploadForm: (classId: string) => void;
   onCloseUploadForm: () => void;
@@ -41,6 +46,8 @@ export const ClassesSection = ({
   classMaterials,
   editingNotes,
   savingNotes,
+  editingPrivateNotes,
+  savingPrivateNotes,
   deletingMaterial,
   isAdmin,
   isMobileView,
@@ -54,6 +61,9 @@ export const ClassesSection = ({
   onEditNotes,
   onSaveNotes,
   onCancelEditNotes,
+  onEditPrivateNotes,
+  onSavePrivateNotes,
+  onCancelEditPrivateNotes,
   onDeleteMaterial,
   onOpenUploadForm,
   onCloseUploadForm,
@@ -76,6 +86,8 @@ export const ClassesSection = ({
           classMaterials={classMaterials}
           editingNotes={editingNotes}
           savingNotes={savingNotes}
+          editingPrivateNotes={editingPrivateNotes}
+          savingPrivateNotes={savingPrivateNotes}
           deletingMaterial={deletingMaterial}
           isAdmin={isAdmin}
           formatStudentNames={formatStudentNames}
@@ -86,6 +98,9 @@ export const ClassesSection = ({
           onEditNotes={onEditNotes}
           onSaveNotes={onSaveNotes}
           onCancelEditNotes={onCancelEditNotes}
+          onEditPrivateNotes={onEditPrivateNotes}
+          onSavePrivateNotes={onSavePrivateNotes}
+          onCancelEditPrivateNotes={onCancelEditPrivateNotes}
           onDeleteMaterial={onDeleteMaterial}
           onOpenUploadForm={onOpenUploadForm}
           onCloseUploadForm={onCloseUploadForm}
@@ -95,6 +110,7 @@ export const ClassesSection = ({
           currentPage={pastClassesPage}
           onPageChange={onPastClassesPageChange}
           sectionRef={pastClassesSectionRef}
+          t={t}
         />
       </div>
 
@@ -106,6 +122,8 @@ export const ClassesSection = ({
           classMaterials={classMaterials}
           editingNotes={editingNotes}
           savingNotes={savingNotes}
+          editingPrivateNotes={editingPrivateNotes}
+          savingPrivateNotes={savingPrivateNotes}
           deletingMaterial={deletingMaterial}
           isAdmin={isAdmin}
           formatStudentNames={formatStudentNames}
@@ -116,6 +134,9 @@ export const ClassesSection = ({
           onEditNotes={onEditNotes}
           onSaveNotes={onSaveNotes}
           onCancelEditNotes={onCancelEditNotes}
+          onEditPrivateNotes={onEditPrivateNotes}
+          onSavePrivateNotes={onSavePrivateNotes}
+          onCancelEditPrivateNotes={onCancelEditPrivateNotes}
           onDeleteMaterial={onDeleteMaterial}
           onOpenUploadForm={onOpenUploadForm}
           onCloseUploadForm={onCloseUploadForm}
@@ -125,6 +146,7 @@ export const ClassesSection = ({
           currentPage={upcomingClassesPage}
           onPageChange={onUpcomingClassesPageChange}
           sectionRef={upcomingClassesSectionRef}
+          t={t}
         />
       </div>
     </>

@@ -71,6 +71,9 @@ interface Translation {
   date: string;
   time: string;
   notes: string;
+  notesInfo: string;
+  privateNotes: string;
+  privateNotesInfo: string;
   selectDayToViewDetails: string;
   availableClassDates: string;
   
@@ -254,6 +257,9 @@ const translations: Record<Language, Translation> = {
     date: 'Date',
     time: 'Time',
     notes: 'Notes',
+    notesInfo: 'Notes will be shared with students',
+    privateNotes: 'Private notes',
+    privateNotesInfo: 'Private notes will not be shared with students',
     selectDayToViewDetails: 'Select a day to view class details',
     availableClassDates: 'Available class dates',
     
@@ -290,7 +296,7 @@ const translations: Record<Language, Translation> = {
     // Payment Configuration
     paymentConfiguration: 'Payment Configuration',
     weeklyInterval: 'Weekly Interval',
-    selectPaymentDay: 'Select Payment Day',
+    selectPaymentDay: 'Payment Day',
     firstDayMonth: 'First day of month',
     fifteenthDayMonth: '15th of month',
     lastDayMonth: 'Last day of month',
@@ -435,6 +441,9 @@ const translations: Record<Language, Translation> = {
     date: 'Data',
     time: 'Horário',
     notes: 'Observações',
+    notesInfo: 'Observações serão compartilhadas com os alunos',
+    privateNotes: 'Observações privadas',
+    privateNotesInfo: 'Observações privadas não serão compartilhadas com os alunos',
     selectDayToViewDetails: 'Selecione um dia para ver os detalhes da aula',
     availableClassDates: 'Datas de aula disponíveis',
     
@@ -471,7 +480,7 @@ const translations: Record<Language, Translation> = {
     // Payment Configuration
     paymentConfiguration: 'Configuração de Pagamento',
     weeklyInterval: 'Intervalo Semanal',
-    selectPaymentDay: 'Selecionar Dia de Pagamento',
+    selectPaymentDay: 'Dia de Pagamento',
     firstDayMonth: 'Primeiro dia do mês',
     fifteenthDayMonth: 'Dia 15 do mês',
     lastDayMonth: 'Último dia do mês',

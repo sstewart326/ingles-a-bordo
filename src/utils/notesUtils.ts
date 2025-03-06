@@ -9,6 +9,8 @@ interface NotesState {
   editingNotes: { [classId: string]: string };
   savingNotes: { [classId: string]: boolean };
   textareaRefs: { [key: string]: HTMLTextAreaElement | null };
+  editingPrivateNotes: { [classId: string]: string };
+  savingPrivateNotes: { [classId: string]: boolean };
 }
 
 interface UpdateNotesParams {
@@ -27,17 +29,26 @@ interface UpdateNotesParams {
   pastClasses: ClassSession[];
   setUpcomingClasses: (classes: ClassSession[]) => void;
   setPastClasses: (classes: ClassSession[]) => void;
+  isPrivate?: boolean;
 }
 
 export const handleEditNotes = (
   classSession: ClassSession,
   state: NotesState,
-  setEditingNotes: (updates: { [classId: string]: string }) => void
+  setEditingNotes: (updates: { [classId: string]: string }) => void,
+  isPrivate: boolean = false
 ) => {
-  setEditingNotes({
-    ...state.editingNotes,
-    [classSession.id]: classSession.notes || ''
-  });
+  if (isPrivate) {
+    setEditingNotes({
+      ...state.editingPrivateNotes,
+      [classSession.id]: classSession.privateNotes || ''
+    });
+  } else {
+    setEditingNotes({
+      ...state.editingNotes,
+      [classSession.id]: classSession.notes || ''
+    });
+  }
 };
 
 export const handleSaveNotes = async ({
@@ -50,18 +61,29 @@ export const handleSaveNotes = async ({
   upcomingClasses,
   pastClasses,
   setUpcomingClasses,
-  setPastClasses
+  setPastClasses,
+  isPrivate = false
 }: UpdateNotesParams) => {
   try {
-    setState({
-      savingNotes: {
-        ...state.savingNotes,
-        [classSession.id]: true
-      }
-    });
+    if (isPrivate) {
+      setState({
+        savingPrivateNotes: {
+          ...state.savingPrivateNotes,
+          [classSession.id]: true
+        }
+      });
+    } else {
+      setState({
+        savingNotes: {
+          ...state.savingNotes,
+          [classSession.id]: true
+        }
+      });
+    }
     
     // Get the value directly from the textarea ref
-    const textareaValue = state.textareaRefs[classSession.id]?.value || '';
+    const textareaKey = isPrivate ? `private_${classSession.id}` : classSession.id;
+    const textareaValue = state.textareaRefs[textareaKey]?.value || '';
     
     // Convert Firebase Auth User to our custom User type
     const customUser = currentUser ? {
@@ -73,7 +95,7 @@ export const handleSaveNotes = async ({
     
     // Update in Firebase
     await updateCachedDocument('classes', classSession.id, {
-      notes: textareaValue,
+      [isPrivate ? 'privateNotes' : 'notes']: textareaValue,
       updatedAt: Timestamp.now()
     }, { userId: customUser?.id });
     
@@ -81,7 +103,7 @@ export const handleSaveNotes = async ({
     const updateClassList = (classes: ClassSession[]) => 
       classes.map(c => 
         c.id === classSession.id 
-          ? { ...c, notes: textareaValue } 
+          ? { ...c, [isPrivate ? 'privateNotes' : 'notes']: textareaValue } 
           : c
       );
     
@@ -96,35 +118,63 @@ export const handleSaveNotes = async ({
     }
     
     // Clear editing state for this class
-    const newEditingNotes = { ...state.editingNotes };
-    delete newEditingNotes[classSession.id];
-    setState({
-      editingNotes: newEditingNotes,
-      savingNotes: {
-        ...state.savingNotes,
-        [classSession.id]: false
-      }
-    });
+    if (isPrivate) {
+      const newEditingPrivateNotes = { ...state.editingPrivateNotes };
+      delete newEditingPrivateNotes[classSession.id];
+      setState({
+        editingPrivateNotes: newEditingPrivateNotes,
+        savingPrivateNotes: {
+          ...state.savingPrivateNotes,
+          [classSession.id]: false
+        }
+      });
+    } else {
+      const newEditingNotes = { ...state.editingNotes };
+      delete newEditingNotes[classSession.id];
+      setState({
+        editingNotes: newEditingNotes,
+        savingNotes: {
+          ...state.savingNotes,
+          [classSession.id]: false
+        }
+      });
+    }
     
-    toast.success('Notes saved successfully');
+    toast.success(isPrivate ? 'Private notes saved successfully' : 'Notes saved successfully');
   } catch (error) {
-    console.error('Error in handleSaveNotes:', error);
-    toast.error('Error saving notes');
-    setState({
-      savingNotes: {
-        ...state.savingNotes,
-        [classSession.id]: false
-      }
-    });
+    console.error(`Error in handleSaveNotes (${isPrivate ? 'private' : 'public'}):`, error);
+    toast.error(isPrivate ? 'Error saving private notes' : 'Error saving notes');
+    if (isPrivate) {
+      setState({
+        savingPrivateNotes: {
+          ...state.savingPrivateNotes,
+          [classSession.id]: false
+        }
+      });
+    } else {
+      setState({
+        savingNotes: {
+          ...state.savingNotes,
+          [classSession.id]: false
+        }
+      });
+    }
   }
 };
 
 export const handleCancelEditNotes = (
   classId: string,
   state: NotesState,
-  setEditingNotes: (updates: { [classId: string]: string }) => void
+  setEditingNotes: (updates: { [classId: string]: string }) => void,
+  isPrivate: boolean = false
 ) => {
-  const newEditingNotes = { ...state.editingNotes };
-  delete newEditingNotes[classId];
-  setEditingNotes(newEditingNotes);
+  if (isPrivate) {
+    const newEditingPrivateNotes = { ...state.editingPrivateNotes };
+    delete newEditingPrivateNotes[classId];
+    setEditingNotes(newEditingPrivateNotes);
+  } else {
+    const newEditingNotes = { ...state.editingNotes };
+    delete newEditingNotes[classId];
+    setEditingNotes(newEditingNotes);
+  }
 }; 

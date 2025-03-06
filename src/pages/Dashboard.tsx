@@ -31,6 +31,8 @@ export const Dashboard = () => {
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const [editingNotes, setEditingNotes] = useState<{[classId: string]: string}>({});
   const [savingNotes, setSavingNotes] = useState<{[classId: string]: boolean}>({});
+  const [editingPrivateNotes, setEditingPrivateNotes] = useState<{[classId: string]: string}>({});
+  const [savingPrivateNotes, setSavingPrivateNotes] = useState<{[classId: string]: boolean}>({});
   const [deletingMaterial, setDeletingMaterial] = useState<{[materialId: string]: boolean}>({});
   const [visibleUploadForm, setVisibleUploadForm] = useState<string | null>(null);
   const [upcomingClassesPage, setUpcomingClassesPage] = useState(0);
@@ -161,21 +163,40 @@ export const Dashboard = () => {
       {
         editingNotes,
         savingNotes,
-        textareaRefs: textareaRefs.current
+        textareaRefs: textareaRefs.current,
+        editingPrivateNotes,
+        savingPrivateNotes
       },
       setEditingNotes
     );
-  }, [editingNotes, savingNotes]);
+  }, [editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes]);
+
+  const handleEditPrivateNotes = useCallback((classSession: ClassSession) => {
+    handleEditNotesUtil(
+      classSession,
+      {
+        editingNotes,
+        savingNotes,
+        textareaRefs: textareaRefs.current,
+        editingPrivateNotes,
+        savingPrivateNotes
+      },
+      setEditingPrivateNotes,
+      true
+    );
+  }, [editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes]);
 
   const handleSaveNotes = useCallback(async (classSession: ClassSession) => {
     if (!currentUser) return;
-
+    
     await handleSaveNotesUtil({
       classSession,
       state: {
         editingNotes,
         savingNotes,
-        textareaRefs: textareaRefs.current
+        textareaRefs: textareaRefs.current,
+        editingPrivateNotes,
+        savingPrivateNotes
       },
       setState: (updates) => {
         if ('editingNotes' in updates) {
@@ -193,7 +214,38 @@ export const Dashboard = () => {
       setUpcomingClasses,
       setPastClasses
     });
-  }, [currentUser, editingNotes, savingNotes, selectedDayDetails, upcomingClasses, pastClasses]);
+  }, [currentUser, editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes, selectedDayDetails, upcomingClasses, pastClasses, setSelectedDayDetails, setUpcomingClasses, setPastClasses]);
+
+  const handleSavePrivateNotes = useCallback(async (classSession: ClassSession) => {
+    if (!currentUser) return;
+    
+    await handleSaveNotesUtil({
+      classSession,
+      state: {
+        editingNotes,
+        savingNotes,
+        textareaRefs: textareaRefs.current,
+        editingPrivateNotes,
+        savingPrivateNotes
+      },
+      setState: (updates) => {
+        if ('editingPrivateNotes' in updates) {
+          setEditingPrivateNotes(updates.editingPrivateNotes || {});
+        }
+        if ('savingPrivateNotes' in updates) {
+          setSavingPrivateNotes(updates.savingPrivateNotes || {});
+        }
+      },
+      currentUser,
+      selectedDayDetails,
+      setSelectedDayDetails,
+      upcomingClasses,
+      pastClasses,
+      setUpcomingClasses,
+      setPastClasses,
+      isPrivate: true
+    });
+  }, [currentUser, editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes, selectedDayDetails, upcomingClasses, pastClasses, setSelectedDayDetails, setUpcomingClasses, setPastClasses]);
 
   const handleCancelEditNotes = useCallback((classId: string) => {
     handleCancelEditNotesUtil(
@@ -201,11 +253,28 @@ export const Dashboard = () => {
       {
         editingNotes,
         savingNotes,
-        textareaRefs: textareaRefs.current
+        textareaRefs: textareaRefs.current,
+        editingPrivateNotes,
+        savingPrivateNotes
       },
       setEditingNotes
     );
-  }, [editingNotes, savingNotes]);
+  }, [editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes]);
+
+  const handleCancelEditPrivateNotes = useCallback((classId: string) => {
+    handleCancelEditNotesUtil(
+      classId,
+      {
+        editingNotes,
+        savingNotes,
+        textareaRefs: textareaRefs.current,
+        editingPrivateNotes,
+        savingPrivateNotes
+      },
+      setEditingPrivateNotes,
+      true
+    );
+  }, [editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes]);
 
   const handleDeleteMaterial = async (
     material: ClassMaterial,
@@ -451,7 +520,7 @@ export const Dashboard = () => {
           <h1 className={styles.headings.h1}>{t.dashboard}</h1>
         </div>
       </div>
-
+      
       {/* Classes sections - grid layout on desktop */}
       <div className="mt-8 lg:grid lg:grid-cols-2 lg:gap-8">
         <ClassesSection
@@ -460,6 +529,8 @@ export const Dashboard = () => {
           classMaterials={classMaterials}
           editingNotes={editingNotes}
           savingNotes={savingNotes}
+          editingPrivateNotes={editingPrivateNotes}
+          savingPrivateNotes={savingPrivateNotes}
           deletingMaterial={deletingMaterial}
           isAdmin={isAdmin}
           isMobileView={isMobileView}
@@ -473,6 +544,9 @@ export const Dashboard = () => {
           onEditNotes={handleEditNotes}
           onSaveNotes={handleSaveNotes}
           onCancelEditNotes={handleCancelEditNotes}
+          onEditPrivateNotes={handleEditPrivateNotes}
+          onSavePrivateNotes={handleSavePrivateNotes}
+          onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
           onDeleteMaterial={handleDeleteMaterial}
           onOpenUploadForm={openModal}
           onCloseUploadForm={closeModal}
@@ -506,19 +580,24 @@ export const Dashboard = () => {
         <div className="lg:col-span-1" ref={detailsRef}>
           <DayDetails
             selectedDayDetails={selectedDayDetails}
-            editingNotes={editingNotes}
-            savingNotes={savingNotes}
-            deletingMaterial={deletingMaterial}
-            isAdmin={isAdmin}
             formatStudentNames={formatStudentNames}
             formatClassTime={formatClassTime}
-            onEditNotes={handleEditNotes}
-            onSaveNotes={handleSaveNotes}
-            onCancelEditNotes={handleCancelEditNotes}
+            isAdmin={isAdmin}
+            editingNotes={editingNotes}
+            savingNotes={savingNotes}
+            editingPrivateNotes={editingPrivateNotes}
+            savingPrivateNotes={savingPrivateNotes}
+            deletingMaterial={deletingMaterial}
             onDeleteMaterial={handleDeleteMaterial}
             onOpenUploadForm={openModal}
             onCloseUploadForm={closeModal}
             visibleUploadForm={visibleUploadForm}
+            onEditNotes={handleEditNotes}
+            onSaveNotes={handleSaveNotes}
+            onCancelEditNotes={handleCancelEditNotes}
+            onEditPrivateNotes={handleEditPrivateNotes}
+            onSavePrivateNotes={handleSavePrivateNotes}
+            onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
             textareaRefs={textareaRefs.current}
           />
         </div>
@@ -527,8 +606,14 @@ export const Dashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-white">
-      <DashboardContent />
+    <div className="min-h-screen bg-gray-50">
+      {adminLoading ? (
+        <div className="flex justify-center items-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : (
+        <DashboardContent />
+      )}
     </div>
   );
 }; 

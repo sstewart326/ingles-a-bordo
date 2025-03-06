@@ -203,6 +203,20 @@ export const AdminSchedule = () => {
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate payment start date for monthly payments
+    if (newClass.paymentConfig.type === 'monthly') {
+      const [year, month, day] = newClass.paymentConfig.startDate.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      const dayOfMonth = date.getDate();
+      const lastDayOfMonth = new Date(year, month, 0).getDate();
+      
+      if (dayOfMonth !== 1 && dayOfMonth !== 15 && dayOfMonth !== lastDayOfMonth) {
+        toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+        return;
+      }
+    }
+    
     try {
       const now = Timestamp.now();
       
@@ -246,6 +260,11 @@ export const AdminSchedule = () => {
       await fetchClasses();
       setShowAddForm(false);
       const today = new Date();
+      
+      // Ensure the payment start date is valid for monthly payments
+      let paymentStartDate = today.toISOString().split('T')[0];
+      const paymentType = 'weekly'; // Default to weekly when resetting
+      
       setNewClass({
         dayOfWeek: 1,
         startTime: '09:00 AM',
@@ -256,10 +275,10 @@ export const AdminSchedule = () => {
         startDate: getNextDayOccurrence(1),
         endDate: null,
         paymentConfig: {
-          type: 'weekly',
+          type: paymentType,
           weeklyInterval: 1,
           monthlyOption: null,
-          startDate: today.toISOString().split('T')[0]
+          startDate: paymentStartDate
         }
       });
       toast.success('Class created successfully');
@@ -485,6 +504,19 @@ export const AdminSchedule = () => {
   // Function to handle saving all changes
   const handleSaveChanges = async () => {
     if (!editingClass) return;
+
+    // Validate payment start date for monthly payments
+    if (editingClass.paymentConfig.type === 'monthly') {
+      const [year, month, day] = editingClass.paymentConfig.startDate.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      const dayOfMonth = date.getDate();
+      const lastDayOfMonth = new Date(year, month, 0).getDate();
+      
+      if (dayOfMonth !== 1 && dayOfMonth !== 15 && dayOfMonth !== lastDayOfMonth) {
+        toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+        return;
+      }
+    }
 
     try {
       // Clean up payment config to remove undefined values
@@ -777,16 +809,71 @@ export const AdminSchedule = () => {
                   <label className={styles.form.label}>Payment Type</label>
                   <select
                     value={newClass.paymentConfig.type}
-                    onChange={(e) => setNewClass(prev => ({
-                      ...prev,
-                      paymentConfig: {
-                        ...prev.paymentConfig,
-                        type: e.target.value as 'weekly' | 'monthly',
-                        // Set default values based on type
-                        weeklyInterval: e.target.value === 'weekly' ? 1 : null,
-                        monthlyOption: e.target.value === 'monthly' ? 'first' : null
-                      }
-                    }))}
+                    onChange={(e) => {
+                      const type = e.target.value as 'weekly' | 'monthly';
+                      setNewClass(prev => {
+                        if (type === 'monthly') {
+                          // If switching to monthly, adjust the start date to a valid day (1, 15, or last day)
+                          const currentDate = (() => {
+                            const [year, month, day] = prev.paymentConfig.startDate.split('-').map(Number);
+                            const date = new Date();
+                            date.setFullYear(year);
+                            date.setMonth(month - 1); // Month is 0-indexed in JavaScript
+                            date.setDate(day);
+                            return date;
+                          })();
+                          
+                          const day = currentDate.getDate();
+                          const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+                          
+                          // Determine the closest valid day (1, 15, or last day)
+                          let newDay: number;
+                          if (day <= 8) {
+                            newDay = 1;
+                          } else if (day <= 23) {
+                            newDay = 15;
+                          } else {
+                            newDay = lastDayOfMonth;
+                          }
+                          
+                          // Determine the corresponding monthlyOption
+                          let monthlyOption: 'first' | 'fifteen' | 'last';
+                          if (newDay === 1) {
+                            monthlyOption = 'first';
+                          } else if (newDay === 15) {
+                            monthlyOption = 'fifteen';
+                          } else {
+                            monthlyOption = 'last';
+                          }
+                          
+                          // Create new date string with adjusted day
+                          const year = currentDate.getFullYear();
+                          const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                          const adjustedDateStr = `${year}-${month}-${String(newDay).padStart(2, '0')}`;
+                          
+                          return {
+                            ...prev,
+                            paymentConfig: {
+                              type,
+                              startDate: adjustedDateStr,
+                              monthlyOption: monthlyOption,
+                              weeklyInterval: null
+                            }
+                          };
+                        }
+                        
+                        return {
+                          ...prev,
+                          paymentConfig: {
+                            type,
+                            startDate: prev.paymentConfig.startDate,
+                            ...(type === 'weekly' 
+                              ? { weeklyInterval: 1, monthlyOption: null } 
+                              : { monthlyOption: 'first', weeklyInterval: null })
+                          }
+                        };
+                      });
+                    }}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   >
                     <option value="weekly">Weekly</option>
@@ -808,6 +895,44 @@ export const AdminSchedule = () => {
                     })()}
                     onChange={(date: Date | null) => {
                       if (date) {
+                        // Validate date for monthly payment type
+                        if (newClass.paymentConfig.type === 'monthly') {
+                          const day = date.getDate();
+                          const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                          
+                          // Only allow 1st, 15th, or last day of month for monthly payments
+                          if (day !== 1 && day !== 15 && day !== lastDayOfMonth) {
+                            toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+                            return;
+                          }
+                          
+                          // Automatically set the monthlyOption based on the selected date
+                          let monthlyOption: 'first' | 'fifteen' | 'last';
+                          if (day === 1) {
+                            monthlyOption = 'first';
+                          } else if (day === 15) {
+                            monthlyOption = 'fifteen';
+                          } else {
+                            monthlyOption = 'last';
+                          }
+                          
+                          // Fix: Use local date string to prevent timezone issues
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
+                          
+                          setNewClass(prev => ({
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              startDate: dateStr,
+                              monthlyOption: monthlyOption
+                            }
+                          }));
+                          return;
+                        }
+                        
+                        // For weekly payments, just update the date
                         // Fix: Use local date string to prevent timezone issues
                         const year = date.getFullYear();
                         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -826,6 +951,15 @@ export const AdminSchedule = () => {
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     showTimeSelect={false}
                     dateFormat="MMMM d, yyyy"
+                    filterDate={(date) => {
+                      // For monthly payments, only allow selecting 1st, 15th, or last day of month
+                      if (newClass.paymentConfig.type === 'monthly') {
+                        const day = date.getDate();
+                        const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                        return day === 1 || day === 15 || day === lastDayOfMonth;
+                      }
+                      return true; // No filter for weekly payments
+                    }}
                   />
                 </div>
                 <div>
@@ -856,23 +990,20 @@ export const AdminSchedule = () => {
                     <div>
                       <label htmlFor="monthlyOption" className={styles.form.label}>
                         {t.selectPaymentDay || "Payment Day"}
+                        <span className="ml-1 text-gray-500 text-xs">
+                          (auto-set)
+                        </span>
                       </label>
-                      <select
-                        id="monthlyOption"
-                        value={newClass.paymentConfig.monthlyOption || 'first'}
-                        onChange={(e) => setNewClass(prev => ({
-                          ...prev,
-                          paymentConfig: {
-                            ...prev.paymentConfig,
-                            monthlyOption: e.target.value as 'first' | 'fifteen' | 'last'
-                          }
-                        }))}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      >
-                        <option value="first">{t.firstDayMonth}</option>
-                        <option value="fifteen">{t.fifteenthDayMonth}</option>
-                        <option value="last">{t.lastDayMonth}</option>
-                      </select>
+                      <div className="relative">
+                        <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-500 px-3 py-2 sm:text-sm flex items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                          {newClass.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
+                          {newClass.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
+                          {newClass.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -921,6 +1052,15 @@ export const AdminSchedule = () => {
                     menuPlacement="auto"
                     maxMenuHeight={300}
                   />
+                </div>
+                <div>
+                  <label className={styles.form.label}>{t.courseType}</label>
+                  <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
+                    {newClass.courseType}
+                    <span className="ml-2 text-gray-500 text-xs">
+                      (auto-determined by number of students)
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <label className={styles.form.label}>{t.notes}</label>
@@ -1096,15 +1236,12 @@ export const AdminSchedule = () => {
 
                 <div>
                   <label className={styles.form.label}>{t.courseType}</label>
-                  <select
-                    value={editingClass.courseType}
-                    onChange={(e) => setEditingClass(prev => ({ ...prev!, courseType: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  >
-                    <option value="Individual">Individual</option>
-                    <option value="Pair">Pair</option>
-                    <option value="Group">Group</option>
-                  </select>
+                  <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
+                    {editingClass.courseType}
+                    <span className="ml-2 text-gray-500 text-xs">
+                      (auto-determined by number of students)
+                    </span>
+                  </div>
                 </div>
 
                 <div>
@@ -1114,13 +1251,61 @@ export const AdminSchedule = () => {
                     value={studentOptions.filter(option => editingClass.studentEmails.includes(option.value))}
                     onChange={(selected: MultiValue<SelectOption>) => {
                       const selectedEmails = selected ? selected.map(option => option.value) : [];
-                      setEditingClass(prev => ({ ...prev!, studentEmails: selectedEmails }));
+                      // Automatically determine course type based on number of students
+                      const courseType = selectedEmails.length === 1 ? 'Individual' : 
+                                         selectedEmails.length === 2 ? 'Pair' : 'Group';
+                      setEditingClass(prev => ({ 
+                        ...prev!, 
+                        studentEmails: selectedEmails,
+                        courseType: courseType
+                      }));
                     }}
                     options={studentOptions}
                     className="mt-1"
                     classNamePrefix="select"
                     styles={customSelectStyles}
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={styles.form.label}>{t.startDate || "Class Start Date"}</label>
+                    <DatePicker
+                      selected={editingClass.startDate}
+                      onChange={(date: Date | null) => {
+                        if (date) {
+                          setEditingClass(prev => {
+                            if (!prev) return prev;
+                            return {
+                              ...prev,
+                              startDate: date
+                            };
+                          });
+                        }
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      dateFormat="MMMM d, yyyy"
+                    />
+                  </div>
+                  <div>
+                    <label className={styles.form.label}>{t.endDate || "Class End Date"}</label>
+                    <DatePicker
+                      selected={editingClass.endDate}
+                      onChange={(date: Date | null) => {
+                        setEditingClass(prev => {
+                          if (!prev) return prev;
+                          return {
+                            ...prev,
+                            endDate: date
+                          };
+                        });
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      dateFormat="MMMM d, yyyy"
+                      isClearable={true}
+                      placeholderText="No end date"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1132,6 +1317,58 @@ export const AdminSchedule = () => {
                         const type = e.target.value as 'weekly' | 'monthly';
                         setEditingClass(prev => {
                           if (!prev) return prev;
+                          
+                          if (type === 'monthly') {
+                            // If switching to monthly, adjust the start date to a valid day (1, 15, or last day)
+                            const currentDate = (() => {
+                              const [year, month, day] = prev.paymentConfig.startDate.split('-').map(Number);
+                              const date = new Date();
+                              date.setFullYear(year);
+                              date.setMonth(month - 1); // Month is 0-indexed in JavaScript
+                              date.setDate(day);
+                              return date;
+                            })();
+                            
+                            const day = currentDate.getDate();
+                            const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+                            
+                            // Determine the closest valid day (1, 15, or last day)
+                            let newDay: number;
+                            if (day <= 8) {
+                              newDay = 1;
+                            } else if (day <= 23) {
+                              newDay = 15;
+                            } else {
+                              newDay = lastDayOfMonth;
+                            }
+                            
+                            // Determine the corresponding monthlyOption
+                            let monthlyOption: 'first' | 'fifteen' | 'last';
+                            if (newDay === 1) {
+                              monthlyOption = 'first';
+                            } else if (newDay === 15) {
+                              monthlyOption = 'fifteen';
+                            } else {
+                              monthlyOption = 'last';
+                            }
+                            
+                            // Create new date string with adjusted day
+                            const year = currentDate.getFullYear();
+                            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                            const adjustedDateStr = `${year}-${month}-${String(newDay).padStart(2, '0')}`;
+                            
+                            // Create a properly structured payment config
+                            const paymentConfig: PaymentConfig = {
+                              type,
+                              startDate: adjustedDateStr,
+                              monthlyOption: monthlyOption
+                            };
+                            
+                            return {
+                              ...prev,
+                              paymentConfig
+                            };
+                          }
                           
                           // Create a properly structured payment config
                           const paymentConfig: PaymentConfig = {
@@ -1169,6 +1406,51 @@ export const AdminSchedule = () => {
                       })()}
                       onChange={(date: Date | null) => {
                         if (date) {
+                          // Validate date for monthly payment type
+                          if (editingClass.paymentConfig.type === 'monthly') {
+                            const day = date.getDate();
+                            const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                            
+                            // Only allow 1st, 15th, or last day of month for monthly payments
+                            if (day !== 1 && day !== 15 && day !== lastDayOfMonth) {
+                              toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+                              return;
+                            }
+                            
+                            // Automatically set the monthlyOption based on the selected date
+                            let monthlyOption: 'first' | 'fifteen' | 'last';
+                            if (day === 1) {
+                              monthlyOption = 'first';
+                            } else if (day === 15) {
+                              monthlyOption = 'fifteen';
+                            } else {
+                              monthlyOption = 'last';
+                            }
+                            
+                            // Fix: Use local date string to prevent timezone issues
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
+                            
+                            setEditingClass(prev => {
+                              if (!prev) return prev;
+                              
+                              // Create a properly structured payment config
+                              const paymentConfig: PaymentConfig = {
+                                type: prev.paymentConfig.type,
+                                startDate: dateStr,
+                                monthlyOption: monthlyOption
+                              };
+                              
+                              return {
+                                ...prev,
+                                paymentConfig
+                              };
+                            });
+                            return;
+                          }
+                          
+                          // For weekly payments, just update the date
                           // Fix: Use local date string to prevent timezone issues
                           const year = date.getFullYear();
                           const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -1196,6 +1478,15 @@ export const AdminSchedule = () => {
                       }}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       dateFormat="MMMM d, yyyy"
+                      filterDate={(date) => {
+                        // For monthly payments, only allow selecting 1st, 15th, or last day of month
+                        if (editingClass.paymentConfig.type === 'monthly') {
+                          const day = date.getDate();
+                          const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                          return day === 1 || day === 15 || day === lastDayOfMonth;
+                        }
+                        return true; // No filter for weekly payments
+                      }}
                     />
                   </div>
                 </div>
@@ -1240,34 +1531,23 @@ export const AdminSchedule = () => {
                   <div>
                     <label htmlFor="edit-monthlyOption" className={styles.form.label}>
                       {t.selectPaymentDay || "Payment Day"}
+                      <span className="ml-1 text-gray-500 text-xs">
+                        (auto-set)
+                      </span>
                     </label>
-                    <select
-                      id="edit-monthlyOption"
-                      value={editingClass.paymentConfig.monthlyOption || 'first'}
-                      onChange={(e) => {
-                        const monthlyOption = e.target.value as 'first' | 'fifteen' | 'last';
-                        setEditingClass(prev => {
-                          if (!prev) return prev;
-                          
-                          // Create a properly structured payment config
-                          const paymentConfig: PaymentConfig = {
-                            type: 'monthly',
-                            startDate: prev.paymentConfig.startDate,
-                            monthlyOption
-                          };
-                          
-                          return {
-                            ...prev,
-                            paymentConfig
-                          };
-                        });
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      <option value="first">{t.firstDayMonth}</option>
-                      <option value="fifteen">{t.fifteenthDayMonth}</option>
-                      <option value="last">{t.lastDayMonth}</option>
-                    </select>
+                    <div className="relative">
+                      <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-500 px-3 py-2 sm:text-sm flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        {editingClass.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
+                        {editingClass.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
+                        {editingClass.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                      </div>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Payment day is automatically set based on the selected payment start date.
+                    </p>
                   </div>
                 )}
 

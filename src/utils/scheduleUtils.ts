@@ -12,6 +12,7 @@ export interface ClassSession {
   endTime?: string;
   courseType?: string;
   notes?: string;
+  privateNotes?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   endDate?: Timestamp;
