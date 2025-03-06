@@ -30,6 +30,7 @@ interface PaymentConfig {
   weeklyInterval?: number;  // for weekly payments, number of weeks
   monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
   startDate: string;  // YYYY-MM-DD date string
+  paymentLink?: string;  // URL for payment
 }
 
 interface Class {
@@ -94,6 +95,7 @@ interface NewClass {
     weeklyInterval: number | null;
     monthlyOption: 'first' | 'fifteen' | 'last' | null;
     startDate: string;  // YYYY-MM-DD date string
+    paymentLink?: string;  // URL for payment
   };
 }
 
@@ -120,7 +122,8 @@ export const AdminSchedule = () => {
         type: 'weekly',
         weeklyInterval: 1,
         monthlyOption: null,
-        startDate: today.toISOString().split('T')[0]
+        startDate: today.toISOString().split('T')[0],
+        paymentLink: ''
       }
     };
   });
@@ -236,7 +239,8 @@ export const AdminSchedule = () => {
         } : { 
           weeklyInterval: null,
           monthlyOption: newClass.paymentConfig.monthlyOption || 'first'
-        })
+        }),
+        paymentLink: newClass.paymentConfig.paymentLink || ''
       };
       
       const classData = {
@@ -278,7 +282,8 @@ export const AdminSchedule = () => {
           type: paymentType,
           weeklyInterval: 1,
           monthlyOption: null,
-          startDate: paymentStartDate
+          startDate: paymentStartDate,
+          paymentLink: ''
         }
       });
       toast.success('Class created successfully');
@@ -482,9 +487,10 @@ export const AdminSchedule = () => {
     const paymentConfig: PaymentConfig = {
       type: classItem.paymentConfig.type,
       startDate: classItem.paymentConfig.startDate,
-      ...(classItem.paymentConfig.type === 'weekly' 
-        ? { weeklyInterval: classItem.paymentConfig.weeklyInterval || 1 } 
-        : { monthlyOption: classItem.paymentConfig.monthlyOption || 'first' })
+      ...(classItem.paymentConfig.type === 'weekly'
+        ? { weeklyInterval: classItem.paymentConfig.weeklyInterval || 1 }
+        : { monthlyOption: classItem.paymentConfig.monthlyOption || 'first' }),
+      paymentLink: classItem.paymentConfig.paymentLink || ''
     };
 
     setEditingClass({
@@ -523,13 +529,14 @@ export const AdminSchedule = () => {
       const paymentConfig = {
         type: editingClass.paymentConfig.type,
         startDate: editingClass.paymentConfig.startDate,
-        ...(editingClass.paymentConfig.type === 'weekly' ? { 
+        ...(editingClass.paymentConfig.type === 'weekly' ? {
           weeklyInterval: editingClass.paymentConfig.weeklyInterval || 1,
           monthlyOption: null
-        } : { 
+        } : {
           weeklyInterval: null,
           monthlyOption: editingClass.paymentConfig.monthlyOption || 'first'
-        })
+        }),
+        paymentLink: editingClass.paymentConfig.paymentLink || ''
       };
 
       const updateData = {
@@ -585,9 +592,10 @@ export const AdminSchedule = () => {
       const paymentConfig: PaymentConfig = {
         type: prev.paymentConfig.type,
         startDate: prev.paymentConfig.startDate,
-        ...(prev.paymentConfig.type === 'weekly' 
-          ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 } 
-          : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' })
+        ...(prev.paymentConfig.type === 'weekly'
+          ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 }
+          : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' }),
+        paymentLink: prev.paymentConfig.paymentLink || ''
       };
       
       return {
@@ -608,9 +616,10 @@ export const AdminSchedule = () => {
       const paymentConfig: PaymentConfig = {
         type: prev.paymentConfig.type,
         startDate: prev.paymentConfig.startDate,
-        ...(prev.paymentConfig.type === 'weekly' 
-          ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 } 
-          : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' })
+        ...(prev.paymentConfig.type === 'weekly'
+          ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 }
+          : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' }),
+        paymentLink: prev.paymentConfig.paymentLink || ''
       };
       
       // Parse both times
@@ -690,8 +699,8 @@ export const AdminSchedule = () => {
             </div>
             <div className="mt-2">
               <div className={styles.card.label}>Payment Details</div>
-              <div className="text-gray-800">
-                {classItem.paymentConfig?.type === 'weekly' 
+              <div className="text-sm text-gray-600 mt-1">
+                <span className="font-medium">Payment:</span> {classItem.paymentConfig?.type === 'weekly' 
                   ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
                       ? 'Every week' 
                       : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
@@ -701,6 +710,21 @@ export const AdminSchedule = () => {
                       ? '15th day of month'
                       : 'Last day of month'
                 }
+                {classItem.paymentConfig?.paymentLink && (
+                  <div className="mt-1">
+                    <a 
+                      href={classItem.paymentConfig.paymentLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      Payment Link
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
             <div className="mt-2">
@@ -757,7 +781,8 @@ export const AdminSchedule = () => {
                       type: 'weekly',
                       weeklyInterval: 1,
                       monthlyOption: null,
-                      startDate: today.toISOString().split('T')[0]
+                      startDate: today.toISOString().split('T')[0],
+                      paymentLink: ''
                     }
                   });
                 }
@@ -1139,8 +1164,34 @@ export const AdminSchedule = () => {
                           {newClass.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
                         </div>
                       </div>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Payment day is automatically set based on the selected payment start date.
+                      </p>
                     </div>
                   )}
+                  
+                  <div>
+                    <label htmlFor="paymentLink" className={styles.form.label}>
+                      Payment Link
+                    </label>
+                    <input
+                      type="url"
+                      id="paymentLink"
+                      value={newClass.paymentConfig.paymentLink || ''}
+                      onChange={(e) => setNewClass(prev => ({
+                        ...prev,
+                        paymentConfig: {
+                          ...prev.paymentConfig,
+                          paymentLink: e.target.value
+                        }
+                      }))}
+                      placeholder="https://payment-provider.com/your-payment-link"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter a URL where students can make payments
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1223,16 +1274,33 @@ export const AdminSchedule = () => {
                         {classItem.paymentConfig?.type === 'weekly' ? 'Weekly' : 'Monthly'}
                       </td>
                       <td className={styles.table.cell}>
-                        {classItem.paymentConfig?.type === 'weekly' 
-                          ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
-                              ? 'Every week' 
-                              : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
-                          : classItem.paymentConfig?.monthlyOption === 'first' 
-                            ? 'First day of month'
-                            : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                              ? '15th day of month'
-                              : 'Last day of month'
-                        }
+                        <div className="text-sm text-gray-600 mt-1">
+                          <span className="font-medium">Payment:</span> {classItem.paymentConfig?.type === 'weekly' 
+                            ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
+                                ? 'Every week' 
+                                : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
+                            : classItem.paymentConfig?.monthlyOption === 'first' 
+                              ? 'First day of month'
+                              : classItem.paymentConfig?.monthlyOption === 'fifteen'
+                                ? '15th day of month'
+                                : 'Last day of month'
+                          }
+                          {classItem.paymentConfig?.paymentLink && (
+                            <div className="mt-1">
+                              <a 
+                                href={classItem.paymentConfig.paymentLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Payment Link
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className={`${styles.table.cell} text-center`}>
                         <div className="flex justify-center gap-2">
@@ -1459,7 +1527,8 @@ export const AdminSchedule = () => {
                             const paymentConfig: PaymentConfig = {
                               type,
                               startDate: adjustedDateStr,
-                              monthlyOption: monthlyOption
+                              monthlyOption: monthlyOption,
+                              paymentLink: prev.paymentConfig.paymentLink || ''
                             };
                             
                             return {
@@ -1473,8 +1542,9 @@ export const AdminSchedule = () => {
                             type,
                             startDate: prev.paymentConfig.startDate,
                             ...(type === 'weekly' 
-                              ? { weeklyInterval: 1 } 
-                              : { monthlyOption: 'first' })
+                              ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 } 
+                              : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' }),
+                            paymentLink: prev.paymentConfig.paymentLink || ''
                           };
                           
                           return {
@@ -1537,7 +1607,8 @@ export const AdminSchedule = () => {
                               const paymentConfig: PaymentConfig = {
                                 type: prev.paymentConfig.type,
                                 startDate: dateStr,
-                                monthlyOption: monthlyOption
+                                monthlyOption: monthlyOption,
+                                paymentLink: prev.paymentConfig.paymentLink || ''
                               };
                               
                               return {
@@ -1564,7 +1635,8 @@ export const AdminSchedule = () => {
                               startDate: dateStr,
                               ...(prev.paymentConfig.type === 'weekly' 
                                 ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 } 
-                                : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' })
+                                : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' }),
+                              paymentLink: prev.paymentConfig.paymentLink || ''
                             };
                             
                             return {
@@ -1607,7 +1679,8 @@ export const AdminSchedule = () => {
                               const paymentConfig: PaymentConfig = {
                                 type: 'weekly',
                                 startDate: prev.paymentConfig.startDate,
-                                weeklyInterval
+                                weeklyInterval,
+                                paymentLink: prev.paymentConfig.paymentLink || ''
                               };
                               
                               return {
@@ -1645,6 +1718,35 @@ export const AdminSchedule = () => {
                       </p>
                     </div>
                   )}
+                  
+                  <div>
+                    <label htmlFor="edit-paymentLink" className={styles.form.label}>
+                      Payment Link
+                    </label>
+                    <input
+                      type="url"
+                      id="edit-paymentLink"
+                      value={editingClass.paymentConfig.paymentLink || ''}
+                      onChange={(e) => {
+                        setEditingClass(prev => {
+                          if (!prev) return prev;
+                          
+                          return {
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              paymentLink: e.target.value
+                            }
+                          };
+                        });
+                      }}
+                      placeholder="https://payment-provider.com/your-payment-link"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter a URL where students can make payments
+                    </p>
+                  </div>
                 </div>
               </div>
 

@@ -249,6 +249,21 @@ export const DayDetails = ({
                           {classSession.startTime && classSession.endTime && (
                             <div>{t.time}: {classSession.startTime} - {classSession.endTime}</div>
                           )}
+                          {classSession.paymentConfig?.paymentLink && (
+                            <div className="mt-2">
+                              <a 
+                                href={classSession.paymentConfig.paymentLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 flex items-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                {t.paymentLink}
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

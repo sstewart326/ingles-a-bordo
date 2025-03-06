@@ -23,6 +23,13 @@ interface User {
   status?: 'active' | 'pending';
   createdAt: string | Date;
   birthdate?: string;  // Add birthdate to User interface
+  paymentConfig?: {
+    type: 'weekly' | 'monthly';
+    weeklyInterval?: number;
+    monthlyOption?: 'first' | 'fifteen' | 'last';
+    startDate: string;
+    paymentLink?: string;
+  };
 }
 
 interface NewUser {
@@ -31,7 +38,13 @@ interface NewUser {
   isTeacher: boolean;
   isAdmin: boolean;
   birthdate?: string;  // Optional birthdate field
-  paymentConfig?: any;
+  paymentConfig?: {
+    type: 'weekly' | 'monthly';
+    weeklyInterval?: number;
+    monthlyOption?: 'first' | 'fifteen' | 'last';
+    startDate: string;
+    paymentLink?: string;
+  };
 }
 
 const logAdmin = (message: string, data?: any) => {

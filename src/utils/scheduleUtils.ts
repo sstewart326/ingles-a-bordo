@@ -23,6 +23,7 @@ export interface ClassSession {
     weeklyInterval?: number;  // for weekly payments, number of weeks
     monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
     startDate: string;  // YYYY-MM-DD date string
+    paymentLink?: string;  // URL for payment
   };
   materials?: any[];
 }
@@ -37,6 +38,7 @@ export interface User {
     weeklyInterval?: number;  // for weekly payments, number of weeks
     monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
     startDate: string;  // YYYY-MM-DD date string
+    paymentLink?: string;  // URL for payment
   };
 }
 
@@ -45,13 +47,20 @@ export interface ClassWithStudents extends ClassSession {
     id: string;
     name?: string;
     email: string;
-    paymentConfig?: User['paymentConfig'];
+    paymentConfig?: {
+      type: 'weekly' | 'monthly';
+      weeklyInterval?: number;
+      monthlyOption?: 'first' | 'fifteen' | 'last';
+      startDate: string;
+      paymentLink?: string;
+    };
   }[];
   paymentConfig: {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;  // for weekly payments, number of weeks
     monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
     startDate: string;  // YYYY-MM-DD date string
+    paymentLink?: string;  // URL for payment
   };
 }
 
