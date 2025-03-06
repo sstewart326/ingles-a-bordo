@@ -32,7 +32,7 @@ interface PaymentConfig {
   startDate: string;  // YYYY-MM-DD date string
   paymentLink?: string;  // URL for payment
   amount?: number;  // Payment amount
-  currency?: string;  // Payment currency
+  currency?: string;  // Payment currency (e.g., USD, BRL)
 }
 
 interface Class {
@@ -99,7 +99,7 @@ interface NewClass {
     startDate: string;  // YYYY-MM-DD date string
     paymentLink?: string;  // URL for payment
     amount?: number;  // Payment amount
-    currency?: string;  // Payment currency
+    currency?: string;  // Payment currency (e.g., USD, BRL)
   };
 }
 
@@ -128,7 +128,7 @@ export const AdminSchedule = () => {
         monthlyOption: null,
         startDate: today.toISOString().split('T')[0],
         paymentLink: '',
-        amount: undefined,
+        amount: 0,
         currency: 'BRL'
       }
     };
@@ -609,9 +609,7 @@ export const AdminSchedule = () => {
         ...(prev.paymentConfig.type === 'weekly'
           ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 }
           : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' }),
-        paymentLink: prev.paymentConfig.paymentLink || '',
-        amount: prev.paymentConfig.amount || 0,
-        currency: prev.paymentConfig.currency || 'BRL'
+        paymentLink: prev.paymentConfig.paymentLink || ''
       };
       
       return {
@@ -635,9 +633,7 @@ export const AdminSchedule = () => {
         ...(prev.paymentConfig.type === 'weekly'
           ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 }
           : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' }),
-        paymentLink: prev.paymentConfig.paymentLink || '',
-        amount: prev.paymentConfig.amount || 0,
-        currency: prev.paymentConfig.currency || 'BRL'
+        paymentLink: prev.paymentConfig.paymentLink || ''
       };
       
       // Parse both times
@@ -718,15 +714,15 @@ export const AdminSchedule = () => {
             <div className="mt-2">
               <div className={styles.card.label}>Payment Details</div>
               <div className="text-sm text-gray-600 mt-1">
-                <span className="font-medium">Payment:</span> {classItem.paymentConfig?.type === 'weekly' 
-                  ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
-                      ? 'Every week' 
-                      : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
-                  : classItem.paymentConfig?.monthlyOption === 'first' 
-                    ? 'First day of month'
+                <span className="font-medium">Payment:</span> {classItem.paymentConfig?.type === 'weekly'
+                  ? ((classItem.paymentConfig.weeklyInterval || 1) === 1
+                    ? 'Weekly'
+                    : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
+                  : classItem.paymentConfig?.monthlyOption === 'first'
+                    ? 'Monthly (1st day)'
                     : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                      ? '15th day of month'
-                      : 'Last day of month'
+                      ? 'Monthly (15th day)'
+                      : 'Monthly (last day)'
                 }
                 {classItem.paymentConfig?.paymentLink && (
                   <div className="mt-1">
@@ -746,6 +742,9 @@ export const AdminSchedule = () => {
               </div>
             </div>
             <div className="mt-2">
+              <span className="font-medium">Payment Amount:</span> {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
+            </div>
+            <div className="mt-2">
               <div className={styles.card.label}>{t.paymentStartDate || "Payment Start Date"}</div>
               <div className="text-gray-800">
                 {new Date(classItem.paymentConfig?.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
@@ -754,12 +753,6 @@ export const AdminSchedule = () => {
             <div className="mt-2">
               <div className={styles.card.label}>{t.notes}</div>
               <div className="text-gray-800">{classItem.notes || t.noNotes}</div>
-            </div>
-            <div className="mt-2">
-              <div className={styles.card.label}>Payment Amount</div>
-              <div className="text-gray-800">
-                {classItem.paymentConfig?.amount !== undefined ? `${classItem.paymentConfig.amount.toFixed(2)} ${classItem.paymentConfig.currency}` : 'N/A'}
-              </div>
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -807,7 +800,7 @@ export const AdminSchedule = () => {
                       monthlyOption: null,
                       startDate: today.toISOString().split('T')[0],
                       paymentLink: '',
-                      amount: undefined,
+                      amount: 0,
                       currency: 'BRL'
                     }
                   });
@@ -910,7 +903,47 @@ export const AdminSchedule = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="flex space-x-4 md:col-span-1">
+                  <div className="md:col-span-2 flex space-x-4">
+                    <div className="flex-1">
+                      <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
+                      <DatePicker
+                        selected={newClass.startDate}
+                        onChange={(date: Date | null) => {
+                          if (date) {
+                            setNewClass(prev => ({
+                              ...prev,
+                              startDate: date,
+                              // Reset end date if it's now before the start date
+                              ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
+                            }));
+                          }
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        showTimeSelect={false}
+                        dateFormat="MMMM d, yyyy"
+                        minDate={new Date()}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
+                      <DatePicker
+                        selected={newClass.endDate}
+                        onChange={(date: Date | null) => {
+                          setNewClass(prev => ({
+                            ...prev,
+                            endDate: date
+                          }));
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        showTimeSelect={false}
+                        dateFormat="MMMM d, yyyy"
+                        minDate={newClass.startDate}
+                        isClearable={true}
+                        placeholderText={t.noEndDate || "No end date"}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex space-x-4 md:col-span-2">
                     <div className="flex-1">
                       <label className={styles.form.label}>{"Start Time"}</label>
                       <select
@@ -935,44 +968,6 @@ export const AdminSchedule = () => {
                         ))}
                       </select>
                     </div>
-                  </div>
-                  <div>
-                    <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
-                    <DatePicker
-                      selected={newClass.startDate}
-                      onChange={(date: Date | null) => {
-                        if (date) {
-                          setNewClass(prev => ({
-                            ...prev,
-                            startDate: date,
-                            // Reset end date if it's now before the start date
-                            ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
-                          }));
-                        }
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      showTimeSelect={false}
-                      dateFormat="MMMM d, yyyy"
-                      minDate={new Date()}
-                    />
-                  </div>
-                  <div>
-                    <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
-                    <DatePicker
-                      selected={newClass.endDate}
-                      onChange={(date: Date | null) => {
-                        setNewClass(prev => ({
-                          ...prev,
-                          endDate: date
-                        }));
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      showTimeSelect={false}
-                      dateFormat="MMMM d, yyyy"
-                      minDate={newClass.startDate}
-                      isClearable={true}
-                      placeholderText={t.noEndDate || "No end date"}
-                    />
                   </div>
                   <div className="md:col-span-2">
                     <label className={styles.form.label}>{t.notes}</label>
@@ -1224,23 +1219,18 @@ export const AdminSchedule = () => {
                       Payment Amount
                     </label>
                     <input
-                      type="text"
+                      type="number"
                       id="paymentAmount"
-                      value={newClass.paymentConfig.amount !== undefined ? newClass.paymentConfig.amount : ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers and decimal point
-                        if (value === '' || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                          setNewClass(prev => ({
-                            ...prev,
-                            paymentConfig: {
-                              ...prev.paymentConfig,
-                              amount: value === '' ? undefined : parseFloat(value)
-                            }
-                          }));
+                      min="0"
+                      step="0.01"
+                      value={newClass.paymentConfig.amount || 0}
+                      onChange={(e) => setNewClass(prev => ({
+                        ...prev,
+                        paymentConfig: {
+                          ...prev.paymentConfig,
+                          amount: parseFloat(e.target.value) || 0
                         }
-                      }}
-                      placeholder="0.00"
+                      }))}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     />
                   </div>
@@ -1349,15 +1339,15 @@ export const AdminSchedule = () => {
                       </td>
                       <td className={styles.table.cell}>
                         <div className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium">Payment:</span> {classItem.paymentConfig?.type === 'weekly' 
-                            ? ((classItem.paymentConfig.weeklyInterval || 1) === 1 
-                                ? 'Every week' 
-                                : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
-                            : classItem.paymentConfig?.monthlyOption === 'first' 
-                              ? 'First day of month'
+                          <span className="font-medium">Payment:</span> {classItem.paymentConfig?.type === 'weekly'
+                            ? ((classItem.paymentConfig.weeklyInterval || 1) === 1
+                              ? 'Weekly'
+                              : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
+                            : classItem.paymentConfig?.monthlyOption === 'first'
+                              ? 'Monthly (1st day)'
                               : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                                ? '15th day of month'
-                                : 'Last day of month'
+                                ? 'Monthly (15th day)'
+                                : 'Monthly (last day)'
                           }
                           {classItem.paymentConfig?.paymentLink && (
                             <div className="mt-1">
@@ -1374,6 +1364,16 @@ export const AdminSchedule = () => {
                               </a>
                             </div>
                           )}
+                        </div>
+                      </td>
+                      <td className={styles.table.cell}>
+                        <div className="text-sm text-gray-600 mt-1">
+                          <span className="font-medium">Payment Amount:</span> {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
+                        </div>
+                      </td>
+                      <td className={styles.table.cell}>
+                        <div className="text-sm text-gray-600 mt-1">
+                          <span className="font-medium">Payment Start Date:</span> {new Date(classItem.paymentConfig?.startDate).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
                         </div>
                       </td>
                       <td className={`${styles.table.cell} text-center`}>
@@ -1421,93 +1421,6 @@ export const AdminSchedule = () => {
                 </h3>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className={styles.form.label}>{t.students}</label>
-                        <Select
-                          isMulti
-                          value={studentOptions.filter(option => editingClass.studentEmails.includes(option.value))}
-                          onChange={(selected: MultiValue<SelectOption>) => {
-                            const selectedEmails = selected ? selected.map(option => option.value) : [];
-                            // Automatically determine course type based on number of students
-                            const courseType = selectedEmails.length === 1 ? 'Individual' : 
-                                              selectedEmails.length === 2 ? 'Pair' : 'Group';
-                            setEditingClass(prev => ({ 
-                              ...prev!, 
-                              studentEmails: selectedEmails,
-                              courseType: courseType
-                            }));
-                          }}
-                          options={studentOptions}
-                          className="mt-1"
-                          classNamePrefix="select"
-                          styles={customSelectStyles}
-                        />
-                      </div>
-                      <div>
-                        <label className={styles.form.label}>{t.courseType}</label>
-                        <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
-                          {editingClass.courseType}
-                          <span className="ml-2 text-gray-500 text-xs">
-                            (auto-determined by number of students)
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className={styles.form.label}>{t.dayOfWeek}</label>
-                        <select
-                          value={editingClass.dayOfWeek}
-                          onChange={(e) => setEditingClass(prev => ({ ...prev!, dayOfWeek: parseInt(e.target.value) }))}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        >
-                          {DAYS_OF_WEEK.map((day, index) => (
-                            <option key={day} value={index}>{day}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex space-x-4">
-                        <div className="flex-1">
-                          <label className={styles.form.label}>{"Start Time"}</label>
-                          <select
-                            value={editingClass.startTime}
-                            onChange={(e) => handleEditStartTimeChange(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                          >
-                            {timeOptions.map(time => (
-                              <option key={time} value={time}>{time}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex-1">
-                          <label className={styles.form.label}>{"End Time"}</label>
-                          <select
-                            value={editingClass.endTime}
-                            onChange={(e) => handleEditEndTimeChange(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                          >
-                            {timeOptions.map(time => (
-                              <option key={time} value={time}>{time}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className={styles.form.label}>{t.startDate || "Class Start Date"}</label>
-                        <DatePicker
-                          selected={editingClass.startDate}
-                          onChange={(date: Date | null) => {
-                            if (date) {
-                              setEditingClass(prev => {
-                                if (!prev) return prev;
-                                return {
-                                  ...prev,
-                                  startDate: date,
-                                  // Reset end date if it's now before the start date
-                                  ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
-                                };
-                              });
-                            }
-                          }}
                     <div>
                       <label className={styles.form.label}>{t.students}</label>
                       <Select
@@ -1551,7 +1464,49 @@ export const AdminSchedule = () => {
                         ))}
                       </select>
                     </div>
-                    <div className="flex space-x-4">
+                    <div className="md:col-span-2 flex space-x-4">
+                      <div className="flex-1">
+                        <label className={styles.form.label}>{t.startDate || "Class Start Date"}</label>
+                        <DatePicker
+                          selected={editingClass.startDate}
+                          onChange={(date: Date | null) => {
+                            if (date) {
+                              setEditingClass(prev => {
+                                if (!prev) return prev;
+                                return {
+                                  ...prev,
+                                  startDate: date,
+                                  // Reset end date if it's now before the start date
+                                  ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
+                                };
+                              });
+                            }
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          dateFormat="MMMM d, yyyy"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className={styles.form.label}>{t.endDate || "Class End Date"}</label>
+                        <DatePicker
+                          selected={editingClass.endDate}
+                          onChange={(date: Date | null) => {
+                            setEditingClass(prev => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                endDate: date
+                              };
+                            });
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          dateFormat="MMMM d, yyyy"
+                          isClearable={true}
+                          placeholderText="No end date"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex space-x-4 md:col-span-2">
                       <div className="flex-1">
                         <label className={styles.form.label}>{"Start Time"}</label>
                         <select
@@ -1576,46 +1531,6 @@ export const AdminSchedule = () => {
                           ))}
                         </select>
                       </div>
-                    </div>
-                    <div>
-                      <label className={styles.form.label}>{t.startDate || "Class Start Date"}</label>
-                      <DatePicker
-                        selected={editingClass.startDate}
-                        onChange={(date: Date | null) => {
-                          if (date) {
-                            setEditingClass(prev => {
-                              if (!prev) return prev;
-                              return {
-                                ...prev,
-                                startDate: date,
-                                // Reset end date if it's now before the start date
-                                ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
-                              };
-                            });
-                          }
-                        }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        dateFormat="MMMM d, yyyy"
-                      />
-                    </div>
-                    <div>
-                      <label className={styles.form.label}>{t.endDate || "Class End Date"}</label>
-                      <DatePicker
-                        selected={editingClass.endDate}
-                        onChange={(date: Date | null) => {
-                          setEditingClass(prev => {
-                            if (!prev) return prev;
-                            return {
-                              ...prev,
-                              endDate: date
-                            };
-                          });
-                        }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        dateFormat="MMMM d, yyyy"
-                        isClearable={true}
-                        placeholderText="No end date"
-                      />
                     </div>
                     <div className="md:col-span-2">
                       <label className={styles.form.label}>{t.notes}</label>
@@ -1914,27 +1829,24 @@ export const AdminSchedule = () => {
                       Payment Amount
                     </label>
                     <input
-                      type="text"
+                      type="number"
                       id="edit-paymentAmount"
-                      value={editingClass.paymentConfig.amount !== undefined ? editingClass.paymentConfig.amount : ''}
+                      min="0"
+                      step="0.01"
+                      value={editingClass.paymentConfig.amount || 0}
                       onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers and decimal point
-                        if (value === '' || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                          setEditingClass(prev => {
-                            if (!prev) return prev;
-                            
-                            return {
-                              ...prev,
-                              paymentConfig: {
-                                ...prev.paymentConfig,
-                                amount: value === '' ? undefined : parseFloat(value)
-                              }
-                            };
-                          });
-                        }
+                        setEditingClass(prev => {
+                          if (!prev) return prev;
+                          
+                          return {
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              amount: parseFloat(e.target.value) || 0
+                            }
+                          };
+                        });
                       }}
-                      placeholder="0.00"
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     />
                   </div>
