@@ -74,7 +74,11 @@ export function CalendarDay<T extends ClassSession>({
         ? `${classSession.startTime} - ${classSession.endTime}` 
         : '';
       
-      return `${user.name}: ${dayName} ${time}`;
+      const amountText = classSession.paymentConfig?.amount && classSession.paymentConfig?.currency
+        ? ` (${classSession.paymentConfig.currency} ${classSession.paymentConfig.amount.toFixed(2)})`
+        : '';
+      
+      return `${user.name}: ${dayName} ${time}${amountText}`;
     }).join('\n');
   };
 

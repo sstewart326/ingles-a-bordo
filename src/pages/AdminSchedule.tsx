@@ -31,6 +31,8 @@ interface PaymentConfig {
   monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
   startDate: string;  // YYYY-MM-DD date string
   paymentLink?: string;  // URL for payment
+  amount?: number;  // Payment amount
+  currency?: string;  // Payment currency
 }
 
 interface Class {
@@ -96,6 +98,8 @@ interface NewClass {
     monthlyOption: 'first' | 'fifteen' | 'last' | null;
     startDate: string;  // YYYY-MM-DD date string
     paymentLink?: string;  // URL for payment
+    amount?: number;  // Payment amount
+    currency?: string;  // Payment currency
   };
 }
 
@@ -123,7 +127,9 @@ export const AdminSchedule = () => {
         weeklyInterval: 1,
         monthlyOption: null,
         startDate: today.toISOString().split('T')[0],
-        paymentLink: ''
+        paymentLink: '',
+        amount: undefined,
+        currency: 'BRL'
       }
     };
   });
@@ -240,7 +246,9 @@ export const AdminSchedule = () => {
           weeklyInterval: null,
           monthlyOption: newClass.paymentConfig.monthlyOption || 'first'
         }),
-        paymentLink: newClass.paymentConfig.paymentLink || ''
+        paymentLink: newClass.paymentConfig.paymentLink || '',
+        amount: newClass.paymentConfig.amount || 0,
+        currency: newClass.paymentConfig.currency || 'BRL'
       };
       
       const classData = {
@@ -283,7 +291,9 @@ export const AdminSchedule = () => {
           weeklyInterval: 1,
           monthlyOption: null,
           startDate: paymentStartDate,
-          paymentLink: ''
+          paymentLink: '',
+          amount: 0,
+          currency: 'BRL'
         }
       });
       toast.success('Class created successfully');
@@ -490,7 +500,9 @@ export const AdminSchedule = () => {
       ...(classItem.paymentConfig.type === 'weekly'
         ? { weeklyInterval: classItem.paymentConfig.weeklyInterval || 1 }
         : { monthlyOption: classItem.paymentConfig.monthlyOption || 'first' }),
-      paymentLink: classItem.paymentConfig.paymentLink || ''
+      paymentLink: classItem.paymentConfig.paymentLink || '',
+      amount: classItem.paymentConfig.amount || 0,
+      currency: classItem.paymentConfig.currency || 'BRL'
     };
 
     setEditingClass({
@@ -536,7 +548,9 @@ export const AdminSchedule = () => {
           weeklyInterval: null,
           monthlyOption: editingClass.paymentConfig.monthlyOption || 'first'
         }),
-        paymentLink: editingClass.paymentConfig.paymentLink || ''
+        paymentLink: editingClass.paymentConfig.paymentLink || '',
+        amount: editingClass.paymentConfig.amount || 0,
+        currency: editingClass.paymentConfig.currency || 'BRL'
       };
 
       const updateData = {
@@ -595,7 +609,9 @@ export const AdminSchedule = () => {
         ...(prev.paymentConfig.type === 'weekly'
           ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 }
           : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' }),
-        paymentLink: prev.paymentConfig.paymentLink || ''
+        paymentLink: prev.paymentConfig.paymentLink || '',
+        amount: prev.paymentConfig.amount || 0,
+        currency: prev.paymentConfig.currency || 'BRL'
       };
       
       return {
@@ -619,7 +635,9 @@ export const AdminSchedule = () => {
         ...(prev.paymentConfig.type === 'weekly'
           ? { weeklyInterval: prev.paymentConfig.weeklyInterval || 1 }
           : { monthlyOption: prev.paymentConfig.monthlyOption || 'first' }),
-        paymentLink: prev.paymentConfig.paymentLink || ''
+        paymentLink: prev.paymentConfig.paymentLink || '',
+        amount: prev.paymentConfig.amount || 0,
+        currency: prev.paymentConfig.currency || 'BRL'
       };
       
       // Parse both times
@@ -737,6 +755,12 @@ export const AdminSchedule = () => {
               <div className={styles.card.label}>{t.notes}</div>
               <div className="text-gray-800">{classItem.notes || t.noNotes}</div>
             </div>
+            <div className="mt-2">
+              <div className={styles.card.label}>Payment Amount</div>
+              <div className="text-gray-800">
+                {classItem.paymentConfig?.amount !== undefined ? `${classItem.paymentConfig.amount.toFixed(2)} ${classItem.paymentConfig.currency}` : 'N/A'}
+              </div>
+            </div>
           </div>
           <div className="flex flex-col gap-2">
             <button
@@ -782,7 +806,9 @@ export const AdminSchedule = () => {
                       weeklyInterval: 1,
                       monthlyOption: null,
                       startDate: today.toISOString().split('T')[0],
-                      paymentLink: ''
+                      paymentLink: '',
+                      amount: undefined,
+                      currency: 'BRL'
                     }
                   });
                 }
@@ -1192,6 +1218,54 @@ export const AdminSchedule = () => {
                       Enter a URL where students can make payments
                     </p>
                   </div>
+                  
+                  <div>
+                    <label htmlFor="paymentAmount" className={styles.form.label}>
+                      Payment Amount
+                    </label>
+                    <input
+                      type="text"
+                      id="paymentAmount"
+                      value={newClass.paymentConfig.amount !== undefined ? newClass.paymentConfig.amount : ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow numbers and decimal point
+                        if (value === '' || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                          setNewClass(prev => ({
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              amount: value === '' ? undefined : parseFloat(value)
+                            }
+                          }));
+                        }
+                      }}
+                      placeholder="0.00"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="paymentCurrency" className={styles.form.label}>
+                      Currency
+                    </label>
+                    <select
+                      id="paymentCurrency"
+                      value={newClass.paymentConfig.currency || 'BRL'}
+                      onChange={(e) => setNewClass(prev => ({
+                        ...prev,
+                        paymentConfig: {
+                          ...prev.paymentConfig,
+                          currency: e.target.value
+                        }
+                      }))}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="BRL">BRL (R$)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1347,6 +1421,93 @@ export const AdminSchedule = () => {
                 </h3>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={styles.form.label}>{t.students}</label>
+                        <Select
+                          isMulti
+                          value={studentOptions.filter(option => editingClass.studentEmails.includes(option.value))}
+                          onChange={(selected: MultiValue<SelectOption>) => {
+                            const selectedEmails = selected ? selected.map(option => option.value) : [];
+                            // Automatically determine course type based on number of students
+                            const courseType = selectedEmails.length === 1 ? 'Individual' : 
+                                              selectedEmails.length === 2 ? 'Pair' : 'Group';
+                            setEditingClass(prev => ({ 
+                              ...prev!, 
+                              studentEmails: selectedEmails,
+                              courseType: courseType
+                            }));
+                          }}
+                          options={studentOptions}
+                          className="mt-1"
+                          classNamePrefix="select"
+                          styles={customSelectStyles}
+                        />
+                      </div>
+                      <div>
+                        <label className={styles.form.label}>{t.courseType}</label>
+                        <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
+                          {editingClass.courseType}
+                          <span className="ml-2 text-gray-500 text-xs">
+                            (auto-determined by number of students)
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className={styles.form.label}>{t.dayOfWeek}</label>
+                        <select
+                          value={editingClass.dayOfWeek}
+                          onChange={(e) => setEditingClass(prev => ({ ...prev!, dayOfWeek: parseInt(e.target.value) }))}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          {DAYS_OF_WEEK.map((day, index) => (
+                            <option key={day} value={index}>{day}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex space-x-4">
+                        <div className="flex-1">
+                          <label className={styles.form.label}>{"Start Time"}</label>
+                          <select
+                            value={editingClass.startTime}
+                            onChange={(e) => handleEditStartTimeChange(e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          >
+                            {timeOptions.map(time => (
+                              <option key={time} value={time}>{time}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className={styles.form.label}>{"End Time"}</label>
+                          <select
+                            value={editingClass.endTime}
+                            onChange={(e) => handleEditEndTimeChange(e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          >
+                            {timeOptions.map(time => (
+                              <option key={time} value={time}>{time}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className={styles.form.label}>{t.startDate || "Class Start Date"}</label>
+                        <DatePicker
+                          selected={editingClass.startDate}
+                          onChange={(date: Date | null) => {
+                            if (date) {
+                              setEditingClass(prev => {
+                                if (!prev) return prev;
+                                return {
+                                  ...prev,
+                                  startDate: date,
+                                  // Reset end date if it's now before the start date
+                                  ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
+                                };
+                              });
+                            }
+                          }}
                     <div>
                       <label className={styles.form.label}>{t.students}</label>
                       <Select
@@ -1746,6 +1907,64 @@ export const AdminSchedule = () => {
                     <p className="mt-1 text-xs text-gray-500">
                       Enter a URL where students can make payments
                     </p>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="edit-paymentAmount" className={styles.form.label}>
+                      Payment Amount
+                    </label>
+                    <input
+                      type="text"
+                      id="edit-paymentAmount"
+                      value={editingClass.paymentConfig.amount !== undefined ? editingClass.paymentConfig.amount : ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow numbers and decimal point
+                        if (value === '' || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                          setEditingClass(prev => {
+                            if (!prev) return prev;
+                            
+                            return {
+                              ...prev,
+                              paymentConfig: {
+                                ...prev.paymentConfig,
+                                amount: value === '' ? undefined : parseFloat(value)
+                              }
+                            };
+                          });
+                        }
+                      }}
+                      placeholder="0.00"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="edit-paymentCurrency" className={styles.form.label}>
+                      Currency
+                    </label>
+                    <select
+                      id="edit-paymentCurrency"
+                      value={editingClass.paymentConfig.currency || 'BRL'}
+                      onChange={(e) => {
+                        setEditingClass(prev => {
+                          if (!prev) return prev;
+                          
+                          return {
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              currency: e.target.value
+                            }
+                          };
+                        });
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="BRL">BRL (R$)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                    </select>
                   </div>
                 </div>
               </div>

@@ -125,6 +125,7 @@ interface Translation {
   weeklyPayment: string;
   monthlyPayment: string;
   paymentLink: string;
+  amount: string;
 
   // Days of Week - Short Names
   sundayShort: string;
@@ -322,6 +323,7 @@ const translations: Record<Language, Translation> = {
     weeklyPayment: 'Weekly Payment',
     monthlyPayment: 'Monthly Payment',
     paymentLink: 'Payment Link',
+    amount: 'Amount',
 
     // Days of Week - Short Names
     sundayShort: 'Sun',
@@ -517,6 +519,7 @@ const translations: Record<Language, Translation> = {
     weeklyPayment: 'Pagamento Semanal',
     monthlyPayment: 'Pagamento Mensal',
     paymentLink: 'Link de Pagamento',
+    amount: 'Valor',
 
     // Days of Week - Short Names
     sundayShort: 'Dom',

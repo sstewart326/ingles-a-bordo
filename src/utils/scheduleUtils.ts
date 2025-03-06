@@ -24,6 +24,8 @@ export interface ClassSession {
     monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
     startDate: string;  // YYYY-MM-DD date string
     paymentLink?: string;  // URL for payment
+    amount?: number;  // Payment amount
+    currency?: string;  // Payment currency (e.g., USD, BRL)
   };
   materials?: any[];
 }
@@ -53,6 +55,8 @@ export interface ClassWithStudents extends ClassSession {
       monthlyOption?: 'first' | 'fifteen' | 'last';
       startDate: string;
       paymentLink?: string;
+      amount?: number;  // Payment amount
+      currency?: string;  // Payment currency (e.g., USD, BRL)
     };
   }[];
   paymentConfig: {
@@ -61,6 +65,8 @@ export interface ClassWithStudents extends ClassSession {
     monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
     startDate: string;  // YYYY-MM-DD date string
     paymentLink?: string;  // URL for payment
+    amount?: number;  // Payment amount
+    currency?: string;  // Payment currency (e.g., USD, BRL)
   };
 }
 

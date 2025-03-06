@@ -65,7 +65,27 @@ export const CalendarDay = ({
               className={`calendar-pill payment-pill ${isPaymentSoon ? 'soon' : 'normal'}`}
               onClick={(e) => onPaymentPillClick(e, date, dayClasses, paymentsDue)}
             >
-              {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue || 'payment' : t.paymentDue || 'payments'}
+              {(() => {
+                // Calculate total payment amount if available
+                let totalAmount = 0;
+                let currency = '';
+                let hasPaymentAmount = false;
+                
+                paymentsDue.forEach(({ classSession }) => {
+                  if (classSession.paymentConfig?.amount && classSession.paymentConfig?.currency) {
+                    totalAmount += classSession.paymentConfig.amount;
+                    currency = classSession.paymentConfig.currency;
+                    hasPaymentAmount = true;
+                  }
+                });
+                
+                return (
+                  <>
+                    {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue || 'payment' : t.paymentDue || 'payments'}
+                    {hasPaymentAmount && ` (${currency} ${totalAmount.toFixed(2)})`}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

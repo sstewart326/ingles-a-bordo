@@ -95,7 +95,11 @@ export function ScheduleCalendarDay<T extends ClassSession>({
         ? `${classSession.startTime} - ${classSession.endTime}` 
         : '';
       
-      return `${user.name}: ${dayName} ${time}`;
+      const amountText = classSession.paymentConfig?.amount && classSession.paymentConfig?.currency
+        ? ` (${classSession.paymentConfig.currency} ${classSession.paymentConfig.amount.toFixed(2)})`
+        : '';
+      
+      return `${user.name}: ${dayName} ${time}${amountText}`;
     }).join('\n');
   };
 
@@ -209,9 +213,29 @@ export function ScheduleCalendarDay<T extends ClassSession>({
               onClick={handlePaymentPillClick}
               title={createPaymentTooltip()}
             >
-              {Array.isArray(paymentsDue) 
-                ? `${paymentsDue.length} ${paymentsDue.length === 1 ? t.paymentDue || 'payment' : t.paymentsDue || 'payments'}`
-                : t.paymentDue || 'Payment due'
+              {Array.isArray(paymentsDue)
+                ? (() => {
+                    // Calculate total payment amount if available
+                    let totalAmount = 0;
+                    let currency = '';
+                    let hasPaymentAmount = false;
+                    
+                    paymentsDue.forEach(({ classSession }) => {
+                      if (classSession.paymentConfig?.amount && classSession.paymentConfig?.currency) {
+                        totalAmount += classSession.paymentConfig.amount;
+                        currency = classSession.paymentConfig.currency;
+                        hasPaymentAmount = true;
+                      }
+                    });
+                    
+                    return (
+                      <>
+                        {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue || 'payment' : t.paymentsDue || 'payments'}
+                        {hasPaymentAmount && ` (${currency} ${totalAmount.toFixed(2)})`}
+                      </>
+                    );
+                  })()
+                : 'Payment Due'
               }
             </div>
           )}
