@@ -67,6 +67,37 @@ export function ScheduleCalendarDay<T extends ClassSession>({
       onPaymentPillClick(e, date, classes);
     }
   };
+  
+  // Function to get day name from dayOfWeek number
+  const getDayName = (dayOfWeek: number | undefined): string => {
+    if (dayOfWeek === undefined) return '';
+    
+    const days = [
+      t.sunday || 'Sunday',
+      t.monday || 'Monday', 
+      t.tuesday || 'Tuesday', 
+      t.wednesday || 'Wednesday', 
+      t.thursday || 'Thursday', 
+      t.friday || 'Friday', 
+      t.saturday || 'Saturday'
+    ];
+    
+    return days[dayOfWeek];
+  };
+  
+  // Create tooltip text for payment pill
+  const createPaymentTooltip = (): string => {
+    if (!Array.isArray(paymentsDue) || !paymentsDue.length) return '';
+    
+    return paymentsDue.map(({ user, classSession }) => {
+      const dayName = getDayName(classSession.dayOfWeek);
+      const time = classSession.startTime && classSession.endTime 
+        ? `${classSession.startTime} - ${classSession.endTime}` 
+        : '';
+      
+      return `${user.name}: ${dayName} ${time}`;
+    }).join('\n');
+  };
 
   // Format time for a single class
   const formatSingleClassTime = (classItem: ClassSession): string => {
@@ -117,14 +148,14 @@ export function ScheduleCalendarDay<T extends ClassSession>({
 
     const startTimeInfo = formatTimeString(classItem.startTime);
     const endTimeInfo = formatTimeString(classItem.endTime);
-
-    // If both times are in the same period (AM or PM), only show the period once at the end
+    
+    // If both periods are the same, only show it once at the end
     if (startTimeInfo.period === endTimeInfo.period) {
-      return `${startTimeInfo.display} - ${endTimeInfo.display} ${startTimeInfo.period}`;
-    } else {
-      // If times span AM/PM, show the period for each time
-      return `${startTimeInfo.display} ${startTimeInfo.period} - ${endTimeInfo.display} ${endTimeInfo.period}`;
+      return `${startTimeInfo.display}-${endTimeInfo.display} ${startTimeInfo.period}`;
     }
+    
+    // Otherwise show both periods
+    return `${startTimeInfo.display} ${startTimeInfo.period}-${endTimeInfo.display} ${endTimeInfo.period}`;
   };
 
   return (
@@ -141,10 +172,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
           />
         )}
         {hasMaterials && (
-          <div 
-            className="indicator material-indicator bg-[#4f46e5]"
-            title="Has documents or links"
-          />
+          <div className="indicator material-indicator" title="Has materials" />
         )}
       </div>
 
@@ -179,6 +207,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
             <div 
               className={`calendar-pill payment-pill ${isPaymentSoon ? 'soon' : 'normal'}`}
               onClick={handlePaymentPillClick}
+              title={createPaymentTooltip()}
             >
               {Array.isArray(paymentsDue) 
                 ? `${paymentsDue.length} ${paymentsDue.length === 1 ? t.paymentDue || 'payment' : t.paymentsDue || 'payments'}`

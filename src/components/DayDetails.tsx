@@ -79,6 +79,23 @@ export const DayDetails = ({
     }));
   };
 
+  // Function to get day name from dayOfWeek number
+  const getDayName = (dayOfWeek: number | undefined): string => {
+    if (dayOfWeek === undefined) return '';
+    
+    const days = [
+      t.sunday || 'Sunday',
+      t.monday || 'Monday', 
+      t.tuesday || 'Tuesday', 
+      t.wednesday || 'Wednesday', 
+      t.thursday || 'Thursday', 
+      t.friday || 'Friday', 
+      t.saturday || 'Saturday'
+    ];
+    
+    return days[dayOfWeek];
+  };
+
   // Only fetch completed payments when there are payments due
   useEffect(() => {
     const fetchCompletedPayments = async () => {
@@ -226,8 +243,12 @@ export const DayDetails = ({
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="text-xl font-semibold mb-2">{user.name}</h4>
-                        <div className="text-base text-gray-700">
-                          {formatClassTime(classSession)}
+                        {/* Add class day and time details */}
+                        <div className="text-sm text-gray-600">
+                          <div className="font-medium">{t.dayOfWeek}: {getDayName(classSession.dayOfWeek)}</div>
+                          {classSession.startTime && classSession.endTime && (
+                            <div>{t.time}: {classSession.startTime} - {classSession.endTime}</div>
+                          )}
                         </div>
                       </div>
                     </div>

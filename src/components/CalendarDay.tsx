@@ -46,6 +46,37 @@ export function CalendarDay<T extends ClassSession>({
 
   // Don't show payment indicators while loading
   const shouldShowPaymentIndicators = isPaymentDay && !isLoading;
+  
+  // Function to get day name from dayOfWeek number
+  const getDayName = (dayOfWeek: number | undefined): string => {
+    if (dayOfWeek === undefined) return '';
+    
+    const days = [
+      t.sunday || 'Sunday',
+      t.monday || 'Monday', 
+      t.tuesday || 'Tuesday', 
+      t.wednesday || 'Wednesday', 
+      t.thursday || 'Thursday', 
+      t.friday || 'Friday', 
+      t.saturday || 'Saturday'
+    ];
+    
+    return days[dayOfWeek];
+  };
+  
+  // Create tooltip text for payment pill
+  const createPaymentTooltip = (): string => {
+    if (!paymentsDue.length) return '';
+    
+    return paymentsDue.map(({ user, classSession }) => {
+      const dayName = getDayName(classSession.dayOfWeek);
+      const time = classSession.startTime && classSession.endTime 
+        ? `${classSession.startTime} - ${classSession.endTime}` 
+        : '';
+      
+      return `${user.name}: ${dayName} ${time}`;
+    }).join('\n');
+  };
 
   return (
     <div className="h-full flex flex-col" onClick={handleDayClick}>
@@ -106,6 +137,7 @@ export function CalendarDay<T extends ClassSession>({
                 e.stopPropagation();
                 handleDayClick();
               }}
+              title={createPaymentTooltip()}
             >
               {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue : t.paymentsDue}
             </div>
