@@ -25,6 +25,7 @@ import { CalendarSection } from '../components/CalendarSection';
 import { ClassesSection } from '../components/ClassesSection';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { debugLog, debugMaterials } from '../utils/debugUtils';
+import { getPaymentsDueForDay } from '../utils/paymentUtils';
 
 export const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -63,7 +64,7 @@ export const Dashboard = () => {
     getClassesForDay,
     isDateInRelevantMonthRange,
     getRelevantMonthKeys,
-    getMonthKey
+    getMonthKey,
   } = useDashboardData();
 
   // Add resize event listener to update mobile view state
@@ -509,6 +510,29 @@ export const Dashboard = () => {
     return prevDate;
   };
 
+  const handlePaymentStatusChange = useCallback((date: Date) => {
+    // Force refresh of the calendar by clearing the previous month reference
+    // This will trigger a re-fetch of payments for the current month
+    const monthKey = getMonthKey(date);
+    const loadedMonthsCopy = new Set(loadedMonths);
+    loadedMonthsCopy.delete(monthKey);
+    
+    // Re-fetch classes and payments for the current month
+    fetchClasses(date);
+    
+    // Force a refresh of the calendar by setting a new date object with the same value
+    // This will trigger the useEffect in CalendarSection to re-fetch payments
+    setSelectedDate(new Date(date));
+    
+    // If we have selected day details, refresh them too
+    if (selectedDayDetails && selectedDayDetails.date.getTime() === date.getTime()) {
+      // Get updated payment due information
+      const paymentsDue = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
+      
+      handleDayClick(date, selectedDayDetails.classes, paymentsDue);
+    }
+  }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, handleDayClick, upcomingClasses, users, isDateInRelevantMonthRange, setSelectedDate]);
+
   if (adminLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -601,6 +625,7 @@ export const Dashboard = () => {
             onSavePrivateNotes={handleSavePrivateNotes}
             onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
             textareaRefs={textareaRefs.current}
+            onPaymentStatusChange={handlePaymentStatusChange}
           />
         </div>
       </div>

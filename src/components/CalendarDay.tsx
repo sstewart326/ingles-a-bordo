@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ClassSession, User } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
+import { Payment } from '../types/payment';
+import { getPaymentsForDates } from '../services/paymentService';
 
 export interface CalendarDayProps<T extends ClassSession> {
   date: Date;
   isToday: boolean;
   classes: T[];
-  paymentsDue: { user: User; classSession: ClassSession }[] | boolean;
-  onClassCountClick?: (e: React.MouseEvent, classes: T[], date: Date) => void;
-  onPaymentPillClick?: (e: React.MouseEvent, date: Date, classes: T[]) => void;
+  paymentsDue: { user: User; classSession: ClassSession }[];
   onDayClick?: (date: Date, classes: T[]) => void;
+  completedPayments?: Payment[];
+  isLoading?: boolean;
 }
 
 export function CalendarDay<T extends ClassSession>({
@@ -18,18 +20,24 @@ export function CalendarDay<T extends ClassSession>({
   isToday,
   classes,
   paymentsDue,
-  onClassCountClick,
-  onPaymentPillClick,
   onDayClick,
+  completedPayments = [],
+  isLoading = false,
 }: CalendarDayProps<T>) {
   const { language } = useLanguage();
   const t = useTranslation(language);
   
-  // Determine if it's a payment day and if payment is soon
-  const isPaymentDay = Array.isArray(paymentsDue) ? paymentsDue.length > 0 : !!paymentsDue;
+  const isPaymentDay = paymentsDue.length > 0;
   const daysUntilPayment = isPaymentDay ? 
     Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
   const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+
+  // Check if all payments for this day are completed
+  const allPaymentsCompleted = isPaymentDay && paymentsDue.every(({ user, classSession }) => {
+    return completedPayments.some(payment => 
+      payment.userId === user.id && payment.classSessionId === classSession.id
+    );
+  });
 
   // Handle day click
   const handleDayClick = () => {
@@ -38,21 +46,8 @@ export function CalendarDay<T extends ClassSession>({
     }
   };
 
-  // Handle class count click
-  const handleClassCountClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the calendar day click
-    if (onClassCountClick) {
-      onClassCountClick(e, classes, date);
-    }
-  };
-
-  // Handle payment pill click
-  const handlePaymentPillClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the calendar day click
-    if (onPaymentPillClick) {
-      onPaymentPillClick(e, date, classes);
-    }
-  };
+  // Don't show payment indicators while loading
+  const shouldShowPaymentIndicators = isPaymentDay && !isLoading;
 
   return (
     <div className="h-full flex flex-col" onClick={handleDayClick}>
@@ -61,17 +56,28 @@ export function CalendarDay<T extends ClassSession>({
         {classes.length > 0 && (
           <div className="indicator class-indicator" title="Has classes" />
         )}
-        {isPaymentDay && (
+        {shouldShowPaymentIndicators && (
           <div 
-            className={`indicator ${isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'}`}
-            title={isPaymentSoon ? 'Payment due soon' : 'Payment due'}
+            className={`indicator ${
+              allPaymentsCompleted ? 'bg-green-500' :
+              isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'
+            }`}
+            title={
+              allPaymentsCompleted ? t.allPaymentsCompleted :
+              isPaymentSoon ? 'Payment due soon' : 'Payment due'
+            }
           />
         )}
       </div>
 
       {/* Date */}
       <div className="flex flex-col items-center">
-        <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
+        <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${
+          shouldShowPaymentIndicators ? (
+            allPaymentsCompleted ? 'text-green-500' :
+            isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]'
+          ) : ''
+        }`}>
           {date.getDate()}
         </div>
       </div>
@@ -82,21 +88,28 @@ export function CalendarDay<T extends ClassSession>({
           {classes.length > 0 && (
             <div 
               className="calendar-pill class-count-pill"
-              onClick={handleClassCountClick}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDayClick();
+              }}
             >
-              {classes.length} {t.class || 'class'}
+              {classes.length} {classes.length === 1 ? t.class : t.class}
             </div>
           )}
           
-          {isPaymentDay && (
+          {shouldShowPaymentIndicators && (
             <div 
-              className={`calendar-pill payment-pill ${isPaymentSoon ? 'soon' : 'normal'}`}
-              onClick={handlePaymentPillClick}
+              key={`payment-pill-${completedPayments.length}`}
+              className={`calendar-pill payment-pill ${
+                allPaymentsCompleted ? 'bg-green-500 hover:bg-green-600' :
+                isPaymentSoon ? 'soon' : 'normal'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDayClick();
+              }}
             >
-              {Array.isArray(paymentsDue) 
-                ? `${paymentsDue.length} ${paymentsDue.length === 1 ? t.paymentDue || 'payment' : t.paymentsDue || 'payments'}`
-                : t.paymentDue || 'Payment due'
-              }
+              {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue : t.paymentsDue}
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface ClassSession {
   id: string;
+  name: string;
   date?: string;
   title?: string;
   description?: string;

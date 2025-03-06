@@ -393,7 +393,7 @@ export const ClassSection = ({
               </button>
               
               <span className="text-sm text-gray-600">
-                {startIndex + 1}-{Math.min(startIndex + pageSize, classes.length)} {t.of} {classes.length}
+                {startIndex + 1}-{Math.min(startIndex + pageSize, classes.length)} {t.of} ({classes.length} {t.total || 'total'})
               </span>
               
               <button

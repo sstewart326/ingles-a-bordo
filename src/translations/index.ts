@@ -107,6 +107,7 @@ interface Translation {
   success: string;
   of: string;
   page: string;
+  total: string;
 
   // Payment Configuration
   paymentConfiguration: string;
@@ -184,6 +185,13 @@ interface Translation {
 
   // URL Validation
   invalidUrl: string;
+
+  // Payment Completion
+  completed: string;
+  markAsCompleted: string;
+  classSchedule: string;
+  allPaymentsCompleted: string;
+  markAsIncomplete: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -294,6 +302,7 @@ const translations: Record<Language, Translation> = {
     success: 'Success',
     of: 'of',
     page: 'Page',
+    total: 'total',
 
     // Payment Configuration
     paymentConfiguration: 'Payment Configuration',
@@ -371,6 +380,13 @@ const translations: Record<Language, Translation> = {
 
     // URL Validation
     invalidUrl: 'URL must start with http:// or https://',
+
+    // Payment Completion
+    completed: 'Completed',
+    markAsCompleted: 'Mark as Completed',
+    classSchedule: 'Class Schedule',
+    allPaymentsCompleted: 'All payments completed',
+    markAsIncomplete: 'Mark as Incomplete',
   },
   'pt-BR': {
     // Auth & Profile
@@ -479,6 +495,7 @@ const translations: Record<Language, Translation> = {
     success: 'Sucesso',
     of: 'de',
     page: 'Página',
+    total: 'total',
 
     // Payment Configuration
     paymentConfiguration: 'Configuração de Pagamento',
@@ -556,6 +573,13 @@ const translations: Record<Language, Translation> = {
 
     // URL Validation
     invalidUrl: 'URL deve começar com http:// ou https://',
+
+    // Payment Completion
+    completed: 'Concluído',
+    markAsCompleted: 'Marcar como Concluído',
+    classSchedule: 'Horário das Aulas',
+    allPaymentsCompleted: 'Todos os pagamentos concluídos',
+    markAsIncomplete: 'Marcar como Não Concluído',
   }
 };
 
