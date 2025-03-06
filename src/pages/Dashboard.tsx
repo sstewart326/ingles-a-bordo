@@ -115,7 +115,8 @@ export const Dashboard = () => {
       
       for (const classSession of classes) {
         try {
-          const materials = await getClassMaterials(classSession.id);
+          const materials = await getClassMaterials(classSession.id, date);
+          
           if (materials.length > 0) {
             materialsMap[classSession.id] = materials;
           }

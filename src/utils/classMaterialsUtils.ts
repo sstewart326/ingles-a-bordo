@@ -124,7 +124,8 @@ export const addClassMaterials = async (
 };
 
 export const getClassMaterials = async (
-  classId: string
+  classId: string,
+  specificDate?: Date
 ): Promise<ClassMaterial[]> => {
   try {
     if (!classId) {
@@ -133,7 +134,10 @@ export const getClassMaterials = async (
     }
 
     // Check cache first
-    const cacheKey = `${COLLECTION_PATH}_${classId}_all`;
+    const cacheKey = specificDate 
+      ? `${COLLECTION_PATH}_${classId}_${specificDate.toISOString().split('T')[0]}`
+      : `${COLLECTION_PATH}_${classId}_all`;
+    
     const cachedData = getCached<ClassMaterial[]>(cacheKey);
     if (cachedData) {
       return cachedData;
@@ -162,13 +166,29 @@ export const getClassMaterials = async (
       } as unknown as ClassMaterial;
     });
 
+    // Filter by specific date if provided
+    let filteredMaterials = materials;
+    if (specificDate) {
+      const targetDate = new Date(specificDate);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      filteredMaterials = materials.filter(material => {
+        const materialDate = new Date(material.classDate);
+        materialDate.setHours(0, 0, 0, 0);
+        
+        return materialDate.getFullYear() === targetDate.getFullYear() &&
+               materialDate.getMonth() === targetDate.getMonth() &&
+               materialDate.getDate() === targetDate.getDate();
+      });
+    }
+
     // Sort by date descending
-    materials.sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
+    filteredMaterials.sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
 
     // Cache the result
-    setCached(cacheKey, materials, COLLECTION_PATH);
+    setCached(cacheKey, filteredMaterials, COLLECTION_PATH);
     
-    return materials;
+    return filteredMaterials;
   } catch (error) {
     console.error('Error getting class materials:', error);
     return [];

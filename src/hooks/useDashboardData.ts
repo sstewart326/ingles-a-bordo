@@ -110,19 +110,50 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     }
     
     const classes = upcomingClasses.filter(classItem => {
+      // First check if this class is scheduled for this day of the week
       if (classItem.dayOfWeek !== dayOfWeek) return false;
       
+      // Check if the class has a start date and it's after the calendar date
       if (classItem.startDate) {
         const startDate = classItem.startDate.toDate();
         startDate.setHours(0, 0, 0, 0);
         if (startDate > calendarDate) return false;
       }
 
-      if (!classItem.endDate) return true;
-      
-      const endDate = classItem.endDate.toDate();
-      endDate.setHours(0, 0, 0, 0);
-      return endDate >= calendarDate;
+      // Check if the class has an end date and it's before the calendar date
+      if (classItem.endDate) {
+        const endDate = classItem.endDate.toDate();
+        endDate.setHours(0, 0, 0, 0);
+        if (endDate < calendarDate) return false;
+      }
+
+      // Check if this class has materials for this specific date
+      if (classMaterials[classItem.id]) {
+        // If the class has materials, check if any of them are for this specific date
+        const materialsForThisClass = classMaterials[classItem.id];
+        const materialsForThisDate = materialsForThisClass.filter(material => {
+          if (!material.classDate) return false;
+          
+          const materialDate = material.classDate instanceof Date 
+            ? material.classDate 
+            : new Date(material.classDate);
+          
+          materialDate.setHours(0, 0, 0, 0);
+          
+          // Compare year, month, and day to match the exact date
+          return materialDate.getFullYear() === calendarDate.getFullYear() &&
+                 materialDate.getMonth() === calendarDate.getMonth() &&
+                 materialDate.getDate() === calendarDate.getDate();
+        });
+        
+        // If this class has materials specifically for this date, include it
+        if (materialsForThisDate.length > 0) {
+          return true;
+        }
+      }
+
+      // If no specific materials for this date, follow the regular class schedule
+      return true;
     });
 
     return classes.sort((a, b) => {
