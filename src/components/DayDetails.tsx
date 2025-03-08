@@ -200,7 +200,7 @@ export const DayDetails = ({
   }
 
   return (
-    <div id="day-details-section" className="bg-white rounded-lg p-6" ref={detailsContainerRef}>
+    <div id="day-details-section" className="bg-white rounded-lg p-6 w-full" style={{ maxWidth: '100%', overflowX: 'hidden' }} ref={detailsContainerRef}>
       <h2 className="text-xl font-semibold mb-6">
         {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', {
           weekday: 'long',
@@ -303,7 +303,7 @@ export const DayDetails = ({
       {paginatedClasses.map((classSession) => (
         <div key={classSession.id} className="mb-8 last:mb-0">
           <div className="flex justify-between items-start w-full">
-            <div className="w-full">
+            <div className="w-full overflow-hidden">
               <div className="text-sm font-bold text-black mb-2">
                 {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
                   weekday: 'long', 
@@ -450,7 +450,7 @@ export const DayDetails = ({
                       </a>
                     )}
                   </div>
-                  <div className="mt-1 space-y-2">
+                  <div className="mt-1 space-y-2 overflow-hidden" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
                     {selectedDayDetails.materials[classSession.id].map((material, index) => (
                       <div key={index} className="flex flex-col space-y-2">
                         {material.slides && material.slides.length > 0 && (
@@ -463,8 +463,10 @@ export const DayDetails = ({
                                 rel="noopener noreferrer"
                                 className="flex items-center text-blue-600 hover:text-blue-800 group"
                               >
-                                <FaFilePdf className="mr-2" />
-                                <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
+                                <FaFilePdf className="mr-2 flex-shrink-0" />
+                                <span className="text-sm overflow-hidden whitespace-nowrap text-ellipsis" style={{ maxWidth: '250px', display: 'inline-block', wordBreak: 'break-all' }}>
+                                  {t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}
+                                </span>
                                 {isAdmin && (
                                   <button
                                     onClick={(e) => {
@@ -493,8 +495,8 @@ export const DayDetails = ({
                                 rel="noopener noreferrer"
                                 className="flex items-center text-blue-600 hover:text-blue-800 group"
                               >
-                                <FaLink className="mr-2" />
-                                <span className="text-sm truncate">{link}</span>
+                                <FaLink className="mr-2 flex-shrink-0" />
+                                <span className="text-sm overflow-hidden whitespace-nowrap text-ellipsis" style={{ maxWidth: '250px', display: 'inline-block', wordBreak: 'break-all' }}>{link}</span>
                                 {isAdmin && (
                                   <button
                                     onClick={(e) => {
