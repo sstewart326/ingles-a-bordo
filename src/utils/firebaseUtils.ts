@@ -178,4 +178,39 @@ export const deleteCachedDocument = async (
     cache.invalidate(cacheKey);
     cache.invalidate(encodeCacheKey(`${collectionPath}${options.userId || ''}`));
   }
+};
+
+// Function to update a class session's payment link
+export const updateClassPaymentLink = async (
+  classId: string,
+  paymentLink: string
+): Promise<void> => {
+  try {
+    const docRef = doc(db, 'classes', classId);
+    
+    // Update only the payment link within the paymentConfig
+    await updateDoc(docRef, {
+      'paymentConfig.paymentLink': paymentLink
+    });
+    
+    // Invalidate cache for this class
+    const cacheKey = encodeCacheKey(`classes/${classId}`);
+    cache.invalidate(cacheKey);
+    cache.invalidate(encodeCacheKey('classes'));
+    
+    console.log(`Payment link updated for class ${classId}`);
+  } catch (error) {
+    console.error('Error updating payment link:', error);
+    throw error;
+  }
+};
+
+// Function to get a class by its ID
+export const getClassById = async (classId: string) => {
+  try {
+    return await getCachedDocument('classes', classId);
+  } catch (error) {
+    console.error('Error fetching class by ID:', error);
+    throw error;
+  }
 }; 

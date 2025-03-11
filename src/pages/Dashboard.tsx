@@ -617,6 +617,7 @@ export const Dashboard = () => {
         <div className="lg:col-span-1" ref={detailsRef}>
           <DayDetails
             selectedDayDetails={selectedDayDetails}
+            setSelectedDayDetails={setSelectedDayDetails}
             formatStudentNames={formatStudentNames}
             formatClassTime={formatClassTime}
             isAdmin={isAdmin}

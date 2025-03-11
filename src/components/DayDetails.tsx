@@ -10,6 +10,7 @@ import { UploadMaterialsForm } from './UploadMaterialsForm';
 import Modal from './Modal';
 import { Payment } from '../types/payment';
 import { createPayment, getPaymentsByDueDate, deletePayment } from '../services/paymentService';
+import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -19,6 +20,13 @@ interface DayDetailsProps {
     materials: Record<string, ClassMaterial[]>;
     birthdays?: User[];
   } | null;
+  setSelectedDayDetails?: (details: {
+    date: Date;
+    classes: ClassSession[];
+    paymentsDue: { user: User; classSession: ClassSession }[];
+    materials: Record<string, ClassMaterial[]>;
+    birthdays?: User[];
+  }) => void;
   editingNotes: { [classId: string]: string };
   savingNotes: { [classId: string]: boolean };
   editingPrivateNotes: { [classId: string]: string };
@@ -43,6 +51,7 @@ interface DayDetailsProps {
 
 export const DayDetails = ({
   selectedDayDetails,
+  setSelectedDayDetails,
   editingNotes,
   savingNotes,
   editingPrivateNotes,
@@ -69,6 +78,10 @@ export const DayDetails = ({
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [completedPayments, setCompletedPayments] = useState<Record<string, Payment[]>>({});
+  const [editingPaymentLink, setEditingPaymentLink] = useState<{[classId: string]: string | null}>({});
+  const [savingPaymentLink, setSavingPaymentLink] = useState<{[classId: string]: boolean}>({});
+  const [paymentLinks, setPaymentLinks] = useState<{[classId: string]: string | null}>({});
+  const [loadingPaymentLinks, setLoadingPaymentLinks] = useState<{[classId: string]: boolean}>({});
   const CLASSES_PER_PAGE = 3;
   const detailsContainerRef = useRef<HTMLDivElement>(null);
   
@@ -116,6 +129,56 @@ export const DayDetails = ({
     fetchCompletedPayments();
   }, [selectedDayDetails?.date, selectedDayDetails?.paymentsDue]);
 
+  // Add a useEffect to fetch payment links for all classes in selectedDayDetails
+  useEffect(() => {
+    if (!selectedDayDetails) return;
+    
+    const fetchPaymentLinks = async () => {
+      const classIds = new Set<string>();
+      
+      // Collect all class IDs from classes and paymentsDue
+      selectedDayDetails.classes.forEach(c => classIds.add(c.id));
+      selectedDayDetails.paymentsDue.forEach(p => classIds.add(p.classSession.id));
+      
+      // Initialize loading state for all classes
+      const newLoadingState: {[classId: string]: boolean} = {};
+      Array.from(classIds).forEach(id => {
+        newLoadingState[id] = true;
+      });
+      setLoadingPaymentLinks(newLoadingState);
+      
+      // Fetch payment links for all classes
+      const promises = Array.from(classIds).map(async (classId) => {
+        try {
+          const classData = await getClassById(classId);
+          return { 
+            classId, 
+            paymentLink: classData?.paymentConfig?.paymentLink || null 
+          };
+        } catch (error) {
+          console.error(`Error fetching payment link for class ${classId}:`, error);
+          return { classId, paymentLink: null };
+        }
+      });
+      
+      const results = await Promise.all(promises);
+      
+      // Update payment links state
+      const newPaymentLinks: {[classId: string]: string | null} = {};
+      const newLoadingPaymentLinks: {[classId: string]: boolean} = {};
+      
+      results.forEach(({ classId, paymentLink }) => {
+        newPaymentLinks[classId] = paymentLink;
+        newLoadingPaymentLinks[classId] = false;
+      });
+      
+      setPaymentLinks(newPaymentLinks);
+      setLoadingPaymentLinks(newLoadingPaymentLinks);
+    };
+    
+    fetchPaymentLinks();
+  }, [selectedDayDetails]);
+
   const handleMarkPaymentCompleted = async (userId: string, classSession: ClassSession) => {
     try {
       // Default amount and currency - in a real app, these would come from the class configuration
@@ -161,6 +224,172 @@ export const DayDetails = ({
     }
   };
 
+  const handleEditPaymentLink = async (classSession: ClassSession) => {
+    try {
+      // Find the most up-to-date class session from selectedDayDetails
+      let updatedClassSession = classSession;
+      
+      if (selectedDayDetails) {
+        // Try to find the class in the classes array
+        const foundClass = selectedDayDetails.classes.find(c => c.id === classSession.id);
+        if (foundClass) {
+          updatedClassSession = foundClass;
+        } else {
+          // If not found in classes, try to find it in paymentsDue
+          const foundPaymentDue = selectedDayDetails.paymentsDue.find(
+            p => p.classSession.id === classSession.id
+          );
+          if (foundPaymentDue) {
+            updatedClassSession = foundPaymentDue.classSession;
+          }
+        }
+      }
+      
+      // Fetch the latest class data from the database to ensure we have the most up-to-date payment link
+      try {
+        const latestClassData = await getClassById(updatedClassSession.id);
+        
+        if (latestClassData && latestClassData.paymentConfig) {
+          // Use the latest payment link from the database
+          setEditingPaymentLink({
+            ...editingPaymentLink,
+            [updatedClassSession.id]: latestClassData.paymentConfig.paymentLink || ''
+          });
+          
+          // Log for debugging
+          console.log('Editing payment link for class:', updatedClassSession.id);
+          console.log('Latest payment link from DB:', latestClassData.paymentConfig.paymentLink);
+          return;
+        }
+      } catch (error) {
+        console.error('Error fetching latest class data:', error);
+        // Continue with local data if fetch fails
+      }
+      
+      // Fallback to local data if fetch fails or returns no data
+      if (!updatedClassSession.paymentConfig?.paymentLink) {
+        setEditingPaymentLink({
+          ...editingPaymentLink,
+          [updatedClassSession.id]: ''
+        });
+      } else {
+        setEditingPaymentLink({
+          ...editingPaymentLink,
+          [updatedClassSession.id]: updatedClassSession.paymentConfig.paymentLink
+        });
+      }
+      
+      // Log for debugging
+      console.log('Editing payment link for class:', updatedClassSession.id);
+      console.log('Current payment link (from local state):', updatedClassSession.paymentConfig?.paymentLink);
+    } catch (error) {
+      console.error('Error in handleEditPaymentLink:', error);
+    }
+  };
+
+  const handleSavePaymentLink = async (classSession: ClassSession) => {
+    if (editingPaymentLink[classSession.id] === undefined) return;
+    
+    try {
+      setSavingPaymentLink({
+        ...savingPaymentLink,
+        [classSession.id]: true
+      });
+      
+      const paymentLink = editingPaymentLink[classSession.id] || '';
+      console.log('Saving payment link:', paymentLink);
+      
+      await updateClassPaymentLink(classSession.id, paymentLink);
+      console.log('Payment link saved to database');
+      
+      // Fetch the latest class data from the database to ensure we have the most up-to-date data
+      const latestClassData = await getClassById(classSession.id);
+      
+      // Update our component state with the new payment link
+      setPaymentLinks(prev => ({
+        ...prev,
+        [classSession.id]: latestClassData?.paymentConfig?.paymentLink || null
+      }));
+      
+      // Update the class session in the selected day details
+      if (selectedDayDetails && latestClassData) {
+        // Create updated class session with the latest data from the database
+        const updatedClassSession: ClassSession = {
+          ...classSession,
+          ...latestClassData,
+          paymentConfig: latestClassData.paymentConfig || {
+            type: 'monthly', // Default type
+            startDate: new Date().toISOString().split('T')[0], // Default start date
+            paymentLink
+          }
+        };
+        
+        console.log('Updated class session:', updatedClassSession);
+        console.log('Updated payment link:', updatedClassSession.paymentConfig?.paymentLink);
+        
+        // Update the classes array in selectedDayDetails
+        const updatedClasses = selectedDayDetails.classes.map(c => 
+          c.id === classSession.id ? updatedClassSession : c
+        );
+        
+        // Update the paymentsDue array in selectedDayDetails
+        const updatedPaymentsDue = selectedDayDetails.paymentsDue.map(item => {
+          if (item.classSession.id === classSession.id) {
+            return {
+              ...item,
+              classSession: updatedClassSession
+            };
+          }
+          return item;
+        });
+        
+        // Set the updated selectedDayDetails
+        const updatedSelectedDayDetails = {
+          ...selectedDayDetails,
+          classes: updatedClasses,
+          paymentsDue: updatedPaymentsDue
+        };
+        
+        console.log('Updating selectedDayDetails with new payment link');
+        
+        // Update the local state first
+        if (setSelectedDayDetails) {
+          setSelectedDayDetails(updatedSelectedDayDetails);
+          console.log('selectedDayDetails updated');
+        } else {
+          console.log('setSelectedDayDetails is not available');
+        }
+        
+        // Then notify parent component to refresh calendar
+        if (onPaymentStatusChange) {
+          onPaymentStatusChange(selectedDayDetails.date);
+          console.log('Calendar refresh triggered');
+        }
+      }
+      
+      // Clear the editing state
+      setEditingPaymentLink({
+        ...editingPaymentLink,
+        [classSession.id]: null
+      });
+      console.log('Editing state cleared');
+    } catch (error) {
+      console.error('Error saving payment link:', error);
+    } finally {
+      setSavingPaymentLink({
+        ...savingPaymentLink,
+        [classSession.id]: false
+      });
+    }
+  };
+
+  const handleCancelEditPaymentLink = (classId: string) => {
+    setEditingPaymentLink({
+      ...editingPaymentLink,
+      [classId]: null
+    });
+  };
+
   const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (
     <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
       <UploadMaterialsForm
@@ -188,6 +417,98 @@ export const DayDetails = ({
     const detailsSection = document.getElementById('day-details-section');
     if (detailsSection) {
       detailsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Log when selectedDayDetails changes
+  useEffect(() => {
+    if (selectedDayDetails) {
+      console.log('selectedDayDetails changed:', selectedDayDetails);
+      
+      // Log payment links for all classes
+      selectedDayDetails.classes.forEach(classSession => {
+        console.log(`Class ${classSession.id} payment link:`, classSession.paymentConfig?.paymentLink);
+      });
+      
+      // Log payment links for all payment due classes
+      selectedDayDetails.paymentsDue.forEach(({ classSession }) => {
+        console.log(`Payment due class ${classSession.id} payment link:`, classSession.paymentConfig?.paymentLink);
+      });
+    }
+  }, [selectedDayDetails]);
+
+  // Replace the nested useState and useEffect in the JSX with a function that uses the component-level state
+  const renderPaymentLink = (classSession: ClassSession) => {
+    // Find the most up-to-date class session
+    let updatedClassSession = classSession;
+    
+    if (selectedDayDetails) {
+      // Try to find the class in the classes array
+      const foundClass = selectedDayDetails.classes.find(c => c.id === classSession.id);
+      if (foundClass) {
+        updatedClassSession = foundClass;
+      } else {
+        // If not found in classes, try to find it in paymentsDue
+        const foundPaymentDue = selectedDayDetails.paymentsDue.find(
+          p => p.classSession.id === classSession.id
+        );
+        if (foundPaymentDue) {
+          updatedClassSession = foundPaymentDue.classSession;
+        }
+      }
+    }
+    
+    // Use the payment link from our component state
+    const isLoading = loadingPaymentLinks[updatedClassSession.id];
+    const paymentLink = paymentLinks[updatedClassSession.id];
+    
+    // Display loading state if needed
+    if (isLoading) {
+      return (
+        <div className="flex items-center">
+          <span className="text-gray-500">Loading payment link...</span>
+        </div>
+      );
+    }
+    
+    // Display the payment link if available
+    if (paymentLink) {
+      return (
+        <div className="flex items-center">
+          <a 
+            href={paymentLink} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            {t.paymentLink}
+          </a>
+          {isAdmin && (
+            <PencilIcon
+              onClick={() => handleEditPaymentLink(updatedClassSession)}
+              className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
+              title={t.edit || 'Edit'}
+            />
+          )}
+        </div>
+      );
+    } else if (isAdmin) {
+      return (
+        <button
+          onClick={() => handleEditPaymentLink(updatedClassSession)}
+          className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+        >
+          <PencilIcon className="h-4 w-4 mr-1" />
+          {t.paymentLink || 'Add payment link'}
+        </button>
+      );
+    } else {
+      return (
+        <span className="text-gray-500">{'No payment link available'}</span>
+      );
     }
   };
 
@@ -254,21 +575,48 @@ export const DayDetails = ({
                               {t.amount || "Amount"}: {classSession.paymentConfig.currency} {classSession.paymentConfig.amount.toFixed(2)}
                             </div>
                           )}
-                          {classSession.paymentConfig?.paymentLink && (
-                            <div className="mt-1">
-                              <a 
-                                href={classSession.paymentConfig.paymentLink} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 flex items-center"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                                {t.paymentLink}
-                              </a>
-                            </div>
-                          )}
+                          
+                          {/* Payment Link Section */}
+                          <div className="mt-1">
+                            {editingPaymentLink[classSession.id] !== undefined && editingPaymentLink[classSession.id] !== null ? (
+                              <div>
+                                <div className="flex items-center">
+                                  <input
+                                    type="text"
+                                    value={editingPaymentLink[classSession.id] || ''}
+                                    onChange={(e) => setEditingPaymentLink({
+                                      ...editingPaymentLink,
+                                      [classSession.id]: e.target.value
+                                    })}
+                                    className="w-full p-1 border border-gray-300 rounded text-sm"
+                                    placeholder="https://..."
+                                  />
+                                </div>
+                                <div className="flex justify-end mt-2 space-x-2">
+                                  <button
+                                    onClick={() => handleCancelEditPaymentLink(classSession.id)}
+                                    className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                    disabled={savingPaymentLink[classSession.id]}
+                                  >
+                                    {t.cancel || 'Cancel'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleSavePaymentLink(classSession)}
+                                    className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                    disabled={savingPaymentLink[classSession.id]}
+                                  >
+                                    {savingPaymentLink[classSession.id] 
+                                      ? 'Saving...' 
+                                      : 'Save'}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center">
+                                {renderPaymentLink(classSession)}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
