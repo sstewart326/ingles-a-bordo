@@ -38,6 +38,8 @@ export const Header = () => {
     ])
   ];
 
+  const dashboardPath = isAdmin ? '/dashboard' : '/schedule';
+
   return (
     <Disclosure as="nav" className="header-nav bg-header">
       {({ open }) => (
@@ -55,12 +57,14 @@ export const Header = () => {
                 </Disclosure.Button>
               </div>
               <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
-                <div className="flex flex-shrink-0 items-center">
-                  <img
-                    src="/ingles-a-bordo.png"
-                    alt="Inglês a Bordo"
-                    className="h-12 w-auto"
-                  />
+                <div className="flex flex-shrink-0 items-center mr-6 sm:mr-10 pl-10 sm:pl-0">
+                  <Link to={dashboardPath}>
+                    <img
+                      src="/ingles-a-bordo.png"
+                      alt="Inglês a Bordo"
+                      className="h-12 w-auto cursor-pointer"
+                    />
+                  </Link>
                 </div>
                 <div className="hidden sm:ml-6 sm:block">
                   <div className="flex space-x-4">
