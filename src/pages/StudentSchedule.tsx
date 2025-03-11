@@ -3,6 +3,9 @@ import { collection, query, getDocs, addDoc, deleteDoc, doc, where, Timestamp } 
 import { db } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { styles } from '../styles/styleUtils';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
+import Modal from '../components/Modal';
 
 interface User {
   id: string;
@@ -245,124 +248,122 @@ export const StudentSchedule = () => {
         </div>
 
         {/* Add Class Modal */}
-        {isModalOpen && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-start justify-center z-50 pt-20 px-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-              <h3 className="text-lg font-medium text-black mb-4">Add Class</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-black">Students</label>
-                  <select
-                    multiple
-                    value={selectedStudents}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.selectedOptions, option => option.value);
-                      setSelectedStudents(selected);
-                    }}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
-                    style={{ minHeight: '100px' }}
-                  >
-                    {students.map((student) => (
-                      <option key={student.id} value={student.id} className="p-1 hover:bg-gray-100 text-black">
-                        {student.name || student.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-black">Day of Week</label>
-                  <select
-                    value={newClass.dayOfWeek}
-                    onChange={(e) => setNewClass({...newClass, dayOfWeek: parseInt(e.target.value)})}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
-                  >
-                    {DAYS_OF_WEEK.map((day, index) => (
-                      <option key={index} value={index} className="p-1 text-black">{day}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-black">Start Time</label>
-                  <input
-                    type="time"
-                    value={newClass.startTime}
-                    onChange={(e) => setNewClass({...newClass, startTime: e.target.value})}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-black">End Time</label>
-                  <input
-                    type="time"
-                    value={newClass.endTime}
-                    onChange={(e) => setNewClass({...newClass, endTime: e.target.value})}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-black">Course Type</label>
-                  <select
-                    value={newClass.courseType}
-                    onChange={(e) => setNewClass({...newClass, courseType: e.target.value})}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
-                  >
-                    {COURSE_TYPES.map((type) => (
-                      <option key={type} value={type} className="p-1 text-black">{type}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-black">Notes (Optional)</label>
-                  <input
-                    type="text"
-                    value={newClass.notes}
-                    onChange={(e) => setNewClass({...newClass, notes: e.target.value})}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-black">End Date</label>
-                  <input
-                    type="date"
-                    value={newClass.endDate.toDate().toISOString().split('T')[0]}
-                    onChange={(e) => setNewClass({
-                      ...newClass,
-                      endDate: Timestamp.fromDate(new Date(e.target.value))
-                    })}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
-                  />
-                </div>
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+          <div className="max-w-md w-full">
+            <h3 className="text-lg font-medium text-black mb-4">Add Class</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-black">Students</label>
+                <select
+                  multiple
+                  value={selectedStudents}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions, option => option.value);
+                    setSelectedStudents(selected);
+                  }}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
+                  style={{ minHeight: '100px' }}
+                >
+                  {students.map((student) => (
+                    <option key={student.id} value={student.id} className="p-1 hover:bg-gray-100 text-black">
+                      {student.name || student.email}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setIsModalOpen(false);
-                    resetNewClass();
-                  }}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-black hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              <div>
+                <label className="block text-sm font-medium text-black">Day of Week</label>
+                <select
+                  value={newClass.dayOfWeek}
+                  onChange={(e) => setNewClass({...newClass, dayOfWeek: parseInt(e.target.value)})}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={addClass}
-                  disabled={selectedStudents.length === 0}
-                  className="rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:bg-gray-300"
+                  {DAYS_OF_WEEK.map((day, index) => (
+                    <option key={index} value={index} className="p-1 text-black">{day}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black">Start Time</label>
+                <input
+                  type="time"
+                  value={newClass.startTime}
+                  onChange={(e) => setNewClass({...newClass, startTime: e.target.value})}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black">End Time</label>
+                <input
+                  type="time"
+                  value={newClass.endTime}
+                  onChange={(e) => setNewClass({...newClass, endTime: e.target.value})}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black">Course Type</label>
+                <select
+                  value={newClass.courseType}
+                  onChange={(e) => setNewClass({...newClass, courseType: e.target.value})}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
                 >
-                  Add
-                </button>
+                  {COURSE_TYPES.map((type) => (
+                    <option key={type} value={type} className="p-1 text-black">{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black">Notes (Optional)</label>
+                <input
+                  type="text"
+                  value={newClass.notes}
+                  onChange={(e) => setNewClass({...newClass, notes: e.target.value})}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black">End Date</label>
+                <input
+                  type="date"
+                  value={newClass.endDate.toDate().toISOString().split('T')[0]}
+                  onChange={(e) => setNewClass({
+                    ...newClass,
+                    endDate: Timestamp.fromDate(new Date(e.target.value))
+                  })}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white text-black"
+                />
               </div>
             </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  resetNewClass();
+                }}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addClass}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm"
+                disabled={selectedStudents.length === 0}
+              >
+                Add Class
+              </button>
+            </div>
           </div>
-        )}
+        </Modal>
       </div>
     </div>
   );

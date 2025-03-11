@@ -12,6 +12,7 @@ import { useTranslation } from '../translations';
 import { cache } from '../utils/cache';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
+import Modal from '../components/Modal';
 
 interface User {
   id: string;
@@ -540,20 +541,7 @@ export const AdminUsers = () => {
           <h1 className={styles.headings.h1}>{t.manageUsers}</h1>
           <div className="relative">
             <button
-              onClick={() => {
-                setShowAddForm(!showAddForm);
-                if (!showAddForm) {
-                  const form = document.getElementById('addUserForm');
-                  if (form) {
-                    form.classList.remove('hidden');
-                  }
-                } else {
-                  const form = document.getElementById('addUserForm');
-                  if (form) {
-                    form.classList.add('hidden');
-                  }
-                }
-              }}
+              onClick={() => setShowAddForm(!showAddForm)}
               className={`${
                 showAddForm 
                   ? "bg-gray-200 hover:bg-gray-300 text-gray-800 w-8 h-8" 
@@ -568,129 +556,119 @@ export const AdminUsers = () => {
                 t.addNewUser
               )}
             </button>
-            <div id="addUserForm" className="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg p-6 z-10 border border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className={styles.headings.h2}>{t.addNewUser}</h2>
-              </div>
-              <form onSubmit={handleNewUserSubmit} className="space-y-3">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                    {t.name}
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    value={newUser.name}
-                    onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder={t.enterFullName}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    required
-                  />
+            <Modal isOpen={showAddForm} onClose={() => setShowAddForm(false)}>
+              <div className="w-96">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className={styles.headings.h2}>{t.addNewUser}</h2>
                 </div>
-                <div>
-                  <label htmlFor="birthdate" className="block text-sm font-medium text-gray-700">
-                    {t.birthdate} <span className="text-gray-500">({t.optional})</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="birthdate"
-                    value={newUser.birthdate}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Allow empty value for optional field
-                      if (value === '') {
-                        setNewUser(prev => ({ ...prev, birthdate: '' }));
-                        return;
-                      }
-                      
-                      // Only allow digits and hyphen
-                      if (!/^[\d-]*$/.test(value)) return;
-                      
-                      // Auto-add hyphen after MM
-                      let formattedValue = value;
-                      if (value.length === 2 && !value.includes('-')) {
-                        formattedValue = value + '-';
-                      }
-                      
-                      // Limit to MM-DD format
-                      if (formattedValue.length > 5) return;
-                      
-                      // Validate month and day
-                      if (formattedValue.includes('-')) {
-                        const [month, day] = formattedValue.split('-');
-                        const monthNum = parseInt(month);
-                        const dayNum = parseInt(day);
+                <form onSubmit={handleNewUserSubmit} className="space-y-3">
+                  <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                      {t.name}
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      value={newUser.name}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder={t.enterFullName}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="birthdate" className="block text-sm font-medium text-gray-700">
+                      {t.birthdate} <span className="text-gray-500">({t.optional})</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="birthdate"
+                      value={newUser.birthdate}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty value for optional field
+                        if (value === '') {
+                          setNewUser(prev => ({ ...prev, birthdate: value }));
+                          return;
+                        }
                         
-                        if (monthNum < 1 || monthNum > 12) return;
-                        if (dayNum < 1 || dayNum > 31) return;
-                      }
-                      
-                      setNewUser(prev => ({ ...prev, birthdate: formattedValue }));
-                    }}
-                    placeholder={t.birthdateFormat}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    {t.email}
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder={t.enterEmailAddress}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="flex items-center space-x-2">
+                        // Auto-add hyphen after MM
+                        let formattedValue = value;
+                        if (value.length === 2 && !value.includes('-')) {
+                          formattedValue = value + '-';
+                        }
+                        
+                        // Limit to MM-DD format
+                        if (formattedValue.length > 5) return;
+                        
+                        // Validate month and day
+                        if (formattedValue.includes('-')) {
+                          const [month, day] = formattedValue.split('-');
+                          const monthNum = parseInt(month);
+                          const dayNum = parseInt(day);
+                          
+                          if (monthNum < 1 || monthNum > 12) return;
+                          if (dayNum < 1 || dayNum > 31) return;
+                        }
+                        
+                        setNewUser(prev => ({ ...prev, birthdate: formattedValue }));
+                      }}
+                      placeholder={t.birthdateFormat}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t.birthdateFormat}
+                    </p>
+                  </div>
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                      {t.email}
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder={t.enterEmailAddress}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="flex items-center">
                     <input
                       type="checkbox"
+                      id="isTeacher"
                       checked={newUser.isTeacher}
-                      onChange={(e) => {
-                        const isTeacher = e.target.checked;
-                        setNewUser(prev => ({
-                          ...prev,
-                          isTeacher,
-                          // Clear payment config if teacher is selected
-                          paymentConfig: isTeacher ? undefined : (prev.isAdmin ? undefined : prev.paymentConfig)
-                        }));
-                      }}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, isTeacher: e.target.checked }))}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <span className="text-sm font-medium text-gray-700">{t.teacherAccount}</span>
-                  </label>
-                </div>
-                <div>
-                  <label className="flex items-center space-x-2">
+                    <label htmlFor="isTeacher" className="ml-2 block text-sm text-gray-900">
+                      {t.teacherAccount}
+                    </label>
+                  </div>
+                  <div className="flex items-center">
                     <input
                       type="checkbox"
+                      id="isAdmin"
                       checked={newUser.isAdmin}
-                      onChange={(e) => {
-                        const isAdmin = e.target.checked;
-                        setNewUser(prev => ({
-                          ...prev,
-                          isAdmin,
-                          // Clear payment config if admin is selected
-                          paymentConfig: isAdmin ? undefined : (prev.isTeacher ? undefined : prev.paymentConfig)
-                        }));
-                      }}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, isAdmin: e.target.checked }))}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <span className="text-sm font-medium text-gray-700">{t.adminAccount}</span>
-                  </label>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  {t.generateSignupLink}
-                </button>
-              </form>
-            </div>
+                    <label htmlFor="isAdmin" className="ml-2 block text-sm text-gray-900">
+                      {t.adminAccount}
+                    </label>
+                  </div>
+                  <div className="pt-3">
+                    <button
+                      type="submit"
+                      className={`${styles.buttons.primary} w-full`}
+                    >
+                      {t.generateSignupLink}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </Modal>
           </div>
         </div>
 

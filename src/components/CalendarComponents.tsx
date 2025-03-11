@@ -1,6 +1,7 @@
 import { ClassSession, User } from '../utils/scheduleUtils';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
+import React, { useRef } from 'react';
 
 interface CalendarDayProps {
   date: Date;
@@ -100,6 +101,7 @@ interface ClassTimeModalProps {
   classes: ClassSession[];
   date: Date;
   formatStudentNames: (studentEmails: string[]) => string;
+  onClose: () => void;
 }
 
 export const ClassTimeModal = ({
@@ -107,59 +109,74 @@ export const ClassTimeModal = ({
   position,
   classes,
   date,
-  formatStudentNames
+  formatStudentNames,
+  onClose
 }: ClassTimeModalProps) => {
   const { language } = useLanguage();
+  const modalRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
 
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+      onClose();
+    }
+  };
+
   return (
-    <div 
-      className="class-time-modal"
-      style={{
-        position: 'fixed',
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        transform: 'translateX(-50%)',
-        zIndex: 50,
-        backgroundColor: 'white',
-        borderRadius: '0.5rem',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        padding: '0.75rem',
-        minWidth: '200px',
-        maxWidth: '300px',
-        maxHeight: '80vh',
-        overflowY: 'auto',
-        pointerEvents: 'auto'
-      }}
-    >
-      <div className="text-sm font-medium mb-2">
-        {date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
-          weekday: 'short', 
-          month: 'short', 
-          day: 'numeric' 
-        })}
-      </div>
-      <div className="space-y-2">
-        {classes.map((classItem) => (
-          <div 
-            key={classItem.id}
-            className="time-pill"
-            style={{
-              backgroundColor: '#6366f1',
-              color: 'white',
-              padding: '0.25rem 0.5rem',
-              borderRadius: '0.25rem',
-              fontSize: '0.75rem'
-            }}
-          >
-            <div className="flex justify-between items-center">
-              <span>{classItem.startTime}</span>
-              <span className="text-xs">{formatStudentNames(classItem.studentEmails)}</span>
+    <>
+      <div 
+        className="fixed inset-0 z-40"
+        onClick={handleOverlayClick}
+      />
+      <div 
+        ref={modalRef}
+        className="class-time-modal"
+        style={{
+          position: 'fixed',
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          transform: 'translateX(-50%)',
+          zIndex: 50,
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          padding: '0.75rem',
+          minWidth: '200px',
+          maxWidth: '300px',
+          maxHeight: '80vh',
+          overflowY: 'auto',
+          pointerEvents: 'auto'
+        }}
+      >
+        <div className="text-sm font-medium mb-2">
+          {date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+          })}
+        </div>
+        <div className="space-y-2">
+          {classes.map((classItem) => (
+            <div 
+              key={classItem.id}
+              className="time-pill"
+              style={{
+                backgroundColor: '#6366f1',
+                color: 'white',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.25rem',
+                fontSize: '0.75rem'
+              }}
+            >
+              <div className="flex justify-between items-center">
+                <span>{classItem.startTime}</span>
+                <span className="text-xs">{formatStudentNames(classItem.studentEmails)}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 }; 
