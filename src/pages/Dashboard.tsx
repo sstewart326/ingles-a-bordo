@@ -38,8 +38,9 @@ export const Dashboard = () => {
   const [visibleUploadForm, setVisibleUploadForm] = useState<string | null>(null);
   const [upcomingClassesPage, setUpcomingClassesPage] = useState(0);
   const [pastClassesPage, setPastClassesPage] = useState(0);
+  const [initialDataFetched, setInitialDataFetched] = useState(false);
   
-  const { currentUser } = useAuth();
+  const { currentUser, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -66,6 +67,15 @@ export const Dashboard = () => {
     getRelevantMonthKeys,
     getMonthKey,
   } = useDashboardData();
+
+  // Add a specific effect to handle initial data loading after auth and admin status are determined
+  useEffect(() => {
+    if (!authLoading && !adminLoading && currentUser && !initialDataFetched) {
+      debugLog('Dashboard - Initial data fetch triggered');
+      fetchClasses(new Date());
+      setInitialDataFetched(true);
+    }
+  }, [authLoading, adminLoading, currentUser, initialDataFetched, fetchClasses]);
 
   // Add resize event listener to update mobile view state
   useEffect(() => {
@@ -533,7 +543,8 @@ export const Dashboard = () => {
     }
   }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, handleDayClick, upcomingClasses, users, isDateInRelevantMonthRange, setSelectedDate]);
 
-  if (adminLoading) {
+  // Show loading state if auth or admin status is still loading
+  if (authLoading || adminLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -634,7 +645,7 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {adminLoading ? (
+      {authLoading || adminLoading ? (
         <div className="flex justify-center items-center h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>

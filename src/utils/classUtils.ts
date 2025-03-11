@@ -4,6 +4,12 @@ import { getMonthKey } from './calendarUtils';
 import { toast } from 'react-hot-toast';
 import { ClassMaterial } from '../types/interfaces';
 
+// Extended interface to include dates property
+interface ExtendedClassSession extends ClassSession {
+  dates?: Date[];
+  studentNames?: string[];
+}
+
 interface ClassState {
   upcomingClasses: ClassSession[];
   pastClasses: ClassSession[];
@@ -38,8 +44,11 @@ const compareTimes = (timeA: string, timeB: string): number => {
 };
 
 export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpcomingClasses, setPastClasses }: UpdateClassListParams) => {
+  console.log('updateClassList called with classes:', classes);
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const todayTime = today.getTime();
 
   // Calculate start and end of current week
   const startOfWeek = new Date(today);
@@ -68,9 +77,49 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
     existingPastClassesMap.set(c.id, c);
   });
 
+  // Helper function to safely convert a date value to a Date object
+  const safeToDate = (dateValue: any): Date | null => {
+    if (!dateValue) return null;
+    
+    try {
+      // If it's a Firestore Timestamp with toDate method
+      if (typeof dateValue.toDate === 'function') {
+        return dateValue.toDate();
+      }
+      // If it's already a Date object
+      else if (dateValue instanceof Date) {
+        return dateValue;
+      }
+      // If it's a string or number
+      else {
+        return new Date(dateValue);
+      }
+    } catch (error) {
+      console.error('Error converting date:', error, dateValue);
+      return null;
+    }
+  };
+
   // Filter classes based on their day of week and start date
   const newUpcomingClasses = classes
     .filter(c => {
+      const extendedClass = c as ExtendedClassSession;
+      
+      // If the class has specific dates, check if any are in the future
+      if (extendedClass.dates && extendedClass.dates.length > 0) {
+        console.log(`Checking future dates for class ${c.id}:`, extendedClass.dates);
+        // Check if any dates are today or in the future
+        return extendedClass.dates.some(date => {
+          const dateToCheck = new Date(date);
+          dateToCheck.setHours(0, 0, 0, 0);
+          const isUpcoming = dateToCheck.getTime() >= todayTime;
+          if (isUpcoming) {
+            console.log(`Found upcoming date for class ${c.id}:`, dateToCheck);
+          }
+          return isUpcoming;
+        });
+      }
+      
       // Skip classes without a day of week
       if (c.dayOfWeek === undefined) return false;
       
@@ -79,9 +128,12 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       
       // For upcoming classes, we want to show them even if they haven't started yet
       // Only filter out if they have an end date that's passed
-      if (c.endDate && c.endDate.toDate() < today) return false;
-      else return isThisWeek;
+      if (c.endDate) {
+        const endDate = safeToDate(c.endDate);
+        if (endDate && endDate < today) return false;
+      }
       
+      return isThisWeek;
     })
     .map(c => {
       // Preserve materials from existing classes
@@ -89,14 +141,36 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       return existingClass ? { ...c, materials: existingClass.materials } : c;
     })
     .sort((a, b) => {
+      const extendedA = a as ExtendedClassSession;
+      const extendedB = b as ExtendedClassSession;
+      
+      // If both classes have specific dates, sort by the earliest upcoming date
+      if (extendedA.dates && extendedA.dates.length > 0 && extendedB.dates && extendedB.dates.length > 0) {
+        // Find the earliest upcoming date for each class
+        const upcomingDatesA = extendedA.dates.filter(date => {
+          const dateObj = new Date(date);
+          return dateObj.getTime() >= todayTime;
+        });
+        const upcomingDatesB = extendedB.dates.filter(date => {
+          const dateObj = new Date(date);
+          return dateObj.getTime() >= todayTime;
+        });
+        
+        if (upcomingDatesA.length > 0 && upcomingDatesB.length > 0) {
+          const earliestA = new Date(Math.min(...upcomingDatesA.map(d => new Date(d).getTime())));
+          const earliestB = new Date(Math.min(...upcomingDatesB.map(d => new Date(d).getTime())));
+          return earliestA.getTime() - earliestB.getTime();
+        }
+      }
+      
       // Skip sorting if dayOfWeek is undefined
       if (a.dayOfWeek === undefined || b.dayOfWeek === undefined) return 0;
       
-      const today = new Date().getDay();
+      const currentDayOfWeek = today.getDay();
       
       // Calculate days until each class (considering week wraparound)
       const getDaysUntil = (dayOfWeek: number): number => {
-        const daysUntil = dayOfWeek - today;
+        const daysUntil = dayOfWeek - currentDayOfWeek;
         // If the day is earlier in the week or today, it's next week
         return daysUntil <= 0 ? daysUntil + 7 : daysUntil;
       };
@@ -114,6 +188,23 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
 
   const newPastClasses = classes
     .filter(c => {
+      const extendedClass = c as ExtendedClassSession;
+      
+      // If the class has specific dates, check if any are in the past
+      if (extendedClass.dates && extendedClass.dates.length > 0) {
+        console.log(`Checking past dates for class ${c.id}:`, extendedClass.dates);
+        // Check if any dates are in the past
+        return extendedClass.dates.some(date => {
+          const dateToCheck = new Date(date);
+          dateToCheck.setHours(0, 0, 0, 0);
+          const isPast = dateToCheck.getTime() < todayTime;
+          if (isPast) {
+            console.log(`Found past date for class ${c.id}:`, dateToCheck);
+          }
+          return isPast;
+        });
+      }
+      
       // Skip classes without a day of week
       if (c.dayOfWeek === undefined) return false;
       
@@ -121,7 +212,12 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       const isThisWeek = weekDays.includes(c.dayOfWeek);
       
       // Check if the class has started based on start date
-      const hasStarted = !c.startDate || c.startDate.toDate() <= today;
+      let hasStarted = true;
+      if (c.startDate) {
+        const startDate = safeToDate(c.startDate);
+        hasStarted = !startDate || startDate <= today;
+      }
+      
       if (!hasStarted) return false;
       else return isThisWeek;
     })
@@ -131,6 +227,28 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       return existingClass ? { ...c, materials: existingClass.materials } : c;
     })
     .sort((a, b) => {
+      const extendedA = a as ExtendedClassSession;
+      const extendedB = b as ExtendedClassSession;
+      
+      // If both classes have specific dates, sort by the most recent past date
+      if (extendedA.dates && extendedA.dates.length > 0 && extendedB.dates && extendedB.dates.length > 0) {
+        // Find the most recent past date for each class
+        const pastDatesA = extendedA.dates.filter(date => {
+          const dateObj = new Date(date);
+          return dateObj.getTime() < todayTime;
+        });
+        const pastDatesB = extendedB.dates.filter(date => {
+          const dateObj = new Date(date);
+          return dateObj.getTime() < todayTime;
+        });
+        
+        if (pastDatesA.length > 0 && pastDatesB.length > 0) {
+          const mostRecentA = new Date(Math.max(...pastDatesA.map(d => new Date(d).getTime())));
+          const mostRecentB = new Date(Math.max(...pastDatesB.map(d => new Date(d).getTime())));
+          return mostRecentB.getTime() - mostRecentA.getTime(); // Most recent first
+        }
+      }
+      
       // Skip sorting if dayOfWeek is undefined
       if (a.dayOfWeek === undefined || b.dayOfWeek === undefined) return 0;
       
@@ -149,6 +267,9 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       return getDateForClass(b).getTime() - getDateForClass(a).getTime();
     });
 
+  console.log('New upcoming classes:', newUpcomingClasses);
+  console.log('New past classes:', newPastClasses);
+  
   setUpcomingClasses(newUpcomingClasses);
   setPastClasses(newPastClasses);
 };

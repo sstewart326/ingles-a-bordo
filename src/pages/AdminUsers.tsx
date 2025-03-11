@@ -23,6 +23,7 @@ interface User {
   status?: 'active' | 'pending';
   createdAt: string | Date;
   birthdate?: string;  // Add birthdate to User interface
+  teacher?: string;  // ID of the admin who created this user
   paymentConfig?: {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;
@@ -38,6 +39,7 @@ interface NewUser {
   isTeacher: boolean;
   isAdmin: boolean;
   birthdate?: string;  // Optional birthdate field
+  teacher?: string;  // ID of the admin who created this user
   paymentConfig?: {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;
@@ -68,7 +70,8 @@ export const AdminUsers = () => {
     name: '',
     isTeacher: false,
     isAdmin: false,
-    birthdate: ''  // Initialize birthdate field
+    birthdate: '',  // Initialize birthdate field
+    teacher: undefined  // Initialize teacher field
   });
   const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: string}>({});
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -278,6 +281,11 @@ export const AdminUsers = () => {
         newUserData.birthdate = newUser.birthdate.trim();
       }
       
+      // Set the teacher field to the current admin's ID if the user is not an admin or teacher
+      if (!newUser.isAdmin && !newUser.isTeacher && currentUser?.uid) {
+        newUserData.teacher = currentUser.uid;
+      }
+      
       // Use setCachedDocument to properly handle caching
       await setCachedDocument('users', tempId, newUserData, { userId: currentUser?.uid });
       
@@ -292,7 +300,8 @@ export const AdminUsers = () => {
         name: '', 
         isTeacher: false,
         isAdmin: false,
-        birthdate: ''  // Reset birthdate field
+        birthdate: '',  // Reset birthdate field
+        teacher: undefined  // Reset teacher field
       }); // Reset form
       
       // Hide the form
