@@ -499,7 +499,7 @@ export const DayDetails = ({
       return (
         <button
           onClick={() => handleEditPaymentLink(updatedClassSession)}
-          className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+          className={`${styles.buttons.secondary} flex items-center text-sm py-1 px-3`}
         >
           <PencilIcon className="h-4 w-4 mr-1" />
           {t.paymentLink || 'Add payment link'}
@@ -521,7 +521,7 @@ export const DayDetails = ({
   }
 
   return (
-    <div id="day-details-section" className="bg-white rounded-lg p-6 w-full" style={{ maxWidth: '100%', overflowX: 'hidden' }} ref={detailsContainerRef}>
+    <div id="day-details-section" className="bg-white rounded-lg p-6 w-full shadow-md border border-gray-200" style={{ maxWidth: '100%', overflowX: 'hidden' }} ref={detailsContainerRef}>
       <h2 className="text-xl font-semibold mb-6">
         {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', {
           weekday: 'long',

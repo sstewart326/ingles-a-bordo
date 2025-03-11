@@ -120,7 +120,7 @@ export const ClassSection = ({
   );
 
   return (
-    <div className="max-w-2xl" ref={sectionRef}>
+    <div className="max-w-2xl bg-white rounded-lg p-6 shadow-md border border-gray-200" ref={sectionRef}>
       <h2 className={styles.headings.h2}>{title}</h2>
       <div className="mt-4 space-y-4">
         {displayedClasses.length === 0 ? (

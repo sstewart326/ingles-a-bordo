@@ -560,8 +560,53 @@ export const Dashboard = () => {
         </div>
       </div>
       
-      {/* Classes sections - grid layout on desktop */}
-      <div className="mt-8 lg:grid lg:grid-cols-2 lg:gap-8">
+      {/* Calendar and Day details section - side by side on desktop */}
+      <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">
+        {/* Calendar section */}
+        <div>
+          <CalendarSection
+            selectedDate={selectedDate}
+            upcomingClasses={upcomingClasses}
+            onMonthChange={handleMonthChange}
+            onDayClick={handleDayClick}
+            formatStudentNames={formatStudentNames}
+            isDateInRelevantMonthRange={isDateInRelevantMonthRange}
+            getClassesForDay={getClassesForDay}
+            users={users}
+          />
+        </div>
+        
+        {/* Day details section */}
+        <div ref={detailsRef} className="mt-8 lg:mt-0">
+          <DayDetails
+            selectedDayDetails={selectedDayDetails}
+            setSelectedDayDetails={setSelectedDayDetails}
+            formatStudentNames={formatStudentNames}
+            formatClassTime={formatClassTime}
+            isAdmin={isAdmin}
+            editingNotes={editingNotes}
+            savingNotes={savingNotes}
+            editingPrivateNotes={editingPrivateNotes}
+            savingPrivateNotes={savingPrivateNotes}
+            deletingMaterial={deletingMaterial}
+            onDeleteMaterial={handleDeleteMaterial}
+            onOpenUploadForm={openModal}
+            onCloseUploadForm={closeModal}
+            visibleUploadForm={visibleUploadForm}
+            onEditNotes={handleEditNotes}
+            onSaveNotes={handleSaveNotes}
+            onCancelEditNotes={handleCancelEditNotes}
+            onEditPrivateNotes={handleEditPrivateNotes}
+            onSavePrivateNotes={handleSavePrivateNotes}
+            onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
+            textareaRefs={textareaRefs.current}
+            onPaymentStatusChange={handlePaymentStatusChange}
+          />
+        </div>
+      </div>
+      
+      {/* Classes section - at the bottom */}
+      <div className="mt-8 pt-8 border-t-4 border-gray-200 lg:grid lg:grid-cols-2 lg:gap-8 lg:border-t-0 lg:pt-0">
         <ClassesSection
           upcomingClasses={upcomingClasses}
           pastClasses={pastClasses}
@@ -598,48 +643,6 @@ export const Dashboard = () => {
             pastClasses: t.pastClasses
           }}
         />
-      </div>
-
-      <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">
-        {/* Calendar section */}
-        <CalendarSection
-          selectedDate={selectedDate}
-          upcomingClasses={upcomingClasses}
-          onMonthChange={handleMonthChange}
-          onDayClick={handleDayClick}
-          formatStudentNames={formatStudentNames}
-          isDateInRelevantMonthRange={isDateInRelevantMonthRange}
-          getClassesForDay={getClassesForDay}
-          users={users}
-        />
-
-        {/* Details section */}
-        <div className="lg:col-span-1" ref={detailsRef}>
-          <DayDetails
-            selectedDayDetails={selectedDayDetails}
-            setSelectedDayDetails={setSelectedDayDetails}
-            formatStudentNames={formatStudentNames}
-            formatClassTime={formatClassTime}
-            isAdmin={isAdmin}
-            editingNotes={editingNotes}
-            savingNotes={savingNotes}
-            editingPrivateNotes={editingPrivateNotes}
-            savingPrivateNotes={savingPrivateNotes}
-            deletingMaterial={deletingMaterial}
-            onDeleteMaterial={handleDeleteMaterial}
-            onOpenUploadForm={openModal}
-            onCloseUploadForm={closeModal}
-            visibleUploadForm={visibleUploadForm}
-            onEditNotes={handleEditNotes}
-            onSaveNotes={handleSaveNotes}
-            onCancelEditNotes={handleCancelEditNotes}
-            onEditPrivateNotes={handleEditPrivateNotes}
-            onSavePrivateNotes={handleSavePrivateNotes}
-            onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
-            textareaRefs={textareaRefs.current}
-            onPaymentStatusChange={handlePaymentStatusChange}
-          />
-        </div>
       </div>
     </div>
   );
