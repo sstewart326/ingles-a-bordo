@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Select from 'react-select';
-import { useLanguage } from '../hooks/useLanguage';
 import { useAuth } from '../hooks/useAuth';
 import { 
   getStudentClassPlans, 
@@ -32,7 +30,6 @@ import {
   CheckIcon, 
   DocumentDuplicateIcon,
   ChevronRightIcon,
-  ChevronDownIcon,
   EyeIcon,
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
@@ -50,8 +47,6 @@ interface SelectOption {
 
 // Simple tooltip component
 const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  
   return (
     <span className="relative inline-flex items-center group">
       <span className="cursor-help">
@@ -72,8 +67,6 @@ const months = [
 
 export const AdminClassPlans = () => {
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
-  const { language } = useLanguage();
   
   // State for month/year selection
   const currentDate = new Date();
@@ -185,53 +178,38 @@ export const AdminClassPlans = () => {
     }
   }, [selectedStudent, selectedMonth, selectedYear]);
   
-  // Create a new class plan if one doesn't exist
-  const handleCreateClassPlan = async () => {
+  // Combined function to create a class plan and add the first item
+  const handleAddFirstItem = async () => {
     if (!selectedStudent || !currentUser) return;
     
     try {
-      const planId = await createClassPlan(
-        selectedStudent.value,
-        selectedMonth,
-        selectedYear,
-        currentUser.email || ''
-      );
-      
-      // Fetch the newly created plan
-      await fetchClassPlan();
-      toast.success('Class plan created');
-    } catch (error) {
-      console.error('Error creating class plan:', error);
-      toast.error('Failed to create class plan');
-    }
-  };
-  
-  // Combined function to create a class plan and add the first item
-  const handleAddFirstItem = async () => {
-    if (!selectedStudent || !currentUser || !newItemTitle.trim()) return;
-    
-    try {
       // First create the class plan
-      const planId = await createClassPlan(
+      await createClassPlan(
         selectedStudent.value,
         selectedMonth,
         selectedYear,
         currentUser.email || ''
       );
-      
-      // Add the item directly to the newly created plan using the planId
-      await addClassPlanItem(planId, newItemTitle, newItemDescription);
       
       // Fetch the updated plan
       await fetchClassPlan();
       
+      // Add the item directly to the newly created plan
+      if (classPlan) {
+        await addClassPlanItem(classPlan.id, newItemTitle, newItemDescription);
+        
+        // Fetch the updated plan again
+        await fetchClassPlan();
+      }
+      
+      // Reset form and close modal
       setNewItemTitle('');
       setNewItemDescription('');
       setShowAddItemModal(false);
-      toast.success('Class plan created with first item');
+      toast.success('Item added to class plan');
     } catch (error) {
-      console.error('Error creating class plan with first item:', error);
-      toast.error('Failed to create class plan with item');
+      console.error('Error adding first item:', error);
+      toast.error('Failed to add item');
     }
   };
   
@@ -387,25 +365,29 @@ export const AdminClassPlans = () => {
     
     try {
       // First create the class plan
-      const planId = await createClassPlan(
+      await createClassPlan(
         selectedStudent.value,
         selectedMonth,
         selectedYear,
         currentUser.email || ''
       );
       
-      // Then apply the template to it
-      await applyTemplateToClassPlan(planId, selectedTemplate);
-      
       // Fetch the updated plan
       await fetchClassPlan();
       
-      setSelectedTemplate('');
+      // Then apply the template to it
+      if (classPlan) {
+        await applyTemplateToClassPlan(classPlan.id, selectedTemplate);
+        
+        // Fetch the updated plan again
+        await fetchClassPlan();
+      }
+      
       setShowApplyTemplateModal(false);
-      toast.success('New class plan created with template');
+      toast.success('Template applied to new class plan');
     } catch (error) {
-      console.error('Error creating plan with template:', error);
-      toast.error('Failed to create plan with template');
+      console.error('Error applying template to new plan:', error);
+      toast.error('Failed to apply template');
     }
   };
   
@@ -558,7 +540,7 @@ export const AdminClassPlans = () => {
   };
   
   // Recursive function to render an item and its children
-  const renderItem = (item: ClassPlanItem, index: number, isChild: boolean = false, isLast: boolean = false, parentArray?: ClassPlanItem[]) => {
+  const renderItem = (item: ClassPlanItem, index: number, isChild: boolean = false) => {
     const hasChildren = item.children && item.children.length > 0;
     
     return (
@@ -680,7 +662,7 @@ export const AdminClassPlans = () => {
                   </button>
                 </div>
                 
-                {renderItem(child, childIndex, true, childIndex === item.children!.length - 1, item.children)}
+                {renderItem(child, childIndex, true)}
               </li>
             ))}
             
@@ -919,7 +901,7 @@ export const AdminClassPlans = () => {
               ) : (
                 <ul className="divide-y divide-gray-200">
                   {classPlan.items.map((item, index) => 
-                    renderItem(item, index, false, index === classPlan.items.length - 1, classPlan.items)
+                    renderItem(item, index, false)
                   )}
                 </ul>
               )}

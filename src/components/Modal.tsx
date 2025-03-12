@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
 interface ModalProps {

@@ -3,8 +3,6 @@ import { collection, query, getDocs, addDoc, deleteDoc, doc, where, Timestamp } 
 import { db } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { styles } from '../styles/styleUtils';
-import { useLanguage } from '../hooks/useLanguage';
-import { useTranslation } from '../translations';
 import Modal from '../components/Modal';
 
 interface User {
