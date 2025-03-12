@@ -46,4 +46,33 @@ export interface User {
 export interface MonthYear {
   month: number;
   year: number;
+}
+
+export interface ClassPlanItem {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  completedDate?: { toDate: () => Date }; // Firebase Timestamp
+  children?: ClassPlanItem[]; // Add support for nested items
+  isExpanded?: boolean; // Track if children are visible
+}
+
+export interface ClassPlan {
+  id: string;
+  studentEmail: string;
+  month: number; // 0-11
+  year: number;
+  items: ClassPlanItem[];
+  createdAt: { toDate: () => Date }; // Firebase Timestamp
+  updatedAt: { toDate: () => Date }; // Firebase Timestamp
+  createdBy: string; // admin's email
+}
+
+export interface ClassPlanTemplate {
+  id: string;
+  name: string;
+  items: Omit<ClassPlanItem, 'id' | 'completed' | 'completedDate'>[];
+  createdAt: { toDate: () => Date }; // Firebase Timestamp
+  createdBy: string; // admin's email
 } 

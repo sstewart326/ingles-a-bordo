@@ -11,6 +11,7 @@ import { Schedule } from './pages/Schedule';
 import { Profile } from './pages/Profile';
 import { AdminUsers } from './pages/AdminUsers';
 import { AdminSchedule } from './pages/AdminSchedule';
+import { AdminClassPlans } from './pages/AdminClassPlans';
 
 // Lazy load components that use Firebase Storage
 const ClassMaterials = lazy(() => import('./pages/ClassMaterials'));
@@ -25,7 +26,7 @@ const LoadingSpinner = () => (
 
 export const AppRoutes = () => {
   return (
-    <div className="flex flex-col flex-1">
+    <div className="flex flex-col flex-1 w-full m-0 p-0 overflow-x-hidden">
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<><Login /><Footer /></>} />
@@ -117,6 +118,18 @@ export const AppRoutes = () => {
                 <Suspense fallback={<LoadingSpinner />}>
                   <AdminMaterials />
                 </Suspense>
+              </main>
+              <Footer />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/class-plans"
+          element={
+            <AdminRoute>
+              <Header />
+              <main className="flex-1">
+                <AdminClassPlans />
               </main>
               <Footer />
             </AdminRoute>

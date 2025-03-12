@@ -28,6 +28,7 @@ interface Translation {
   manageUsers: string;
   manageSchedules: string;
   manageMaterials: string;
+  classPlans: string;
   
   // Dashboard
   quickActions: string;
@@ -226,6 +227,7 @@ const translations: Record<Language, Translation> = {
     manageUsers: 'Manage Users',
     manageSchedules: 'Manage Classes',
     manageMaterials: 'Manage Materials',
+    classPlans: 'Class Plans',
     
     // Dashboard
     quickActions: 'Quick Actions',
@@ -422,6 +424,7 @@ const translations: Record<Language, Translation> = {
     manageUsers: 'Gerenciar Usuários',
     manageSchedules: 'Gerenciar Aulas',
     manageMaterials: 'Gerenciar Materiais',
+    classPlans: 'Planos de Aula',
     
     // Dashboard
     quickActions: 'Ações Rápidas',

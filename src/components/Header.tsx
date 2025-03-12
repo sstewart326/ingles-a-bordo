@@ -32,7 +32,8 @@ export const Header = () => {
     ...(isAdmin ? [
       { name: t.dashboard, href: '/dashboard', current: location.pathname === '/dashboard' },
       { name: t.manageUsers, href: '/admin/users', current: location.pathname === '/admin/users' },
-      { name: t.manageSchedules, href: '/admin/schedule', current: location.pathname === '/admin/schedule' }
+      { name: t.manageSchedules, href: '/admin/schedule', current: location.pathname === '/admin/schedule' },
+      { name: t.classPlans, href: '/admin/class-plans', current: location.pathname === '/admin/class-plans' }
     ] : [
       { name: t.schedule, href: '/schedule', current: location.pathname === '/schedule' }
     ])
@@ -41,12 +42,12 @@ export const Header = () => {
   const dashboardPath = isAdmin ? '/dashboard' : '/schedule';
 
   return (
-    <Disclosure as="nav" className="header-nav bg-header">
+    <Disclosure as="nav" className="header-nav bg-header w-full">
       {({ open }) => (
         <>
-          <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
+          <div className="w-full px-0 sm:px-4 lg:px-6">
             <div className="relative flex h-20 items-center justify-between">
-              <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">
+              <div className="absolute inset-y-0 left-0 flex items-center sm:hidden pl-2">
                 <Disclosure.Button className="header-nav-button relative inline-flex items-center justify-center rounded-md p-2 text-[var(--brand-color)] hover:text-[var(--brand-color-dark)] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--brand-color)] bg-transparent">
                   <span className="sr-only">Open main menu</span>
                   {open ? (
@@ -57,7 +58,7 @@ export const Header = () => {
                 </Disclosure.Button>
               </div>
               <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
-                <div className="flex flex-shrink-0 items-center mr-6 sm:mr-10 pl-10 sm:pl-0">
+                <div className="flex flex-shrink-0 items-center mr-6 sm:mr-10 pl-10 sm:pl-4">
                   <Link to={dashboardPath}>
                     <img
                       src="/ingles-a-bordo.png"
@@ -84,8 +85,8 @@ export const Header = () => {
                   </div>
                 </div>
               </div>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
-                <Menu as="div" className="relative ml-3">
+              <div className="absolute inset-y-0 right-0 flex items-center pr-4 sm:pr-2 sm:static sm:inset-auto sm:ml-2">
+                <Menu as="div" className="relative">
                   <div>
                     <Menu.Button className="header-profile-button relative flex rounded-full text-sm">
                       <span className="sr-only">Open user menu</span>

@@ -132,8 +132,15 @@ select:focus {
 nav.header-nav {
   background-color: var(--header-bg) !important;
   border-bottom: 1px solid var(--brand-color-medium) !important;
-  width: 100%;
+  width: 100vw !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
   z-index: 50;
+  position: relative;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
 }
 
 nav.header-nav .header-nav-logo {
