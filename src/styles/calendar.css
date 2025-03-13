@@ -8,6 +8,8 @@
   border-radius: 0.5rem;
   overflow: hidden;
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 /* Calendar Day */
@@ -20,6 +22,7 @@
   transition: background-color 0.2s ease;
   border-right: 1px solid #E5E7EB;
   border-bottom: 1px solid #E5E7EB;
+  z-index: 1;
 }
 
 /* Remove right border for last day in each row */
@@ -35,12 +38,16 @@
 /* Empty day styling */
 .calendar-day.empty {
   background-color: #E5E7EB;
+  opacity: 1;
   cursor: default;
   border: none;
+  position: relative;
+  z-index: 1;
 }
 
 .calendar-day.empty:hover {
   background-color: #E5E7EB;
+  opacity: 1;
 }
 
 /* Remove borders between empty days */
@@ -255,6 +262,8 @@
   background-color: white;
   border-radius: 0.75rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
 }
 
 .calendar-selected-day-header {

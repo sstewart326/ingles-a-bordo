@@ -4,6 +4,7 @@ import { AdminProvider } from './contexts/AdminContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { AppRoutes } from './AppRoutes';
 import { Toaster } from 'react-hot-toast';
+import './styles/globals.css';
 import './App.css';
 
 function App() {
@@ -12,6 +13,9 @@ function App() {
       <AuthProvider>
         <AdminProvider>
           <LanguageProvider>
+            <div className="background-clouds">
+              <img src={new URL('./clouds.png', import.meta.url).href} alt="" />
+            </div>
             <AppRoutes />
             <Toaster position="top-right" />
           </LanguageProvider>

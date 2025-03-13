@@ -40,20 +40,20 @@ export const Calendar: React.FC<CalendarProps> = ({
   return (
     <div>
       {showNavigation && (
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 relative z-10">
           <h2 className={styles.headings.h2}>
             {selectedDate.toLocaleString(language === 'pt-BR' ? 'pt-BR' : 'en', { month: 'long', year: 'numeric' })}
           </h2>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePreviousMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--brand-color)] hover:bg-[var(--brand-color-dark)] text-[var(--header-bg)] transition-colors text-xl"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#6B5590] hover:bg-[#7B65A0] text-white transition-colors text-xl relative z-10"
             >
               ‹
             </button>
             <button
               onClick={handleNextMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--brand-color)] hover:bg-[var(--brand-color-dark)] text-[var(--header-bg)] transition-colors text-xl"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#6B5590] hover:bg-[#7B65A0] text-white transition-colors text-xl relative z-10"
             >
               ›
             </button>
