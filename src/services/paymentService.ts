@@ -53,6 +53,28 @@ class PaymentsCache {
 
 const paymentsCache = new PaymentsCache();
 
+export const checkExistingPayment = async (userId: string, classSessionId: string, dueDate: Date): Promise<Payment | null> => {
+  const startOfDay = new Date(dueDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(dueDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const q = query(
+    collection(db, PAYMENTS_COLLECTION),
+    where('userId', '==', userId),
+    where('classSessionId', '==', classSessionId),
+    where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
+    where('dueDate', '<=', Timestamp.fromDate(endOfDay))
+  );
+
+  const querySnapshot = await getDocs(q);
+  if (!querySnapshot.empty) {
+    const doc = querySnapshot.docs[0];
+    return { id: doc.id, ...doc.data() } as Payment;
+  }
+  return null;
+};
+
 export const createPayment = async (
   userId: string,
   classSessionId: string,
@@ -60,6 +82,12 @@ export const createPayment = async (
   currency: string,
   dueDate: Date
 ): Promise<string> => {
+  // Check if payment already exists
+  const existingPayment = await checkExistingPayment(userId, classSessionId, dueDate);
+  if (existingPayment) {
+    return existingPayment.id;
+  }
+
   const paymentData: Omit<Payment, 'id'> = {
     userId,
     classSessionId,
@@ -128,8 +156,26 @@ export const getPaymentsForDate = async (date: Date): Promise<Payment[]> => {
 };
 
 export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string): Promise<Payment[]> => {
-  const payments = await getPaymentsForDates([dueDate], [classSessionId]);
-  return payments.filter(payment => payment.classSessionId === classSessionId);
+  // Create start and end of day timestamps for the due date
+  const startOfDay = new Date(dueDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(dueDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const q = query(
+    collection(db, PAYMENTS_COLLECTION),
+    where('classSessionId', '==', classSessionId),
+    where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
+    where('dueDate', '<=', Timestamp.fromDate(endOfDay))
+  );
+
+  const querySnapshot = await getDocs(q);
+  const payments: Payment[] = [];
+  querySnapshot.forEach(doc => {
+    payments.push({ id: doc.id, ...doc.data() } as Payment);
+  });
+
+  return payments;
 };
 
 export const getPaymentById = async (paymentId: string): Promise<Payment | null> => {

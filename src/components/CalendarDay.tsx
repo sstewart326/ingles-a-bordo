@@ -35,7 +35,7 @@ export function CalendarDay<T extends ClassSession>({
   // Check if all payments for this day are completed
   const allPaymentsCompleted = isPaymentDay && paymentsDue.every(({ user, classSession }) => {
     return completedPayments.some(payment => 
-      payment.userId === user.id && payment.classSessionId === classSession.id
+      payment.userId === user.email && payment.classSessionId === classSession.id
     );
   });
 

@@ -185,23 +185,48 @@ export const DayDetails = ({
 
   const handleMarkPaymentCompleted = async (userId: string, classSession: ClassSession) => {
     try {
-      // Default amount and currency - in a real app, these would come from the class configuration
-      const amount = 50;
-      const currency = 'USD';
+      console.log('Starting payment completion...', { userId, classSessionId: classSession.id });
       
-      await createPayment(userId, classSession.id, amount, currency, selectedDayDetails!.date);
+      // Get amount and currency from class configuration
+      const amount = classSession.paymentConfig?.amount || 0;
+      const currency = classSession.paymentConfig?.currency || 'USD';
       
-      // Only fetch the updated payments for this specific class
-      const updatedPayments = await getPaymentsByDueDate(selectedDayDetails!.date, classSession.id);
-      if (updatedPayments.length > 0) {
-        setCompletedPayments(prev => ({
-          ...prev,
-          [classSession.id]: updatedPayments
-        }));
+      console.log('Payment details:', { amount, currency });
+      
+      // Find the user in the paymentsDue array to get their email
+      const userPaymentDue = selectedDayDetails?.paymentsDue.find(
+        payment => payment.classSession.id === classSession.id && payment.user.email === userId
+      );
+      
+      if (!userPaymentDue) {
+        console.error('User payment due not found');
+        return;
+      }
+      
+      // Use the user's email as the userId since that's what we have
+      const paymentId = await createPayment(userPaymentDue.user.email, classSession.id, amount, currency, selectedDayDetails!.date);
+      console.log('Payment created with ID:', paymentId);
+      
+      // Fetch all completed payments to ensure state is fully up to date
+      if (selectedDayDetails?.paymentsDue) {
+        console.log('Fetching updated payments...');
+        const payments: Record<string, Payment[]> = {};
+        
+        for (const { classSession: cs } of selectedDayDetails.paymentsDue) {
+          const completedPaymentsForClass = await getPaymentsByDueDate(selectedDayDetails.date, cs.id);
+          console.log('Completed payments for class:', cs.id, completedPaymentsForClass);
+          if (completedPaymentsForClass.length > 0) {
+            payments[cs.id] = completedPaymentsForClass;
+          }
+        }
+        
+        console.log('Setting completed payments:', payments);
+        setCompletedPayments(payments);
       }
       
       // Notify parent component to refresh calendar
       if (onPaymentStatusChange && selectedDayDetails) {
+        console.log('Triggering calendar refresh...');
         onPaymentStatusChange(selectedDayDetails.date);
       }
     } catch (error) {
@@ -617,11 +642,11 @@ export const DayDetails = ({
           <h3 className="text-lg font-medium mb-4">{t.paymentsDue}</h3>
           <div className="space-y-4">
             {paginatedPayments.map(({ user, classSession }) => {
-              const payment = completedPayments[classSession.id]?.find(p => p.userId === user.id);
+              const payment = completedPayments[classSession.id]?.find(p => p.userId === user.email);
               const completed = !!payment;
               return (
                 <div
-                  key={`${user.id}-${classSession.id}`}
+                  key={`${user.email}-${classSession.id}`}
                   className={`rounded-lg border ${
                     completed ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
                   }`}
@@ -704,7 +729,7 @@ export const DayDetails = ({
                   {!completed ? (
                     <div className="px-6 py-3 border-t border-yellow-200 bg-yellow-50">
                       <button
-                        onClick={() => handleMarkPaymentCompleted(user.id, classSession)}
+                        onClick={() => handleMarkPaymentCompleted(user.email, classSession)}
                         className="w-full bg-yellow-100 text-yellow-700 hover:bg-yellow-200 py-2 rounded-md text-sm font-medium transition-colors border border-yellow-300"
                       >
                         {t.markAsCompleted}
