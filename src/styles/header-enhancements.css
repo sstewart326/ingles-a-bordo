@@ -101,7 +101,12 @@
 .header-nav-item.nav-item {
   color: #ffffff !important;
   font-weight: 800;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 
+    -1px -1px 0 rgba(0, 0, 0, 0.2),
+    1px -1px 0 rgba(0, 0, 0, 0.2),
+    -1px 1px 0 rgba(0, 0, 0, 0.2),
+    1px 1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.2);
   letter-spacing: 0.3px;
   transition: all 0.2s ease;
 }
@@ -109,13 +114,23 @@
 .header-nav-item.nav-item:hover {
   box-shadow: 0 0 15px rgba(225, 201, 230, 0.3);
   transform: translateY(-1px);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  text-shadow: 
+    -1px -1px 0 rgba(0, 0, 0, 0.3),
+    1px -1px 0 rgba(0, 0, 0, 0.3),
+    -1px 1px 0 rgba(0, 0, 0, 0.3),
+    1px 1px 0 rgba(0, 0, 0, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .header-nav-item.nav-item.active {
   color: var(--brand-color) !important;
   font-weight: 900;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  text-shadow: 
+    -1px -1px 0 rgba(0, 0, 0, 0.25),
+    1px -1px 0 rgba(0, 0, 0, 0.25),
+    -1px 1px 0 rgba(0, 0, 0, 0.25),
+    1px 1px 0 rgba(0, 0, 0, 0.25),
+    0 1px 3px rgba(0, 0, 0, 0.3);
   background-color: rgba(255, 255, 255, 0.1);
 }
 

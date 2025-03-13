@@ -215,7 +215,7 @@ nav.header-nav .header-profile-button {
 nav.header-nav .header-profile-button:hover > div {
   transform: scale(1.05);
   border-color: var(--brand-color) !important;
-  box-shadow: 0 0 8px var(--brand-color-light);
+  box-shadow: 0 0 4px 0px var(--brand-color-light);
 }
 
 nav.header-nav .header-dropdown {

@@ -162,7 +162,7 @@
 /* Common Pill Base */
 .calendar-pill {
   font-size: 0.7rem;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 12px;
   text-align: center;
   cursor: pointer;
@@ -172,9 +172,13 @@
   margin: 0 auto;
   transition: background-color 0.2s ease;
   color: white;
-  min-width: 80px;
-  height: 20px;
-  white-space: nowrap;
+  width: 100%;
+  max-width: 120px;
+  min-height: 20px;
+  height: auto;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Class Count Pill */

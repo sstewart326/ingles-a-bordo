@@ -30,6 +30,9 @@ import {
   DocumentDuplicateIcon,
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
+import { styles } from '../styles/styleUtils';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
 
 interface User {
   id: string;
@@ -64,6 +67,8 @@ const months = [
 
 export const AdminClassPlans = () => {
   const { currentUser } = useAuth();
+  const { language } = useLanguage();
+  const t = useTranslation(language);
   
   // State for month/year selection
   const currentDate = new Date();
@@ -710,7 +715,7 @@ export const AdminClassPlans = () => {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Class Planning</h1>
+      <h1 className={`${styles.headings.h1} mb-6`}>{t.classPlans}</h1>
       
       {/* Selection Controls */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -1235,7 +1240,7 @@ export const AdminClassPlans = () => {
       {/* Templates Section */}
       <div className="mt-8 bg-white rounded-lg shadow-md p-6">
         <div className="mb-6">
-          <h2 className="text-xl font-semibold">Template Library</h2>
+          <h2 className={styles.headings.h2}>Template Library</h2>
         </div>
         
         {templates.length === 0 ? (

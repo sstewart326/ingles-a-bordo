@@ -89,7 +89,7 @@ export const Header = () => {
               <div className="absolute inset-y-0 right-0 flex items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
                 <Menu as="div" className="relative">
                   <div>
-                    <Menu.Button className="header-profile-button flex rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-color)] focus:ring-offset-2">
+                    <Menu.Button className="header-profile-button flex rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-color)] focus:ring-offset-0">
                       <span className="sr-only">Open user menu</span>
                       <div className="h-8 w-8 rounded-full flex items-center justify-center text-black bg-[var(--brand-color)] border border-[var(--brand-color-medium)] hover:border-[var(--brand-color)] transition-all">
                         {currentUser?.email?.charAt(0).toUpperCase()}
