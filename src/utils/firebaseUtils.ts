@@ -23,6 +23,7 @@ const USER_SCOPED_COLLECTIONS = new Set(['users']);
 interface CacheOptions {
   includeIds?: boolean;
   userId?: string | null; // Current user's ID for scoping
+  bypassCache?: boolean; // Whether to bypass the cache
 }
 
 // Function to safely encode cache keys
@@ -56,6 +57,10 @@ const rehydrateTimestamps = (data: unknown): unknown => {
 
 // Function to determine if data should be cached
 const shouldCache = (collectionPath: string, options: CacheOptions = {}): boolean => {
+  if (options.bypassCache) {
+    return false;
+  }
+
   if (NEVER_CACHE_COLLECTIONS.has(collectionPath)) {
     return false;
   }

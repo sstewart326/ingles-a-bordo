@@ -10,7 +10,6 @@ import {
   deleteClassPlanItem,
   deleteClassPlan,
   getClassPlanTemplates,
-  getClassPlanTemplate,
   createClassPlanTemplate,
   updateClassPlanTemplate,
   applyTemplateToClassPlan,
@@ -29,8 +28,6 @@ import {
   PencilIcon, 
   CheckIcon, 
   DocumentDuplicateIcon,
-  ChevronRightIcon,
-  EyeIcon,
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
 
@@ -264,6 +261,7 @@ export const AdminClassPlans = () => {
       });
       
       await fetchClassPlan();
+      toast.success(item.completed ? 'Item marked as incomplete' : 'Item marked as completed');
     } catch (error) {
       console.error('Error toggling item completion:', error);
       toast.error('Failed to update item');
@@ -292,28 +290,6 @@ export const AdminClassPlans = () => {
     setShowEditItemModal(true);
   };
   
-  // Save current plan as a template
-  const handleSaveTemplate = async () => {
-    if (!classPlan || !templateName.trim() || !currentUser) return;
-    
-    try {
-      // Use the actual class plan items directly
-      await createClassPlanTemplate(
-        templateName,
-        classPlan.items,
-        currentUser.email || ''
-      );
-      
-      await fetchTemplates();
-      setTemplateName('');
-      setShowTemplateModal(false);
-      toast.success('Template saved');
-    } catch (error) {
-      console.error('Error saving template:', error);
-      toast.error('Failed to save template');
-    }
-  };
-  
   // Create a new empty template
   const handleCreateNewTemplate = async () => {
     if (!templateName.trim() || !currentUser) return;
@@ -329,14 +305,7 @@ export const AdminClassPlans = () => {
       await fetchTemplates();
       setTemplateName('');
       setShowTemplateModal(false);
-      toast.success('Empty template created');
-      
-      // Get the newly created template and open it for editing
-      const updatedTemplates = await getClassPlanTemplates();
-      const newTemplate = updatedTemplates.find(t => t.name === templateName);
-      if (newTemplate) {
-        handleEditTemplate(newTemplate.id);
-      }
+      toast.success('Template created successfully. You can now add items to it.');
     } catch (error) {
       console.error('Error creating empty template:', error);
       toast.error('Failed to create template');
@@ -365,29 +334,24 @@ export const AdminClassPlans = () => {
     
     try {
       // First create the class plan
-      await createClassPlan(
+      const newPlanId = await createClassPlan(
         selectedStudent.value,
         selectedMonth,
         selectedYear,
         currentUser.email || ''
       );
       
-      // Fetch the updated plan
+      // Immediately apply the template to the new plan without fetching in between
+      await applyTemplateToClassPlan(newPlanId, selectedTemplate);
+      
+      // Now fetch the updated plan with the template applied
       await fetchClassPlan();
       
-      // Then apply the template to it
-      if (classPlan) {
-        await applyTemplateToClassPlan(classPlan.id, selectedTemplate);
-        
-        // Fetch the updated plan again
-        await fetchClassPlan();
-      }
-      
       setShowApplyTemplateModal(false);
-      toast.success('Template applied to new class plan');
+      toast.success('Plan created with template');
     } catch (error) {
-      console.error('Error applying template to new plan:', error);
-      toast.error('Failed to apply template');
+      console.error('Error creating plan with template:', error);
+      toast.error('Failed to create plan with template');
     }
   };
   
@@ -395,37 +359,11 @@ export const AdminClassPlans = () => {
   const handleDeleteTemplate = async (templateId: string) => {
     try {
       await deleteClassPlanTemplate(templateId);
-      await fetchTemplates();
-      toast.success('Template deleted');
+      setTemplates(templates.filter(t => t.id !== templateId));
+      toast.success('Template deleted successfully');
     } catch (error) {
       console.error('Error deleting template:', error);
       toast.error('Failed to delete template');
-    }
-  };
-  
-  // View template details
-  const handleViewTemplate = async (templateId: string) => {
-    try {
-      const template = await getClassPlanTemplate(templateId);
-      setCurrentTemplate(template);
-      setShowViewTemplateModal(true);
-    } catch (error) {
-      console.error('Error fetching template details:', error);
-      toast.error('Failed to load template details');
-    }
-  };
-  
-  // Open edit template modal
-  const handleEditTemplate = async (templateId: string) => {
-    try {
-      const template = await getClassPlanTemplate(templateId);
-      setCurrentTemplate(template);
-      setEditTemplateName(template.name);
-      setTemplateItems(template.items);
-      setShowEditTemplateModal(true);
-    } catch (error) {
-      console.error('Error fetching template for editing:', error);
-      toast.error('Failed to load template for editing');
     }
   };
   
@@ -439,12 +377,17 @@ export const AdminClassPlans = () => {
         items: templateItems
       });
       
-      await fetchTemplates();
+      setTemplates(templates.map(t => 
+        t.id === currentTemplate.id 
+          ? { ...t, name: editTemplateName, items: templateItems }
+          : t
+      ));
+      
       setShowEditTemplateModal(false);
       setCurrentTemplate(null);
       setEditTemplateName('');
       setTemplateItems([]);
-      toast.success('Template updated');
+      toast.success('Template updated successfully');
     } catch (error) {
       console.error('Error updating template:', error);
       toast.error('Failed to update template');
@@ -857,23 +800,6 @@ export const AdminClassPlans = () => {
                   </button>
                 </>
               )}
-              
-              <button
-                type="button"
-                onClick={() => setShowApplyTemplateModal(true)}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                {classPlan ? 'Apply Template' : 'Create Plan with Template'}
-                <div className="relative ml-1 group">
-                  <InformationCircleIcon className="h-3 w-3 text-indigo-500 cursor-help" />
-                  <div className="absolute bottom-full right-0 mb-1 px-2 py-1 w-48 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-200 z-50 pointer-events-none">
-                    {classPlan 
-                      ? 'Apply an existing template to this class plan. This will add all template items to the current plan.'
-                      : 'Create a new class plan using a template.'}
-                    <div className="absolute w-2 h-2 bg-gray-800 transform rotate-45 right-1 -bottom-1"></div>
-                  </div>
-                </div>
-              </button>
             </div>
           </div>
           
@@ -886,17 +812,31 @@ export const AdminClassPlans = () => {
               {classPlan.items.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <p>No items in this plan yet. Add your first item to get started.</p>
-                  <button
-                    onClick={() => {
-                      setNewItemTitle('');
-                      setNewItemDescription('');
-                      setShowAddItemModal(true);
-                    }}
-                    className="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    <PlusIcon className="h-4 w-4 mr-1" />
-                    Add First Item
-                  </button>
+                  <div className="flex justify-center space-x-3 mt-4">
+                    <button
+                      onClick={() => {
+                        setNewItemTitle('');
+                        setNewItemDescription('');
+                        setShowAddItemModal(true);
+                      }}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      <PlusIcon className="h-4 w-4 mr-1" />
+                      Add First Item
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplate('');
+                        setShowApplyTemplateModal(true);
+                      }}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                      Apply Template
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-200">
@@ -909,17 +849,33 @@ export const AdminClassPlans = () => {
           ) : (
             <div className="text-center py-8">
               <p className="text-gray-500 mb-4">No class plan exists for this student in {months[selectedMonth]} {selectedYear}.</p>
-              <button
-                onClick={() => {
-                  setNewItemTitle('');
-                  setNewItemDescription('');
-                  setShowAddItemModal(true);
-                }}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                <PlusIcon className="h-4 w-4 mr-1" />
-                Add First Item
-              </button>
+              <div className="flex justify-center space-x-3">
+                <button
+                  onClick={() => {
+                    setNewItemTitle('');
+                    setNewItemDescription('');
+                    setShowAddItemModal(true);
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  <PlusIcon className="h-4 w-4 mr-1" />
+                  Add First Item
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    // When clicking "Create Plan with Template", we want to directly
+                    // open the template selection modal with the context that we're creating a new plan
+                    setSelectedTemplate('');
+                    setShowApplyTemplateModal(true);
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                  Create Plan with Template
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1073,45 +1029,11 @@ export const AdminClassPlans = () => {
                   <DocumentDuplicateIcon className="h-5 w-5 text-indigo-500" />
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-gray-900">Template Options</h3>
+                  <h3 className="text-sm font-medium text-gray-900">Create New Template</h3>
                   <p className="text-sm text-gray-500">
-                    Choose how you want to create your template
+                    After creating the template, you'll be able to add items to it using the edit button in the template library.
                   </p>
                 </div>
-              </div>
-              
-              <div className="space-y-3">
-                {classPlan && (
-                  <button
-                    type="button"
-                    onClick={handleSaveTemplate}
-                    disabled={!templateName.trim()}
-                    className="w-full flex justify-between items-center px-4 py-3 border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="text-left">
-                      <p className="text-sm font-medium text-gray-900">Use Current Plan</p>
-                      <p className="text-xs text-gray-500">
-                        Create a template based on the current class plan structure
-                      </p>
-                    </div>
-                    <ChevronRightIcon className="h-5 w-5 text-gray-400" />
-                  </button>
-                )}
-                
-                <button
-                  type="button"
-                  onClick={handleCreateNewTemplate}
-                  disabled={!templateName.trim()}
-                  className="w-full flex justify-between items-center px-4 py-3 border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-900">Create Empty Template</p>
-                    <p className="text-xs text-gray-500">
-                      Start with an empty template and add items manually
-                    </p>
-                  </div>
-                  <ChevronRightIcon className="h-5 w-5 text-gray-400" />
-                </button>
               </div>
             </div>
             
@@ -1122,6 +1044,15 @@ export const AdminClassPlans = () => {
                 className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Cancel
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleCreateNewTemplate}
+                disabled={!templateName.trim()}
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                Create Template
               </button>
             </div>
           </div>
@@ -1135,7 +1066,7 @@ export const AdminClassPlans = () => {
       >
         <div>
           <h2 className="text-lg font-medium text-gray-900 mb-4">
-            {classPlan ? 'Apply Template' : 'Create Plan with Template'}
+            {!classPlan ? 'Create Plan with Template' : 'Apply Template'}
           </h2>
           <div className="space-y-4">
             <div>
@@ -1174,11 +1105,11 @@ export const AdminClassPlans = () => {
               
               <button
                 type="button"
-                onClick={classPlan ? handleApplyTemplate : handleApplyTemplateToNewPlan}
+                onClick={!classPlan ? handleApplyTemplateToNewPlan : handleApplyTemplate}
                 disabled={!selectedTemplate}
                 className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                {classPlan ? 'Apply Template' : 'Create Plan with Template'}
+                {!classPlan ? 'Create Plan with Template' : 'Apply Template'}
               </button>
             </div>
           </div>
@@ -1303,29 +1234,13 @@ export const AdminClassPlans = () => {
       
       {/* Templates Section */}
       <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6">
           <h2 className="text-xl font-semibold">Template Library</h2>
-          
-          <div className="flex space-x-2">
-            <button
-              onClick={() => {
-                setTemplateName('');
-                setShowTemplateModal(true);
-              }}
-              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-              Create New Template
-              <Tooltip text="Create a new reusable template that can be applied to any student's class plan. You can start with an empty template or use an existing plan as a base.">
-                <InformationCircleIcon className="h-4 w-4 ml-1 text-indigo-200" />
-              </Tooltip>
-            </button>
-          </div>
         </div>
         
         {templates.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            <p>No templates available yet. Create your first template to get started.</p>
+            <p>No templates available yet.</p>
             <p className="mt-2 text-sm">Templates allow you to reuse class plan structures across different students and months.</p>
           </div>
         ) : (
@@ -1338,23 +1253,7 @@ export const AdminClassPlans = () => {
                     <p className="text-sm text-gray-500 mt-1">{template.items.length} items</p>
                   </div>
                   
-                  <div className="flex space-x-1">
-                    <button
-                      onClick={() => handleViewTemplate(template.id)}
-                      className="p-1.5 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-600"
-                      title="View template"
-                    >
-                      <EyeIcon className="h-4 w-4" />
-                    </button>
-                    
-                    <button
-                      onClick={() => handleEditTemplate(template.id)}
-                      className="p-1.5 rounded-full bg-yellow-50 text-yellow-500 hover:bg-yellow-100 hover:text-yellow-600"
-                      title="Edit template"
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </button>
-                    
+                  <div>
                     <button
                       onClick={() => handleDeleteTemplate(template.id)}
                       className="p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600"
@@ -1379,32 +1278,24 @@ export const AdminClassPlans = () => {
                   </ul>
                 </div>
                 
-                <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between">
+                <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
                   <span className="text-xs text-gray-400">
                     Created by: {template.createdBy.split('@')[0]}
                   </span>
                   
                   {selectedStudent && (
-                    <div className="flex items-center">
-                      <button
-                        onClick={() => {
-                          setSelectedTemplate(template.id);
-                          setShowApplyTemplateModal(true);
-                        }}
-                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium bg-white"
-                      >
-                        {classPlan ? 'Apply to current plan' : 'Create plan with template'}
-                      </button>
-                      <div className="relative ml-1 group">
-                        <InformationCircleIcon className="h-3 w-3 text-indigo-500 cursor-help" />
-                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 w-48 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-200 z-50 pointer-events-none">
-                          {classPlan 
-                            ? 'Add all items from this template to the current class plan.'
-                            : 'Create a new class plan using this template.'}
-                          <div className="absolute w-2 h-2 bg-gray-800 transform rotate-45 right-1 -bottom-1"></div>
-                        </div>
-                      </div>
-                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedTemplate(template.id);
+                        setShowApplyTemplateModal(true);
+                      }}
+                      className="px-2 py-1 text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      title={classPlan 
+                        ? 'Add all items from this template to the current class plan'
+                        : 'Create a new class plan using this template'}
+                    >
+                      {classPlan ? 'Apply to plan' : 'Create plan'}
+                    </button>
                   )}
                 </div>
               </div>
@@ -1458,15 +1349,7 @@ export const AdminClassPlans = () => {
                 )}
               </div>
               
-              <div className="flex justify-between pt-4">
-                <button
-                  type="button"
-                  onClick={() => handleEditTemplate(currentTemplate.id)}
-                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                >
-                  Edit Template
-                </button>
-                
+              <div className="flex justify-center pt-4">
                 <button
                   type="button"
                   onClick={() => setShowViewTemplateModal(false)}

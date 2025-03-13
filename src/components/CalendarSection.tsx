@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar } from './Calendar';
 import { CalendarDay } from './CalendarDay';
 import { ClassSession, User } from '../utils/scheduleUtils';
@@ -11,7 +11,6 @@ interface CalendarSectionProps {
   upcomingClasses: ClassSession[];
   onMonthChange: (date: Date) => void;
   onDayClick: (date: Date, classes: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
-  formatStudentNames: (studentEmails: string[]) => string;
   isDateInRelevantMonthRange: (date: Date) => boolean;
   getClassesForDay: (dayOfWeek: number, date: Date) => ClassSession[];
   users: User[];
@@ -28,10 +27,16 @@ export const CalendarSection = ({
 }: CalendarSectionProps) => {
   const [completedPayments, setCompletedPayments] = useState<Payment[]>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
-  const previousMonthRef = useRef<string>('');
+  const previousClassMonthRef = useRef<string>('');
+  const previousPaymentMonthRef = useRef<string>('');
+  const calendarClassesRef = useRef<Record<string, ClassSession[]>>({});
+  const [monthPaymentDueDates, setMonthPaymentDueDates] = useState<{
+    datesWithPayments: Date[];
+    classSessionIds: string[];
+  }>({ datesWithPayments: [], classSessionIds: [] });
 
   // Pre-calculate all payment due dates for the month
-  const getMonthPaymentDueDates = () => {
+  useEffect(() => {
     const datesWithPayments: Date[] = [];
     const classSessionIds = new Set<string>();
     
@@ -46,88 +51,84 @@ export const CalendarSection = ({
       }
     }
 
-    return { datesWithPayments, classSessionIds: Array.from(classSessionIds) };
-  };
+    setMonthPaymentDueDates({
+      datesWithPayments,
+      classSessionIds: Array.from(classSessionIds)
+    });
+  }, [selectedDate, upcomingClasses, users, isDateInRelevantMonthRange]);
+
+  // Cache classes for each day to prevent recalculation
+  const getClassesForDayWithCache = useCallback((date: Date) => {
+    const dateKey = date.toISOString().split('T')[0];
+    if (!calendarClassesRef.current[dateKey]) {
+      calendarClassesRef.current[dateKey] = getClassesForDay(date.getDay(), date);
+    }
+    return calendarClassesRef.current[dateKey];
+  }, [getClassesForDay]);
+
+  // Clear class cache when month changes
+  useEffect(() => {
+    const currentMonth = selectedDate.getMonth();
+    const currentYear = selectedDate.getFullYear();
+    const monthKey = `${currentYear}-${currentMonth}`;
+    
+    if (previousClassMonthRef.current !== monthKey) {
+      previousClassMonthRef.current = monthKey;
+      calendarClassesRef.current = {};
+    }
+  }, [selectedDate]);
 
   // Fetch all payments for the visible month
   useEffect(() => {
     const currentMonth = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}`;
     
-    // Only fetch if the month has changed
-    if (previousMonthRef.current !== currentMonth) {
-      const fetchMonthPayments = async () => {
-        setIsLoadingPayments(true);
-        
-        try {
-          const { datesWithPayments, classSessionIds } = getMonthPaymentDueDates();
-
-          if (datesWithPayments.length > 0) {
-            const payments = await getPaymentsForDates(datesWithPayments, classSessionIds);
-            setCompletedPayments(payments);
-          } else {
-            setCompletedPayments([]);
-          }
-        } finally {
-          setIsLoadingPayments(false);
+    const fetchMonthPayments = async () => {
+      setIsLoadingPayments(true);
+      
+      try {
+        if (monthPaymentDueDates.datesWithPayments.length > 0) {
+          const payments = await getPaymentsForDates(
+            monthPaymentDueDates.datesWithPayments,
+            monthPaymentDueDates.classSessionIds
+          );
+          setCompletedPayments(payments);
+        } else {
+          setCompletedPayments([]);
         }
-      };
+      } finally {
+        setIsLoadingPayments(false);
+      }
+    };
 
+    // Fetch payments when month changes or payment due dates update
+    if (previousPaymentMonthRef.current !== currentMonth || monthPaymentDueDates.datesWithPayments.length > 0) {
       fetchMonthPayments();
-      previousMonthRef.current = currentMonth;
+      previousPaymentMonthRef.current = currentMonth;
     }
-  }, [selectedDate, upcomingClasses, users, isDateInRelevantMonthRange]);
+  }, [selectedDate, monthPaymentDueDates]);
 
-  const handleMonthChange = (newDate: Date) => {
-    // Clear the previous month ref to force a refresh on month change
-    previousMonthRef.current = '';
-    onMonthChange(newDate);
-  };
-
-  const getPaymentsDueForSelectedDay = (date: Date): { user: User; classSession: ClassSession }[] => {
-    return getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
-  };
-
-  const handleDayClick = (date: Date, classes: ClassSession[]) => {
-    const paymentsDue = getPaymentsDueForSelectedDay(date);
+  const handleDayClick = useCallback((date: Date) => {
+    const classes = getClassesForDayWithCache(date);
+    const paymentsDue = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
     onDayClick(date, classes, paymentsDue);
-  };
+  }, [getClassesForDayWithCache, upcomingClasses, users, isDateInRelevantMonthRange, onDayClick]);
 
-  const renderCalendarDayWrapper = (date: Date, isToday: boolean) => {
-    const dayClasses = getClassesForDay(date.getDay(), date);
-    const paymentsDue = getPaymentsDueForSelectedDay(date);
-
-    // Filter completed payments for this specific day
-    const dayCompletedPayments = completedPayments.filter(payment => {
-      const paymentDate = payment.dueDate.toDate();
-      return paymentDate.getDate() === date.getDate() &&
-             paymentDate.getMonth() === date.getMonth() &&
-             paymentDate.getFullYear() === date.getFullYear();
-    });
-
-    return (
-      <div className="h-full flex flex-col">
+  return (
+    <Calendar
+      selectedDate={selectedDate}
+      onMonthChange={onMonthChange}
+      onDayClick={handleDayClick}
+      renderDay={(date, isToday) => (
         <CalendarDay
           date={date}
           isToday={isToday}
-          classes={dayClasses}
-          paymentsDue={paymentsDue}
-          onDayClick={handleDayClick}
-          completedPayments={dayCompletedPayments}
+          classes={getClassesForDayWithCache(date)}
+          paymentsDue={getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange)}
+          isDateInRelevantMonthRange={isDateInRelevantMonthRange}
+          completedPayments={completedPayments}
           isLoading={isLoadingPayments}
         />
-      </div>
-    );
-  };
-
-  return (
-    <div className="relative">
-      <Calendar
-        key={`calendar-${selectedDate.getTime()}`}
-        selectedDate={selectedDate}
-        onDateSelect={handleDayClick}
-        onMonthChange={handleMonthChange}
-        renderDay={renderCalendarDayWrapper}
-      />
-    </div>
+      )}
+    />
   );
 }; 

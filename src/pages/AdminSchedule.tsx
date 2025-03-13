@@ -17,6 +17,8 @@ import { getDocs, collection } from 'firebase/firestore';
 import { styles, classNames } from '../styles/styleUtils';
 import { getDayName } from '../utils/dateUtils';
 import Modal from '../components/Modal';
+import { useDashboardData } from '../hooks/useDashboardData';
+import { ClassSchedule } from '../types/interfaces';
 
 interface User {
   id: string;
@@ -41,9 +43,11 @@ interface Class {
   id: string;
   studentEmails: string[];
   studentIds?: string[];
+  scheduleType: 'single' | 'multiple';  // New field to indicate schedule type
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  schedules?: ClassSchedule[];
   courseType: string;
   notes?: string;
   startDate: Timestamp;
@@ -51,6 +55,10 @@ interface Class {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   paymentConfig: PaymentConfig;
+  frequency: {
+    type: 'weekly' | 'biweekly' | 'custom';
+    every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks
+  };
 }
 
 interface SelectOption {
@@ -85,71 +93,43 @@ const getNextDayOccurrence = (dayOfWeek: number) => {
 
 const timeOptions = generateTimeOptions();
 
-interface NewClass {
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  courseType: string;
-  notes: string;
-  studentEmails: string[];
-  startDate: Date;
-  endDate: Date | null;
-  paymentConfig: {
-    type: 'weekly' | 'monthly';
-    weeklyInterval: number | null;
-    monthlyOption: 'first' | 'fifteen' | 'last' | null;
-    startDate: string;  // YYYY-MM-DD date string
-    paymentLink?: string;  // URL for payment
-    amount?: number;  // Payment amount
-    currency?: string;  // Payment currency (e.g., USD, BRL)
-  };
-}
-
 export const AdminSchedule = () => {
   const { language } = useLanguage();
   const t = useTranslation(language);
   const DAYS_OF_WEEK = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newClass, setNewClass] = useState<NewClass>(() => {
-    const today = new Date();
-    return {
-      dayOfWeek: 1,
-      startTime: '09:00 AM',
-      endTime: '10:00 AM',
-      courseType: 'Individual',
-      notes: '',
-      studentEmails: [],
-      startDate: getNextDayOccurrence(1),
-      endDate: null,
-      paymentConfig: {
-        type: 'weekly',
-        weeklyInterval: 1,
-        monthlyOption: null,
-        startDate: today.toISOString().split('T')[0],
-        paymentLink: '',
-        amount: 0,
-        currency: 'BRL'
-      }
-    };
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<any>(null);
+  const [newClass, setNewClass] = useState<any>({
+    scheduleType: 'single',
+    dayOfWeek: 1,
+    startTime: '09:00 AM',
+    endTime: '10:00 AM',
+    schedules: [],
+    courseType: 'Individual',
+    notes: '',
+    studentEmails: [],
+    startDate: getNextDayOccurrence(1),
+    endDate: null,
+    paymentConfig: {
+      type: 'weekly',
+      weeklyInterval: 1,
+      monthlyOption: null,
+      startDate: new Date().toISOString().split('T')[0],
+      paymentLink: '',
+      amount: 0,
+      currency: 'BRL'
+    },
+    frequency: {
+      type: 'weekly',
+      every: 1
+    }
   });
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
 
-  // Replace editing states with modal state
-  const [editingClass, setEditingClass] = useState<{
-    id: string;
-    dayOfWeek: number;
-    startTime: string;
-    endTime: string;
-    courseType: string;
-    notes: string;
-    studentEmails: string[];
-    startDate: Date;
-    endDate: Date | null;
-    paymentConfig: PaymentConfig;
-  } | null>(null);
+  const { setLoadedMonths } = useDashboardData();
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -212,8 +192,95 @@ export const AdminSchedule = () => {
     }
   };
 
+  // Add these functions to handle schedule management
+  const handleAddSchedule = () => {
+    setNewClass((prev: typeof newClass) => ({
+      ...prev,
+      schedules: [...prev.schedules, { dayOfWeek: 0, startTime: '', endTime: '' }]
+    }));
+  };
+
+  const handleRemoveSchedule = (index: number) => {
+    setNewClass((prev: typeof newClass) => ({
+      ...prev,
+      schedules: prev.schedules.filter((_: any, i: number) => i !== index)
+    }));
+  };
+
+  const handleScheduleChange = (index: number, field: keyof ClassSchedule, value: string | number) => {
+    setNewClass((prev: typeof newClass) => {
+      const updatedSchedules = [...prev.schedules];
+      updatedSchedules[index] = {
+        ...updatedSchedules[index],
+        [field]: value
+      };
+      
+      // If changing day of week, update start/end times if needed
+      if (field === 'dayOfWeek') {
+        // Logic similar to single day change if needed
+      } else if (field === 'startTime') {
+        // Parse the selected start time
+        const [time, period] = value.toString().split(' ');
+        const [hours, minutes] = time.split(':').map(Number);
+        
+        // Create Date objects for start and end times
+        const startDate = new Date();
+        startDate.setHours(period === 'PM' && hours !== 12 ? hours + 12 : (period === 'AM' && hours === 12 ? 0 : hours), minutes);
+        
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
+        
+        // Format end time in 12-hour format
+        const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        
+        updatedSchedules[index].endTime = endTime;
+      } else if (field === 'endTime') {
+        // Parse both times
+        const [startTime, startPeriod] = updatedSchedules[index].startTime.split(' ');
+        const [endTime, endPeriod] = value.toString().split(' ');
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        const [endHours, endMinutes] = endTime.split(':').map(Number);
+
+        // Create Date objects for comparison
+        const startDate = new Date();
+        const endDate = new Date();
+        
+        startDate.setHours(
+          startPeriod === 'PM' && startHours !== 12 ? startHours + 12 : (startPeriod === 'AM' && startHours === 12 ? 0 : startHours),
+          startMinutes
+        );
+        endDate.setHours(
+          endPeriod === 'PM' && endHours !== 12 ? endHours + 12 : (endPeriod === 'AM' && endHours === 12 ? 0 : endHours),
+          endMinutes
+        );
+
+        // If end time is before start time, adjust start time to be 1 hour before end time
+        if (endDate <= startDate) {
+          const newStartDate = new Date(endDate.getTime() - 60 * 60 * 1000);
+          const newStartTime = newStartDate.toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: true 
+          });
+          
+          updatedSchedules[index].startTime = newStartTime;
+        }
+      }
+      
+      return {
+        ...prev,
+        schedules: updatedSchedules
+      };
+    });
+  };
+
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate that at least one student is selected
+    if (newClass.studentEmails.length === 0) {
+      toast.error("Please select at least one student for the class");
+      return;
+    }
     
     // Validate payment start date for monthly payments
     if (newClass.paymentConfig.type === 'monthly') {
@@ -226,6 +293,12 @@ export const AdminSchedule = () => {
         toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
         return;
       }
+    }
+    
+    // Validate that multiple schedule has at least one schedule
+    if (newClass.scheduleType === 'multiple' && newClass.schedules.length === 0) {
+      toast.error("Please add at least one schedule for multiple day classes");
+      return;
     }
     
     try {
@@ -254,9 +327,11 @@ export const AdminSchedule = () => {
       };
       
       const classData = {
+        scheduleType: newClass.scheduleType,
         dayOfWeek: newClass.dayOfWeek,
         startTime: newClass.startTime,
         endTime: newClass.endTime,
+        schedules: newClass.scheduleType === 'multiple' ? newClass.schedules : [],
         courseType: newClass.courseType,
         notes: newClass.notes,
         studentEmails: studentEmails,
@@ -264,7 +339,8 @@ export const AdminSchedule = () => {
         ...(newClass.endDate ? { endDate: Timestamp.fromDate(newClass.endDate) } : {}),
         createdAt: now,
         updatedAt: now,
-        paymentConfig
+        paymentConfig,
+        frequency: newClass.frequency
       };
 
       // Generate a unique ID for the new class
@@ -272,7 +348,7 @@ export const AdminSchedule = () => {
       await setCachedDocument('classes', classId, classData);
       
       await fetchClasses();
-      setShowAddForm(false);
+      setIsModalOpen(false);
       const today = new Date();
       
       // Ensure the payment start date is valid for monthly payments
@@ -280,9 +356,11 @@ export const AdminSchedule = () => {
       const paymentType = 'weekly'; // Default to weekly when resetting
       
       setNewClass({
+        scheduleType: 'single',
         dayOfWeek: 1,
         startTime: '09:00 AM',
         endTime: '10:00 AM',
+        schedules: [],
         courseType: 'Individual',
         notes: '',
         studentEmails: [],
@@ -296,6 +374,10 @@ export const AdminSchedule = () => {
           paymentLink: '',
           amount: 0,
           currency: 'BRL'
+        },
+        frequency: {
+          type: 'weekly',
+          every: 1
         }
       });
       toast.success('Class created successfully');
@@ -318,6 +400,8 @@ export const AdminSchedule = () => {
 
     try {
       await deleteCachedDocument('classes', classId);
+      // Clear the loaded months cache to force a fresh fetch
+      setLoadedMonths(new Set());
       await fetchClasses();
       toast.success('Class deleted successfully');
     } catch (error) {
@@ -423,7 +507,7 @@ export const AdminSchedule = () => {
 
   const handleStudentChange = (selected: MultiValue<SelectOption>) => {
     const selectedEmails = selected ? selected.map(option => option.value) : [];
-    setNewClass(prev => ({
+    setNewClass((prev: typeof newClass) => ({
       ...prev,
       studentEmails: selectedEmails,
       courseType: selectedEmails.length === 1 ? 'Individual' : selectedEmails.length === 2 ? 'Pair' : 'Group'
@@ -437,14 +521,14 @@ export const AdminSchedule = () => {
     
     // Create Date objects for start and end times
     const startDate = new Date();
-    startDate.setHours(period === 'PM' && hours !== 12 ? hours + 12 : hours, minutes);
+    startDate.setHours(period === 'PM' && hours !== 12 ? hours + 12 : (period === 'AM' && hours === 12 ? 0 : hours), minutes);
     
     const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
     
     // Format end time in 12-hour format
     const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     
-    setNewClass(prev => ({
+    setNewClass((prev: typeof newClass) => ({
       ...prev,
       startTime,
       endTime
@@ -463,11 +547,11 @@ export const AdminSchedule = () => {
     const endDate = new Date();
     
     startDate.setHours(
-      startPeriod === 'PM' && startHours !== 12 ? startHours + 12 : startHours,
+      startPeriod === 'PM' && startHours !== 12 ? startHours + 12 : (startPeriod === 'AM' && startHours === 12 ? 0 : startHours),
       startMinutes
     );
     endDate.setHours(
-      endPeriod === 'PM' && endHours !== 12 ? endHours + 12 : endHours,
+      endPeriod === 'PM' && endHours !== 12 ? endHours + 12 : (endPeriod === 'AM' && endHours === 12 ? 0 : endHours),
       endMinutes
     );
 
@@ -480,13 +564,13 @@ export const AdminSchedule = () => {
         hour12: true 
       });
       
-      setNewClass(prev => ({
+      setNewClass((prev: typeof newClass) => ({
         ...prev,
         startTime: newStartTime,
         endTime
       }));
     } else {
-      setNewClass(prev => ({
+      setNewClass((prev: typeof newClass) => ({
         ...prev,
         endTime
       }));
@@ -507,23 +591,38 @@ export const AdminSchedule = () => {
       currency: classItem.paymentConfig.currency || 'BRL'
     };
 
+    // Ensure frequency has proper structure (for backward compatibility)
+    const frequency = classItem.frequency || {
+      type: 'weekly',
+      every: 1
+    };
+
     setEditingClass({
       id: classItem.id,
+      scheduleType: classItem.scheduleType || 'single', // Default to single for backward compatibility
       dayOfWeek: classItem.dayOfWeek,
       startTime: classItem.startTime,
       endTime: classItem.endTime,
+      schedules: classItem.schedules || [],
       courseType: classItem.courseType,
       notes: classItem.notes || '',
       studentEmails: classItem.studentEmails,
       startDate: classItem.startDate.toDate(),
       endDate: classItem.endDate?.toDate() || null,
-      paymentConfig: paymentConfig
+      paymentConfig: paymentConfig,
+      frequency: frequency
     });
   };
 
   // Function to handle saving all changes
   const handleSaveChanges = async () => {
     if (!editingClass) return;
+
+    // Validate that at least one student is selected
+    if (editingClass.studentEmails.length === 0) {
+      toast.error("Please select at least one student for the class");
+      return;
+    }
 
     // Validate payment start date for monthly payments
     if (editingClass.paymentConfig.type === 'monthly') {
@@ -537,11 +636,17 @@ export const AdminSchedule = () => {
         return;
       }
     }
+    
+    // Validate that multiple schedule has at least one schedule
+    if (editingClass.scheduleType === 'multiple' && editingClass.schedules.length === 0) {
+      toast.error("Please add at least one schedule for multiple day classes");
+      return;
+    }
 
     try {
       // Clean up payment config to remove undefined values
       const paymentConfig = {
-        type: editingClass.paymentConfig.type,
+        type: editingClass.paymentConfig.type || 'weekly',
         startDate: editingClass.paymentConfig.startDate,
         ...(editingClass.paymentConfig.type === 'weekly' ? {
           weeklyInterval: editingClass.paymentConfig.weeklyInterval || 1,
@@ -555,17 +660,33 @@ export const AdminSchedule = () => {
         currency: editingClass.paymentConfig.currency || 'BRL'
       };
 
+      // Ensure frequency has proper structure
+      const frequency = {
+        type: editingClass.frequency?.type || 'weekly',
+        every: editingClass.frequency?.every || 1
+      };
+
       const updateData = {
-        dayOfWeek: editingClass.dayOfWeek,
-        startTime: editingClass.startTime,
-        endTime: editingClass.endTime,
-        courseType: editingClass.courseType,
-        notes: editingClass.notes,
-        studentEmails: editingClass.studentEmails,
+        scheduleType: editingClass.scheduleType || 'single',
+        dayOfWeek: editingClass.scheduleType === 'single' ? editingClass.dayOfWeek : 0,
+        startTime: editingClass.scheduleType === 'single' ? editingClass.startTime : '',
+        endTime: editingClass.scheduleType === 'single' ? editingClass.endTime : '',
+        schedules: editingClass.scheduleType === 'multiple' ? editingClass.schedules.map((schedule: ClassSchedule) => {
+          const s: Partial<Class> = {
+            dayOfWeek: schedule.dayOfWeek,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime
+          };
+          return s;
+        }) : [],
+        courseType: editingClass.courseType || 'Individual',
+        notes: editingClass.notes || '',
+        studentEmails: editingClass.studentEmails || [],
         startDate: Timestamp.fromDate(editingClass.startDate),
         endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate) : null,
         paymentConfig: paymentConfig,
-        updatedAt: Timestamp.now()
+        updatedAt: Timestamp.now(),
+        frequency: frequency
       };
 
       await updateCachedDocument('classes', editingClass.id, updateData);
@@ -587,8 +708,38 @@ export const AdminSchedule = () => {
       <div className="space-y-2">
         <div className="flex justify-between items-start">
           <div className="text-gray-900">
-            <div className={styles.card.title}>{DAYS_OF_WEEK[classItem.dayOfWeek]}</div>
+            <div className={styles.card.title}>
+              {classItem.scheduleType === 'multiple' ? 'Multiple Days Schedule' : DAYS_OF_WEEK[classItem.dayOfWeek]}
+            </div>
+            {classItem.scheduleType === 'single' ? (
             <div className={styles.card.subtitle}>{classItem.startTime} - {classItem.endTime}</div>
+            ) : (
+              <div className="mt-2">
+                <div className={styles.card.label}>Schedule</div>
+                <div className="text-gray-800">
+                  {classItem.schedules && classItem.schedules.length > 0 ? (
+                    <div className="space-y-1">
+                      {classItem.schedules.map((schedule, index) => (
+                        <div key={index} className="flex items-center text-sm">
+                          <span className="font-medium mr-2">{DAYS_OF_WEEK[schedule.dayOfWeek]}:</span>
+                          <span>{schedule.startTime} - {schedule.endTime}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-gray-500 italic">No schedule details available</div>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="mt-2">
+              <div className={styles.card.label}>Frequency</div>
+              <div className="text-gray-800">
+                {classItem.frequency?.type === 'weekly' ? 'Weekly' : 
+                 classItem.frequency?.type === 'biweekly' ? 'Every 2 weeks' : 
+                 `Every ${classItem.frequency?.every || 1} weeks`}
+              </div>
+            </div>
             <div className="mt-2">
               <div className={styles.card.label}>{t.courseType}</div>
               <div className="text-gray-800">{classItem.courseType}</div>
@@ -693,6 +844,91 @@ export const AdminSchedule = () => {
     </div>
   );
 
+  // Add these functions to handle schedule management for editing
+  const handleAddScheduleToEdit = () => {
+    if (!editingClass) return;
+    
+    setEditingClass((prev: any) => ({
+      ...prev,
+      schedules: [...prev.schedules, { dayOfWeek: 0, startTime: '', endTime: '' }]
+    }));
+  };
+
+  const handleRemoveScheduleFromEdit = (index: number) => {
+    if (!editingClass) return;
+    
+    setEditingClass((prev: any) => ({
+      ...prev,
+      schedules: prev.schedules.filter((_: any, i: number) => i !== index)
+    }));
+  };
+
+  const handleEditScheduleChange = (index: number, field: keyof ClassSchedule, value: string | number) => {
+    if (!editingClass) return;
+    
+    setEditingClass((prev: any) => {
+      const updatedSchedules = [...prev.schedules];
+      updatedSchedules[index] = {
+        ...updatedSchedules[index],
+        [field]: value
+      };
+      
+      // If changing start time, update end time
+      if (field === 'startTime') {
+        // Parse the selected start time
+        const [time, period] = value.toString().split(' ');
+        const [hours, minutes] = time.split(':').map(Number);
+        
+        // Create Date objects for start and end times
+        const startDate = new Date();
+        startDate.setHours(period === 'PM' && hours !== 12 ? hours + 12 : (period === 'AM' && hours === 12 ? 0 : hours), minutes);
+        
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
+        
+        // Format end time in 12-hour format
+        const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        
+        updatedSchedules[index].endTime = endTime;
+      } else if (field === 'endTime') {
+        // Parse both times
+        const [startTime, startPeriod] = updatedSchedules[index].startTime.split(' ');
+        const [endTime, endPeriod] = value.toString().split(' ');
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        const [endHours, endMinutes] = endTime.split(':').map(Number);
+
+        // Create Date objects for comparison
+        const startDate = new Date();
+        const endDate = new Date();
+        
+        startDate.setHours(
+          startPeriod === 'PM' && startHours !== 12 ? startHours + 12 : (startPeriod === 'AM' && startHours === 12 ? 0 : startHours),
+          startMinutes
+        );
+        endDate.setHours(
+          endPeriod === 'PM' && endHours !== 12 ? endHours + 12 : (endPeriod === 'AM' && endHours === 12 ? 0 : endHours),
+          endMinutes
+        );
+
+        // If end time is before start time, adjust start time to be 1 hour before end time
+        if (endDate <= startDate) {
+          const newStartDate = new Date(endDate.getTime() - 60 * 60 * 1000);
+          const newStartTime = newStartDate.toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: true 
+          });
+          
+          updatedSchedules[index].startTime = newStartTime;
+        }
+      }
+      
+      return {
+        ...prev,
+        schedules: updatedSchedules
+      };
+    });
+  };
+
   return (
     <div className="flex-1">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -701,13 +937,15 @@ export const AdminSchedule = () => {
           <div className="relative">
             <button
               onClick={async () => {
-                if (!showAddForm) {
+                if (!isModalOpen) {
                   await fetchAllUsers();
                   const today = new Date();
                   setNewClass({
+                    scheduleType: 'single',
                     dayOfWeek: 1,
                     startTime: '09:00 AM',
                     endTime: '10:00 AM',
+                    schedules: [],
                     courseType: 'Individual',
                     notes: '',
                     studentEmails: [],
@@ -721,20 +959,24 @@ export const AdminSchedule = () => {
                       paymentLink: '',
                       amount: 0,
                       currency: 'BRL'
+                    },
+                    frequency: {
+                      type: 'weekly',
+                      every: 1
                     }
                   });
                 }
-                setShowAddForm(!showAddForm);
+                setIsModalOpen(!isModalOpen);
               }}
               className={classNames(
-                showAddForm 
+                isModalOpen 
                   ? "bg-gray-200 hover:bg-gray-300 text-gray-800" 
                   : styles.buttons.primary,
                 "focus:outline-none focus:ring-2 focus:ring-offset-2",
-                showAddForm ? "focus:ring-gray-500" : "focus:ring-indigo-500"
+                isModalOpen ? "focus:ring-gray-500" : "focus:ring-indigo-500"
               )}
             >
-              {showAddForm ? (
+              {isModalOpen ? (
                 <span className="text-xl">&times;</span>
               ) : (
                 t.addNewClass
@@ -744,7 +986,7 @@ export const AdminSchedule = () => {
         </div>
 
         {/* Add Class Form */}
-        <Modal isOpen={showAddForm} onClose={() => setShowAddForm(false)} paddingTop="20px">
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} paddingTop="20px">
           <div className="max-w-4xl w-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-800">{t.addNewClass}</h2>
@@ -757,7 +999,9 @@ export const AdminSchedule = () => {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={styles.form.label}>{t.students}</label>
+                    <label className={styles.form.label}>
+                      {t.students}
+                    </label>
                     <Select
                       isMulti
                       value={studentOptions.filter(option => 
@@ -767,24 +1011,101 @@ export const AdminSchedule = () => {
                       options={studentOptions}
                       className="mt-1"
                       classNamePrefix="select"
-                      placeholder={t.selectStudents}
-                      isClearable={true}
-                      closeMenuOnSelect={false}
-                      hideSelectedOptions={false}
                       styles={customSelectStyles}
-                      menuPlacement="auto"
-                      maxMenuHeight={300}
                     />
                   </div>
+                  
+                  {/* Add frequency selection here */}
                   <div>
-                    <label className={styles.form.label}>{t.courseType}</label>
-                    <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 px-3 py-2 sm:text-sm">
-                      {newClass.courseType}
-                      <span className="ml-2 text-gray-500 text-xs">
-                        (auto-determined by number of students)
-                      </span>
+                    <label className={styles.form.label}>Class Frequency</label>
+                    <div className="space-y-2">
+                      <select
+                        value={newClass.frequency.type}
+                        onChange={(e) => {
+                          const type = e.target.value as 'weekly' | 'biweekly' | 'custom';
+                          setNewClass((prev: typeof newClass) => ({
+                            ...prev,
+                            frequency: {
+                              type,
+                              every: type === 'weekly' ? 1 : type === 'biweekly' ? 2 : prev.frequency.every
+                            }
+                          }));
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Every 2 weeks</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                      
+                      {newClass.frequency.type === 'custom' && (
+                        <div className="flex items-center mt-1">
+                          <span className="text-gray-800 mr-2">Every</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={newClass.frequency.every}
+                            onChange={(e) => {
+                              const every = parseInt(e.target.value) || 1;
+                              setNewClass((prev: typeof newClass) => ({
+                                ...prev,
+                                frequency: {
+                                  ...prev.frequency,
+                                  every: Math.max(1, every)
+                                }
+                              }));
+                            }}
+                            className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          />
+                          <span className="text-gray-800 ml-2">weeks</span>
+                        </div>
+                      )}
                     </div>
                   </div>
+                  <div className="md:col-span-2 mb-4">
+                    <label className={styles.form.label}>Schedule Type</label>
+                    <div className="flex items-center space-x-4 mt-2">
+                      <label className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          className="form-radio h-4 w-4 text-indigo-600"
+                          checked={newClass.scheduleType === 'single'}
+                          onChange={() => setNewClass((prev: typeof newClass) => ({
+                            ...prev,
+                            scheduleType: 'single'
+                          }))}
+                        />
+                        <span className="ml-2 text-gray-800">Single Day</span>
+                      </label>
+                      <label className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          className="form-radio h-4 w-4 text-indigo-600"
+                          checked={newClass.scheduleType === 'multiple'}
+                          onChange={() => {
+                            // If switching to multiple and no schedules yet, add the current day/time as first schedule
+                            const initialSchedules: ClassSchedule[] = [];
+                            if (newClass.scheduleType === 'single') {
+                              initialSchedules.push({
+                                dayOfWeek: newClass.dayOfWeek,
+                                startTime: newClass.startTime,
+                                endTime: newClass.endTime
+                              });
+                            }
+                            
+                            setNewClass((prev: typeof newClass) => ({
+                              ...prev,
+                              scheduleType: 'multiple',
+                              schedules: prev.schedules.length > 0 ? prev.schedules : initialSchedules
+                            }));
+                          }}
+                        />
+                        <span className="ml-2 text-gray-800">Multiple Days</span>
+                      </label>
+                    </div>
+                  </div>
+                  {newClass.scheduleType === 'single' ? (
+                    <>
                   <div>
                     <label className={styles.form.label}>{t.dayOfWeek}</label>
                     <select
@@ -798,7 +1119,7 @@ export const AdminSchedule = () => {
                         const shouldUpdateStartDate = 
                           newClass.startDate.getTime() === previousNextOccurrence.getTime();
                         
-                        setNewClass(prev => ({ 
+                        setNewClass((prev: typeof newClass) => ({ 
                           ...prev, 
                           dayOfWeek: newDayOfWeek,
                           ...(shouldUpdateStartDate ? { 
@@ -815,6 +1136,110 @@ export const AdminSchedule = () => {
                       ))}
                     </select>
                   </div>
+                      <div className="flex space-x-4 md:col-span-2">
+                        <div className="flex-1">
+                          <label className={styles.form.label}>{"Start Time"}</label>
+                          <select
+                            value={newClass.startTime}
+                            onChange={(e) => handleStartTimeChange(e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          >
+                            {timeOptions.map(time => (
+                              <option key={time} value={time}>{time}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className={styles.form.label}>{"End Time"}</label>
+                          <select
+                            value={newClass.endTime}
+                            onChange={(e) => handleEndTimeChange(e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          >
+                            {timeOptions.map(time => (
+                              <option key={time} value={time}>{time}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="md:col-span-2">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className={styles.form.label}>Class Schedule</label>
+                        <button
+                          type="button"
+                          onClick={handleAddSchedule}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          Add Day
+                        </button>
+                      </div>
+                      
+                      {newClass.schedules.length === 0 ? (
+                        <div className="text-center py-4 text-gray-500 border border-dashed border-gray-300 rounded-md">
+                          No schedules added. Click "Add Day" to add a class day.
+                        </div>
+                      ) : (
+                        <div className="space-y-4 mt-2">
+                          {newClass.schedules.map((schedule: ClassSchedule, index: number) => (
+                            <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-sm font-medium text-gray-700">Day {index + 1}</h4>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSchedule(index)}
+                                  className="text-red-600 hover:text-red-800 bg-transparent"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">Day</label>
+                                  <select
+                                    value={schedule.dayOfWeek}
+                                    onChange={(e) => handleScheduleChange(index, 'dayOfWeek', parseInt(e.target.value))}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                  >
+                                    {DAYS_OF_WEEK.map((day, dayIndex) => (
+                                      <option key={day} value={dayIndex}>{day}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                                  <select
+                                    value={schedule.startTime}
+                                    onChange={(e) => handleScheduleChange(index, 'startTime', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                  >
+                                    {timeOptions.map(time => (
+                                      <option key={time} value={time}>{time}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">End Time</label>
+                                  <select
+                                    value={schedule.endTime}
+                                    onChange={(e) => handleScheduleChange(index, 'endTime', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                  >
+                                    {timeOptions.map(time => (
+                                      <option key={time} value={time}>{time}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="md:col-span-2 flex space-x-4">
                     <div className="flex-1">
                       <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
@@ -822,7 +1247,7 @@ export const AdminSchedule = () => {
                         selected={newClass.startDate}
                         onChange={(date: Date | null) => {
                           if (date) {
-                            setNewClass(prev => ({
+                            setNewClass((prev: typeof newClass) => ({
                               ...prev,
                               startDate: date,
                               // Reset end date if it's now before the start date
@@ -834,14 +1259,38 @@ export const AdminSchedule = () => {
                         showTimeSelect={false}
                         dateFormat="MMMM d, yyyy"
                         minDate={new Date()}
+                        filterDate={(date) => {
+                          // For single schedule, only allow selecting dates that match the selected day of week
+                          if (newClass.scheduleType === 'single') {
+                            return date.getDay() === newClass.dayOfWeek;
+                          }
+                          
+                          // For multiple schedules, only allow selecting dates that match any of the selected days
+                          if (newClass.scheduleType === 'multiple' && newClass.schedules.length > 0) {
+                            const selectedDays = newClass.schedules.map((schedule: ClassSchedule) => schedule.dayOfWeek);
+                            return selectedDays.includes(date.getDay());
+                          }
+                          
+                          return true; // Allow all dates if no schedules defined yet
+                        }}
                       />
+                      {newClass.scheduleType === 'multiple' && newClass.schedules.length > 0 && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Only {newClass.schedules.map((s: ClassSchedule) => DAYS_OF_WEEK[s.dayOfWeek]).join(', ')} dates can be selected
+                        </p>
+                      )}
+                      {newClass.scheduleType === 'single' && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Only {DAYS_OF_WEEK[newClass.dayOfWeek]} dates can be selected
+                        </p>
+                      )}
                     </div>
                     <div className="flex-1">
                       <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
                       <DatePicker
                         selected={newClass.endDate}
                         onChange={(date: Date | null) => {
-                          setNewClass(prev => ({
+                          setNewClass((prev: typeof newClass) => ({
                             ...prev,
                             endDate: date
                           }));
@@ -855,37 +1304,11 @@ export const AdminSchedule = () => {
                       />
                     </div>
                   </div>
-                  <div className="flex space-x-4 md:col-span-2">
-                    <div className="flex-1">
-                      <label className={styles.form.label}>{"Start Time"}</label>
-                      <select
-                        value={newClass.startTime}
-                        onChange={(e) => handleStartTimeChange(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      >
-                        {timeOptions.map(time => (
-                          <option key={time} value={time}>{time}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex-1">
-                      <label className={styles.form.label}>{"End Time"}</label>
-                      <select
-                        value={newClass.endTime}
-                        onChange={(e) => handleEndTimeChange(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      >
-                        {timeOptions.map(time => (
-                          <option key={time} value={time}>{time}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
                   <div className="md:col-span-2">
                     <label className={styles.form.label}>{t.notes}</label>
                     <textarea
                       value={newClass.notes}
-                      onChange={(e) => setNewClass(prev => ({ ...prev, notes: e.target.value }))}
+                      onChange={(e) => setNewClass((prev: typeof newClass) => ({ ...prev, notes: e.target.value }))}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       rows={3}
                     />
@@ -905,7 +1328,7 @@ export const AdminSchedule = () => {
                       value={newClass.paymentConfig.type}
                       onChange={(e) => {
                         const type = e.target.value as 'weekly' | 'monthly';
-                        setNewClass(prev => {
+                        setNewClass((prev: typeof newClass) => {
                           if (type === 'monthly') {
                             // If switching to monthly, adjust the start date to a valid day (1, 15, or last day)
                             const currentDate = (() => {
@@ -1015,7 +1438,7 @@ export const AdminSchedule = () => {
                             const month = String(date.getMonth() + 1).padStart(2, '0');
                             const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
                             
-                            setNewClass(prev => ({
+                            setNewClass((prev: typeof newClass) => ({
                               ...prev,
                               paymentConfig: {
                                 ...prev.paymentConfig,
@@ -1033,7 +1456,7 @@ export const AdminSchedule = () => {
                           const day = String(date.getDate()).padStart(2, '0');
                           const dateStr = `${year}-${month}-${day}`;
                           
-                          setNewClass(prev => ({
+                          setNewClass((prev: typeof newClass) => ({
                             ...prev,
                             paymentConfig: {
                               ...prev.paymentConfig,
@@ -1067,7 +1490,7 @@ export const AdminSchedule = () => {
                           id="weeklyInterval"
                           min="1"
                           value={newClass.paymentConfig.weeklyInterval || 1}
-                          onChange={(e) => setNewClass(prev => ({
+                          onChange={(e) => setNewClass((prev: typeof newClass) => ({
                             ...prev,
                             paymentConfig: {
                               ...prev.paymentConfig,
@@ -1111,7 +1534,7 @@ export const AdminSchedule = () => {
                       type="url"
                       id="paymentLink"
                       value={newClass.paymentConfig.paymentLink || ''}
-                      onChange={(e) => setNewClass(prev => ({
+                      onChange={(e) => setNewClass((prev: typeof newClass) => ({
                         ...prev,
                         paymentConfig: {
                           ...prev.paymentConfig,
@@ -1136,7 +1559,7 @@ export const AdminSchedule = () => {
                       min="0"
                       step="0.01"
                       value={newClass.paymentConfig.amount || 0}
-                      onChange={(e) => setNewClass(prev => ({
+                      onChange={(e) => setNewClass((prev: typeof newClass) => ({
                         ...prev,
                         paymentConfig: {
                           ...prev.paymentConfig,
@@ -1154,7 +1577,7 @@ export const AdminSchedule = () => {
                     <select
                       id="paymentCurrency"
                       value={newClass.paymentConfig.currency || 'BRL'}
-                      onChange={(e) => setNewClass(prev => ({
+                      onChange={(e) => setNewClass((prev: typeof newClass) => ({
                         ...prev,
                         paymentConfig: {
                           ...prev.paymentConfig,
@@ -1174,7 +1597,7 @@ export const AdminSchedule = () => {
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => setShowAddForm(false)}
+                  onClick={() => setIsModalOpen(false)}
                   className="mr-3 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   {t.cancel || "Cancel"}
@@ -1196,110 +1619,151 @@ export const AdminSchedule = () => {
           </div>
         ) : (
           <div className="bg-white shadow-md rounded-lg overflow-hidden relative">
-            <div className="table-container overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className={styles.table.header}>
-                      {t.dayAndTime}
-                    </th>
-                    <th scope="col" className={styles.table.header}>
-                      {t.courseType}
-                    </th>
-                    <th scope="col" className={styles.table.header}>
-                      {t.students}
-                    </th>
-                    <th scope="col" className={styles.table.header}>
-                      Payment Type
-                    </th>
-                    <th scope="col" className={styles.table.header}>
-                      Payment Amount
-                    </th>
-                    <th scope="col" className={styles.table.header}>
-                      Payment Day
-                    </th>
-                    <th scope="col" className={`${styles.table.header} text-center`}>
-                      {t.actions}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {classes.map((classItem) => (
-                    <tr key={classItem.id}>
-                      <td className={styles.table.cell}>
-                        {getDayName(classItem.dayOfWeek, t)}<br />
-                        {classItem.startTime} - {classItem.endTime}
-                      </td>
-                      <td className={styles.table.cell}>
-                        {classItem.courseType}
-                      </td>
-                      <td className={styles.table.cell}>
-                        {classItem.studentEmails.join(', ')}
-                      </td>
-                      <td className={styles.table.cell}>
-                        {classItem.paymentConfig?.type === 'weekly'
-                          ? ((classItem.paymentConfig.weeklyInterval || 1) === 1
-                            ? 'Weekly'
-                            : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
-                          : classItem.paymentConfig?.monthlyOption === 'first'
-                            ? 'Monthly (1st day)'
-                            : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                              ? 'Monthly (15th day)'
-                              : 'Monthly (last day)'
-                        }
-                        {classItem.paymentConfig?.paymentLink && (
-                          <div className="mt-1">
-                            <a 
-                              href={classItem.paymentConfig.paymentLink} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                              Payment Link
-                            </a>
-                          </div>
-                        )}
-                      </td>
-                      <td className={styles.table.cell}>
-                        {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
-                      </td>
-                      <td className={styles.table.cell}>
-                        {classItem.paymentConfig?.type === 'weekly'
-                          ? (() => {
-                              const [year, month, day] = classItem.paymentConfig.startDate.split('-').map(Number);
-                              const date = new Date(year, month - 1, day);
-                              return getDayName(date.getDay(), t);
-                            })()
-                          : classItem.paymentConfig?.monthlyOption === 'first'
-                            ? '1st day of month'
-                            : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                              ? '15th day of month'
-                              : 'Last day of month'
-                        }
-                      </td>
-                      <td className={`${styles.table.cell} text-center`}>
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => openEditModal(classItem)}
-                            className={styles.buttons.primary}
-                          >
-                            {t.edit}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClass(classItem.id)}
-                            className={styles.buttons.danger}
-                          >
-                            {t.delete}
-                          </button>
-                        </div>
-                      </td>
+            <div className="hidden md:flex justify-end mb-2">
+              <div className="text-sm text-gray-500 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Scroll horizontally to see all columns
+              </div>
+            </div>
+            <div className="relative">
+              {/* Left fade indicator */}
+              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none hidden md:block"></div>
+              
+              <div className="table-container overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-gray-500">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className={styles.table.header}>
+                        {t.dayAndTime}
+                      </th>
+                      <th scope="col" className={styles.table.header}>
+                        {t.courseType}
+                      </th>
+                      <th scope="col" className={styles.table.header}>
+                        Frequency
+                      </th>
+                      <th scope="col" className={styles.table.header}>
+                        {t.students}
+                      </th>
+                      <th scope="col" className={styles.table.header}>
+                        Payment Type
+                      </th>
+                      <th scope="col" className={styles.table.header}>
+                        Payment Amount
+                      </th>
+                      <th scope="col" className={styles.table.header}>
+                        Payment Day
+                      </th>
+                      <th scope="col" className={`${styles.table.header} text-center`}>
+                        {t.actions}
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {classes.map((classItem) => (
+                      <tr key={classItem.id}>
+                        <td className={styles.table.cell}>
+                          {classItem.scheduleType === 'single' ? (
+                            <>
+                          {getDayName(classItem.dayOfWeek, t)}<br />
+                          {classItem.startTime} - {classItem.endTime}
+                            </>
+                          ) : (
+                            <div className="max-h-32 overflow-y-auto">
+                              <div className="font-medium mb-1">Multiple Days:</div>
+                              {classItem.schedules && classItem.schedules.length > 0 ? (
+                                <div className="space-y-1">
+                                  {classItem.schedules.map((schedule: ClassSchedule, index: number) => (
+                                    <div key={index} className="text-sm">
+                                      <span className="font-medium">{DAYS_OF_WEEK[schedule.dayOfWeek]}:</span>{' '}
+                                      {schedule.startTime} - {schedule.endTime}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-gray-500 italic">No schedule details</div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className={styles.table.cell}>
+                          {classItem.courseType}
+                        </td>
+                        <td className={styles.table.cell}>
+                          {classItem.frequency?.type === 'weekly' ? 'Weekly' : 
+                           classItem.frequency?.type === 'biweekly' ? 'Every 2 weeks' : 
+                           `Every ${classItem.frequency?.every || 1} weeks`}
+                        </td>
+                        <td className={styles.table.cell}>
+                          {classItem.studentEmails.join(', ')}
+                        </td>
+                        <td className={styles.table.cell}>
+                          {classItem.paymentConfig?.type === 'weekly'
+                            ? ((classItem.paymentConfig.weeklyInterval || 1) === 1
+                              ? 'Weekly'
+                              : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
+                            : classItem.paymentConfig?.monthlyOption === 'first'
+                              ? 'Monthly (1st day)'
+                              : classItem.paymentConfig?.monthlyOption === 'fifteen'
+                                ? 'Monthly (15th day)'
+                                : 'Monthly (last day)'
+                            }
+                          {classItem.paymentConfig?.paymentLink && (
+                            <div className="mt-1">
+                              <a 
+                                href={classItem.paymentConfig.paymentLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Payment Link
+                              </a>
+                            </div>
+                          )}
+                        </td>
+                        <td className={styles.table.cell}>
+                          {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
+                        </td>
+                        <td className={styles.table.cell}>
+                          {classItem.paymentConfig?.type === 'weekly'
+                            ? (() => {
+                                const [year, month, day] = classItem.paymentConfig.startDate.split('-').map(Number);
+                                const date = new Date(year, month - 1, day);
+                                return getDayName(date.getDay(), t);
+                              })()
+                            : classItem.paymentConfig?.monthlyOption === 'first'
+                              ? '1st day of month'
+                              : classItem.paymentConfig?.monthlyOption === 'fifteen'
+                                ? '15th day of month'
+                                : 'Last day of month'
+                            }
+                        </td>
+                        <td className={`${styles.table.cell} text-center`}>
+                          <div className="flex justify-center gap-2">
+                            <button
+                              onClick={() => openEditModal(classItem)}
+                              className={styles.buttons.primary}
+                            >
+                              {t.edit}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClass(classItem.id)}
+                              className={styles.buttons.danger}
+                            >
+                              {t.delete}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1319,16 +1783,17 @@ export const AdminSchedule = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className={styles.form.label}>{t.students}</label>
+                    <label className={styles.form.label}>
+                      {t.students}
+                    </label>
                     <Select
                       isMulti
                       value={studentOptions.filter(option => editingClass?.studentEmails.includes(option.value))}
                       onChange={(selected: MultiValue<SelectOption>) => {
                         const selectedEmails = selected ? selected.map(option => option.value) : [];
-                        // Automatically determine course type based on number of students
                         const courseType = selectedEmails.length === 1 ? 'Individual' : 
                                           selectedEmails.length === 2 ? 'Pair' : 'Group';
-                        setEditingClass(prev => ({ 
+                        setEditingClass((prev: any) => ({ 
                           ...prev!, 
                           studentEmails: selectedEmails,
                           courseType: courseType
@@ -1340,10 +1805,380 @@ export const AdminSchedule = () => {
                       styles={customSelectStyles}
                     />
                   </div>
+                  
+                  {/* Add frequency selection here */}
+                  <div className="md:col-span-2">
+                    <label className={styles.form.label}>Class Frequency</label>
+                    <div className="flex items-center space-x-4">
+                      <select
+                        value={editingClass?.frequency?.type || 'weekly'}
+                        onChange={(e) => {
+                          if (!editingClass) return;
+                          const type = e.target.value as 'weekly' | 'biweekly' | 'custom';
+                          setEditingClass((prev: any) => ({
+                            ...prev,
+                            frequency: {
+                              type,
+                              every: type === 'weekly' ? 1 : type === 'biweekly' ? 2 : editingClass.frequency?.every || 3
+                            }
+                          }));
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Every 2 weeks</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                      
+                      {editingClass?.frequency?.type === 'custom' && (
+                        <div className="flex items-center mt-1">
+                          <span className="text-gray-800 mr-2">Every</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editingClass?.frequency?.every || 3}
+                            onChange={(e) => {
+                              if (!editingClass) return;
+                              const every = parseInt(e.target.value) || 1;
+                              setEditingClass((prev: any) => ({
+                                ...prev,
+                                frequency: {
+                                  ...editingClass.frequency,
+                                  every: Math.max(1, every)
+                                }
+                              }));
+                            }}
+                            className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          />
+                          <span className="text-gray-800 ml-2">weeks</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 
-                {/* Rest of the form content */}
-                {/* ... existing code ... */}
+                {/* Schedule Type Selection */}
+                <div className="md:col-span-2 mb-4">
+                  <label className={styles.form.label}>Schedule Type</label>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio h-4 w-4 text-indigo-600"
+                        checked={editingClass?.scheduleType === 'single'}
+                        onChange={() => {
+                          if (!editingClass) return;
+                          setEditingClass((prev: any) => ({
+                            ...prev,
+                            scheduleType: 'single'
+                          }));
+                        }}
+                      />
+                      <span className="ml-2 text-gray-800">Single Day</span>
+                    </label>
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio h-4 w-4 text-indigo-600"
+                        checked={editingClass?.scheduleType === 'multiple'}
+                        onChange={() => {
+                          if (!editingClass) return;
+                          
+                          // If switching to multiple and no schedules yet, add the current day/time as first schedule
+                          const initialSchedules: ClassSchedule[] = [];
+                          if (editingClass.scheduleType === 'single' && editingClass.schedules.length === 0) {
+                            initialSchedules.push({
+                              dayOfWeek: editingClass.dayOfWeek,
+                              startTime: editingClass.startTime,
+                              endTime: editingClass.endTime
+                            });
+                          }
+                          
+                          setEditingClass((prev: any) => ({
+                            ...prev,
+                            scheduleType: 'multiple',
+                            schedules: editingClass.schedules.length > 0 ? editingClass.schedules : initialSchedules
+                          }));
+                        }}
+                      />
+                      <span className="ml-2 text-gray-800">Multiple Days</span>
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Schedule Configuration based on type */}
+                {editingClass?.scheduleType === 'single' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={styles.form.label}>{t.dayOfWeek}</label>
+                      <select
+                        value={editingClass?.dayOfWeek}
+                        onChange={(e) => {
+                          if (!editingClass) return;
+                          setEditingClass((prev: any) => ({
+                            ...prev,
+                            dayOfWeek: parseInt(e.target.value)
+                          }));
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        {DAYS_OF_WEEK.map((day, index) => (
+                          <option key={day} value={index}>{day}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex space-x-4 md:col-span-2">
+                      <div className="flex-1">
+                        <label className={styles.form.label}>{"Start Time"}</label>
+                        <select
+                          value={editingClass?.startTime}
+                          onChange={(e) => {
+                            if (!editingClass) return;
+                            
+                            // Parse the selected start time
+                            const startTime = e.target.value;
+                            const [time, period] = startTime.split(' ');
+                            const [hours, minutes] = time.split(':').map(Number);
+                            
+                            // Create Date objects for start and end times
+                            const startDate = new Date();
+                            startDate.setHours(period === 'PM' && hours !== 12 ? hours + 12 : (period === 'AM' && hours === 12 ? 0 : hours), minutes);
+                            
+                            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
+                            
+                            // Format end time in 12-hour format
+                            const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                            
+                            setEditingClass((prev: any) => ({
+                              ...prev,
+                              startTime,
+                              endTime
+                            }));
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          {timeOptions.map(time => (
+                            <option key={time} value={time}>{time}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className={styles.form.label}>{"End Time"}</label>
+                        <select
+                          value={editingClass?.endTime}
+                          onChange={(e) => {
+                            if (!editingClass) return;
+                            
+                            // Parse both times
+                            const [startTime, startPeriod] = editingClass.startTime.split(' ');
+                            const [endTime, endPeriod] = e.target.value.split(' ');
+                            const [startHours, startMinutes] = startTime.split(':').map(Number);
+                            const [endHours, endMinutes] = endTime.split(':').map(Number);
+
+                            // Create Date objects for comparison
+                            const startDate = new Date();
+                            const endDate = new Date();
+                            
+                            startDate.setHours(
+                              startPeriod === 'PM' && startHours !== 12 ? startHours + 12 : (startPeriod === 'AM' && startHours === 12 ? 0 : startHours),
+                              startMinutes
+                            );
+                            endDate.setHours(
+                              endPeriod === 'PM' && endHours !== 12 ? endHours + 12 : (endPeriod === 'AM' && endHours === 12 ? 0 : endHours),
+                              endMinutes
+                            );
+
+                            // If end time is before start time, adjust start time to be 1 hour before end time
+                            if (endDate <= startDate) {
+                              const newStartDate = new Date(endDate.getTime() - 60 * 60 * 1000);
+                              const newStartTime = newStartDate.toLocaleTimeString([], { 
+                                hour: '2-digit', 
+                                minute: '2-digit', 
+                                hour12: true 
+                              });
+                              
+                              setEditingClass((prev: any) => ({
+                                ...prev,
+                                startTime: newStartTime,
+                                endTime: e.target.value
+                              }));
+                            } else {
+                              setEditingClass((prev: any) => ({
+                                ...prev,
+                                endTime: e.target.value
+                              }));
+                            }
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          {timeOptions.map(time => (
+                            <option key={time} value={time}>{time}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className={styles.form.label}>Class Schedule</label>
+                      <button
+                        type="button"
+                        onClick={handleAddScheduleToEdit}
+                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Add Day
+                      </button>
+                    </div>
+                    
+                    {editingClass?.schedules.length === 0 ? (
+                      <div className="text-center py-4 text-gray-500 border border-dashed border-gray-300 rounded-md">
+                        No schedules added. Click "Add Day" to add a class day.
+                      </div>
+                    ) : (
+                      <div className="space-y-4 mt-2">
+                        {editingClass?.schedules.map((schedule: ClassSchedule, index: number) => (
+                          <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="text-sm font-medium text-gray-700">Day {index + 1}</h4>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveScheduleFromEdit(index)}
+                                className="text-red-600 hover:text-red-800 bg-transparent"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Day</label>
+                                <select
+                                  value={schedule.dayOfWeek}
+                                  onChange={(e) => handleEditScheduleChange(index, 'dayOfWeek', parseInt(e.target.value))}
+                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
+                                  {DAYS_OF_WEEK.map((day, dayIndex) => (
+                                    <option key={day} value={dayIndex}>{day}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                                <select
+                                  value={schedule.startTime}
+                                  onChange={(e) => handleEditScheduleChange(index, 'startTime', e.target.value)}
+                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
+                                  {timeOptions.map(time => (
+                                    <option key={time} value={time}>{time}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">End Time</label>
+                                <select
+                                  value={schedule.endTime}
+                                  onChange={(e) => handleEditScheduleChange(index, 'endTime', e.target.value)}
+                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
+                                  {timeOptions.map(time => (
+                                    <option key={time} value={time}>{time}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Date Pickers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
+                    <DatePicker
+                      selected={editingClass?.startDate}
+                      onChange={(date: Date | null) => {
+                        if (!editingClass || !date) return;
+                        setEditingClass((prev: any) => ({
+                          ...prev,
+                          startDate: date,
+                          // Reset end date if it's now before the start date
+                          ...(editingClass.endDate && editingClass.endDate < date ? { endDate: null } : {})
+                        }));
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      showTimeSelect={false}
+                      dateFormat="MMMM d, yyyy"
+                      minDate={new Date()}
+                      filterDate={(date) => {
+                        if (!editingClass) return true;
+                        
+                        // For single schedule, only allow selecting dates that match the selected day of week
+                        if (editingClass.scheduleType === 'single') {
+                          return date.getDay() === editingClass.dayOfWeek;
+                        }
+                        
+                        // For multiple schedules, only allow selecting dates that match any of the selected days
+                        if (editingClass.scheduleType === 'multiple' && editingClass.schedules.length > 0) {
+                          const selectedDays = editingClass.schedules.map((schedule: ClassSchedule) => schedule.dayOfWeek);
+                          return selectedDays.includes(date.getDay());
+                        }
+                        
+                        return true; // Allow all dates if no schedules defined yet
+                      }}
+                    />
+                    {editingClass?.scheduleType === 'multiple' && editingClass.schedules.length > 0 && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Only {editingClass.schedules.map((s: ClassSchedule) => DAYS_OF_WEEK[s.dayOfWeek]).join(', ')} dates can be selected
+                      </p>
+                    )}
+                    {editingClass?.scheduleType === 'single' && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Only {DAYS_OF_WEEK[editingClass.dayOfWeek]} dates can be selected
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
+                    <DatePicker
+                      selected={editingClass?.endDate}
+                      onChange={(date: Date | null) => {
+                        if (!editingClass) return;
+                        setEditingClass((prev: any) => ({
+                          ...prev,
+                          endDate: date
+                        }));
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      showTimeSelect={false}
+                      dateFormat="MMMM d, yyyy"
+                      minDate={editingClass?.startDate}
+                      isClearable={true}
+                      placeholderText={t.noEndDate || "No end date"}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={styles.form.label}>{t.notes}</label>
+                  <textarea
+                    value={editingClass?.notes}
+                    onChange={(e) => {
+                      if (!editingClass) return;
+                      setEditingClass((prev: any) => ({
+                        ...prev,
+                        notes: e.target.value
+                      }));
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    rows={3}
+                  />
+                </div>
               </div>
             </div>
             

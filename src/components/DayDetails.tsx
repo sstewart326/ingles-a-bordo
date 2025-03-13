@@ -33,7 +33,6 @@ interface DayDetailsProps {
   savingPrivateNotes: { [classId: string]: boolean };
   deletingMaterial: { [materialId: string]: boolean };
   isAdmin: boolean;
-  formatStudentNames: (studentEmails: string[]) => string;
   formatClassTime: (classSession: ClassSession) => string;
   onEditNotes: (classSession: ClassSession) => void;
   onSaveNotes: (classSession: ClassSession) => void;
@@ -58,7 +57,6 @@ export const DayDetails = ({
   savingPrivateNotes,
   deletingMaterial,
   isAdmin,
-  formatStudentNames,
   formatClassTime,
   onEditNotes,
   onSaveNotes,
@@ -77,6 +75,7 @@ export const DayDetails = ({
   const t = useTranslation(language);
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
   const [currentPage, setCurrentPage] = useState(0);
+  const [paymentsPage, setPaymentsPage] = useState(0);
   const [completedPayments, setCompletedPayments] = useState<Record<string, Payment[]>>({});
   const [editingPaymentLink, setEditingPaymentLink] = useState<{[classId: string]: string | null}>({});
   const [savingPaymentLink, setSavingPaymentLink] = useState<{[classId: string]: boolean}>({});
@@ -108,6 +107,11 @@ export const DayDetails = ({
     
     return days[dayOfWeek];
   };
+
+  // Reset payments page when selected day changes
+  useEffect(() => {
+    setPaymentsPage(0);
+  }, [selectedDayDetails?.date]);
 
   // Only fetch completed payments when there are payments due
   useEffect(() => {
@@ -395,7 +399,7 @@ export const DayDetails = ({
       <UploadMaterialsForm
         classId={classSession.id}
         classDate={date}
-        studentEmails={classSession.studentEmails}
+        studentEmails={classSession.studentEmails || []}
         onUploadSuccess={onCloseUploadForm}
       />
     </Modal>
@@ -412,6 +416,45 @@ export const DayDetails = ({
   const startIndex = currentPage * CLASSES_PER_PAGE;
   const endIndex = Math.min(startIndex + CLASSES_PER_PAGE, totalClasses);
   const paginatedClasses = selectedDayDetails?.classes.slice(startIndex, endIndex) || [];
+
+  // Add pagination controls for payments
+  const PAYMENTS_PER_PAGE = 2;
+  const totalPaymentsPages = selectedDayDetails ? Math.ceil(selectedDayDetails.paymentsDue.length / PAYMENTS_PER_PAGE) : 0;
+  const paginatedPayments = selectedDayDetails ? selectedDayDetails.paymentsDue.slice(
+    paymentsPage * PAYMENTS_PER_PAGE,
+    (paymentsPage + 1) * PAYMENTS_PER_PAGE
+  ) : [];
+
+  // Add pagination controls component
+  const PaymentsPagination = () => (
+    <div className="flex justify-center items-center space-x-4 mt-4 mb-2">
+      <button
+        onClick={() => setPaymentsPage(prev => Math.max(0, prev - 1))}
+        disabled={paymentsPage === 0}
+        className={`px-3 py-1 rounded ${
+          paymentsPage === 0
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-blue-500 text-white hover:bg-blue-600'
+        }`}
+      >
+        {t.previous || 'Previous'}
+      </button>
+      <span className="text-sm text-gray-600">
+        {t.page || 'Page'} {paymentsPage + 1} {t.of || 'of'} {totalPaymentsPages}
+      </span>
+      <button
+        onClick={() => setPaymentsPage(prev => Math.min(totalPaymentsPages - 1, prev + 1))}
+        disabled={paymentsPage >= totalPaymentsPages - 1}
+        className={`px-3 py-1 rounded ${
+          paymentsPage >= totalPaymentsPages - 1
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-blue-500 text-white hover:bg-blue-600'
+        }`}
+      >
+        {t.next || 'Next'}
+      </button>
+    </div>
+  );
 
   const scrollToTop = () => {
     const detailsSection = document.getElementById('day-details-section');
@@ -512,6 +555,43 @@ export const DayDetails = ({
     }
   };
 
+  // Add pagination controls component for classes
+  const ClassesPagination = () => (
+    <div className="flex justify-center items-center space-x-4 mt-4 mb-2">
+      <button
+        onClick={() => {
+          setCurrentPage(prev => Math.max(0, prev - 1));
+          scrollToTop();
+        }}
+        disabled={currentPage === 0}
+        className={`px-3 py-1 rounded ${
+          currentPage === 0
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-blue-500 text-white hover:bg-blue-600'
+        }`}
+      >
+        {t.previous || 'Previous'}
+      </button>
+      <span className="text-sm text-gray-600">
+        {t.page || 'Page'} {currentPage + 1} {t.of || 'of'} {totalPages}
+      </span>
+      <button
+        onClick={() => {
+          setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
+          scrollToTop();
+        }}
+        disabled={currentPage >= totalPages - 1}
+        className={`px-3 py-1 rounded ${
+          currentPage >= totalPages - 1
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-blue-500 text-white hover:bg-blue-600'
+        }`}
+      >
+        {t.next || 'Next'}
+      </button>
+    </div>
+  );
+
   if (!selectedDayDetails) {
     return (
       <div className="bg-white rounded-lg p-6 h-full flex items-center justify-center text-gray-500">
@@ -536,7 +616,7 @@ export const DayDetails = ({
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-4">{t.paymentsDue}</h3>
           <div className="space-y-4">
-            {selectedDayDetails.paymentsDue.map(({ user, classSession }) => {
+            {paginatedPayments.map(({ user, classSession }) => {
               const payment = completedPayments[classSession.id]?.find(p => p.userId === user.id);
               const completed = !!payment;
               return (
@@ -644,6 +724,7 @@ export const DayDetails = ({
               );
             })}
           </div>
+          <PaymentsPagination />
         </div>
       )}
 
@@ -660,7 +741,7 @@ export const DayDetails = ({
                 })}
               </div>
               <div className={styles.card.title}>
-                {formatStudentNames(classSession.studentEmails)}
+                {(classSession.students || []).join(', ')}
               </div>
               <div className={styles.card.subtitle}>
                 {formatClassTime(classSession)}
@@ -890,27 +971,8 @@ export const DayDetails = ({
         </div>
       ))}
       
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-6 flex justify-center items-center gap-4">
-          {Array.from({ length: totalPages }).map((_, index) => (
-            <button
-              key={index}
-              onClick={() => {
-                setCurrentPage(index);
-                scrollToTop();
-              }}
-              className={`px-3 py-1 rounded ${
-                currentPage === index
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {index + 1}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Classes Pagination */}
+      {totalPages > 1 && <ClassesPagination />}
     </div>
   );
 }; 

@@ -124,12 +124,14 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
 /**
  * Fetches all classes for a specific month and year for admin users
  */
-export const getAllClassesForMonth = async (month: number, year: number): Promise<any> => {
+export const getAllClassesForMonth = async (month: number, year: number, options: { bypassCache?: boolean } = {}): Promise<any> => {
   try {
-    // Check cache first
-    const cachedData = calendarCache.get('getAllClassesForMonthHttp', { month, year });
-    if (cachedData) {
-      return cachedData;
+    // Check cache first if not bypassing
+    if (!options.bypassCache) {
+      const cachedData = calendarCache.get('getAllClassesForMonthHttp', { month, year });
+      if (cachedData) {
+        return cachedData;
+      }
     }
     
     const baseUrl = getFunctionBaseUrl();
@@ -158,8 +160,10 @@ export const getAllClassesForMonth = async (month: number, year: number): Promis
     
     const data = await response.json();
     
-    // Store in cache
-    calendarCache.set('getAllClassesForMonthHttp', { month, year }, data);
+    // Store in cache if not bypassing
+    if (!options.bypassCache) {
+      calendarCache.set('getAllClassesForMonthHttp', { month, year }, data);
+    }
     
     return data;
   } catch (error) {

@@ -120,8 +120,14 @@ export const getPaymentsDueForDay = (
   }
   
   const paymentsDue: PaymentDue[] = [];
+  const processedClassIds = new Set<string>();
   
   upcomingClasses.forEach(classSession => {
+    // Skip if we've already processed this class
+    if (processedClassIds.has(classSession.id)) {
+      return;
+    }
+    
     if (classSession.paymentConfig) {
       const paymentDates = getNextPaymentDates(classSession.paymentConfig, classSession, date);
       const isPaymentDue = paymentDates.some(paymentDate => 
@@ -131,6 +137,10 @@ export const getPaymentsDueForDay = (
       );
       
       if (isPaymentDue) {
+        // Mark this class as processed
+        processedClassIds.add(classSession.id);
+        
+        // Add one entry per student
         classSession.studentEmails.forEach(email => {
           const user = users.find(u => u.email === email);
           if (user) {

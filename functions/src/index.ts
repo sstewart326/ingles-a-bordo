@@ -316,7 +316,10 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
   // Handle multiple days of the week
   const daysOfWeek: number[] = [];
   
-  if (Array.isArray(classData.daysOfWeek) && classData.daysOfWeek.length > 0) {
+  if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
+    // Use the schedules array for multiple schedule type
+    daysOfWeek.push(...classData.schedules.map((schedule: any) => schedule.dayOfWeek));
+  } else if (Array.isArray(classData.daysOfWeek) && classData.daysOfWeek.length > 0) {
     // Use the daysOfWeek array if it exists
     daysOfWeek.push(...classData.daysOfWeek);
   } else if (classData.dayOfWeek !== undefined || classData.dayOfWeek === 0) {
@@ -326,40 +329,78 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
     // No valid day of week information
     return dates;
   }
+
+  // Handle frequency for recurring classes
+  const frequency = classData.frequency || { type: 'weekly', every: 1 };
+  const isBiweekly = frequency.type === 'biweekly';
+  const isCustom = frequency.type === 'custom';
+  const interval = isBiweekly ? 2 : (isCustom ? frequency.every : recurrenceInterval);
+  
+  // Get the class start date for reference
+  const classStartDate = classData.startDate ? classData.startDate.toDate() : new Date(startDate);
   
   // Process each day of the week
   for (const dayOfWeek of daysOfWeek) {
-    // Start from the effective start date
-    const currentDate = new Date(startDate);
-    
-    // Adjust to the first occurrence of this day of week
-    const currentDayOfWeek = currentDate.getDay();
-    
-    if (currentDayOfWeek !== dayOfWeek) {
-      // Calculate days to add to reach the target day of week
-      const daysToAdd = (dayOfWeek - currentDayOfWeek + 7) % 7;
-      currentDate.setDate(currentDate.getDate() + daysToAdd);
-    }
-    
-    // If the adjusted date is before the start date, move to the next occurrence
-    if (currentDate < startDate) {
-      if (recurrencePattern === 'weekly' || recurrencePattern === 'biweekly') {
-        currentDate.setDate(currentDate.getDate() + 7 * recurrenceInterval);
-      } else if (recurrencePattern === 'monthly') {
-        currentDate.setMonth(currentDate.getMonth() + 1);
-      }
-    }
-    
-    // Generate dates based on recurrence pattern
-    while (currentDate <= endDate) {
-      // Add this date to our results
-      dates.push(new Date(currentDate));
+    // For custom and biweekly frequencies, we need to calculate dates based on the original start date
+    if ((isBiweekly || isCustom) && classData.startDate) {
+      // Find the first occurrence of this day of week from the class start date
+      const firstOccurrence = new Date(classStartDate);
+      const startDayOfWeek = firstOccurrence.getDay();
       
-      // Move to next occurrence based on pattern
-      if (recurrencePattern === 'weekly' || recurrencePattern === 'biweekly') {
-        currentDate.setDate(currentDate.getDate() + 7 * recurrenceInterval);
-      } else if (recurrencePattern === 'monthly') {
-        currentDate.setMonth(currentDate.getMonth() + 1);
+      // Adjust to the first occurrence of this day of week
+      if (startDayOfWeek !== dayOfWeek) {
+        // Calculate days to add to reach the target day of week
+        const daysToAdd = (dayOfWeek - startDayOfWeek + 7) % 7;
+        firstOccurrence.setDate(firstOccurrence.getDate() + daysToAdd);
+      }
+      
+      // Now generate all occurrences based on the interval
+      let currentDate = new Date(firstOccurrence);
+      
+      // If the first occurrence is before our start date, move forward by intervals until we reach or pass the start date
+      while (currentDate < startDate) {
+        currentDate.setDate(currentDate.getDate() + (7 * interval));
+      }
+      
+      // Generate dates based on the interval
+      while (currentDate <= endDate) {
+        dates.push(new Date(currentDate));
+        currentDate.setDate(currentDate.getDate() + (7 * interval));
+      }
+    } else {
+      // For weekly or monthly classes, use the original approach
+      // Start from the effective start date
+      const currentDate = new Date(startDate);
+      
+      // Adjust to the first occurrence of this day of week
+      const currentDayOfWeek = currentDate.getDay();
+      
+      if (currentDayOfWeek !== dayOfWeek) {
+        // Calculate days to add to reach the target day of week
+        const daysToAdd = (dayOfWeek - currentDayOfWeek + 7) % 7;
+        currentDate.setDate(currentDate.getDate() + daysToAdd);
+      }
+      
+      // If the adjusted date is before the start date, move to the next occurrence
+      if (currentDate < startDate) {
+        if (recurrencePattern === 'weekly') {
+          currentDate.setDate(currentDate.getDate() + 7);
+        } else if (recurrencePattern === 'monthly') {
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+      }
+      
+      // Generate dates based on recurrence pattern
+      while (currentDate <= endDate) {
+        // Add this date to our results
+        dates.push(new Date(currentDate));
+        
+        // Move to next occurrence based on pattern
+        if (recurrencePattern === 'weekly') {
+          currentDate.setDate(currentDate.getDate() + 7);
+        } else if (recurrencePattern === 'monthly') {
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
       }
     }
   }

@@ -5,10 +5,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { DayDetails } from '../components/DayDetails';
 import '../styles/calendar.css';
-import {
-  ClassSession,
-  User,
-} from '../utils/scheduleUtils';
+import { ClassSession } from '../utils/scheduleUtils';
 import { styles } from '../styles/styleUtils';
 import { getClassMaterials } from '../utils/classMaterialsUtils';
 import { ClassMaterial } from '../types/interfaces';
@@ -64,7 +61,6 @@ export const Dashboard = () => {
     fetchClasses,
     getClassesForDay,
     isDateInRelevantMonthRange,
-    getRelevantMonthKeys,
     getMonthKey,
   } = useDashboardData();
 
@@ -98,17 +94,14 @@ export const Dashboard = () => {
 
   const handleMonthChange = (newDate: Date) => {
     setSelectedDate(newDate);
-    
-    const monthsToCheck = getRelevantMonthKeys(newDate);
-    const needToLoadNewMonths = monthsToCheck.some(monthKey => !loadedMonths.has(monthKey));
-    
-    if (needToLoadNewMonths) {
-      fetchClasses(newDate);
-    }
+    fetchClasses(newDate);
   };
 
-  const handleDayClick = (date: Date, classes: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => {
-    setSelectedDate(date);
+  const handleDayClick = (date: Date, classes: ClassSession[]) => {
+    // Don't reset selected date if it's the same date
+    if (!selectedDayDetails || selectedDayDetails.date.getTime() !== date.getTime()) {
+      setSelectedDate(date);
+    }
     
     const monthKey = getMonthKey(date);
     const materialsAlreadyLoaded = loadedMaterialMonths.has(monthKey);
@@ -118,6 +111,9 @@ export const Dashboard = () => {
     const day = date.getDate().toString().padStart(2, '0');
     const dateString = `${month}-${day}`;
     const birthdays = users.filter(user => user.birthdate === dateString);
+    
+    // Get payments due for the day
+    const paymentsDueForDay = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
     
     const fetchMaterials = async () => {
       const materialsMap: Record<string, ClassMaterial[]> = {};
@@ -143,20 +139,22 @@ export const Dashboard = () => {
       setSelectedDayDetails({
         date,
         classes,
-        paymentsDue,
+        paymentsDue: paymentsDueForDay,
         materials: materialsMap,
         birthdays
       });
     };
 
+    // Set initial state immediately with empty materials
     setSelectedDayDetails({
       date,
       classes,
-      paymentsDue,
-      materials: {},
+      paymentsDue: paymentsDueForDay,
+      materials: selectedDayDetails?.materials || {},
       birthdays
     });
 
+    // Then fetch materials asynchronously
     fetchMaterials();
 
     if (window.innerWidth < 1024 && detailsRef.current) {
@@ -387,22 +385,10 @@ export const Dashboard = () => {
 
   const handleUpcomingClassesPagination = (newPage: number) => {
     setUpcomingClassesPage(newPage);
-    setTimeout(() => {
-      const upcomingSection = document.getElementById('upcoming-classes-section');
-      if (upcomingSection) {
-        upcomingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 150);
   };
 
   const handlePastClassesPagination = (newPage: number) => {
     setPastClassesPage(newPage);
-    setTimeout(() => {
-      const pastSection = document.getElementById('past-classes-section');
-      if (pastSection) {
-        pastSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 150);
   };
 
   const formatStudentNames = (studentEmails: string[]) => {
@@ -537,11 +523,15 @@ export const Dashboard = () => {
     // If we have selected day details, refresh them too
     if (selectedDayDetails && selectedDayDetails.date.getTime() === date.getTime()) {
       // Get updated payment due information
-      const paymentsDue = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
+      const updatedPaymentsDue = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
       
-      handleDayClick(date, selectedDayDetails.classes, paymentsDue);
+      // Update the selected day details with the updated payments
+      setSelectedDayDetails({
+        ...selectedDayDetails,
+        paymentsDue: updatedPaymentsDue
+      });
     }
-  }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, handleDayClick, upcomingClasses, users, isDateInRelevantMonthRange, setSelectedDate]);
+  }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, upcomingClasses, users, isDateInRelevantMonthRange, setSelectedDate, setSelectedDayDetails]);
 
   // Show loading state if auth or admin status is still loading
   if (authLoading || adminLoading) {
@@ -569,7 +559,6 @@ export const Dashboard = () => {
             upcomingClasses={upcomingClasses}
             onMonthChange={handleMonthChange}
             onDayClick={handleDayClick}
-            formatStudentNames={formatStudentNames}
             isDateInRelevantMonthRange={isDateInRelevantMonthRange}
             getClassesForDay={getClassesForDay}
             users={users}
@@ -581,8 +570,6 @@ export const Dashboard = () => {
           <DayDetails
             selectedDayDetails={selectedDayDetails}
             setSelectedDayDetails={setSelectedDayDetails}
-            formatStudentNames={formatStudentNames}
-            formatClassTime={formatClassTime}
             isAdmin={isAdmin}
             editingNotes={editingNotes}
             savingNotes={savingNotes}
@@ -601,6 +588,7 @@ export const Dashboard = () => {
             onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
             textareaRefs={textareaRefs.current}
             onPaymentStatusChange={handlePaymentStatusChange}
+            formatClassTime={formatClassTime}
           />
         </div>
       </div>
@@ -620,9 +608,9 @@ export const Dashboard = () => {
           isMobileView={isMobileView}
           upcomingClassesPage={upcomingClassesPage}
           pastClassesPage={pastClassesPage}
-          formatStudentNames={formatStudentNames}
           formatClassTime={formatClassTime}
           formatClassDate={formatClassDate}
+          formatStudentNames={formatStudentNames}
           getNextClassDate={getNextClassDate}
           getPreviousClassDate={getPreviousClassDate}
           onEditNotes={handleEditNotes}

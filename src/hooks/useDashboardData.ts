@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { where } from 'firebase/firestore';
 import { useAuth } from './useAuth';
 import { useAdmin } from './useAdmin';
@@ -7,6 +7,7 @@ import { ClassSession, User } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { updateClassList, fetchMaterialsForClasses } from '../utils/classUtils';
 import { getAllClassesForMonth } from '../services/calendarService';
+import { debugLog } from '../utils/debugUtils';
 
 // Extend the ClassSession interface to include the additional properties we need
 interface ExtendedClassSession extends ClassSession {
@@ -29,6 +30,7 @@ interface DashboardData {
     materials: Record<string, ClassMaterial[]>;
     birthdays?: User[];
   } | null;
+  dailyClassMap: Record<string, any[]>;
 }
 
 interface UseDashboardDataReturn extends DashboardData {
@@ -50,20 +52,16 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const { isAdmin, loading: adminLoading } = useAdmin();
 
   // State
-  const [upcomingClasses, setUpcomingClasses] = useState<ClassSession[]>([]);
-  const [pastClasses, setPastClasses] = useState<ClassSession[]>([]);
+  const [upcomingClasses, setUpcomingClasses] = useState<ExtendedClassSession[]>([]);
+  const [pastClasses, setPastClasses] = useState<ExtendedClassSession[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [userNames, setUserNames] = useState<{[email: string]: string}>({});
+  const [classMaterials, setClassMaterials] = useState<Record<string, ClassMaterial[]>>({});
   const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
   const [loadedMaterialMonths, setLoadedMaterialMonths] = useState<Set<string>>(new Set());
-  const [classMaterials, setClassMaterials] = useState<Record<string, ClassMaterial[]>>({});
-  const [selectedDayDetails, setSelectedDayDetails] = useState<{
-    date: Date;
-    classes: ClassSession[];
-    paymentsDue: { user: User; classSession: ClassSession }[];
-    materials: Record<string, ClassMaterial[]>;
-    birthdays?: User[];
-  } | null>(null);
+  const [selectedDayDetails, setSelectedDayDetails] = useState<DashboardData['selectedDayDetails']>(null);
+  const [dailyClassMap, setDailyClassMap] = useState<Record<string, any[]>>({});
+  const initializationRef = useRef(false);
 
   // Utility functions
   const getMonthKey = (date: Date, offset: number = 0): string => {
@@ -107,7 +105,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   };
 
   // Helper function to sort classes by start time
-  const sortClassesByTime = (classes: ClassSession[]): ClassSession[] => {
+  const sortClassesByTime = useCallback((classes: ClassSession[]): ClassSession[] => {
     return classes.sort((a, b) => {
       const dayDiff = (a.dayOfWeek || 0) - (b.dayOfWeek || 0);
       if (dayDiff !== 0) return dayDiff;
@@ -132,45 +130,54 @@ export const useDashboardData = (): UseDashboardDataReturn => {
       
       return parseTimeToMinutes(timeA) - parseTimeToMinutes(timeB);
     });
-  };
+  }, []);
 
-  const getClassesForDay = useCallback((dayOfWeek: number, date: Date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  // Cache for date calculations
+  const dateCache = useRef(new Map<string, Date[]>());
+  const classCache = useRef(new Map<string, ClassSession[]>());
+
+  const getClassesForDay = useCallback((dayOfWeek: number, date: Date): ClassSession[] => {
+    if (isAdmin) {
+      // For admin users, use the dailyClassMap
+      const dateString = date.toISOString().split('T')[0];
+      return dailyClassMap[dateString] || [];
+    }
+
+    // For non-admin users, use the existing logic
+    const cacheKey = `${date.toISOString()}_${dayOfWeek}`;
+    if (classCache.current.has(cacheKey)) {
+      return classCache.current.get(cacheKey)!;
+    }
+
     const calendarDate = new Date(date);
     calendarDate.setHours(0, 0, 0, 0);
     
-    if (!isDateInRelevantMonthRange(date)) {
-      return [];
+    // Check if date is in relevant range using cache
+    const rangeCacheKey = calendarDate.getTime().toString();
+    if (!dateCache.current.has(rangeCacheKey)) {
+      dateCache.current.set(rangeCacheKey, isDateInRelevantMonthRange(date) ? [calendarDate] : []);
     }
     
-    console.log(`Getting classes for day: ${date.toISOString()}, day of week: ${dayOfWeek}`);
-    console.log('Available classes (state):', upcomingClasses);
+    if (!dateCache.current.get(rangeCacheKey)) {
+      classCache.current.set(cacheKey, []);
+      return [];
+    }
     
     const classes = upcomingClasses.filter(classItem => {
       // If the class has specific dates, check if this date is in the list
       const extendedClass = classItem as ExtendedClassSession;
       if (extendedClass.dates && extendedClass.dates.length > 0) {
-        console.log(`Class ${classItem.id} has specific dates:`, extendedClass.dates);
-        // Check if any of the dates match the calendar date
-        const matchingDate = extendedClass.dates.some(classDate => {
+        return extendedClass.dates.some(classDate => {
           const dateToCheck = new Date(classDate);
           dateToCheck.setHours(0, 0, 0, 0);
-          const matches = dateToCheck.getTime() === calendarDate.getTime();
-          if (matches) {
-            console.log(`Found matching date for class ${classItem.id}:`, dateToCheck);
-          }
-          return matches;
+          return dateToCheck.getTime() === calendarDate.getTime();
         });
-        
-        return matchingDate;
       }
       
       // If no specific dates, use the traditional day of week check
-      // First check if this class is scheduled for this day of the week
       if (classItem.dayOfWeek !== dayOfWeek) return false;
       
-      // Check if the class has a start date and it's after the calendar date
+      // Check start and end dates
       if (classItem.startDate) {
         const startDate = typeof classItem.startDate.toDate === 'function' 
           ? classItem.startDate.toDate() 
@@ -179,7 +186,6 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         if (startDate > calendarDate) return false;
       }
 
-      // Check if the class has an end date and it's before the calendar date
       if (classItem.endDate) {
         const endDate = typeof classItem.endDate.toDate === 'function' 
           ? classItem.endDate.toDate() 
@@ -188,115 +194,114 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         if (endDate < calendarDate) return false;
       }
 
+      // Check class frequency
+      const frequency = classItem.frequency || { type: 'weekly', every: 1 };
+      
+      if (!classItem.startDate) return true;
+
+      const startDate = typeof classItem.startDate.toDate === 'function' 
+        ? classItem.startDate.toDate() 
+        : new Date(classItem.startDate as any);
+      startDate.setHours(0, 0, 0, 0);
+
+      const weeksBetween = Math.floor((calendarDate.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
+
+      if (frequency.type === 'weekly') {
+        return weeksBetween % frequency.every === 0;
+      } else if (frequency.type === 'biweekly') {
+        return weeksBetween % 2 === 0;
+      } else if (frequency.type === 'custom') {
+        return weeksBetween % frequency.every === 0;
+      }
+
       return true;
     });
     
     const sortedClasses = sortClassesByTime(classes);
-    console.log(`Found ${sortedClasses.length} classes for ${date.toISOString()}:`, sortedClasses);
+    classCache.current.set(cacheKey, sortedClasses);
     return sortedClasses;
-  }, [upcomingClasses]);
+  }, [isAdmin, dailyClassMap, upcomingClasses, sortClassesByTime]);
+
+  // Clear caches when month changes
+  useEffect(() => {
+    dateCache.current.clear();
+    classCache.current.clear();
+  }, [loadedMonths]);
 
   const fetchClasses = useCallback(async (targetDate: Date = new Date()) => {
     if (!currentUser || adminLoading) return;
 
     try {
       const monthsToLoad = getRelevantMonthKeys(targetDate);
-      const newMonthsToLoad = monthsToLoad.filter(monthKey => !loadedMonths.has(monthKey));
+      console.log('Months to load:', monthsToLoad);
       
-      if (newMonthsToLoad.length > 0) {
+      if (monthsToLoad.length > 0) {
         let transformedClasses: ExtendedClassSession[] = [];
         let userDocs: User[] = [];
+        let combinedDailyClassMap: Record<string, any[]> = {};
         
         if (isAdmin) {
-          // For admin users, use the getAllClassesForMonth API
-          const month = targetDate.getMonth();
-          const year = targetDate.getFullYear();
+          // For admin users, fetch data for all relevant months
+          const fetchPromises = monthsToLoad.map(async (monthKey) => {
+            const [year, month] = monthKey.split('-').map(Number);
+            try {
+              const response = await getAllClassesForMonth(month, year, { bypassCache: true });
+              return response;
+            } catch (error) {
+              console.error(`Error fetching classes for ${monthKey}:`, error);
+              return null;
+            }
+          });
+
+          const responses = await Promise.all(fetchPromises);
           
-          try {
-            const response = await getAllClassesForMonth(month, year);
-            console.log('API Response:', response);
-            
-            if (response && response.classes) {
-              // The API now returns data in a format that's compatible with the frontend
-              // We just need to ensure dates are properly handled
-              transformedClasses = response.classes.map((classInfo: any) => {
-                // Ensure dates are Date objects
-                const dates = Array.isArray(classInfo.dates) 
-                  ? classInfo.dates.map((d: string | Date) => d instanceof Date ? d : new Date(d))
-                  : [];
+          // Combine all responses
+          responses.forEach(response => {
+            if (response) {
+              if (response.classes) {
+                const monthClasses = response.classes.map((classInfo: any) => {
+                  // Ensure dates are Date objects
+                  const dates = Array.isArray(classInfo.dates) 
+                    ? classInfo.dates.map((d: string | Date) => d instanceof Date ? d : new Date(d))
+                    : [];
+                  
+                  const startDate = classInfo.startDate ? new Date(classInfo.startDate) : null;
+                  const endDate = classInfo.endDate ? new Date(classInfo.endDate) : null;
+                  
+                  return {
+                    ...classInfo,
+                    dates,
+                    startDate,
+                    endDate
+                  };
+                });
                 
-                const startDate = classInfo.startDate ? new Date(classInfo.startDate) : null;
-                const endDate = classInfo.endDate ? new Date(classInfo.endDate) : null;
-                
-                return {
-                  ...classInfo,
-                  dates,
-                  startDate,
-                  endDate
-                };
-              });
+                transformedClasses = [...transformedClasses, ...monthClasses];
+              }
+              
+              if (response.dailyClassMap) {
+                // Merge the dailyClassMap from this response
+                combinedDailyClassMap = { ...combinedDailyClassMap, ...response.dailyClassMap };
+              }
               
               // Get users from the response
               if (response.users && Array.isArray(response.users)) {
-                userDocs = response.users;
-              }
-              
-              // Process birthdays if available
-              if (response.birthdays && response.birthdays.length > 0) {
-                // Add birthdays to user data if needed
-                response.birthdays.forEach((birthday: any) => {
-                  const existingUserIndex = userDocs.findIndex(user => user.email === birthday.email);
-                  if (existingUserIndex >= 0) {
-                    userDocs[existingUserIndex].birthdate = birthday.birthdate;
-                  } else {
-                    userDocs.push({
-                      id: birthday.userId,
-                      name: birthday.name,
-                      email: birthday.email,
-                      birthdate: birthday.birthdate
-                    } as User);
-                  }
-                });
+                userDocs = [...userDocs, ...response.users];
               }
             }
-          } catch (error) {
-            console.error('Error fetching classes from API:', error);
-            
-            // Fallback to the original implementation if API call fails
-            const allClasses = await getCachedCollection<ClassSession>(
-              'classes',
-              [],
-              { userId: currentUser.uid }
-            );
-            
-            transformedClasses = allClasses.map(classDoc => ({
-              ...classDoc,
-              paymentConfig: classDoc.paymentConfig || {
-                type: 'monthly',
-                monthlyOption: 'first',
-                startDate: classDoc.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
-              }
-            }));
-            
-            // Extract unique emails from classes
-            const uniqueEmails = new Set<string>();
-            transformedClasses.forEach(classSession => {
-              if (classSession.studentEmails) {
-                classSession.studentEmails.forEach(email => uniqueEmails.add(email));
-              }
-            });
-            
-            // Fetch users
-            userDocs = await getCachedCollection<User>('users', [
-              where('email', 'in', Array.from(uniqueEmails))
-            ], { userId: currentUser.uid });
-          }
+          });
+
+          // Update the dailyClassMap state
+          setDailyClassMap(combinedDailyClassMap);
+
+          // Remove duplicate users by email
+          userDocs = Array.from(new Map(userDocs.map(user => [user.email, user])).values());
         } else {
-          // For non-admin users, use the original implementation
+          // For non-admin users, use the original implementation but bypass cache
           const allClasses = await getCachedCollection<ClassSession>(
             'classes',
             [where('studentEmails', 'array-contains', currentUser.email)],
-            { userId: currentUser.uid }
+            { userId: currentUser.uid, bypassCache: true }
           );
           
           transformedClasses = allClasses.map(classDoc => ({
@@ -323,128 +328,38 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         }
         
         // Process user data
-        const userMap = new Map<string, User>();
+        const newUserNames: {[email: string]: string} = {};
         userDocs.forEach(user => {
-          userMap.set(user.email, user);
-          userNames[user.email] = user.name;
+          newUserNames[user.email] = user.name;
         });
-        setUserNames(userNames);
-        setUsers(userDocs);
 
-        console.log('Transformed Classes:', transformedClasses);
-        
-        // Create local copies of the current state
-        const currentUpcomingClasses = [...upcomingClasses];
-        const currentPastClasses = [...pastClasses];
-        
-        // Update class lists using the updateClassList function
-        // This will modify the local copies
-        updateClassList({
-          classes: transformedClasses,
-          upcomingClasses: currentUpcomingClasses,
-          pastClasses: currentPastClasses,
-          setUpcomingClasses,
-          setPastClasses
-        });
-        
-        // Log the updated upcomingClasses
-        setTimeout(() => {
-          console.log('Updated upcomingClasses from state:', upcomingClasses);
-          console.log('Local updated upcomingClasses:', currentUpcomingClasses);
+        // Batch state updates to reduce re-renders
+        const updates = () => {
+          setUserNames(newUserNames);
+          setUsers(userDocs);
           
-          // Test getClassesForDay with a specific date from the API response
-          if (transformedClasses.length > 0 && transformedClasses[0].dates && transformedClasses[0].dates.length > 0) {
-            const testDate = transformedClasses[0].dates[0];
-            console.log(`Testing getClassesForDay with date: ${testDate.toISOString()}`);
-            
-            // Create a modified version of getClassesForDay that uses our local copy
-            const testGetClassesForDay = (dayOfWeek: number, date: Date) => {
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              const calendarDate = new Date(date);
-              calendarDate.setHours(0, 0, 0, 0);
-              
-              if (!isDateInRelevantMonthRange(date)) {
-                return [];
-              }
-              
-              console.log(`Getting classes for day: ${date.toISOString()}, day of week: ${dayOfWeek}`);
-              console.log('Available classes (local):', currentUpcomingClasses);
-              
-              const classes = currentUpcomingClasses.filter(classItem => {
-                // If the class has specific dates, check if this date is in the list
-                const extendedClass = classItem as ExtendedClassSession;
-                if (extendedClass.dates && extendedClass.dates.length > 0) {
-                  console.log(`Class ${classItem.id} has specific dates:`, extendedClass.dates);
-                  // Check if any of the dates match the calendar date
-                  const matchingDate = extendedClass.dates.some(classDate => {
-                    const dateToCheck = new Date(classDate);
-                    dateToCheck.setHours(0, 0, 0, 0);
-                    const matches = dateToCheck.getTime() === calendarDate.getTime();
-                    if (matches) {
-                      console.log(`Found matching date for class ${classItem.id}:`, dateToCheck);
-                    }
-                    return matches;
-                  });
-                  
-                  return matchingDate;
-                }
-                
-                // If no specific dates, use the traditional day of week check
-                // First check if this class is scheduled for this day of the week
-                if (classItem.dayOfWeek !== dayOfWeek) return false;
-                
-                // Check if the class has a start date and it's after the calendar date
-                if (classItem.startDate) {
-                  const startDate = typeof classItem.startDate.toDate === 'function' 
-                    ? classItem.startDate.toDate() 
-                    : new Date(classItem.startDate as any);
-                  startDate.setHours(0, 0, 0, 0);
-                  if (startDate > calendarDate) return false;
-                }
+          // Update class lists using the updateClassList function
+          updateClassList({
+            classes: transformedClasses,
+            upcomingClasses: [],  // Start with empty arrays to ensure fresh data
+            pastClasses: [],
+            setUpcomingClasses,
+            setPastClasses
+          });
+          
+          // Update loaded months
+          setLoadedMonths(new Set(monthsToLoad));  // Only keep the current relevant months
+        };
 
-                // Check if the class has an end date and it's before the calendar date
-                if (classItem.endDate) {
-                  const endDate = typeof classItem.endDate.toDate === 'function' 
-                    ? classItem.endDate.toDate() 
-                    : new Date(classItem.endDate as any);
-                  endDate.setHours(0, 0, 0, 0);
-                  if (endDate < calendarDate) return false;
-                }
-
-                return true;
-              });
-              
-              const sortedClasses = sortClassesByTime(classes);
-              console.log(`Found ${sortedClasses.length} classes for ${date.toISOString()} (local):`, sortedClasses);
-              return sortedClasses;
-            };
-            
-            const classesForDay = testGetClassesForDay(testDate.getDay(), testDate);
-            console.log('Classes for test date (local):', classesForDay);
-            
-            // If we found classes using our local copy but not with the state,
-            // it means the state hasn't been updated yet
-            if (classesForDay.length > 0) {
-              console.log('Classes found in local copy but not in state. Forcing update...');
-              // Force update the state
-              setUpcomingClasses([...currentUpcomingClasses]);
-              setPastClasses([...currentPastClasses]);
-            }
-          }
-        }, 500);
-        
-        // Update loaded months
-        const updatedLoadedMonths = new Set(loadedMonths);
-        newMonthsToLoad.forEach(month => updatedLoadedMonths.add(month));
-        setLoadedMonths(updatedLoadedMonths);
+        // Perform all state updates in one go
+        updates();
 
         // Fetch materials for classes
         await fetchMaterialsForClasses({
           classes: transformedClasses,
           state: {
-            upcomingClasses: currentUpcomingClasses, // Use local copy
-            pastClasses: currentPastClasses, // Use local copy
+            upcomingClasses: [],  // Start with empty arrays to ensure fresh data
+            pastClasses: [],
             classMaterials,
             loadedMaterialMonths
           },
@@ -459,12 +374,16 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
-  }, [currentUser, adminLoading, isAdmin, loadedMonths, upcomingClasses, pastClasses, classMaterials, loadedMaterialMonths, selectedDayDetails, userNames]);
+  }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails]);
 
-  // Initial data fetch
+  // Combined initialization and data fetching effect
   useEffect(() => {
-    fetchClasses();
-  }, [fetchClasses]);
+    if (!currentUser || adminLoading || initializationRef.current) return;
+
+    debugLog('Dashboard - Initial data fetch triggered');
+    initializationRef.current = true;
+    fetchClasses(new Date());
+  }, [currentUser, adminLoading, fetchClasses]);
 
   return {
     // State
@@ -476,6 +395,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     loadedMonths,
     loadedMaterialMonths,
     selectedDayDetails,
+    dailyClassMap,
 
     // State setters
     setUpcomingClasses,

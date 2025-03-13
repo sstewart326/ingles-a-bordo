@@ -7,20 +7,22 @@ export interface CalendarDayProps<T extends ClassSession> {
   date: Date;
   isToday: boolean;
   classes: T[];
-  paymentsDue: { user: User; classSession: ClassSession }[];
+  paymentsDue?: { user: User; classSession: ClassSession }[];
   onDayClick?: (date: Date, classes: T[]) => void;
   completedPayments?: Payment[];
   isLoading?: boolean;
+  isDateInRelevantMonthRange: (date: Date) => boolean;
 }
 
 export function CalendarDay<T extends ClassSession>({
   date,
   isToday,
-  classes,
-  paymentsDue,
+  classes = [],
+  paymentsDue = [],
   onDayClick,
   completedPayments = [],
   isLoading = false,
+  isDateInRelevantMonthRange
 }: CalendarDayProps<T>) {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -82,11 +84,14 @@ export function CalendarDay<T extends ClassSession>({
     }).join('\n');
   };
 
+  const isRelevant = isDateInRelevantMonthRange(date);
+  const hasClasses = classes.length > 0;
+
   return (
-    <div className="h-full flex flex-col" onClick={handleDayClick}>
+    <div className={`h-full flex flex-col ${!isRelevant ? 'text-gray-400' : ''}`} onClick={handleDayClick}>
       {/* Indicators */}
       <div className="calendar-day-indicators">
-        {classes.length > 0 && (
+        {hasClasses && (
           <div className="indicator class-indicator" title="Has classes" />
         )}
         {shouldShowPaymentIndicators && (
@@ -118,7 +123,7 @@ export function CalendarDay<T extends ClassSession>({
       {/* Class count and payment pills */}
       <div className="class-details">
         <div className="flex flex-col items-center gap-2">
-          {classes.length > 0 && (
+          {hasClasses && (
             <div 
               className="calendar-pill class-count-pill"
               onClick={(e) => {

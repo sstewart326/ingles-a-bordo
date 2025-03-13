@@ -75,4 +75,10 @@ export interface ClassPlanTemplate {
   items: Omit<ClassPlanItem, 'id' | 'completed' | 'completedDate'>[];
   createdAt: { toDate: () => Date }; // Firebase Timestamp
   createdBy: string; // admin's email
+}
+
+export interface ClassSchedule {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
 } 

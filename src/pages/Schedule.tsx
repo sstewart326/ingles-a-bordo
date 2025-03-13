@@ -288,7 +288,8 @@ export const Schedule = () => {
           <div>
             <Calendar
               selectedDate={selectedDate}
-              onDateSelect={(date: Date) => {
+              onMonthChange={setSelectedDate}
+              onDayClick={(date: Date) => {
                 const dayClasses = getClassesForDay(classes, date.getDay(), date);
                 const paymentDates = classes.length > 0 ? 
                   classes.flatMap(classItem => {
@@ -308,8 +309,9 @@ export const Schedule = () => {
 
                 handleDayClick(date, dayClasses, isPaymentDay, isPaymentSoon);
               }}
-              onMonthChange={setSelectedDate}
-              renderDay={renderCalendarDay}
+              renderDay={(date: Date, isToday: boolean) => (
+                renderCalendarDay(date, isToday)
+              )}
             />
           </div>
 

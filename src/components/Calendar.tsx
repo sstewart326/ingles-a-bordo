@@ -3,20 +3,19 @@ import { getDaysInMonth } from '../utils/dateUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { styles } from '../styles/styleUtils';
-import { ClassSession } from '../utils/scheduleUtils';
 
 interface CalendarProps {
   selectedDate: Date;
-  onDateSelect: (date: Date, classes: ClassSession[]) => void;
   onMonthChange: (date: Date) => void;
+  onDayClick: (date: Date) => void;
   renderDay: (date: Date, isToday: boolean) => React.ReactNode;
   showNavigation?: boolean;
 }
 
 export const Calendar: React.FC<CalendarProps> = ({
   selectedDate,
-  onDateSelect,
   onMonthChange,
+  onDayClick,
   renderDay,
   showNavigation = true,
 }) => {
@@ -32,6 +31,10 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const handleNextMonth = () => {
     onMonthChange(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1));
+  };
+
+  const handleDayClick = (date: Date) => {
+    onDayClick(date);
   };
 
   return (
@@ -89,7 +92,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           return (
             <div
               key={index}
-              onClick={() => onDateSelect(date, [])}
+              onClick={() => handleDayClick(date)}
               className={`calendar-day ${isToday ? 'bg-[#f8f8f8]' : ''} ${isSelected ? 'selected' : ''}`}
             >
               {renderDay(date, isToday)}

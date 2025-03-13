@@ -6,6 +6,7 @@ export interface ClassSession {
   date?: string;
   title?: string;
   description?: string;
+  students?: any[];  // Allow both string[] and object[] types
   studentEmails: string[];
   studentIds?: string[]; // Keep for backward compatibility
   dayOfWeek?: number;
@@ -18,6 +19,10 @@ export interface ClassSession {
   updatedAt?: Timestamp;
   endDate?: Timestamp;
   startDate?: Timestamp;
+  frequency?: {
+    type: 'weekly' | 'biweekly' | 'custom';
+    every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks
+  };
   paymentConfig?: {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;  // for weekly payments, number of weeks
