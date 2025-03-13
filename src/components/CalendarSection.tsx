@@ -127,6 +127,7 @@ export const CalendarSection = ({
           isDateInRelevantMonthRange={isDateInRelevantMonthRange}
           completedPayments={completedPayments}
           isLoading={isLoadingPayments}
+          users={users}
         />
       )}
     />

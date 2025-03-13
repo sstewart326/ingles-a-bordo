@@ -12,6 +12,7 @@ export interface CalendarDayProps<T extends ClassSession> {
   completedPayments?: Payment[];
   isLoading?: boolean;
   isDateInRelevantMonthRange: (date: Date) => boolean;
+  users?: User[];
 }
 
 export function CalendarDay<T extends ClassSession>({
@@ -22,7 +23,8 @@ export function CalendarDay<T extends ClassSession>({
   onDayClick,
   completedPayments = [],
   isLoading = false,
-  isDateInRelevantMonthRange
+  isDateInRelevantMonthRange,
+  users = []
 }: CalendarDayProps<T>) {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -31,6 +33,13 @@ export function CalendarDay<T extends ClassSession>({
   const daysUntilPayment = isPaymentDay ? 
     Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
   const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+
+  // Check for birthdays
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const dateString = `${month}-${day}`;
+  const birthdays = users.filter(user => user.birthdate === dateString);
+  const hasBirthdays = birthdays.length > 0;
 
   // Check if all payments for this day are completed
   const allPaymentsCompleted = isPaymentDay && paymentsDue.every(({ user, classSession }) => {
@@ -106,6 +115,11 @@ export function CalendarDay<T extends ClassSession>({
             }
           />
         )}
+        {hasBirthdays && (
+          <div className="indicator birthday-indicator" title={`${birthdays.length} ${birthdays.length === 1 ? t.birthday : t.birthdays}`}>
+            🎂
+          </div>
+        )}
       </div>
 
       {/* Date */}
@@ -120,7 +134,7 @@ export function CalendarDay<T extends ClassSession>({
         </div>
       </div>
 
-      {/* Class count and payment pills */}
+      {/* Class count, payment pills, and birthday pills */}
       <div className="class-details">
         <div className="flex flex-col items-center gap-2">
           {hasClasses && (
@@ -149,6 +163,19 @@ export function CalendarDay<T extends ClassSession>({
               title={createPaymentTooltip()}
             >
               {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue : t.paymentsDue}
+            </div>
+          )}
+
+          {hasBirthdays && (
+            <div 
+              className="calendar-pill birthday-pill"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDayClick();
+              }}
+              title={birthdays.map(user => user.name).join('\n')}
+            >
+              {birthdays.length} {birthdays.length === 1 ? t.birthday : t.birthdays}
             </div>
           )}
         </div>

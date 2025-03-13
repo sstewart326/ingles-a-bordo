@@ -636,6 +636,23 @@ export const DayDetails = ({
         })}
       </h2>
 
+      {/* Birthdays Section */}
+      {selectedDayDetails.birthdays && selectedDayDetails.birthdays.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-4 flex items-center">
+            <span role="img" aria-label="birthday" className="mr-2">🎂</span>
+            {t.birthdays || 'Birthdays'}
+          </h3>
+          <div className="space-y-2 ml-6">
+            {selectedDayDetails.birthdays.map((user) => (
+              <div key={user.email} className="flex items-center">
+                <h4 className="text-lg font-semibold text-purple-600">{user.name}</h4>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Payments Due Section */}
       {selectedDayDetails.paymentsDue.length > 0 && (
         <div className="mb-6">
