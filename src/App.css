@@ -238,6 +238,27 @@ nav.header-nav .header-dropdown .header-dropdown-item:hover {
   color: white !important;
 }
 
+/* Add styles for active state to prevent white text highlighting */
+nav.header-nav .header-dropdown .header-dropdown-item:active,
+nav.header-nav .header-dropdown .header-dropdown-item:focus {
+  background-color: var(--header-hover) !important;
+  color: white !important;
+  outline: none;
+}
+
+/* Style for the active dropdown item */
+nav.header-nav .header-dropdown .header-dropdown-item-active {
+  background-color: var(--header-hover) !important;
+  color: white !important;
+}
+
+/* Override any default Headless UI active state styling */
+nav.header-nav .header-dropdown button[data-headlessui-state="active"],
+nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
+  background-color: var(--header-hover) !important;
+  color: white !important;
+}
+
 /* Mobile Menu Styles */
 @media (max-width: 640px) {
   nav.header-nav .header-nav-button {

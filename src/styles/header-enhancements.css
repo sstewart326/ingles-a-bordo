@@ -145,4 +145,27 @@
 .header-dropdown-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: var(--brand-color) !important;
+}
+
+/* Prevent white text highlighting in dropdown */
+.header-dropdown-item::selection,
+.header-dropdown-item::-moz-selection {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+/* Ensure text is visible when menu item is active */
+.header-dropdown button,
+.header-dropdown a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.header-dropdown button:active,
+.header-dropdown a:active,
+.header-dropdown button:focus,
+.header-dropdown a:focus,
+.header-dropdown-item-active {
+  background-color: var(--header-hover) !important;
+  color: white !important;
+  outline: none !important;
 } 

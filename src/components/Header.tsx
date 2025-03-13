@@ -107,20 +107,22 @@ export const Header = () => {
                   >
                     <Menu.Items className="header-dropdown absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md py-1 focus:outline-none">
                       <Menu.Item>
-                        {() => (
+                        {({ active }) => (
                           <Link
                             to="/profile"
-                            className="header-dropdown-item block px-4 py-2 text-sm"
+                            style={{ backgroundColor: active ? 'var(--header-hover)' : 'transparent', color: '#E8E8E8' }}
+                            className={`header-dropdown-item block px-4 py-2 text-sm ${active ? 'header-dropdown-item-active' : ''}`}
                           >
                             {t.profile}
                           </Link>
                         )}
                       </Menu.Item>
                       <Menu.Item>
-                        {() => (
+                        {({ active }) => (
                           <button
                             onClick={handleLogout}
-                            className="header-dropdown-item block w-full px-4 py-2 text-left text-sm"
+                            style={{ backgroundColor: active ? 'var(--header-hover)' : 'transparent', color: '#E8E8E8' }}
+                            className={`header-dropdown-item block w-full px-4 py-2 text-left text-sm ${active ? 'header-dropdown-item-active' : ''}`}
                           >
                             {t.logout}
                           </button>

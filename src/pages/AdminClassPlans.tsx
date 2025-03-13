@@ -28,7 +28,9 @@ import {
   PencilIcon, 
   CheckIcon, 
   DocumentDuplicateIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 import { useLanguage } from '../hooks/useLanguage';
@@ -117,6 +119,10 @@ export const AdminClassPlans = () => {
   const [currentTemplate, setCurrentTemplate] = useState<ClassPlanTemplate | null>(null);
   const [editTemplateName, setEditTemplateName] = useState('');
   const [templateItems, setTemplateItems] = useState<any[]>([]);
+  
+  // State for highlighting updated controls
+  const [highlightMonth, setHighlightMonth] = useState(false);
+  const [highlightYear, setHighlightYear] = useState(false);
   
   // Fetch all students
   const fetchStudents = useCallback(async () => {
@@ -667,6 +673,56 @@ export const AdminClassPlans = () => {
     }
   };
   
+  // Handle navigation to previous month
+  const handlePreviousMonth = () => {
+    if (selectedMonth === 0) {
+      // If January, go to December of previous year
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+      setHighlightMonth(true);
+      setHighlightYear(true);
+    } else {
+      // Otherwise just decrease month
+      setSelectedMonth(selectedMonth - 1);
+      setHighlightMonth(true);
+    }
+  };
+  
+  // Handle navigation to next month
+  const handleNextMonth = () => {
+    if (selectedMonth === 11) {
+      // If December, go to January of next year
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+      setHighlightMonth(true);
+      setHighlightYear(true);
+    } else {
+      // Otherwise just increase month
+      setSelectedMonth(selectedMonth + 1);
+      setHighlightMonth(true);
+    }
+  };
+  
+  // Reset highlights after animation
+  useEffect(() => {
+    if (highlightMonth || highlightYear) {
+      const timer = setTimeout(() => {
+        setHighlightMonth(false);
+        setHighlightYear(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightMonth, highlightYear]);
+  
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') {
+      handlePreviousMonth();
+    } else if (e.key === 'ArrowRight') {
+      handleNextMonth();
+    }
+  };
+  
   // Initial data loading
   useEffect(() => {
     fetchStudents();
@@ -744,7 +800,9 @@ export const AdminClassPlans = () => {
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 transition-all duration-300 ${
+                highlightMonth ? 'bg-indigo-50 border-indigo-300' : ''
+              }`}
             >
               {months.map((month, index) => (
                 <option key={index} value={index}>
@@ -762,7 +820,9 @@ export const AdminClassPlans = () => {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 transition-all duration-300 ${
+                highlightYear ? 'bg-indigo-50 border-indigo-300' : ''
+              }`}
             >
               {years.map((year) => (
                 <option key={year} value={year}>
@@ -776,35 +836,69 @@ export const AdminClassPlans = () => {
       
       {/* Class Plan Content */}
       {selectedStudent ? (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">
-              {months[selectedMonth]} {selectedYear} Plan for {selectedStudent.label}
-            </h2>
+        <div 
+          className="bg-white rounded-lg shadow-md p-6"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+          aria-label={`Class plan for ${selectedStudent.label}, ${months[selectedMonth]} ${selectedYear}`}
+        >
+          <div className="mb-6">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center">
+                <button
+                  onClick={handlePreviousMonth}
+                  className="p-2 mr-2 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                  title="Previous month"
+                  aria-label="Go to previous month"
+                >
+                  <ChevronLeftIcon className="h-5 w-5" />
+                </button>
+                
+                <h2 className={styles.headings.h2}>
+                  {months[selectedMonth]} {selectedYear}
+                </h2>
+                
+                <button
+                  onClick={handleNextMonth}
+                  className="p-2 ml-2 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                  title="Next month"
+                  aria-label="Go to next month"
+                >
+                  <ChevronRightIcon className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="flex space-x-2">
+                {classPlan && (
+                  <>
+                    <button
+                      onClick={() => setShowTemplateModal(true)}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                      Save as Template
+                      <Tooltip text="Save the current class plan structure as a reusable template that can be applied to other students or months.">
+                        <InformationCircleIcon className="h-4 w-4 ml-1 text-indigo-200" />
+                      </Tooltip>
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowDeletePlanModal(true)}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      <TrashIcon className="h-4 w-4 mr-1" />
+                      Delete Plan
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
             
-            <div className="flex space-x-2">
-              {classPlan && (
-                <>
-                  <button
-                    onClick={() => setShowTemplateModal(true)}
-                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                    Save as Template
-                    <Tooltip text="Save the current class plan structure as a reusable template that can be applied to other students or months.">
-                      <InformationCircleIcon className="h-4 w-4 ml-1 text-indigo-200" />
-                    </Tooltip>
-                  </button>
-                  
-                  <button
-                    onClick={() => setShowDeletePlanModal(true)}
-                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    <TrashIcon className="h-4 w-4 mr-1" />
-                    Delete Plan
-                  </button>
-                </>
-              )}
+            <div className="flex items-center mt-2">
+              <p className="text-sm text-gray-500">
+                Plan for {selectedStudent.label}
+              </p>
+              <span className="mx-2 text-xs text-gray-400">•</span>
             </div>
           </div>
           
