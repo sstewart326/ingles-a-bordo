@@ -649,6 +649,18 @@ export const DayDetails = ({
         })}
       </h2>
 
+      {/* No content message */}
+      {selectedDayDetails.classes.length === 0 && 
+       (!selectedDayDetails.birthdays || selectedDayDetails.birthdays.length === 0) && 
+       selectedDayDetails.paymentsDue.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+          <div className="text-lg mb-2">{t.noDetailsAvailable || 'No details available'}</div>
+          <p className="text-center text-sm">
+            {t.nothingScheduledForThisDay || 'There are no classes, birthdays, or payments scheduled for this day.'}
+          </p>
+        </div>
+      )}
+
       {/* Birthdays Section */}
       {selectedDayDetails.birthdays && selectedDayDetails.birthdays.length > 0 && (
         <div className="mb-6">

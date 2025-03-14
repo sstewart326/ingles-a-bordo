@@ -576,7 +576,7 @@ export const AdminSchedule = () => {
       setNewClass((prev: typeof newClass) => ({
         ...prev,
         startTime: newStartTime,
-        endTime
+        endTime: endTime
       }));
     } else {
       setNewClass((prev: typeof newClass) => ({
@@ -1666,9 +1666,9 @@ export const AdminSchedule = () => {
               {/* Left fade indicator */}
               <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none hidden md:block"></div>
               
-              <div className="table-container overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-gray-500">
+              <div className="table-container overflow-x-auto overflow-y-auto max-h-[600px] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-gray-500">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th scope="col" className={styles.table.header}>
                         {t.dayAndTime}

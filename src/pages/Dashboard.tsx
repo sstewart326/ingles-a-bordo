@@ -157,7 +157,8 @@ export const Dashboard = () => {
     // Then fetch materials asynchronously
     fetchMaterials();
 
-    if (window.innerWidth < 1024 && detailsRef.current) {
+    // Always scroll to details section, regardless of screen size
+    if (detailsRef.current) {
       setTimeout(() => {
         detailsRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -546,7 +547,7 @@ export const Dashboard = () => {
     <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
-          <h1 className={styles.headings.h1}>{t.dashboard}</h1>
+          <h1 className={styles.headings.h1}>{t.home}</h1>
         </div>
       </div>
       

@@ -35,6 +35,11 @@ export const colors = {
   warning: '#F59E0B', // amber-500
   error: '#EF4444',   // red-500
   info: '#3B82F6',    // blue-500
+  
+  // Custom colors
+  custom: {
+    purple: '#4C1D9B', // R76, G29, B155, A1
+  }
 };
 
 export const typography = {
@@ -93,14 +98,14 @@ export const typography = {
 export const componentStyles = {
   // Headings
   headings: {
-    h1: 'text-2xl font-bold text-indigo-700 font-sans tracking-tight',
-    h2: 'text-lg font-semibold text-indigo-700 font-sans tracking-wide',
-    h3: 'text-base font-medium text-indigo-600 font-sans',
+    h1: 'text-2xl font-bold text-[#4C1D9B] font-sans tracking-tight',
+    h2: 'text-lg font-semibold text-[#4C1D9B] font-sans tracking-wide',
+    h3: 'text-base font-medium text-[#4C1D9B] font-sans',
   },
   
   // Form elements
   form: {
-    label: 'block text-sm font-medium text-indigo-700 mb-1',
+    label: 'block text-sm font-medium text-[#4C1D9B] mb-1',
     input: 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm',
     select: 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm',
     textarea: 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm',
@@ -116,7 +121,7 @@ export const componentStyles = {
   
   // Tables
   table: {
-    header: 'px-6 py-3 text-left text-xs font-medium text-indigo-600 uppercase tracking-wider',
+    header: 'px-6 py-3 text-left text-xs font-medium text-[#4C1D9B] uppercase tracking-wider',
     cell: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900',
     row: 'hover:bg-gray-50 transition-colors duration-150',
   },
@@ -124,9 +129,9 @@ export const componentStyles = {
   // Cards
   card: {
     container: 'bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4 hover:shadow-md transition-shadow duration-200',
-    title: 'font-semibold text-indigo-700 text-lg tracking-wide',
+    title: 'font-semibold text-[#4C1D9B] text-lg tracking-wide',
     subtitle: 'text-gray-800 font-medium',
-    label: 'font-medium text-indigo-600 uppercase text-xs tracking-wider',
+    label: 'font-medium text-[#4C1D9B] uppercase text-xs tracking-wider',
   },
 };
 

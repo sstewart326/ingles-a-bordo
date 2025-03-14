@@ -22,6 +22,7 @@ interface Translation {
   
   // Navigation
   dashboard: string;
+  home: string;
   schedule: string;
   classMaterials: string;
   adminPanel: string;
@@ -60,6 +61,8 @@ interface Translation {
   materials: string;
   slides: string;
   dayDetails: string;
+  noDetailsAvailable: string;
+  nothingScheduledForThisDay: string;
   
   // Schedule
   courseSchedule: string;
@@ -222,6 +225,7 @@ const translations: Record<Language, Translation> = {
     
     // Navigation
     dashboard: 'Dashboard',
+    home: 'Home',
     schedule: 'Schedule',
     classMaterials: 'Class Materials',
     adminPanel: 'Admin Panel',
@@ -260,6 +264,8 @@ const translations: Record<Language, Translation> = {
     materials: 'Materials',
     slides: 'Slides',
     dayDetails: 'Day Details',
+    noDetailsAvailable: 'No details available',
+    nothingScheduledForThisDay: 'There is nothing scheduled for this day.',
     
     // Schedule
     courseSchedule: 'Course Schedule',
@@ -420,6 +426,7 @@ const translations: Record<Language, Translation> = {
     
     // Navigation
     dashboard: 'Painel',
+    home: 'Início',
     schedule: 'Agenda',
     classMaterials: 'Materiais de Aula',
     adminPanel: 'Painel Admin',
@@ -458,6 +465,8 @@ const translations: Record<Language, Translation> = {
     materials: 'Materiais',
     slides: 'Slides',
     dayDetails: 'Detalhes do Dia',
+    noDetailsAvailable: 'Nenhum detalhe disponível',
+    nothingScheduledForThisDay: 'Não há nada agendado para este dia.',
     
     // Schedule
     courseSchedule: 'Agenda de Aulas',
