@@ -25,45 +25,25 @@ interface UpdateClassListParams {
   setPastClasses: (classes: ClassSession[]) => void;
 }
 
-// Helper function to compare times
-const compareTimes = (timeA: string, timeB: string): number => {
-  const getTime = (timeStr: string) => {
-    if (!timeStr) return 0;
-    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-    if (!match) return 0;
-    let [_, hours, minutes, period] = match;
-    let hour = parseInt(hours);
-    if (period) {
-      period = period.toUpperCase();
-      if (period === 'PM' && hour !== 12) hour += 12;
-      if (period === 'AM' && hour === 12) hour = 0;
-    }
-    return hour * 60 + parseInt(minutes);
-  };
-  return getTime(timeA) - getTime(timeB);
-};
-
 export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpcomingClasses, setPastClasses }: UpdateClassListParams) => {
-  console.log('updateClassList called with classes:', classes);
-  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayTime = today.getTime();
+  console.log('\n=== Date Processing ===');
+  console.log('Today (midnight):', today.toISOString());
 
-  // Calculate start and end of current week
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay()); // Start from Sunday
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6); // End on Saturday
-  endOfWeek.setHours(23, 59, 59, 999);
-
-  // Get all days of the current week
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(startOfWeek);
-    date.setDate(startOfWeek.getDate() + i);
-    return date.getDay();
+  // Log all classes with their dates for debugging
+  console.log('\nAll classes with dates:');
+  classes.forEach(c => {
+    const extendedClass = c as ExtendedClassSession;
+    if (extendedClass.dates && extendedClass.dates.length > 0) {
+      console.log(`Class ${c.id}:`, {
+        dates: extendedClass.dates.map(d => new Date(d).toISOString()),
+        dayOfWeek: c.dayOfWeek,
+        startTime: c.startTime,
+        endTime: c.endTime
+      });
+    }
   });
 
   // Create a map of existing classes with their materials
@@ -77,63 +57,34 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
     existingPastClassesMap.set(c.id, c);
   });
 
-  // Helper function to safely convert a date value to a Date object
-  const safeToDate = (dateValue: any): Date | null => {
-    if (!dateValue) return null;
-    
-    try {
-      // If it's a Firestore Timestamp with toDate method
-      if (typeof dateValue.toDate === 'function') {
-        return dateValue.toDate();
-      }
-      // If it's already a Date object
-      else if (dateValue instanceof Date) {
-        return dateValue;
-      }
-      // If it's a string or number
-      else {
-        return new Date(dateValue);
-      }
-    } catch (error) {
-      console.error('Error converting date:', error, dateValue);
-      return null;
-    }
-  };
-
-  // Filter classes based on their day of week and start date
+  // Filter classes based on their dates
   const newUpcomingClasses = classes
     .filter(c => {
       const extendedClass = c as ExtendedClassSession;
       
       // If the class has specific dates, check if any are in the future
       if (extendedClass.dates && extendedClass.dates.length > 0) {
-        console.log(`Checking future dates for class ${c.id}:`, extendedClass.dates);
         // Check if any dates are today or in the future
-        return extendedClass.dates.some(date => {
+        const hasUpcomingDate = extendedClass.dates.some(date => {
           const dateToCheck = new Date(date);
+          // Ensure we're comparing dates at midnight in the local timezone
           dateToCheck.setHours(0, 0, 0, 0);
           const isUpcoming = dateToCheck.getTime() >= todayTime;
+          
           if (isUpcoming) {
-            console.log(`Found upcoming date for class ${c.id}:`, dateToCheck);
+            console.log(`\nFound upcoming date for class ${c.id}:`);
+            console.log('Date:', dateToCheck.toISOString());
+            console.log('Today:', new Date(todayTime).toISOString());
+            console.log('Is upcoming:', isUpcoming);
           }
+          
           return isUpcoming;
         });
+        
+        return hasUpcomingDate;
       }
       
-      // Skip classes without a day of week
-      if (c.dayOfWeek === undefined) return false;
-      
-      // Check if the class occurs on any day of the current week
-      const isThisWeek = weekDays.includes(c.dayOfWeek);
-      
-      // For upcoming classes, we want to show them even if they haven't started yet
-      // Only filter out if they have an end date that's passed
-      if (c.endDate) {
-        const endDate = safeToDate(c.endDate);
-        if (endDate && endDate < today) return false;
-      }
-      
-      return isThisWeek;
+      return false;
     })
     .map(c => {
       // Preserve materials from existing classes
@@ -149,10 +100,12 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
         // Find the earliest upcoming date for each class
         const upcomingDatesA = extendedA.dates.filter(date => {
           const dateObj = new Date(date);
+          dateObj.setHours(0, 0, 0, 0);
           return dateObj.getTime() >= todayTime;
         });
         const upcomingDatesB = extendedB.dates.filter(date => {
           const dateObj = new Date(date);
+          dateObj.setHours(0, 0, 0, 0);
           return dateObj.getTime() >= todayTime;
         });
         
@@ -163,27 +116,7 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
         }
       }
       
-      // Skip sorting if dayOfWeek is undefined
-      if (a.dayOfWeek === undefined || b.dayOfWeek === undefined) return 0;
-      
-      const currentDayOfWeek = today.getDay();
-      
-      // Calculate days until each class (considering week wraparound)
-      const getDaysUntil = (dayOfWeek: number): number => {
-        const daysUntil = dayOfWeek - currentDayOfWeek;
-        // If the day is earlier in the week or today, it's next week
-        return daysUntil <= 0 ? daysUntil + 7 : daysUntil;
-      };
-      
-      const daysUntilA = getDaysUntil(a.dayOfWeek);
-      const daysUntilB = getDaysUntil(b.dayOfWeek);
-      
-      // Sort by days until first
-      const dayDiff = daysUntilA - daysUntilB;
-      if (dayDiff !== 0) return dayDiff;
-      
-      // Then by start time
-      return compareTimes(a.startTime || '', b.startTime || '');
+      return 0;
     });
 
   const newPastClasses = classes
@@ -192,34 +125,24 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       
       // If the class has specific dates, check if any are in the past
       if (extendedClass.dates && extendedClass.dates.length > 0) {
-        console.log(`Checking past dates for class ${c.id}:`, extendedClass.dates);
         // Check if any dates are in the past
-        return extendedClass.dates.some(date => {
+        const hasPastDate = extendedClass.dates.some(date => {
           const dateToCheck = new Date(date);
+          // Ensure we're comparing dates at midnight in the local timezone
           dateToCheck.setHours(0, 0, 0, 0);
           const isPast = dateToCheck.getTime() < todayTime;
+          
           if (isPast) {
-            console.log(`Found past date for class ${c.id}:`, dateToCheck);
+            console.log(`Class ${c.id}: ${dateToCheck.toISOString()} is past`);
           }
+          
           return isPast;
         });
+        
+        return hasPastDate;
       }
       
-      // Skip classes without a day of week
-      if (c.dayOfWeek === undefined) return false;
-      
-      // Check if the class occurs on any day of the current week
-      const isThisWeek = weekDays.includes(c.dayOfWeek);
-      
-      // Check if the class has started based on start date
-      let hasStarted = true;
-      if (c.startDate) {
-        const startDate = safeToDate(c.startDate);
-        hasStarted = !startDate || startDate <= today;
-      }
-      
-      if (!hasStarted) return false;
-      else return isThisWeek;
+      return false;
     })
     .map(c => {
       // Preserve materials from existing classes
@@ -235,10 +158,12 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
         // Find the most recent past date for each class
         const pastDatesA = extendedA.dates.filter(date => {
           const dateObj = new Date(date);
+          dateObj.setHours(0, 0, 0, 0);
           return dateObj.getTime() < todayTime;
         });
         const pastDatesB = extendedB.dates.filter(date => {
           const dateObj = new Date(date);
+          dateObj.setHours(0, 0, 0, 0);
           return dateObj.getTime() < todayTime;
         });
         
@@ -249,26 +174,18 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
         }
       }
       
-      // Skip sorting if dayOfWeek is undefined
-      if (a.dayOfWeek === undefined || b.dayOfWeek === undefined) return 0;
-      
-      // For past classes, we want to sort by the actual date and time
-      const getDateForClass = (c: ClassSession) => {
-        const date = new Date(startOfWeek);
-        // We know dayOfWeek is defined here because we've filtered out undefined values
-        date.setDate(startOfWeek.getDate() + (c.dayOfWeek as number));
-        if (c.startTime) {
-          const [hours, minutes] = c.startTime.split(':').map(Number);
-          date.setHours(hours, minutes, 0, 0);
-        }
-        return date;
-      };
-      
-      return getDateForClass(b).getTime() - getDateForClass(a).getTime();
+      return 0;
     });
 
-  console.log('New upcoming classes:', newUpcomingClasses);
-  console.log('New past classes:', newPastClasses);
+  console.log('\n=== Final Classification ===');
+  console.log('Upcoming classes:', newUpcomingClasses.map(c => ({
+    id: c.id,
+    dates: (c as ExtendedClassSession).dates?.map(d => new Date(d).toISOString())
+  })));
+  console.log('Past classes:', newPastClasses.map(c => ({
+    id: c.id,
+    dates: (c as ExtendedClassSession).dates?.map(d => new Date(d).toISOString())
+  })));
   
   setUpcomingClasses(newUpcomingClasses);
   setPastClasses(newPastClasses);

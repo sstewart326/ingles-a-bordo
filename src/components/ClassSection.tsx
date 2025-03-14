@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import { ClassSession } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
-import { FaFilePdf, FaLink, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaLink, FaPlus, FaTrash, FaFilePowerpoint } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
 import { UploadMaterialsForm } from './UploadMaterialsForm';
 import { debugLog, debugMaterials, debugClassSession } from '../utils/debugUtils';
+
+// Extended interface to include dates property
+interface ExtendedClassSession extends ClassSession {
+  dates?: Date[];
+}
 
 interface ClassSectionProps {
   title: string;
@@ -21,24 +26,42 @@ interface ClassSectionProps {
   formatStudentNames: (studentEmails: string[]) => string;
   formatClassTime: (classSession: ClassSession) => string;
   formatClassDate: (date: Date | null) => string;
-  getNextClassDate: (classSession: ClassSession) => Date | null;
-  getPreviousClassDate: (classSession: ClassSession) => Date | null;
   onEditNotes: (classSession: ClassSession) => void;
   onSaveNotes: (classSession: ClassSession) => void;
   onCancelEditNotes: (classId: string) => void;
   onEditPrivateNotes: (classSession: ClassSession) => void;
   onSavePrivateNotes: (classSession: ClassSession) => void;
   onCancelEditPrivateNotes: (classId: string) => void;
-  onDeleteMaterial: (material: ClassMaterial, index: number, classId: string, type: 'slides' | 'link', itemIndex?: number) => void;
+  onDeleteMaterial: (material: ClassMaterial, index: number, classId: string, type?: 'slides' | 'link', itemIndex?: number) => void;
   onOpenUploadForm: (classId: string) => void;
   onCloseUploadForm: () => void;
   visibleUploadForm: string | null;
   textareaRefs: { [key: string]: HTMLTextAreaElement | null };
   pageSize: number;
   currentPage: number;
-  onPageChange: (newPage: number) => void;
+  onPageChange: (page: number) => void;
   sectionRef: React.RefObject<HTMLDivElement | null>;
-  t: any;
+  t: {
+    upcomingClasses: string;
+    pastClasses: string;
+    noUpcomingClasses: string;
+    noPastClasses: string;
+    addNotes: string;
+    addPrivateNotes: string;
+    materials: string;
+    addMaterials: string;
+    slides: string;
+    link: string;
+    previous: string;
+    next: string;
+    notes: string;
+    notesInfo: string;
+    cancel: string;
+    noNotes: string;
+    edit: string;
+    privateNotes: string;
+    privateNotesInfo: string;
+  };
 }
 
 export const ClassSection = ({
@@ -54,8 +77,6 @@ export const ClassSection = ({
   formatStudentNames,
   formatClassTime,
   formatClassDate,
-  getNextClassDate,
-  getPreviousClassDate,
   onEditNotes,
   onSaveNotes,
   onCancelEditNotes,
@@ -90,22 +111,26 @@ export const ClassSection = ({
   const startIndex = currentPage * pageSize;
   const endIndex = startIndex + pageSize;
   const displayedClasses = classes.slice(startIndex, endIndex);
-  const hasMore = startIndex + pageSize < classes.length;
+  const totalPages = Math.ceil(classes.length / pageSize);
+
+  // Log only if the displayed classes count is different from total
+  if (displayedClasses.length !== classes.length) {
+    debugLog(`Displayed classes count: ${displayedClasses.length}`);
+  }
   
-  // More debugging logs
-  debugLog(`Displayed classes count: ${displayedClasses.length}`);
-  
-  // Log materials for each class
-  displayedClasses.forEach((classSession, index) => {
-    debugClassSession(classSession, index);
-    if (classMaterials[classSession.id]) {
-      debugMaterials(classSession.id, classMaterials[classSession.id], 'classMaterials prop');
+  // Log only the first class's materials to avoid spam
+  if (displayedClasses.length > 0) {
+    const firstClass = displayedClasses[0];
+    debugClassSession(firstClass, 0);
+    if (classMaterials[firstClass.id]) {
+      debugMaterials(firstClass.id, classMaterials[firstClass.id], 'classMaterials prop');
     }
-  });
+  }
 
   const handlePageChange = (newPage: number) => {
-    onPageChange(newPage);
-    // No need to scroll here as the parent component will handle it
+    if (newPage >= 0 && newPage < totalPages) {
+      onPageChange(newPage);
+    }
   };
 
   const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (
@@ -128,21 +153,19 @@ export const ClassSection = ({
         ) : (
           <>
             {displayedClasses.map((classSession) => {
-              // Debug each class session
-              debugClassSession(classSession, displayedClasses.indexOf(classSession));
-              debugMaterials(classSession.id, classMaterials[classSession.id], 'classMaterials prop');
-              debugMaterials(classSession.id, classSession.materials, 'class.materials property');
-              
+              // Get the appropriate date from the dates array
+              const extendedClass = classSession as ExtendedClassSession;
+              const dates = extendedClass.dates || [];
               const date = title === t.upcomingClasses 
-                ? getNextClassDate(classSession) 
-                : getPreviousClassDate(classSession);
+                ? dates.find((d: Date) => new Date(d).getTime() >= new Date().getTime()) // First upcoming date
+                : dates.find((d: Date) => new Date(d).getTime() < new Date().getTime()); // First past date
               
               return (
                 <div key={classSession.id} className={styles.card.container}>
                   <div className="flex justify-between items-start w-full">
                     <div className="w-full">
                       <div className="text-sm font-bold text-black mb-2">
-                        {formatClassDate(date)}
+                        {formatClassDate(date ? new Date(date) : null)}
                       </div>
                       <div className={styles.card.title}>
                         {formatStudentNames(classSession.studentEmails)}
@@ -300,7 +323,7 @@ export const ClassSection = ({
                                         rel="noopener noreferrer"
                                         className="flex items-center text-blue-600 hover:text-blue-800 group"
                                       >
-                                        <FaFilePdf className="mr-2" />
+                                        <FaFilePowerpoint className="mr-2" />
                                         <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
                                         {isAdmin && (
                                           <button
@@ -371,7 +394,7 @@ export const ClassSection = ({
                           </a>
                         </div>
                       )}
-                      {isAdmin && renderUploadMaterialsSection(classSession, title === t.upcomingClasses ? getNextClassDate(classSession) || new Date() : getPreviousClassDate(classSession) || new Date())}
+                      {isAdmin && renderUploadMaterialsSection(classSession, date || new Date())}
                     </div>
                   </div>
                 </div>
@@ -379,35 +402,27 @@ export const ClassSection = ({
             })}
             
             {/* Pagination controls */}
-            <div className="flex justify-between items-center mt-4">
-              <button
-                onClick={() => handlePageChange(Math.max(0, currentPage - 1))}
-                disabled={currentPage === 0}
-                className={`px-3 py-1 rounded ${
-                  currentPage === 0
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-500 text-white hover:bg-blue-600'
-                }`}
-              >
-                {t.previous || 'Previous'}
-              </button>
-              
-              <span className="text-sm text-gray-600">
-                {startIndex + 1}-{Math.min(startIndex + pageSize, classes.length)} {t.of} ({classes.length} {t.total || 'total'})
-              </span>
-              
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={!hasMore}
-                className={`px-3 py-1 rounded ${
-                  !hasMore
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-500 text-white hover:bg-blue-600'
-                }`}
-              >
-                {t.next || 'Next'}
-              </button>
-            </div>
+            {totalPages > 1 && (
+              <div className="flex justify-center space-x-2 mt-4">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 0}
+                  className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
+                >
+                  {t.previous || 'Previous'}
+                </button>
+                <span className="px-3 py-1">
+                  {currentPage + 1} / {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages - 1}
+                  className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
+                >
+                  {t.next || 'Next'}
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

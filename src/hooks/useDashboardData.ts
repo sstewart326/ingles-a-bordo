@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { where } from 'firebase/firestore';
 import { useAuth } from './useAuth';
 import { useAdmin } from './useAdmin';
@@ -7,7 +7,6 @@ import { ClassSession, User } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { updateClassList, fetchMaterialsForClasses } from '../utils/classUtils';
 import { getAllClassesForMonth } from '../services/calendarService';
-import { debugLog } from '../utils/debugUtils';
 
 // Extend the ClassSession interface to include the additional properties we need
 interface ExtendedClassSession extends ClassSession {
@@ -61,7 +60,6 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const [loadedMaterialMonths, setLoadedMaterialMonths] = useState<Set<string>>(new Set());
   const [selectedDayDetails, setSelectedDayDetails] = useState<DashboardData['selectedDayDetails']>(null);
   const [dailyClassMap, setDailyClassMap] = useState<Record<string, any[]>>({});
-  const initializationRef = useRef(false);
 
   // Utility functions
   const getMonthKey = (date: Date, offset: number = 0): string => {
@@ -104,129 +102,13 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     );
   };
 
-  // Helper function to sort classes by start time
-  const sortClassesByTime = useCallback((classes: ClassSession[]): ClassSession[] => {
-    return classes.sort((a, b) => {
-      const dayDiff = (a.dayOfWeek || 0) - (b.dayOfWeek || 0);
-      if (dayDiff !== 0) return dayDiff;
-      
-      const timeA = a.startTime || '';
-      const timeB = b.startTime || '';
-      
-      const parseTimeToMinutes = (time: string): number => {
-        if (!time) return 0;
-        const cleanTime = time.toLowerCase().replace(/[ap]m\s*/g, '');
-        const [hours, minutes] = cleanTime.split(':').map(Number);
-        let totalMinutes = hours * 60 + minutes;
-        
-        if (time.toLowerCase().includes('pm') && hours !== 12) {
-          totalMinutes += 12 * 60;
-        } else if (time.toLowerCase().includes('am') && hours === 12) {
-          totalMinutes = minutes;
-        }
-        
-        return totalMinutes;
-      };
-      
-      return parseTimeToMinutes(timeA) - parseTimeToMinutes(timeB);
-    });
-  }, []);
-
-  // Cache for date calculations
-  const dateCache = useRef(new Map<string, Date[]>());
-  const classCache = useRef(new Map<string, ClassSession[]>());
-
-  const getClassesForDay = useCallback((dayOfWeek: number, date: Date): ClassSession[] => {
+  const getClassesForDay = useCallback((_: number, date: Date): ClassSession[] => {
     if (isAdmin) {
-      // For admin users, use the dailyClassMap
       const dateString = date.toISOString().split('T')[0];
       return dailyClassMap[dateString] || [];
     }
-
-    // For non-admin users, use the existing logic
-    const cacheKey = `${date.toISOString()}_${dayOfWeek}`;
-    if (classCache.current.has(cacheKey)) {
-      return classCache.current.get(cacheKey)!;
-    }
-
-    const calendarDate = new Date(date);
-    calendarDate.setHours(0, 0, 0, 0);
-    
-    // Check if date is in relevant range using cache
-    const rangeCacheKey = calendarDate.getTime().toString();
-    if (!dateCache.current.has(rangeCacheKey)) {
-      dateCache.current.set(rangeCacheKey, isDateInRelevantMonthRange(date) ? [calendarDate] : []);
-    }
-    
-    if (!dateCache.current.get(rangeCacheKey)) {
-      classCache.current.set(cacheKey, []);
-      return [];
-    }
-    
-    const classes = upcomingClasses.filter(classItem => {
-      // If the class has specific dates, check if this date is in the list
-      const extendedClass = classItem as ExtendedClassSession;
-      if (extendedClass.dates && extendedClass.dates.length > 0) {
-        return extendedClass.dates.some(classDate => {
-          const dateToCheck = new Date(classDate);
-          dateToCheck.setHours(0, 0, 0, 0);
-          return dateToCheck.getTime() === calendarDate.getTime();
-        });
-      }
-      
-      // If no specific dates, use the traditional day of week check
-      if (classItem.dayOfWeek !== dayOfWeek) return false;
-      
-      // Check start and end dates
-      if (classItem.startDate) {
-        const startDate = typeof classItem.startDate.toDate === 'function' 
-          ? classItem.startDate.toDate() 
-          : new Date(classItem.startDate as any);
-        startDate.setHours(0, 0, 0, 0);
-        if (startDate > calendarDate) return false;
-      }
-
-      if (classItem.endDate) {
-        const endDate = typeof classItem.endDate.toDate === 'function' 
-          ? classItem.endDate.toDate() 
-          : new Date(classItem.endDate as any);
-        endDate.setHours(0, 0, 0, 0);
-        if (endDate < calendarDate) return false;
-      }
-
-      // Check class frequency
-      const frequency = classItem.frequency || { type: 'weekly', every: 1 };
-      
-      if (!classItem.startDate) return true;
-
-      const startDate = typeof classItem.startDate.toDate === 'function' 
-        ? classItem.startDate.toDate() 
-        : new Date(classItem.startDate as any);
-      startDate.setHours(0, 0, 0, 0);
-
-      const weeksBetween = Math.floor((calendarDate.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-
-      if (frequency.type === 'weekly') {
-        return weeksBetween % frequency.every === 0;
-      } else if (frequency.type === 'biweekly') {
-        return weeksBetween % 2 === 0;
-      } else if (frequency.type === 'custom') {
-        return weeksBetween % frequency.every === 0;
-      }
-
-      return true;
-    });
-    
-    const sortedClasses = sortClassesByTime(classes);
-    classCache.current.set(cacheKey, sortedClasses);
-    return sortedClasses;
-  }, [isAdmin, dailyClassMap, upcomingClasses, sortClassesByTime]);
-
-  // Clear caches when month changes
-  useEffect(() => {
-    dateCache.current.clear();
-    classCache.current.clear();
-  }, [loadedMonths]);
+    return [];
+  }, [dailyClassMap, isAdmin]);
 
   const fetchClasses = useCallback(async (targetDate: Date = new Date()) => {
     if (!currentUser || adminLoading) return;
@@ -259,24 +141,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
           responses.forEach(response => {
             if (response) {
               if (response.classes) {
-                const monthClasses = response.classes.map((classInfo: any) => {
-                  // Ensure dates are Date objects
-                  const dates = Array.isArray(classInfo.dates) 
-                    ? classInfo.dates.map((d: string | Date) => d instanceof Date ? d : new Date(d))
-                    : [];
-                  
-                  const startDate = classInfo.startDate ? new Date(classInfo.startDate) : null;
-                  const endDate = classInfo.endDate ? new Date(classInfo.endDate) : null;
-                  
-                  return {
-                    ...classInfo,
-                    dates,
-                    startDate,
-                    endDate
-                  };
-                });
-                
-                transformedClasses = [...transformedClasses, ...monthClasses];
+                transformedClasses = [...transformedClasses, ...response.classes];
               }
               
               if (response.dailyClassMap) {
@@ -375,15 +240,6 @@ export const useDashboardData = (): UseDashboardDataReturn => {
       console.error('Error fetching classes:', error);
     }
   }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails]);
-
-  // Combined initialization and data fetching effect
-  useEffect(() => {
-    if (!currentUser || adminLoading || initializationRef.current) return;
-
-    debugLog('Dashboard - Initial data fetch triggered');
-    initializationRef.current = true;
-    fetchClasses(new Date());
-  }, [currentUser, adminLoading, fetchClasses]);
 
   return {
     // State

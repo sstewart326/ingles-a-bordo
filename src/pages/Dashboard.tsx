@@ -628,7 +628,24 @@ export const Dashboard = () => {
           onPastClassesPageChange={handlePastClassesPagination}
           t={{
             upcomingClasses: t.upcomingClasses,
-            pastClasses: t.pastClasses
+            pastClasses: t.pastClasses,
+            noUpcomingClasses: t.noUpcomingClasses,
+            noPastClasses: t.noPastClasses,
+            addNotes: t.edit,
+            addPrivateNotes: t.edit,
+            materials: t.materials,
+            addMaterials: t.addMaterials,
+            slides: t.slides,
+            link: t.add,
+            previous: t.previous,
+            next: t.next,
+            notes: t.notes,
+            notesInfo: t.notesInfo,
+            cancel: t.cancel,
+            noNotes: t.noNotes,
+            edit: t.edit,
+            privateNotes: t.privateNotes,
+            privateNotesInfo: t.privateNotesInfo
           }}
         />
       </div>

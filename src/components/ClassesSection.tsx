@@ -37,6 +37,23 @@ interface ClassesSectionProps {
   t: {
     upcomingClasses: string;
     pastClasses: string;
+    noUpcomingClasses: string;
+    noPastClasses: string;
+    addNotes: string;
+    addPrivateNotes: string;
+    materials: string;
+    addMaterials: string;
+    slides: string;
+    link: string;
+    previous: string;
+    next: string;
+    notes: string;
+    notesInfo: string;
+    cancel: string;
+    noNotes: string;
+    edit: string;
+    privateNotes: string;
+    privateNotesInfo: string;
   };
 }
 
@@ -56,8 +73,6 @@ export const ClassesSection = ({
   formatStudentNames,
   formatClassTime,
   formatClassDate,
-  getNextClassDate,
-  getPreviousClassDate,
   onEditNotes,
   onSaveNotes,
   onCancelEditNotes,
@@ -73,8 +88,8 @@ export const ClassesSection = ({
   onPastClassesPageChange,
   t
 }: ClassesSectionProps) => {
-  const upcomingClassesSectionRef = useRef<HTMLDivElement | null>(null);
-  const pastClassesSectionRef = useRef<HTMLDivElement | null>(null);
+  const upcomingClassesSectionRef = useRef<HTMLDivElement>(null);
+  const pastClassesSectionRef = useRef<HTMLDivElement>(null);
 
   return (
     <>
@@ -93,8 +108,6 @@ export const ClassesSection = ({
           formatStudentNames={formatStudentNames}
           formatClassTime={formatClassTime}
           formatClassDate={formatClassDate}
-          getNextClassDate={getNextClassDate}
-          getPreviousClassDate={getPreviousClassDate}
           onEditNotes={onEditNotes}
           onSaveNotes={onSaveNotes}
           onCancelEditNotes={onCancelEditNotes}
@@ -129,8 +142,6 @@ export const ClassesSection = ({
           formatStudentNames={formatStudentNames}
           formatClassTime={formatClassTime}
           formatClassDate={formatClassDate}
-          getNextClassDate={getNextClassDate}
-          getPreviousClassDate={getPreviousClassDate}
           onEditNotes={onEditNotes}
           onSaveNotes={onSaveNotes}
           onCancelEditNotes={onCancelEditNotes}
