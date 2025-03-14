@@ -229,10 +229,10 @@ const translations: Record<Language, Translation> = {
     schedule: 'Schedule',
     classMaterials: 'Class Materials',
     adminPanel: 'Admin Panel',
-    manageUsers: 'Manage Users',
-    manageSchedules: 'Manage Classes',
+    manageUsers: 'Users',
+    manageSchedules: 'Classes',
     manageMaterials: 'Manage Materials',
-    classPlans: 'Class Plans',
+    classPlans: 'Study Plans',
     
     // Dashboard
     quickActions: 'Quick Actions',
@@ -430,8 +430,8 @@ const translations: Record<Language, Translation> = {
     schedule: 'Agenda',
     classMaterials: 'Materiais de Aula',
     adminPanel: 'Painel Admin',
-    manageUsers: 'Gerenciar Usuários',
-    manageSchedules: 'Gerenciar Aulas',
+    manageUsers: 'Usuários',
+    manageSchedules: 'Aulas',
     manageMaterials: 'Gerenciar Materiais',
     classPlans: 'Planos de Aula',
     

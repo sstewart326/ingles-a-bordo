@@ -10,6 +10,7 @@ interface CalendarProps {
   onDayClick: (date: Date) => void;
   renderDay: (date: Date, isToday: boolean) => React.ReactNode;
   showNavigation?: boolean;
+  isLoading?: boolean;
 }
 
 export const Calendar: React.FC<CalendarProps> = ({
@@ -18,6 +19,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   onDayClick,
   renderDay,
   showNavigation = true,
+  isLoading = false,
 }) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -38,7 +40,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   return (
-    <div>
+    <div className="relative">
       {showNavigation && (
         <div className="flex items-center justify-between mb-6 relative z-10">
           <h2 className={styles.headings.h2}>
@@ -61,7 +63,7 @@ export const Calendar: React.FC<CalendarProps> = ({
         </div>
       )}
 
-      <div className="calendar-grid bg-white rounded-2xl shadow-sm border border-[#f0f0f0]">
+      <div className="calendar-grid bg-white rounded-2xl shadow-sm border border-[#f0f0f0] relative">
         {/* Day headers */}
         {DAYS_OF_WEEK.map((day) => (
           <div
@@ -104,6 +106,16 @@ export const Calendar: React.FC<CalendarProps> = ({
         {Array.from({ length: (7 - ((firstDay + days) % 7)) % 7 }).map((_, index) => (
           <div key={`empty-end-${index}`} className="calendar-day empty" />
         ))}
+        
+        {/* Loading overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-20 rounded-2xl">
+            <div className="flex flex-col items-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#6B5590]"></div>
+              <p className="mt-2 text-[#6B5590] font-medium">{t.loading || 'Loading...'}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

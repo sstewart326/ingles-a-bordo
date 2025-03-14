@@ -118,6 +118,7 @@ export const CalendarSection = ({
       selectedDate={selectedDate}
       onMonthChange={onMonthChange}
       onDayClick={handleDayClick}
+      isLoading={isLoadingPayments}
       renderDay={(date, isToday) => (
         <CalendarDay
           date={date}
