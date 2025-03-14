@@ -173,6 +173,7 @@ interface Translation {
   copyLink: string;
   confirmDelete: string;
   signupLinkCopied: string;
+  signupLinkExpires: string;
   failedToCopyLink: string;
   pleaseEnterNameEmail: string;
   failedToGenerateLink: string;
@@ -376,6 +377,7 @@ const translations: Record<Language, Translation> = {
     copyLink: 'Copy Link',
     confirmDelete: 'Are you sure you want to delete {name} ({email})?',
     signupLinkCopied: 'Signup link copied to clipboard',
+    signupLinkExpires: 'Link expires in 24 hours. Copying the link extends the expiration date.',
     failedToCopyLink: 'Failed to copy signup link',
     pleaseEnterNameEmail: 'Please fill in both name and email',
     failedToGenerateLink: 'Failed to generate signup link',
@@ -577,6 +579,7 @@ const translations: Record<Language, Translation> = {
     copyLink: 'Copiar Link',
     confirmDelete: 'Tem certeza que deseja excluir {name} ({email})?',
     signupLinkCopied: 'Link de cadastro copiado',
+    signupLinkExpires: 'O link expira em 24 horas. Copiar o link estende a data de expiração.',
     failedToCopyLink: 'Falha ao copiar link de cadastro',
     pleaseEnterNameEmail: 'Por favor, preencha nome e email',
     failedToGenerateLink: 'Falha ao gerar link de cadastro',

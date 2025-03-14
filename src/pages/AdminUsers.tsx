@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { doc, collection, where } from 'firebase/firestore';
 import { db, functions } from '../config/firebase';
 import { getAuth } from 'firebase/auth';
-import { createSignupLink } from '../utils/signupLinks';
+import { createSignupLink, extendSignupTokenExpiration } from '../utils/signupLinks';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
@@ -50,6 +50,11 @@ interface NewUser {
   };
 }
 
+interface SignupLinkData {
+  signupLink: string;
+  token: string;
+}
+
 const logAdmin = (message: string, data?: any) => {
   if (process.env.NODE_ENV === 'development') {
     console.log(`[ADMIN-USERS] ${message}`, data ? data : '');
@@ -74,7 +79,7 @@ export const AdminUsers = () => {
     birthdate: '',  // Initialize birthdate field
     teacher: undefined  // Initialize teacher field
   });
-  const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: string}>({});
+  const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: SignupLinkData}>({});
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [editingBirthdate, setEditingBirthdate] = useState('');
@@ -258,12 +263,12 @@ export const AdminUsers = () => {
 
     try {
       setLoading(true);
-      const signupLink = await createSignupLink(newUser.email, newUser.name);
+      const signupLinkData = await createSignupLink(newUser.email, newUser.name);
       
       // Store the signup link
       setRecentSignupLinks(prev => ({
         ...prev,
-        [newUser.email]: signupLink
+        [newUser.email]: signupLinkData
       }));
       
       // Create a new document with a temporary ID that includes 'pending_' prefix
@@ -296,7 +301,7 @@ export const AdminUsers = () => {
       setUsers(prevUsers => [...prevUsers, newUserData]);
       
       // Copy to clipboard
-      await navigator.clipboard.writeText(signupLink);
+      await navigator.clipboard.writeText(signupLinkData.signupLink);
       
       setNewUser({ 
         email: '', 
@@ -612,37 +617,47 @@ export const AdminUsers = () => {
         {user.status === 'active' ? (
           <button
             onClick={() => deleteUser(user.id)}
-            className={`${styles.buttons.danger} w-[120px]`}
+            className={`${styles.buttons.danger} w-[130px]`}
           >
             {t.delete}
           </button>
         ) : (
           <>
-            <button
-              onClick={async () => {
-                try {
-                  let signupLink = recentSignupLinks[user.email];
-                  if (!signupLink) {
-                    signupLink = await createSignupLink(user.email, user.name);
-                    setRecentSignupLinks(prev => ({
-                      ...prev,
-                      [user.email]: signupLink
-                    }));
+            <div className="relative group">
+              <button
+                onClick={async () => {
+                  try {
+                    let signupLinkData = recentSignupLinks[user.email];
+                    if (!signupLinkData) {
+                      signupLinkData = await createSignupLink(user.email, user.name);
+                      setRecentSignupLinks(prev => ({
+                        ...prev,
+                        [user.email]: signupLinkData
+                      }));
+                    } else {
+                      // Extend the expiration date
+                      await extendSignupTokenExpiration(signupLinkData.token);
+                    }
+                    await navigator.clipboard.writeText(signupLinkData.signupLink);
+                    toast.success(t.signupLinkCopied);
+                  } catch (error) {
+                    console.error('Error copying signup link:', error);
+                    toast.error(t.failedToCopyLink);
                   }
-                  await navigator.clipboard.writeText(signupLink);
-                  toast.success(t.signupLinkCopied);
-                } catch (error) {
-                  console.error('Error copying signup link:', error);
-                  toast.error(t.failedToCopyLink);
-                }
-              }}
-              className={`${styles.buttons.primary} w-[120px]`}
-            >
-              {t.copyLink}
-            </button>
+                }}
+                className={`${styles.buttons.primary} w-[130px] flex items-center justify-center gap-1`}
+              >
+                <span>{t.copyLink}</span>
+                <InformationCircleIcon className="h-4 w-4 text-white/70 flex-shrink-0" />
+              </button>
+              <div className="absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-normal">
+                {t.signupLinkExpires}
+                <div className="absolute bottom-0 right-[60px] transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+              </div>
+            </div>
             <button
               onClick={() => deleteUser(user.id)}
-              className={`${styles.buttons.danger} w-[120px]`}
+              className={`${styles.buttons.danger} w-[130px]`}
             >
               {t.delete}
             </button>
@@ -811,22 +826,22 @@ export const AdminUsers = () => {
               <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none hidden md:block"></div>
               
               <div className="table-container overflow-x-auto overflow-y-auto max-h-[600px] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-gray-500">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
                   <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                     <tr>
-                      <th scope="col" className={styles.table.header}>
+                      <th scope="col" className={`${styles.table.header} w-1/4`}>
                         {t.name}
                       </th>
-                      <th scope="col" className={styles.table.header}>
+                      <th scope="col" className={`${styles.table.header} w-1/4`}>
                         {t.email}
                       </th>
-                      <th scope="col" className={styles.table.header}>
+                      <th scope="col" className={`${styles.table.header} w-1/6`}>
                         {t.birthdate}
                       </th>
-                      <th scope="col" className={`${styles.table.header} text-center`}>
+                      <th scope="col" className={`${styles.table.header} text-center w-1/6`}>
                         {t.userStatus}
                       </th>
-                      <th scope="col" className={`${styles.table.header} text-center`}>
+                      <th scope="col" className={`${styles.table.header} text-center w-1/6`}>
                         {t.actions}
                       </th>
                     </tr>
@@ -1003,38 +1018,48 @@ export const AdminUsers = () => {
                             {user.status === 'active' && (
                               <button
                                 onClick={() => deleteUser(user.id)}
-                                className={`${styles.buttons.danger} w-[120px]`}
+                                className={`${styles.buttons.danger} w-[130px]`}
                               >
                                 {t.delete}
                               </button>
                             )}
                             {user.status === 'pending' && (
                               <>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      let signupLink = recentSignupLinks[user.email];
-                                      if (!signupLink) {
-                                        signupLink = await createSignupLink(user.email, user.name);
-                                        setRecentSignupLinks(prev => ({
-                                          ...prev,
-                                          [user.email]: signupLink
-                                        }));
+                                <div className="relative group">
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        let signupLinkData = recentSignupLinks[user.email];
+                                        if (!signupLinkData) {
+                                          signupLinkData = await createSignupLink(user.email, user.name);
+                                          setRecentSignupLinks(prev => ({
+                                            ...prev,
+                                            [user.email]: signupLinkData
+                                          }));
+                                        } else {
+                                          // Extend the expiration date
+                                          await extendSignupTokenExpiration(signupLinkData.token);
+                                        }
+                                        await navigator.clipboard.writeText(signupLinkData.signupLink);
+                                        toast.success(t.signupLinkCopied);
+                                      } catch (error) {
+                                        console.error('Error copying signup link:', error);
+                                        toast.error(t.failedToCopyLink);
                                       }
-                                      await navigator.clipboard.writeText(signupLink);
-                                      toast.success(t.signupLinkCopied);
-                                    } catch (error) {
-                                      console.error('Error copying signup link:', error);
-                                      toast.error(t.failedToCopyLink);
-                                    }
-                                  }}
-                                  className={`${styles.buttons.primary} w-[120px]`}
-                                >
-                                  {t.copyLink}
-                                </button>
+                                    }}
+                                    className={`${styles.buttons.primary} w-[130px] flex items-center justify-center gap-1`}
+                                  >
+                                    <span>{t.copyLink}</span>
+                                    <InformationCircleIcon className="h-4 w-4 text-white/70 flex-shrink-0" />
+                                  </button>
+                                  <div className="absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-normal">
+                                    {t.signupLinkExpires}
+                                    <div className="absolute bottom-0 right-[60px] transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                                  </div>
+                                </div>
                                 <button
                                   onClick={() => deleteUser(user.id)}
-                                  className={`${styles.buttons.danger} w-[120px]`}
+                                  className={`${styles.buttons.danger} w-[130px]`}
                                 >
                                   {t.delete}
                                 </button>

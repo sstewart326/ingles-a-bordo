@@ -27,7 +27,7 @@ const logSignup = (message: string, data?: any) => {
 };
 
 // Create a signup link for a student
-export const createSignupLink = async (studentEmail: string, studentName: string): Promise<string> => {
+export const createSignupLink = async (studentEmail: string, studentName: string): Promise<{ signupLink: string, token: string }> => {
   // Check for existing valid tokens first
   const tokensRef = collection(db, 'signupTokens');
   const q = query(tokensRef, where('email', '==', studentEmail));
@@ -39,7 +39,10 @@ export const createSignupLink = async (studentEmail: string, studentName: string
     const data = doc.data();
     if (!data.used && new Date(data.expiresAt) > now) {
       // Found a valid token, reuse it
-      return `${window.location.origin}/signup?token=${doc.id}`;
+      return {
+        signupLink: `${window.location.origin}/signup?token=${doc.id}`,
+        token: doc.id
+      };
     }
   }
 
@@ -56,7 +59,10 @@ export const createSignupLink = async (studentEmail: string, studentName: string
     used: false,
   });
 
-  return `${window.location.origin}/signup?token=${token}`;
+  return {
+    signupLink: `${window.location.origin}/signup?token=${token}`,
+    token
+  };
 };
 
 // Validate a signup token
@@ -102,5 +108,29 @@ export const consumeSignupToken = async (token: string) => {
   const tokenRef = doc(db, 'signupTokens', token);
   await updateDoc(tokenRef, {
     used: true
+  });
+};
+
+// Extend the expiration date of a signup token
+export const extendSignupTokenExpiration = async (token: string): Promise<void> => {
+  const tokenRef = doc(db, 'signupTokens', token);
+  const tokenDoc = await getDoc(tokenRef);
+  
+  if (!tokenDoc.exists()) {
+    throw new Error('Token not found');
+  }
+  
+  const data = tokenDoc.data();
+  
+  if (data.used) {
+    throw new Error('Token already used');
+  }
+  
+  // Set new expiration date to 24 hours from now
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + 24);
+  
+  await updateDoc(tokenRef, {
+    expiresAt: expiresAt.toISOString()
   });
 }; 
