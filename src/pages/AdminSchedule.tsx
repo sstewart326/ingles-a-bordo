@@ -100,8 +100,11 @@ export const AdminSchedule = () => {
   const [classes, setClasses] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<any>(null);
+  const [deletingClassId, setDeletingClassId] = useState<string | null>(null);
   const [newClass, setNewClass] = useState<any>({
     scheduleType: 'single',
     dayOfWeek: 1,
@@ -301,6 +304,7 @@ export const AdminSchedule = () => {
       return;
     }
     
+    setIsCreating(true);
     try {
       const now = Timestamp.now();
       
@@ -384,6 +388,8 @@ export const AdminSchedule = () => {
     } catch (error) {
       console.error('Error creating class:', error);
       toast.error('Failed to create class');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -398,6 +404,7 @@ export const AdminSchedule = () => {
       return;
     }
 
+    setDeletingClassId(classId);
     try {
       await deleteCachedDocument('classes', classId);
       // Clear the loaded months cache to force a fresh fetch
@@ -407,6 +414,8 @@ export const AdminSchedule = () => {
     } catch (error) {
       console.error('Error deleting class:', error);
       toast.error('Failed to delete class');
+    } finally {
+      setDeletingClassId(null);
     }
   };
 
@@ -643,6 +652,7 @@ export const AdminSchedule = () => {
       return;
     }
 
+    setIsSaving(true);
     try {
       // Clean up payment config to remove undefined values
       const paymentConfig = {
@@ -696,6 +706,8 @@ export const AdminSchedule = () => {
     } catch (error) {
       console.error('Error updating class:', error);
       toast.error(t.updateFailed);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -834,9 +846,20 @@ export const AdminSchedule = () => {
             </button>
             <button
               onClick={() => handleDeleteClass(classItem.id)}
-              className={styles.buttons.danger}
+              disabled={deletingClassId === classItem.id}
+              className={`${styles.buttons.danger} ${deletingClassId === classItem.id ? 'opacity-80' : ''} flex items-center justify-center`}
             >
-              {t.delete}
+              {deletingClassId === classItem.id ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {"Deleting..."}
+                </>
+              ) : (
+                t.delete
+              )}
             </button>
           </div>
         </div>
@@ -1598,15 +1621,27 @@ export const AdminSchedule = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="mr-3 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  disabled={isCreating}
+                  className={`mr-3 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isCreating ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {t.cancel || "Cancel"}
                 </button>
                 <button
                   type="submit"
-                  className={styles.buttons.primary}
+                  disabled={isCreating}
+                  className={`${styles.buttons.primary} ${isCreating ? 'opacity-80' : ''} flex items-center justify-center`}
                 >
-                  {t.createNewClass}
+                  {isCreating ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {"Creating..."}
+                    </>
+                  ) : (
+                    t.createNewClass
+                  )}
                 </button>
               </div>
             </form>
@@ -1753,9 +1788,20 @@ export const AdminSchedule = () => {
                             </button>
                             <button
                               onClick={() => handleDeleteClass(classItem.id)}
-                              className={styles.buttons.danger}
+                              disabled={deletingClassId === classItem.id}
+                              className={`${styles.buttons.danger} ${deletingClassId === classItem.id ? 'opacity-80' : ''} flex items-center justify-center`}
                             >
-                              {t.delete}
+                              {deletingClassId === classItem.id ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  {"Deleting..."}
+                                </>
+                              ) : (
+                                t.delete
+                              )}
                             </button>
                           </div>
                         </td>
@@ -2186,15 +2232,27 @@ export const AdminSchedule = () => {
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setEditingClass(null)}
-                className={styles.buttons.cancel}
+                disabled={isSaving}
+                className={`${styles.buttons.cancel} ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {t.cancel}
               </button>
               <button
                 onClick={handleSaveChanges}
-                className={styles.buttons.primary}
+                disabled={isSaving}
+                className={`${styles.buttons.primary} ${isSaving ? 'opacity-80' : ''} flex items-center justify-center`}
               >
-                {t.save}
+                {isSaving ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {"Saving..."}
+                  </>
+                ) : (
+                  t.save
+                )}
               </button>
             </div>
           </div>

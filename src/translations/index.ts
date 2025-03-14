@@ -196,6 +196,7 @@ interface Translation {
   classSchedule: string;
   allPaymentsCompleted: string;
   markAsIncomplete: string;
+  processing: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -395,6 +396,7 @@ const translations: Record<Language, Translation> = {
     classSchedule: 'Class Schedule',
     allPaymentsCompleted: 'All payments completed',
     markAsIncomplete: 'Mark as Incomplete',
+    processing: 'Processing...',
   },
   'pt-BR': {
     // Auth & Profile
@@ -592,6 +594,7 @@ const translations: Record<Language, Translation> = {
     classSchedule: 'Horário das Aulas',
     allPaymentsCompleted: 'Todos os pagamentos concluídos',
     markAsIncomplete: 'Marcar como Não Concluído',
+    processing: 'Processando...',
   }
 };
 

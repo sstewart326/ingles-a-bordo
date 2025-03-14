@@ -79,6 +79,8 @@ export const AdminUsers = () => {
   const [editingName, setEditingName] = useState('');
   const [editingBirthdate, setEditingBirthdate] = useState('');
   const [editingField, setEditingField] = useState<'name' | 'birthdate' | null>(null);
+  const [updatingName, setUpdatingName] = useState(false);
+  const [updatingBirthdate, setUpdatingBirthdate] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -338,6 +340,9 @@ export const AdminUsers = () => {
         return;
       }
 
+      // Set loading state to true
+      setUpdatingName(true);
+
       await updateCachedDocument('users', userId, { 
         name: editingName.trim(),
         updatedAt: new Date().toISOString()
@@ -351,6 +356,9 @@ export const AdminUsers = () => {
     } catch (error) {
       console.error('Error updating user name:', error);
       toast.error(t.failedToUpdateName);
+    } finally {
+      // Set loading state back to false
+      setUpdatingName(false);
     }
   };
 
@@ -366,6 +374,9 @@ export const AdminUsers = () => {
         toast.error(t.userNotFound);
         return;
       }
+
+      // Set loading state to true
+      setUpdatingBirthdate(true);
 
       // Create update object
       const updateData: any = {
@@ -392,6 +403,9 @@ export const AdminUsers = () => {
     } catch (error) {
       console.error('Error updating user birthdate:', error);
       toast.error(t.failedToUpdateBirthdate);
+    } finally {
+      // Set loading state back to false
+      setUpdatingBirthdate(false);
     }
   };
 
@@ -420,12 +434,21 @@ export const AdminUsers = () => {
                   onChange={(e) => setEditingName(e.target.value)}
                   className="px-2 py-1 border border-gray-300 rounded text-sm"
                   placeholder={t.enterName}
+                  disabled={updatingName}
                 />
                 <button
                   onClick={() => handleUpdateName(user.id)}
-                  className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm"
+                  className={`${updatingName ? 'bg-green-400' : 'bg-green-500 hover:bg-green-600'} text-white px-2 py-1 rounded text-sm flex items-center justify-center min-w-[40px]`}
+                  disabled={updatingName}
                 >
-                  {t.save}
+                  {updatingName ? (
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    t.save
+                  )}
                 </button>
                 <button
                   onClick={() => {
@@ -434,6 +457,76 @@ export const AdminUsers = () => {
                     setEditingName('');
                   }}
                   className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
+                  disabled={updatingName}
+                >
+                  {t.cancel}
+                </button>
+              </div>
+            </div>
+          ) : editingUserId === user.id && editingField === 'birthdate' ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={editingBirthdate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow empty value for optional field
+                    if (value === '') {
+                      setEditingBirthdate('');
+                      return;
+                    }
+                    
+                    // Only allow digits and hyphen
+                    if (!/^[\d-]*$/.test(value)) return;
+                    
+                    // Auto-add hyphen after MM
+                    let formattedValue = value;
+                    if (value.length === 2 && !value.includes('-')) {
+                      formattedValue = value + '-';
+                    }
+                    
+                    // Limit to MM-DD format
+                    if (formattedValue.length > 5) return;
+                    
+                    // Validate month and day
+                    if (formattedValue.includes('-')) {
+                      const [month, day] = formattedValue.split('-');
+                      const monthNum = parseInt(month);
+                      const dayNum = parseInt(day);
+                      
+                      if (monthNum < 1 || monthNum > 12) return;
+                      if (dayNum < 1 || dayNum > 31) return;
+                    }
+                    
+                    setEditingBirthdate(formattedValue);
+                  }}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  placeholder={t.birthdateFormat}
+                  disabled={updatingBirthdate}
+                />
+                <button
+                  onClick={() => handleUpdateBirthdate(user.id)}
+                  className={`${updatingBirthdate ? 'bg-green-400' : 'bg-green-500 hover:bg-green-600'} text-white px-2 py-1 rounded text-sm flex items-center justify-center min-w-[40px]`}
+                  disabled={updatingBirthdate}
+                >
+                  {updatingBirthdate ? (
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    t.save
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingUserId(null);
+                    setEditingField(null);
+                    setEditingBirthdate('');
+                  }}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
+                  disabled={updatingBirthdate}
                 >
                   {t.cancel}
                 </button>
@@ -466,7 +559,32 @@ export const AdminUsers = () => {
                 </div>
               </div>
               {user.birthdate && (
-                <div className="text-sm text-gray-600">{t.birthdate}: {user.birthdate}</div>
+                <div className="text-sm text-gray-600 flex items-center gap-2">
+                  {t.birthdate}: {user.birthdate}
+                  <PencilIcon
+                    className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    title={t.edit}
+                    onClick={() => {
+                      setEditingUserId(user.id);
+                      setEditingField('birthdate');
+                      setEditingBirthdate(user.birthdate || '');
+                    }}
+                  />
+                </div>
+              )}
+              {!user.birthdate && (
+                <div className="text-sm text-gray-600 flex items-center gap-2">
+                  {t.birthdate}: -
+                  <PencilIcon
+                    className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    title={t.edit}
+                    onClick={() => {
+                      setEditingUserId(user.id);
+                      setEditingField('birthdate');
+                      setEditingBirthdate('');
+                    }}
+                  />
+                </div>
               )}
             </>
           )}
@@ -714,12 +832,21 @@ export const AdminUsers = () => {
                                 onChange={(e) => setEditingName(e.target.value)}
                                 className="px-2 py-1 border border-gray-300 rounded text-sm"
                                 placeholder={t.enterName}
+                                disabled={updatingName}
                               />
                               <button
                                 onClick={() => handleUpdateName(user.id)}
-                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm"
+                                className={`${updatingName ? 'bg-green-400' : 'bg-green-500 hover:bg-green-600'} text-white px-2 py-1 rounded text-sm flex items-center justify-center min-w-[40px]`}
+                                disabled={updatingName}
                               >
-                                {t.save}
+                                {updatingName ? (
+                                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                ) : (
+                                  t.save
+                                )}
                               </button>
                               <button
                                 onClick={() => {
@@ -728,6 +855,7 @@ export const AdminUsers = () => {
                                   setEditingName('');
                                 }}
                                 className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
+                                disabled={updatingName}
                               >
                                 {t.cancel}
                               </button>
@@ -799,12 +927,21 @@ export const AdminUsers = () => {
                                 }}
                                 className="px-2 py-1 border border-gray-300 rounded text-sm"
                                 placeholder={t.birthdateFormat}
+                                disabled={updatingBirthdate}
                               />
                               <button
                                 onClick={() => handleUpdateBirthdate(user.id)}
-                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm"
+                                className={`${updatingBirthdate ? 'bg-green-400' : 'bg-green-500 hover:bg-green-600'} text-white px-2 py-1 rounded text-sm flex items-center justify-center min-w-[40px]`}
+                                disabled={updatingBirthdate}
                               >
-                                {t.save}
+                                {updatingBirthdate ? (
+                                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                ) : (
+                                  t.save
+                                )}
                               </button>
                               <button
                                 onClick={() => {
@@ -813,6 +950,7 @@ export const AdminUsers = () => {
                                   setEditingBirthdate('');
                                 }}
                                 className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-sm"
+                                disabled={updatingBirthdate}
                               >
                                 {t.cancel}
                               </button>

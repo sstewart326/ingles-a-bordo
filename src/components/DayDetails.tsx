@@ -81,6 +81,8 @@ export const DayDetails = ({
   const [savingPaymentLink, setSavingPaymentLink] = useState<{[classId: string]: boolean}>({});
   const [paymentLinks, setPaymentLinks] = useState<{[classId: string]: string | null}>({});
   const [loadingPaymentLinks, setLoadingPaymentLinks] = useState<{[classId: string]: boolean}>({});
+  const [loadingPaymentComplete, setLoadingPaymentComplete] = useState<{[key: string]: boolean}>({});
+  const [loadingPaymentIncomplete, setLoadingPaymentIncomplete] = useState<{[key: string]: boolean}>({});
   const CLASSES_PER_PAGE = 3;
   const detailsContainerRef = useRef<HTMLDivElement>(null);
   
@@ -185,6 +187,9 @@ export const DayDetails = ({
 
   const handleMarkPaymentCompleted = async (userId: string, classSession: ClassSession) => {
     try {
+      const paymentKey = `${userId}-${classSession.id}`;
+      setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: true }));
+      
       console.log('Starting payment completion...', { userId, classSessionId: classSession.id });
       
       // Get amount and currency from class configuration
@@ -200,6 +205,7 @@ export const DayDetails = ({
       
       if (!userPaymentDue) {
         console.error('User payment due not found');
+        setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
         return;
       }
       
@@ -231,11 +237,16 @@ export const DayDetails = ({
       }
     } catch (error) {
       console.error('Error marking payment as completed:', error);
+    } finally {
+      const paymentKey = `${userId}-${classSession.id}`;
+      setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
     }
   };
 
   const handleMarkPaymentIncomplete = async (payment: Payment) => {
     try {
+      setLoadingPaymentIncomplete(prev => ({ ...prev, [payment.id]: true }));
+      
       await deletePayment(payment.id);
       
       // Update the local state by removing the payment
@@ -250,6 +261,8 @@ export const DayDetails = ({
       }
     } catch (error) {
       console.error('Error marking payment as incomplete:', error);
+    } finally {
+      setLoadingPaymentIncomplete(prev => ({ ...prev, [payment.id]: false }));
     }
   };
 
@@ -747,18 +760,34 @@ export const DayDetails = ({
                     <div className="px-6 py-3 border-t border-yellow-200 bg-yellow-50">
                       <button
                         onClick={() => handleMarkPaymentCompleted(user.email, classSession)}
-                        className="w-full bg-yellow-100 text-yellow-700 hover:bg-yellow-200 py-2 rounded-md text-sm font-medium transition-colors border border-yellow-300"
+                        disabled={loadingPaymentComplete[`${user.email}-${classSession.id}`]}
+                        className="w-full bg-yellow-100 text-yellow-700 hover:bg-yellow-200 py-2 rounded-md text-sm font-medium transition-colors border border-yellow-300 flex items-center justify-center"
                       >
-                        {t.markAsCompleted}
+                        {loadingPaymentComplete[`${user.email}-${classSession.id}`] ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-700 mr-2"></div>
+                            {t.processing}
+                          </>
+                        ) : (
+                          t.markAsCompleted
+                        )}
                       </button>
                     </div>
                   ) : (
                     <div className="px-6 py-3 border-t border-green-200 bg-green-50">
                       <button
                         onClick={() => payment && handleMarkPaymentIncomplete(payment)}
-                        className="w-full bg-green-100 text-green-700 hover:bg-green-200 py-2 rounded-md text-sm font-medium transition-colors border border-green-300"
+                        disabled={payment && loadingPaymentIncomplete[payment.id]}
+                        className="w-full bg-green-100 text-green-700 hover:bg-green-200 py-2 rounded-md text-sm font-medium transition-colors border border-green-300 flex items-center justify-center"
                       >
-                        {t.markAsIncomplete}
+                        {payment && loadingPaymentIncomplete[payment.id] ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700 mr-2"></div>
+                            {t.processing}
+                          </>
+                        ) : (
+                          t.markAsIncomplete
+                        )}
                       </button>
                     </div>
                   )}

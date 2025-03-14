@@ -62,7 +62,7 @@ export const Header = () => {
                 <div className="flex-shrink-0 flex items-center ml-8 sm:ml-0">
                   <Link to={dashboardPath}>
                     <img
-                      src="/ingles-a-bordo.png"
+                      src="/IAB_white.png"
                       alt="Inglês a Bordo"
                       className="header-nav-logo cursor-pointer"
                     />
