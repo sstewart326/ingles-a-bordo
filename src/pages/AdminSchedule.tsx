@@ -70,12 +70,19 @@ type SelectStyles = StylesConfig<SelectOption, true>;
 
 const generateTimeOptions = () => {
   const times = [];
+  // Start from 6 AM and go until 9 PM
   for (let hour = 6; hour <= 21; hour++) {
     for (let minute = 0; minute < 60; minute += 30) {
       const time = new Date();
       time.setHours(hour);
       time.setMinutes(minute);
-      times.push(time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }));
+      // Format consistently as "hh:mm AM/PM"
+      const formattedTime = time.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+      times.push(formattedTime);
     }
   }
   return times;
@@ -108,8 +115,8 @@ export const AdminSchedule = () => {
   const [newClass, setNewClass] = useState<any>({
     scheduleType: 'single',
     dayOfWeek: 1,
-    startTime: '09:00 AM',
-    endTime: '10:00 AM',
+    startTime: timeOptions.find(time => time.includes('9:00') && time.includes('AM')) || '09:00 AM',
+    endTime: timeOptions.find(time => time.includes('10:00') && time.includes('AM')) || '10:00 AM',
     schedules: [],
     courseType: 'Individual',
     notes: '',
@@ -197,17 +204,103 @@ export const AdminSchedule = () => {
 
   // Add these functions to handle schedule management
   const handleAddSchedule = () => {
-    setNewClass((prev: typeof newClass) => ({
-      ...prev,
-      schedules: [...prev.schedules, { dayOfWeek: 0, startTime: '', endTime: '' }]
-    }));
+    // Get the time options for 9:00 AM and 10:00 AM
+    const defaultStartTime = timeOptions.find(time => time.includes('9:00') && time.includes('AM')) || '09:00 AM';
+    const defaultEndTime = timeOptions.find(time => time.includes('10:00') && time.includes('AM')) || '10:00 AM';
+    
+    setNewClass((prev: typeof newClass) => {
+      // Default to Sunday (0) if no schedules exist yet, otherwise use the next day after the last added day
+      const lastDayOfWeek = prev.schedules.length > 0 
+        ? prev.schedules[prev.schedules.length - 1].dayOfWeek 
+        : -1;
+      
+      // Choose the next day that isn't already in the schedules
+      let newDayOfWeek = (lastDayOfWeek + 1) % 7;
+      const existingDays = prev.schedules.map((s: ClassSchedule) => s.dayOfWeek);
+      
+      // Find the first day that isn't already scheduled
+      while (existingDays.includes(newDayOfWeek)) {
+        newDayOfWeek = (newDayOfWeek + 1) % 7;
+      }
+      
+      const newSchedule = { 
+        dayOfWeek: newDayOfWeek, 
+        startTime: defaultStartTime, 
+        endTime: defaultEndTime 
+      };
+      
+      const updatedSchedules = [...prev.schedules, newSchedule];
+      
+      // Check if the current start date's day of week is in the selected days
+      const currentStartDateDay = prev.startDate.getDay();
+      const selectedDays = updatedSchedules.map(schedule => schedule.dayOfWeek);
+      const isCurrentStartDateValid = selectedDays.includes(currentStartDateDay);
+      
+      // If this is the first schedule or the current start date is not valid,
+      // update the start date to the next occurrence of the new day
+      if (prev.schedules.length === 0 || !isCurrentStartDateValid) {
+        const nextOccurrence = getNextDayOccurrence(newDayOfWeek);
+        
+        return {
+          ...prev,
+          schedules: updatedSchedules,
+          startDate: nextOccurrence,
+          // Reset end date if it's now before the start date
+          ...(prev.endDate && prev.endDate < nextOccurrence ? { endDate: null } : {})
+        };
+      }
+      
+      return {
+        ...prev,
+        schedules: updatedSchedules
+      };
+    });
   };
 
   const handleRemoveSchedule = (index: number) => {
-    setNewClass((prev: typeof newClass) => ({
-      ...prev,
-      schedules: prev.schedules.filter((_: any, i: number) => i !== index)
-    }));
+    setNewClass((prev: typeof newClass) => {
+      // Get the schedule that's being removed
+      const scheduleToRemove = prev.schedules[index];
+      
+      // Filter out the schedule at the specified index
+      const updatedSchedules = prev.schedules.filter((_: any, i: number) => i !== index);
+      
+      // If we're removing the last schedule, return to single day mode
+      if (updatedSchedules.length === 0) {
+        return {
+          ...prev,
+          scheduleType: 'single',
+          schedules: []
+        };
+      }
+      
+      // Check if the current start date's day of week matches the day being removed
+      const currentStartDateDay = prev.startDate.getDay();
+      const isRemovingCurrentDay = scheduleToRemove.dayOfWeek === currentStartDateDay;
+      
+      // Check if the day being removed is the only instance of that day in the schedules
+      const remainingDaysOfWeek = updatedSchedules.map((s: ClassSchedule) => s.dayOfWeek);
+      const dayStillExists = remainingDaysOfWeek.includes(currentStartDateDay);
+      
+      // If we're removing the day that matches the current start date and it doesn't exist in other schedules
+      if (isRemovingCurrentDay && !dayStillExists && updatedSchedules.length > 0) {
+        // Update the start date to the next occurrence of the first remaining day
+        const nextOccurrence = getNextDayOccurrence(updatedSchedules[0].dayOfWeek);
+        
+        return {
+          ...prev,
+          schedules: updatedSchedules,
+          startDate: nextOccurrence,
+          // Reset end date if it's now before the start date
+          ...(prev.endDate && prev.endDate < nextOccurrence ? { endDate: null } : {})
+        };
+      }
+      
+      return {
+        ...prev,
+        schedules: updatedSchedules
+      };
+    });
   };
 
   const handleScheduleChange = (index: number, field: keyof ClassSchedule, value: string | number) => {
@@ -220,7 +313,29 @@ export const AdminSchedule = () => {
       
       // If changing day of week, update start/end times if needed
       if (field === 'dayOfWeek') {
-        // Logic similar to single day change if needed
+        // When day of week is changed, we need to update the start date if it's currently
+        // set to a day that doesn't match any of the schedules
+        const newDayOfWeek = value as number;
+        
+        // Get all selected days of week from schedules (including the newly updated one)
+        const selectedDays = updatedSchedules.map(schedule => schedule.dayOfWeek);
+        
+        // Check if the current start date's day of week is in the selected days
+        const currentStartDateDay = prev.startDate.getDay();
+        const isCurrentStartDateValid = selectedDays.includes(currentStartDateDay);
+        
+        // If the current start date is not valid anymore, update it to the next occurrence of the new day
+        if (!isCurrentStartDateValid) {
+          const nextOccurrence = getNextDayOccurrence(newDayOfWeek);
+          
+          return {
+            ...prev,
+            schedules: updatedSchedules,
+            startDate: nextOccurrence,
+            // Reset end date if it's now before the start date
+            ...(prev.endDate && prev.endDate < nextOccurrence ? { endDate: null } : {})
+          };
+        }
       } else if (field === 'startTime') {
         // Parse the selected start time
         const [time, period] = value.toString().split(' ');
@@ -871,19 +986,119 @@ export const AdminSchedule = () => {
   const handleAddScheduleToEdit = () => {
     if (!editingClass) return;
     
-    setEditingClass((prev: any) => ({
-      ...prev,
-      schedules: [...prev.schedules, { dayOfWeek: 0, startTime: '', endTime: '' }]
-    }));
+    // Get the time options for 9:00 AM and 10:00 AM
+    const defaultStartTime = timeOptions.find(time => time.includes('9:00') && time.includes('AM')) || '09:00 AM';
+    const defaultEndTime = timeOptions.find(time => time.includes('10:00') && time.includes('AM')) || '10:00 AM';
+    
+    setEditingClass((prev: any) => {
+      // Default to Sunday (0) if no schedules exist yet, otherwise use the next day after the last added day
+      const lastDayOfWeek = prev.schedules.length > 0 
+        ? prev.schedules[prev.schedules.length - 1].dayOfWeek 
+        : -1;
+      
+      // Choose the next day that isn't already in the schedules
+      let newDayOfWeek = (lastDayOfWeek + 1) % 7;
+      const existingDays = prev.schedules.map((s: ClassSchedule) => s.dayOfWeek);
+      
+      // Find the first day that isn't already scheduled
+      while (existingDays.includes(newDayOfWeek)) {
+        newDayOfWeek = (newDayOfWeek + 1) % 7;
+      }
+      
+      const newSchedule = { 
+        dayOfWeek: newDayOfWeek, 
+        startTime: defaultStartTime, 
+        endTime: defaultEndTime 
+      };
+      
+      const updatedSchedules = [...prev.schedules, newSchedule];
+      
+      // Check if the current start date's day of week is in the selected days
+      const currentStartDate = prev.startDate instanceof Timestamp 
+        ? prev.startDate.toDate() 
+        : prev.startDate;
+      const currentStartDateDay = currentStartDate.getDay();
+      const selectedDays = updatedSchedules.map(schedule => schedule.dayOfWeek);
+      const isCurrentStartDateValid = selectedDays.includes(currentStartDateDay);
+      
+      // If this is the first schedule or the current start date is not valid,
+      // update the start date to the next occurrence of the new day
+      if (prev.schedules.length === 0 || !isCurrentStartDateValid) {
+        const nextOccurrence = getNextDayOccurrence(newDayOfWeek);
+        
+        return {
+          ...prev,
+          schedules: updatedSchedules,
+          startDate: nextOccurrence,
+          // Reset end date if it's now before the start date
+          ...(prev.endDate && 
+             (prev.endDate instanceof Timestamp 
+              ? prev.endDate.toDate() < nextOccurrence 
+              : prev.endDate < nextOccurrence) 
+             ? { endDate: null } : {})
+        };
+      }
+      
+      return {
+        ...prev,
+        schedules: updatedSchedules
+      };
+    });
   };
 
   const handleRemoveScheduleFromEdit = (index: number) => {
     if (!editingClass) return;
     
-    setEditingClass((prev: any) => ({
-      ...prev,
-      schedules: prev.schedules.filter((_: any, i: number) => i !== index)
-    }));
+    setEditingClass((prev: any) => {
+      // Get the schedule that's being removed
+      const scheduleToRemove = prev.schedules[index];
+      
+      // Filter out the schedule at the specified index
+      const updatedSchedules = prev.schedules.filter((_: any, i: number) => i !== index);
+      
+      // If we're removing the last schedule, return to single day mode
+      if (updatedSchedules.length === 0) {
+        return {
+          ...prev,
+          scheduleType: 'single',
+          schedules: []
+        };
+      }
+      
+      // Check if the current start date's day of week matches the day being removed
+      const currentStartDate = prev.startDate instanceof Timestamp 
+        ? prev.startDate.toDate() 
+        : prev.startDate;
+      const currentStartDateDay = currentStartDate.getDay();
+      const isRemovingCurrentDay = scheduleToRemove.dayOfWeek === currentStartDateDay;
+      
+      // Check if the day being removed is the only instance of that day in the schedules
+      const remainingDaysOfWeek = updatedSchedules.map((s: ClassSchedule) => s.dayOfWeek);
+      const dayStillExists = remainingDaysOfWeek.includes(currentStartDateDay);
+      
+      // If we're removing the day that matches the current start date and it doesn't exist in other schedules
+      if (isRemovingCurrentDay && !dayStillExists && updatedSchedules.length > 0) {
+        // Update the start date to the next occurrence of the first remaining day
+        const nextOccurrence = getNextDayOccurrence(updatedSchedules[0].dayOfWeek);
+        
+        return {
+          ...prev,
+          schedules: updatedSchedules,
+          startDate: nextOccurrence,
+          // Reset end date if it's now before the start date
+          ...(prev.endDate && 
+             (prev.endDate instanceof Timestamp 
+              ? prev.endDate.toDate() < nextOccurrence 
+              : prev.endDate < nextOccurrence) 
+             ? { endDate: null } : {})
+        };
+      }
+      
+      return {
+        ...prev,
+        schedules: updatedSchedules
+      };
+    });
   };
 
   const handleEditScheduleChange = (index: number, field: keyof ClassSchedule, value: string | number) => {
@@ -896,15 +1111,46 @@ export const AdminSchedule = () => {
         [field]: value
       };
       
-      // If changing start time, update end time
-      if (field === 'startTime') {
+      // If changing day of week, update start date if needed
+      if (field === 'dayOfWeek') {
+        // When day of week is changed, we need to update the start date if it's currently
+        // set to a day that doesn't match any of the schedules
+        const newDayOfWeek = value as number;
+        
+        // Get all selected days of week from schedules (including the newly updated one)
+        const selectedDays = updatedSchedules.map(schedule => schedule.dayOfWeek);
+        
+        // Check if the current start date's day of week is in the selected days
+        const currentStartDate = prev.startDate instanceof Timestamp 
+          ? prev.startDate.toDate() 
+          : prev.startDate;
+        const currentStartDateDay = currentStartDate.getDay();
+        const isCurrentStartDateValid = selectedDays.includes(currentStartDateDay);
+        
+        // If the current start date is not valid anymore, update it to the next occurrence of the new day
+        if (!isCurrentStartDateValid) {
+          const nextOccurrence = getNextDayOccurrence(newDayOfWeek);
+          
+          return {
+            ...prev,
+            schedules: updatedSchedules,
+            startDate: nextOccurrence,
+            // Reset end date if it's now before the start date
+            ...(prev.endDate && 
+               (prev.endDate instanceof Timestamp 
+                ? prev.endDate.toDate() < nextOccurrence 
+                : prev.endDate < nextOccurrence) 
+               ? { endDate: null } : {})
+          };
+        }
+      } else if (field === 'startTime') {
         // Parse the selected start time
-        const [time, period] = value.toString().split(' ');
-        const [hours, minutes] = time.split(':').map(Number);
+        const [startTimeStr, startPeriod] = value.toString().split(' ');
+        const [startHours, startMinutes] = startTimeStr.split(':').map(Number);
         
         // Create Date objects for start and end times
         const startDate = new Date();
-        startDate.setHours(period === 'PM' && hours !== 12 ? hours + 12 : (period === 'AM' && hours === 12 ? 0 : hours), minutes);
+        startDate.setHours(startPeriod === 'PM' && startHours !== 12 ? startHours + 12 : (startPeriod === 'AM' && startHours === 12 ? 0 : startHours), startMinutes);
         
         const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
         
@@ -914,10 +1160,10 @@ export const AdminSchedule = () => {
         updatedSchedules[index].endTime = endTime;
       } else if (field === 'endTime') {
         // Parse both times
-        const [startTime, startPeriod] = updatedSchedules[index].startTime.split(' ');
-        const [endTime, endPeriod] = value.toString().split(' ');
-        const [startHours, startMinutes] = startTime.split(':').map(Number);
-        const [endHours, endMinutes] = endTime.split(':').map(Number);
+        const [startTimeStr, startPeriod] = updatedSchedules[index].startTime.split(' ');
+        const [endTimeStr, endPeriod] = value.toString().split(' ');
+        const [startHours, startMinutes] = startTimeStr.split(':').map(Number);
+        const [endHours, endMinutes] = endTimeStr.split(':').map(Number);
 
         // Create Date objects for comparison
         const startDate = new Date();
@@ -1215,7 +1461,7 @@ export const AdminSchedule = () => {
                                   className="text-red-600 hover:text-red-800 bg-transparent"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                                   </svg>
                                 </button>
                               </div>
