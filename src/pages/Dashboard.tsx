@@ -23,7 +23,6 @@ import { ClassesSection } from '../components/ClassesSection';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { debugLog, debugMaterials } from '../utils/debugUtils';
 import { getPaymentsDueForDay } from '../utils/paymentUtils';
-import { useLocation } from 'react-router-dom';
 
 export const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -38,8 +37,6 @@ export const Dashboard = () => {
   const [pastClassesPage, setPastClassesPage] = useState(0);
   const [initialDataFetched, setInitialDataFetched] = useState(false);
   const [lastVisitTimestamp, setLastVisitTimestamp] = useState<number>(Date.now());
-  
-  const location = useLocation();
   const prevPathRef = useRef<string | null>(null);
   
   const { currentUser, loading: authLoading } = useAuth();
@@ -73,7 +70,7 @@ export const Dashboard = () => {
   useEffect(() => {
     if (!authLoading && !adminLoading && currentUser && !initialDataFetched) {
       debugLog('Dashboard - Initial data fetch triggered');
-      fetchClasses(new Date());
+      fetchClasses(new Date(), true);
       setInitialDataFetched(true);
     }
   }, [authLoading, adminLoading, currentUser, initialDataFetched, fetchClasses]);
@@ -85,7 +82,7 @@ export const Dashboard = () => {
     // If we're coming back to the dashboard from another page
     if (currentPath === '/dashboard' && prevPathRef.current && prevPathRef.current !== '/dashboard') {
       debugLog('Returning to dashboard from another page');
-      fetchClasses(selectedDate);
+      fetchClasses(selectedDate, false);
       setLastVisitTimestamp(Date.now());
     }
     
@@ -100,7 +97,7 @@ export const Dashboard = () => {
         // If it's been more than 5 minutes since last visit, refresh data
         if (now - lastVisitTimestamp > 5 * 60 * 1000) {
           debugLog('Page became visible after extended absence, refreshing data');
-          fetchClasses(selectedDate);
+          fetchClasses(selectedDate, false);
           setLastVisitTimestamp(now);
         }
       }
@@ -133,8 +130,28 @@ export const Dashboard = () => {
   }, [isMobileView]);
 
   const handleMonthChange = (newDate: Date) => {
-    setSelectedDate(newDate);
-    fetchClasses(newDate);
+    // Only update the selected date and fetch classes if the month or year has changed
+    const currentMonth = selectedDate.getMonth();
+    const currentYear = selectedDate.getFullYear();
+    const newMonth = newDate.getMonth();
+    const newYear = newDate.getFullYear();
+    
+    if (currentMonth !== newMonth || currentYear !== newYear) {
+      debugLog(`Month changed from ${currentMonth}/${currentYear} to ${newMonth}/${newYear}`);
+      setSelectedDate(newDate);
+      
+      // Check if we've already loaded this month
+      const monthKey = getMonthKey(newDate);
+      if (!loadedMonths.has(monthKey)) {
+        debugLog(`Month ${monthKey} not loaded yet, fetching data`);
+        fetchClasses(newDate, false);
+      } else {
+        debugLog(`Month ${monthKey} already loaded, skipping fetch`);
+      }
+    } else {
+      // If only the day changed, just update the selected date
+      setSelectedDate(newDate);
+    }
   };
 
   const handleDayClick = (date: Date, classes: ClassSession[]) => {
@@ -158,51 +175,16 @@ export const Dashboard = () => {
     const fetchMaterials = async () => {
       const materialsMap: Record<string, ClassMaterial[]> = {};
       
-      // Check if we already have materials for these classes
-      const classesNeedingMaterials = classes.filter(classSession => 
-        !classMaterials[classSession.id] || classMaterials[classSession.id].length === 0
-      );
-      
-      // Use existing materials for classes that already have them
-      classes.forEach(classSession => {
-        if (classMaterials[classSession.id] && classMaterials[classSession.id].length > 0) {
-          // Filter materials for this specific date if needed
-          const dateStr = date.toISOString().split('T')[0];
-          const materialsForDate = classMaterials[classSession.id].filter(material => {
-            const materialDateStr = material.classDate.toISOString().split('T')[0];
-            return materialDateStr === dateStr;
-          });
+      for (const classSession of classes) {
+        try {
+          const materials = await getClassMaterials(classSession.id, date);
           
-          if (materialsForDate.length > 0) {
-            materialsMap[classSession.id] = materialsForDate;
+          if (materials.length > 0) {
+            materialsMap[classSession.id] = materials;
           }
+        } catch (error) {
+          console.error('Error fetching materials for class:', classSession.id, error);
         }
-      });
-      
-      // Only fetch materials for classes that don't have them yet
-      if (classesNeedingMaterials.length > 0) {
-        debugLog(`Fetching materials for ${classesNeedingMaterials.length} classes out of ${classes.length} total`);
-        
-        for (const classSession of classesNeedingMaterials) {
-          try {
-            const materials = await getClassMaterials(classSession.id, date);
-            
-            if (materials.length > 0) {
-              materialsMap[classSession.id] = materials;
-              
-              // Update the global materials cache
-              const updatedMaterials = {
-                ...classMaterials,
-                [classSession.id]: materials
-              };
-              setClassMaterials(updatedMaterials);
-            }
-          } catch (error) {
-            console.error('Error fetching materials for class:', classSession.id, error);
-          }
-        }
-      } else {
-        debugLog('All materials already loaded, skipping fetch');
       }
       
       if (!materialsAlreadyLoaded) {
@@ -225,12 +207,19 @@ export const Dashboard = () => {
       date,
       classes,
       paymentsDue: paymentsDueForDay,
-      materials: {},
+      materials: selectedDayDetails?.materials || {},
       birthdays
     });
-    
+
     // Then fetch materials asynchronously
     fetchMaterials();
+
+    // Always scroll to details section, regardless of screen size
+    if (detailsRef.current) {
+      setTimeout(() => {
+        detailsRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
   };
 
   const handleEditNotes = useCallback((classSession: ClassSession) => {
@@ -588,7 +577,7 @@ export const Dashboard = () => {
     loadedMonthsCopy.delete(monthKey);
     
     // Re-fetch classes and payments for the current month
-    fetchClasses(date);
+    fetchClasses(date, false);
     
     // Force a refresh of the calendar by setting a new date object with the same value
     // This will trigger the useEffect in CalendarSection to re-fetch payments

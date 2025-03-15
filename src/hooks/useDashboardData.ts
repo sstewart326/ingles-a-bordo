@@ -39,7 +39,7 @@ interface UseDashboardDataReturn extends DashboardData {
   setLoadedMaterialMonths: (months: Set<string>) => void;
   setSelectedDayDetails: (details: DashboardData['selectedDayDetails']) => void;
   setClassMaterials: (materials: Record<string, ClassMaterial[]>) => void;
-  fetchClasses: (targetDate: Date) => Promise<void>;
+  fetchClasses: (targetDate: Date, isInitialLoad?: boolean) => Promise<void>;
   getClassesForDay: (dayOfWeek: number, date: Date) => ClassSession[];
   isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
   getRelevantMonthKeys: (date: Date) => string[];
@@ -112,7 +112,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     return [];
   }, [dailyClassMap, isAdmin]);
 
-  const fetchClasses = useCallback(async (targetDate: Date = new Date()) => {
+  const fetchClasses = useCallback(async (targetDate: Date = new Date(), isInitialLoad: boolean = false) => {
     if (!currentUser || adminLoading) return;
 
     try {
@@ -232,14 +232,17 @@ export const useDashboardData = (): UseDashboardDataReturn => {
             return Array.from(emailMap.values());
           });
           
-          // Update class lists using the updateClassList function
-          updateClassList({
-            classes: transformedClasses,
-            upcomingClasses,  // Use existing arrays instead of empty ones
-            pastClasses,
-            setUpcomingClasses,
-            setPastClasses
-          });
+          // Only update upcoming/past classes on initial load
+          if (isInitialLoad) {
+            // Update class lists using the updateClassList function
+            updateClassList({
+              classes: transformedClasses,
+              upcomingClasses: [],  // Start with empty arrays on initial load
+              pastClasses: [],
+              setUpcomingClasses,
+              setPastClasses
+            });
+          }
           
           // Update loaded months - add new months to the existing set
           setLoadedMonths(prev => {
@@ -256,7 +259,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         await fetchMaterialsForClasses({
           classes: transformedClasses,
           state: {
-            upcomingClasses,  // Use existing arrays instead of empty ones
+            upcomingClasses,
             pastClasses,
             classMaterials,
             loadedMaterialMonths

@@ -227,31 +227,6 @@ export const fetchMaterialsForClass = async ({
   setSelectedDayDetails
 }: FetchMaterialsParams) => {
   try {
-    // Check if materials are already loaded for this class
-    if (state.classMaterials[classId] && state.classMaterials[classId].length > 0) {
-      console.log(`Materials already loaded for class ${classId}, skipping fetch`);
-      
-      // Update selected day details if they exist and match the current class
-      if (selectedDayDetails && selectedDayDetails.classes.some((c: ClassSession) => c.id === classId)) {
-        setSelectedDayDetails({
-          ...selectedDayDetails,
-          materials: {
-            ...selectedDayDetails.materials,
-            [classId]: state.classMaterials[classId]
-          }
-        });
-      }
-      
-      // Update the loaded material months
-      const monthKey = getMonthKey(date);
-      setState({
-        loadedMaterialMonths: new Set([...state.loadedMaterialMonths, monthKey])
-      });
-      
-      return state.classMaterials[classId];
-    }
-    
-    // If not loaded, fetch materials
     const materials = await getClassMaterials(classId);
     
     // Update the materials state
@@ -302,19 +277,7 @@ export const fetchMaterialsForClasses = async ({
   selectedDayDetails,
   setSelectedDayDetails
 }: FetchMaterialsForClassesParams) => {
-  // Filter out classes that already have materials loaded
-  const classesToFetch = classes.filter(classSession => 
-    !state.classMaterials[classSession.id] || state.classMaterials[classSession.id].length === 0
-  );
-  
-  if (classesToFetch.length === 0) {
-    console.log('All materials already loaded, skipping fetch');
-    return;
-  }
-  
-  console.log(`Fetching materials for ${classesToFetch.length} classes out of ${classes.length} total`);
-  
-  const promises = classesToFetch.map(async (classSession) => {
+  const promises = classes.map(async (classSession) => {
     // Get materials for this class without date filtering
     const materials = await getClassMaterials(classSession.id);
     

@@ -11,6 +11,8 @@ import { where } from 'firebase/firestore';
 import { styles, classNames } from '../styles/styleUtils';
 import { ClassMaterial, Class, User } from '../types/interfaces';
 import { useSearchParams } from 'react-router-dom';
+import { getDocs, collection } from 'firebase/firestore';
+import { db } from '../utils/firebase';
 
 const AdminMaterials = () => {
   const { language } = useLanguage();
@@ -69,80 +71,23 @@ const AdminMaterials = () => {
     }
   }, [selectedClass, selectedDate, fetchMaterialsAndStudents]);
 
+  const fetchClasses = async () => {
+    try {
+      setLoading(true);
+      const classesCollection = await getDocs(collection(db, 'classes'));
+      const classesData = classesCollection.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class));
+      setClasses(classesData);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+      toast.error('Failed to load classes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchClasses = async () => {
-      try {
-        // Clear the cache before fetching to ensure we get fresh data with IDs
-        cache.clearAll();
-        const classesData = await getCachedCollection<Class>('classes', [], { includeIds: true });
-        
-        // Fetch all users that are students in any class
-        const allStudentEmails = new Set<string>();
-        classesData.forEach(c => {
-          if (c.studentEmails && c.studentEmails.length > 0) {
-            c.studentEmails.forEach(email => allStudentEmails.add(email));
-          }
-        });
-
-        // Only fetch users if we have student emails
-        let usersData: User[] = [];
-        if (allStudentEmails.size > 0) {
-          try {
-            usersData = await getCachedCollection<User>('users', [
-              where('email', 'in', Array.from(allStudentEmails))
-            ], {
-              includeIds: true
-            });
-          } catch (error) {
-            console.error('Failed to fetch users:', error);
-            // Continue execution even if user fetch fails
-          }
-        }
-
-        setUsers(usersData);
-        
-        // Validate that we have IDs and proper time format
-        const validClasses = classesData.filter(c => c.id && c.startTime);
-        setClasses(validClasses);
-        
-        // Check for date parameter
-        const dateParam = searchParams.get('date');
-        if (dateParam) {
-          try {
-            const date = new Date(dateParam);
-            if (!isNaN(date.getTime())) {
-              setSelectedDate(date);
-            }
-          } catch (error) {
-            console.error('Invalid date parameter:', error);
-          }
-        }
-        
-        // Check for classId in URL parameters
-        const classIdParam = searchParams.get('classId');
-        if (classIdParam) {
-          const classFromParam = validClasses.find(c => c.id === classIdParam);
-          if (classFromParam) {
-            setSelectedClass(classFromParam);
-          }
-        }
-        
-        // Check for tab parameter
-        const tabParam = searchParams.get('tab');
-        if (tabParam === 'upload') {
-          setActiveTab('upload');
-        }
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching classes:', error);
-        toast.error('Failed to load classes');
-        setLoading(false);
-      }
-    };
-
     fetchClasses();
-  }, [searchParams]);
+  }, []);
 
   // Effect to scroll to upload section when tab is set to upload
   useEffect(() => {
