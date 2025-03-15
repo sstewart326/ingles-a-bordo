@@ -4,20 +4,12 @@ import { Calendar } from '../components/Calendar';
 import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';
 import '../styles/calendar.css';
 import { styles } from '../styles/styleUtils';
-import { ClassMaterial } from '../types/interfaces';
 import { FaFilePdf, FaLink, FaFileAlt } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { getCalendarData } from '../services/calendarService';
 import { ClassSession } from '../utils/scheduleUtils';
-
-const logSchedule = (message: string, data?: any) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[SCHEDULE] ${message}`, data ? data : '');
-  }
-};
 
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
@@ -131,7 +123,6 @@ export const Schedule = () => {
   } | null>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useAuth();
-  const { isAdmin } = useAdmin();
   const { language } = useLanguage();
   const t = useTranslation(language);
 
@@ -407,7 +398,6 @@ export const Schedule = () => {
                 {selectedDayDetails.classes.length > 0 ? (
                   selectedDayDetails.classes.map(classItem => {
                     const dateStr = selectedDayDetails.date.toISOString().split('T')[0];
-                    const key = `${classItem.id}_${dateStr}`;
                     
                     // Check if this class has materials
                     let hasMaterials = false;

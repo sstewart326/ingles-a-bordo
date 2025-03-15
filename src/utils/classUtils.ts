@@ -37,7 +37,6 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
   
   const sevenDaysFromNow = new Date(today);
   sevenDaysFromNow.setDate(today.getDate() + 7);
-  const sevenDaysFromNowTime = sevenDaysFromNow.getTime();
   
   console.log('\n=== Date Processing ===');
   console.log('Today (midnight):', today.toISOString());

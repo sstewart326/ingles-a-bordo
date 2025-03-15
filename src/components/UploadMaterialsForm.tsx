@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import { addClassMaterials } from '../utils/classMaterialsUtils';
 import toast from 'react-hot-toast';
 import { FaTrash } from 'react-icons/fa';

@@ -41,25 +41,7 @@ const corsHandler = cors({
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
 
-// Keep the original functions but mark them as deprecated
-export const deleteAuthUser = onCall({
-  region: REGION,
-  cors: [
-    "https://ingles-a-bordo.firebaseapp.com",
-    "https://ingles-a-bordo.web.app", 
-    "http://localhost:5173",
-    "http://localhost",
-    "https://app.inglesabordo.com",
-    "https://inglesabordo.com"
-  ],
-  maxInstances: 10
-}, async (request: { data: any }) => {
-  // Inform about deprecation
-  logger.warn("This function is deprecated. Please use deleteAuthUserHttp instead.");
-  throw new HttpsError('failed-precondition', 'This function is deprecated. Please use deleteAuthUserHttp instead.');
-});
-
-// Create new HTTP-based functions
+// Create HTTP-based functions
 export const deleteAuthUserHttp = onRequest({
   region: REGION,
   cors: true
@@ -88,25 +70,7 @@ export const deleteAuthUserHttp = onRequest({
   });
 });
 
-// Keep the original checkUserExists but mark it as deprecated
-export const checkUserExists = onCall({
-  region: REGION,
-  cors: [
-    "https://ingles-a-bordo.firebaseapp.com",
-    "https://ingles-a-bordo.web.app", 
-    "http://localhost:5173",
-    "http://localhost",
-    "https://app.inglesabordo.com",
-    "https://inglesabordo.com"
-  ],
-  maxInstances: 10
-}, async (request: { data: any }) => {
-  // Inform about deprecation
-  logger.warn("This function is deprecated. Please use checkUserExistsHttp instead.");
-  throw new HttpsError('failed-precondition', 'This function is deprecated. Please use checkUserExistsHttp instead.');
-});
-
-// Create new HTTP-based function for checking user existence
+// Create HTTP-based function for checking user existence
 export const checkUserExistsHttp = onRequest({
   region: REGION,
   cors: true

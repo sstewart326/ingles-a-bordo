@@ -968,17 +968,21 @@ export const DayDetails = ({
                         {material.slides && material.slides.length > 0 && (
                           <div className="space-y-1">
                             {material.slides.map((slideUrl, slideIndex) => (
-                              <a 
+                              <div 
                                 key={slideIndex}
-                                href={slideUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="flex items-center text-blue-600 hover:text-blue-800 group"
+                                className="flex items-center group"
                               >
-                                <FaFilePdf className="mr-2 flex-shrink-0" />
-                                <span className="text-sm overflow-hidden whitespace-nowrap text-ellipsis" style={{ maxWidth: '250px', display: 'inline-block', wordBreak: 'break-all' }}>
-                                  {t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}
-                                </span>
+                                <FaFilePdf className="mr-2 flex-shrink-0 text-blue-600" />
+                                <a 
+                                  href={slideUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <span className="text-sm overflow-hidden whitespace-nowrap text-ellipsis" style={{ maxWidth: '250px', display: 'inline-block', wordBreak: 'break-all' }}>
+                                    {t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}
+                                  </span>
+                                </a>
                                 {isAdmin && (
                                   <button
                                     onClick={(e) => {
@@ -992,7 +996,7 @@ export const DayDetails = ({
                                     <FaTrash className="h-2.5 w-2.5" />
                                   </button>
                                 )}
-                              </a>
+                              </div>
                             ))}
                           </div>
                         )}
@@ -1000,19 +1004,22 @@ export const DayDetails = ({
                         {material.links && material.links.length > 0 && (
                           <div className="space-y-1">
                             {material.links.map((link, linkIndex) => (
-                              <a 
+                              <div 
                                 key={linkIndex}
-                                href={link} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="flex items-center text-blue-600 hover:text-blue-800 group"
+                                className="flex items-center group"
                               >
-                                <FaLink className="mr-2 flex-shrink-0" />
-                                <span className="text-sm overflow-hidden whitespace-nowrap text-ellipsis" style={{ maxWidth: '250px', display: 'inline-block', wordBreak: 'break-all' }}>{link}</span>
+                                <FaLink className="mr-2 flex-shrink-0 text-blue-600" />
+                                <a 
+                                  href={link} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <span className="text-sm overflow-hidden whitespace-nowrap text-ellipsis" style={{ maxWidth: '250px', display: 'inline-block', wordBreak: 'break-all' }}>{link}</span>
+                                </a>
                                 {isAdmin && (
                                   <button
                                     onClick={(e) => {
-                                      e.preventDefault();
                                       onDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
                                     }}
                                     disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
@@ -1022,7 +1029,7 @@ export const DayDetails = ({
                                     <FaTrash className="h-2.5 w-2.5" />
                                   </button>
                                 )}
-                              </a>
+                              </div>
                             ))}
                           </div>
                         )}

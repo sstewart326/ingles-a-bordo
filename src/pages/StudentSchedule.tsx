@@ -64,7 +64,7 @@ export const StudentSchedule = () => {
     }
   }, []);
 
-  const fetchClasses = useCallback(async (date: Date, isInitialLoad: boolean) => {
+  const fetchClasses = useCallback(async () => {
     try {
       logSchedule('Fetching classes...');
       const classesRef = collection(db, 'classes');
@@ -119,7 +119,7 @@ export const StudentSchedule = () => {
       email: currentUser?.email 
     });
     fetchStudents();
-    fetchClasses(new Date(), true);
+    fetchClasses();
   }, [currentUser, fetchStudents, fetchClasses]);
 
   const addClass = async () => {
@@ -134,7 +134,7 @@ export const StudentSchedule = () => {
         updatedAt: now
       });
 
-      await fetchClasses(new Date(), false);
+      await fetchClasses();
       setIsModalOpen(false);
       resetNewClass();
     } catch (error) {
@@ -155,7 +155,7 @@ export const StudentSchedule = () => {
 
     try {
       await deleteDoc(doc(db, 'classes', classId));
-      await fetchClasses(new Date(), false);
+      await fetchClasses();
     } catch (error) {
       console.error('Error deleting class:', error);
     }

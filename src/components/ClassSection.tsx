@@ -414,19 +414,22 @@ export const ClassSection = ({
                                 {material.slides && material.slides.length > 0 && (
                                   <div className="space-y-1">
                                     {material.slides.map((slideUrl: string, slideIndex: number) => (
-                                      <a 
+                                      <div 
                                         key={slideIndex}
-                                        href={slideUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
+                                        className="flex items-center group"
                                       >
-                                        <FaFilePowerpoint className="mr-2" />
-                                        <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
+                                        <FaFilePowerpoint className="mr-2 text-blue-600" />
+                                        <a 
+                                          href={slideUrl} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 hover:text-blue-800"
+                                        >
+                                          <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
+                                        </a>
                                         {isAdmin && (
                                           <button
                                             onClick={(e) => {
-                                              e.preventDefault();
                                               onDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
                                             }}
                                             disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
@@ -436,7 +439,7 @@ export const ClassSection = ({
                                             <FaTrash className="h-2.5 w-2.5" />
                                           </button>
                                         )}
-                                      </a>
+                                      </div>
                                     ))}
                                   </div>
                                 )}
@@ -444,19 +447,22 @@ export const ClassSection = ({
                                 {material.links && material.links.length > 0 && (
                                   <div className="space-y-1">
                                     {material.links.map((link: string, linkIndex: number) => (
-                                      <a 
+                                      <div 
                                         key={linkIndex}
-                                        href={link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="flex items-center text-blue-600 hover:text-blue-800 group"
+                                        className="flex items-center group"
                                       >
-                                        <FaLink className="mr-2" />
-                                        <span className="text-sm truncate max-w-[200px]">{link}</span>
+                                        <FaLink className="mr-2 text-blue-600" />
+                                        <a 
+                                          href={link} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 hover:text-blue-800"
+                                        >
+                                          <span className="text-sm truncate max-w-[200px]">{link}</span>
+                                        </a>
                                         {isAdmin && (
                                           <button
                                             onClick={(e) => {
-                                              e.preventDefault();
                                               onDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
                                             }}
                                             disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
@@ -466,7 +472,7 @@ export const ClassSection = ({
                                             <FaTrash className="h-2.5 w-2.5" />
                                           </button>
                                         )}
-                                      </a>
+                                      </div>
                                     ))}
                                   </div>
                                 )}

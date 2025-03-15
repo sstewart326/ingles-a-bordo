@@ -1,18 +1,14 @@
 import { useState, useEffect, ChangeEvent, FormEvent, useCallback, useRef } from 'react';
-import { getCachedCollection } from '../utils/firebaseUtils';
 import { addClassMaterials, validateFile, getClassMaterials } from '../utils/classMaterialsUtils';
 import { FaPlus, FaTrash } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { ClassDatePicker } from '../components/ClassDatePicker';
-import { cache } from '../utils/cache';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { where } from 'firebase/firestore';
 import { styles, classNames } from '../styles/styleUtils';
 import { ClassMaterial, Class, User } from '../types/interfaces';
-import { useSearchParams } from 'react-router-dom';
 import { getDocs, collection } from 'firebase/firestore';
-import { db } from '../utils/firebase';
+import { db } from '../config/firebase';
 
 const AdminMaterials = () => {
   const { language } = useLanguage();
@@ -26,8 +22,7 @@ const AdminMaterials = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [existingMaterials, setExistingMaterials] = useState<ClassMaterial[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [searchParams] = useSearchParams();
+  const [users] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'view' | 'upload'>('view');
   const uploadSectionRef = useRef<HTMLDivElement>(null);
 
