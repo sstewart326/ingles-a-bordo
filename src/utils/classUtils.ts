@@ -29,8 +29,20 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayTime = today.getTime();
+  
+  // Calculate dates for 7 days ago and 7 days from now
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(today.getDate() - 7);
+  const sevenDaysAgoTime = sevenDaysAgo.getTime();
+  
+  const sevenDaysFromNow = new Date(today);
+  sevenDaysFromNow.setDate(today.getDate() + 7);
+  const sevenDaysFromNowTime = sevenDaysFromNow.getTime();
+  
   console.log('\n=== Date Processing ===');
   console.log('Today (midnight):', today.toISOString());
+  console.log('Seven days ago:', sevenDaysAgo.toISOString());
+  console.log('Seven days from now:', sevenDaysFromNow.toISOString());
 
   // Log all classes with their dates for debugging
   console.log('\nAll classes with dates:');
@@ -41,7 +53,9 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
         dates: extendedClass.dates.map(d => new Date(d).toISOString()),
         dayOfWeek: c.dayOfWeek,
         startTime: c.startTime,
-        endTime: c.endTime
+        endTime: c.endTime,
+        scheduleType: c.scheduleType,
+        schedules: c.schedules
       });
     }
   });
@@ -62,20 +76,20 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
     .filter(c => {
       const extendedClass = c as ExtendedClassSession;
       
-      // If the class has specific dates, check if any are in the future
+      // If the class has specific dates, check if any are in the future but within the next 7 days
       if (extendedClass.dates && extendedClass.dates.length > 0) {
-        // Check if any dates are today or in the future
+        // Check if any dates are today or in the future but within 7 days
         const hasUpcomingDate = extendedClass.dates.some(date => {
           const dateToCheck = new Date(date);
           // Ensure we're comparing dates at midnight in the local timezone
           dateToCheck.setHours(0, 0, 0, 0);
-          const isUpcoming = dateToCheck.getTime() >= todayTime;
+          const isUpcoming = dateToCheck.getTime() >= todayTime && dateToCheck.getTime() <= sevenDaysFromNowTime;
           
           if (isUpcoming) {
             console.log(`\nFound upcoming date for class ${c.id}:`);
             console.log('Date:', dateToCheck.toISOString());
             console.log('Today:', new Date(todayTime).toISOString());
-            console.log('Is upcoming:', isUpcoming);
+            console.log('Is upcoming within 7 days:', isUpcoming);
           }
           
           return isUpcoming;
@@ -101,12 +115,12 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
         const upcomingDatesA = extendedA.dates.filter(date => {
           const dateObj = new Date(date);
           dateObj.setHours(0, 0, 0, 0);
-          return dateObj.getTime() >= todayTime;
+          return dateObj.getTime() >= todayTime && dateObj.getTime() <= sevenDaysFromNowTime;
         });
         const upcomingDatesB = extendedB.dates.filter(date => {
           const dateObj = new Date(date);
           dateObj.setHours(0, 0, 0, 0);
-          return dateObj.getTime() >= todayTime;
+          return dateObj.getTime() >= todayTime && dateObj.getTime() <= sevenDaysFromNowTime;
         });
         
         if (upcomingDatesA.length > 0 && upcomingDatesB.length > 0) {
@@ -123,20 +137,20 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
     .filter(c => {
       const extendedClass = c as ExtendedClassSession;
       
-      // If the class has specific dates, check if any are in the past
+      // If the class has specific dates, check if any are in the past but within the last 7 days
       if (extendedClass.dates && extendedClass.dates.length > 0) {
-        // Check if any dates are in the past
+        // Check if any dates are in the past but within the last 7 days
         const hasPastDate = extendedClass.dates.some(date => {
           const dateToCheck = new Date(date);
           // Ensure we're comparing dates at midnight in the local timezone
           dateToCheck.setHours(0, 0, 0, 0);
-          const isPast = dateToCheck.getTime() < todayTime;
+          const isPastWithinSevenDays = dateToCheck.getTime() < todayTime && dateToCheck.getTime() >= sevenDaysAgoTime;
           
-          if (isPast) {
-            console.log(`Class ${c.id}: ${dateToCheck.toISOString()} is past`);
+          if (isPastWithinSevenDays) {
+            console.log(`Class ${c.id}: ${dateToCheck.toISOString()} is past within 7 days`);
           }
           
-          return isPast;
+          return isPastWithinSevenDays;
         });
         
         return hasPastDate;
@@ -155,16 +169,16 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       
       // If both classes have specific dates, sort by the most recent past date
       if (extendedA.dates && extendedA.dates.length > 0 && extendedB.dates && extendedB.dates.length > 0) {
-        // Find the most recent past date for each class
+        // Find the most recent past date for each class within the last 7 days
         const pastDatesA = extendedA.dates.filter(date => {
           const dateObj = new Date(date);
           dateObj.setHours(0, 0, 0, 0);
-          return dateObj.getTime() < todayTime;
+          return dateObj.getTime() < todayTime && dateObj.getTime() >= sevenDaysAgoTime;
         });
         const pastDatesB = extendedB.dates.filter(date => {
           const dateObj = new Date(date);
           dateObj.setHours(0, 0, 0, 0);
-          return dateObj.getTime() < todayTime;
+          return dateObj.getTime() < todayTime && dateObj.getTime() >= sevenDaysAgoTime;
         });
         
         if (pastDatesA.length > 0 && pastDatesB.length > 0) {
@@ -178,13 +192,17 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
     });
 
   console.log('\n=== Final Classification ===');
-  console.log('Upcoming classes:', newUpcomingClasses.map(c => ({
+  console.log('Upcoming classes (next 7 days):', newUpcomingClasses.map(c => ({
     id: c.id,
-    dates: (c as ExtendedClassSession).dates?.map(d => new Date(d).toISOString())
+    dates: (c as ExtendedClassSession).dates?.map(d => new Date(d).toISOString()),
+    scheduleType: c.scheduleType,
+    schedules: c.schedules
   })));
-  console.log('Past classes:', newPastClasses.map(c => ({
+  console.log('Past classes (last 7 days):', newPastClasses.map(c => ({
     id: c.id,
-    dates: (c as ExtendedClassSession).dates?.map(d => new Date(d).toISOString())
+    dates: (c as ExtendedClassSession).dates?.map(d => new Date(d).toISOString()),
+    scheduleType: c.scheduleType,
+    schedules: c.schedules
   })));
   
   setUpcomingClasses(newUpcomingClasses);

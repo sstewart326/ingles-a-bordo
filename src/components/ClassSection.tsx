@@ -11,6 +11,7 @@ import { debugLog, debugMaterials, debugClassSession } from '../utils/debugUtils
 // Extended interface to include dates property
 interface ExtendedClassSession extends ClassSession {
   dates?: Date[];
+  _displayDate?: Date; // For displaying individual dates
 }
 
 interface ClassSectionProps {
@@ -112,12 +113,83 @@ export const ClassSection = ({
   // Calculate pagination
   const startIndex = currentPage * pageSize;
   const endIndex = startIndex + pageSize;
-  const displayedClasses = classes.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(classes.length / pageSize);
+  
+  // Create an expanded list of classes with separate entries for each date
+  const expandedClasses: ClassSession[] = [];
+  classes.forEach(classSession => {
+    const extendedClass = classSession as ExtendedClassSession;
+    const dates = extendedClass.dates || [];
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const nowTime = now.getTime();
+    
+    // Calculate dates for 7 days ago and 7 days from now
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    const sevenDaysAgoTime = sevenDaysAgo.getTime();
+    
+    const sevenDaysFromNow = new Date(now);
+    sevenDaysFromNow.setDate(now.getDate() + 7);
+    const sevenDaysFromNowTime = sevenDaysFromNow.getTime();
+    
+    let relevantDates: Date[] = [];
+    if (title === t.upcomingClasses) {
+      // Get all upcoming dates for upcoming classes within the next 7 days
+      relevantDates = dates
+        .filter((d: Date) => {
+          const dateTime = new Date(d);
+          dateTime.setHours(0, 0, 0, 0);
+          return dateTime.getTime() >= nowTime && dateTime.getTime() <= sevenDaysFromNowTime;
+        })
+        .map((d: Date) => new Date(d))
+        .sort((a, b) => a.getTime() - b.getTime()); // Sort chronologically
+    } else {
+      // Get all past dates for past classes within the last 7 days
+      relevantDates = dates
+        .filter((d: Date) => {
+          const dateTime = new Date(d);
+          dateTime.setHours(0, 0, 0, 0);
+          return dateTime.getTime() < nowTime && dateTime.getTime() >= sevenDaysAgoTime;
+        })
+        .map((d: Date) => new Date(d))
+        .sort((a, b) => b.getTime() - a.getTime()); // Sort reverse chronologically (most recent first)
+    }
+    
+    // Add each date as a separate class entry
+    if (relevantDates.length > 0) {
+      relevantDates.forEach(date => {
+        expandedClasses.push({
+          ...classSession,
+          _displayDate: date // Add a temporary property to store the date
+        } as ExtendedClassSession);
+      });
+    }
+  });
+  
+  // Sort the expanded classes by date
+  if (title === t.upcomingClasses) {
+    // Sort upcoming classes by date (closest first)
+    expandedClasses.sort((a, b) => {
+      const dateA = (a as any)._displayDate?.getTime() || 0;
+      const dateB = (b as any)._displayDate?.getTime() || 0;
+      return dateA - dateB;
+    });
+  } else {
+    // Sort past classes by date (most recent first)
+    expandedClasses.sort((a, b) => {
+      const dateA = (a as any)._displayDate?.getTime() || 0;
+      const dateB = (b as any)._displayDate?.getTime() || 0;
+      return dateB - dateA;
+    });
+  }
+  
+  // Use the expanded classes for pagination
+  const displayedClasses = expandedClasses.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(expandedClasses.length / pageSize);
 
   // Log only if the displayed classes count is different from total
-  if (displayedClasses.length !== classes.length) {
-    debugLog(`Displayed classes count: ${displayedClasses.length}`);
+  if (displayedClasses.length !== expandedClasses.length) {
+    debugLog(`Displayed classes count: ${displayedClasses.length} of ${expandedClasses.length}`);
   }
   
   // Log only the first class's materials to avoid spam
@@ -136,8 +208,8 @@ export const ClassSection = ({
   };
 
   const renderUploadMaterialsSection = (classSession: ClassSession, date: Date | null | undefined) => {
-    // Use selectedDate if available, otherwise fall back to the provided date or create a new date
-    const dateToUse = selectedDate || (date instanceof Date ? date : new Date());
+    // Use the provided date, falling back to selectedDate or current date if not available
+    const dateToUse = date instanceof Date ? date : (selectedDate || new Date());
     
     // Create a UTC date to avoid timezone issues
     const year = dateToUse.getFullYear();
@@ -145,8 +217,11 @@ export const ClassSection = ({
     const day = dateToUse.getDate();
     const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
     
+    // Create a unique ID for this class-date combination
+    const uniqueId = `${classSession.id}-${dateToUse.getTime()}`;
+    
     return (
-      <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
+      <Modal isOpen={visibleUploadForm === uniqueId} onClose={onCloseUploadForm}>
         <UploadMaterialsForm
           classId={classSession.id}
           classDate={utcDate}
@@ -166,19 +241,15 @@ export const ClassSection = ({
         ) : (
           <>
             {displayedClasses.map((classSession) => {
-              // Get the appropriate date from the dates array
-              const extendedClass = classSession as ExtendedClassSession;
-              const dates = extendedClass.dates || [];
-              const date = title === t.upcomingClasses 
-                ? dates.find((d: Date) => new Date(d).getTime() >= new Date().getTime()) // First upcoming date
-                : dates.find((d: Date) => new Date(d).getTime() < new Date().getTime()); // First past date
+              // Get the date from the _displayDate property
+              const date = (classSession as any)._displayDate;
               
               return (
-                <div key={classSession.id} className={styles.card.container}>
+                <div key={`${classSession.id}-${date.getTime()}`} className={styles.card.container}>
                   <div className="flex justify-between items-start w-full">
                     <div className="w-full">
                       <div className="text-sm font-bold text-black mb-2">
-                        {formatClassDate(date ? new Date(date) : null)}
+                        {formatClassDate(date)}
                       </div>
                       <div className={styles.card.title}>
                         {formatStudentNames(classSession.studentEmails)}
@@ -194,9 +265,9 @@ export const ClassSection = ({
                           <span className="inline-block ml-1 relative group">
                             <InformationCircleIcon 
                               className="h-4 w-4 text-gray-400 inline-block hover:text-gray-600 cursor-pointer" 
-                              onClick={() => toggleTooltip(`notes-${classSession.id}`)}
+                              onClick={() => toggleTooltip(`notes-${classSession.id}-${date.getTime()}`)}
                             />
-                            <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-36 p-1.5 bg-gray-800 text-white text-xs rounded shadow-lg ${activeTooltips[`notes-${classSession.id}`] ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} z-10 whitespace-normal pointer-events-none transition-opacity duration-150 normal-case`}>
+                            <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-36 p-1.5 bg-gray-800 text-white text-xs rounded shadow-lg ${activeTooltips[`notes-${classSession.id}-${date.getTime()}`] ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} z-10 whitespace-normal pointer-events-none transition-opacity duration-150 normal-case`}>
                               {t.notesInfo || 'Notes will be shared with students'}
                               <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></span>
                             </span>
@@ -206,7 +277,7 @@ export const ClassSection = ({
                         {editingNotes[classSession.id] !== undefined ? (
                           <div className="mt-1 w-full">
                             <textarea
-                              ref={(el) => { textareaRefs[classSession.id] = el; }}
+                              ref={(el) => { textareaRefs[`${classSession.id}-${date.getTime()}-notes`] = el; }}
                               defaultValue={editingNotes[classSession.id]}
                               className="w-full p-2 border border-gray-300 rounded text-sm"
                               rows={3}
@@ -251,9 +322,9 @@ export const ClassSection = ({
                           <span className="inline-block ml-1 relative group">
                             <InformationCircleIcon 
                               className="h-4 w-4 text-gray-400 inline-block hover:text-gray-600 cursor-pointer" 
-                              onClick={() => toggleTooltip(`private-notes-${classSession.id}`)}
+                              onClick={() => toggleTooltip(`private-notes-${classSession.id}-${date.getTime()}`)}
                             />
-                            <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-36 p-1.5 bg-gray-800 text-white text-xs rounded shadow-lg ${activeTooltips[`private-notes-${classSession.id}`] ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} z-10 whitespace-normal pointer-events-none transition-opacity duration-150 normal-case`}>
+                            <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-36 p-1.5 bg-gray-800 text-white text-xs rounded shadow-lg ${activeTooltips[`private-notes-${classSession.id}-${date.getTime()}`] ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} z-10 whitespace-normal pointer-events-none transition-opacity duration-150 normal-case`}>
                               {t.privateNotesInfo || 'Private notes will not be shared with students'}
                               <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></span>
                             </span>
@@ -263,7 +334,7 @@ export const ClassSection = ({
                         {editingPrivateNotes[classSession.id] !== undefined ? (
                           <div className="mt-1 w-full">
                             <textarea
-                              ref={(el) => { textareaRefs[`private_${classSession.id}`] = el; }}
+                              ref={(el) => { textareaRefs[`${classSession.id}-${date.getTime()}-private_notes`] = el; }}
                               defaultValue={editingPrivateNotes[classSession.id]}
                               className="w-full p-2 border border-gray-300 rounded text-sm"
                               rows={3}
@@ -311,7 +382,7 @@ export const ClassSection = ({
                                 href="#"
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  onOpenUploadForm(classSession.id);
+                                  onOpenUploadForm(`${classSession.id}-${date.getTime()}`);
                                 }}
                                 className="text-sm text-blue-600 hover:text-blue-800"
                               >
@@ -321,10 +392,33 @@ export const ClassSection = ({
                           </div>
                           <div className="mt-1 space-y-2">
                             {/* Display materials - prioritize class.materials, fall back to classMaterials */}
+                            {/* Filter materials to only show those for the current date */}
                             {((classSession.materials && classSession.materials.length > 0) 
                               ? classSession.materials 
                               : classMaterials[classSession.id] || []
-                            ).map((material, index) => (
+                            )
+                            .filter(material => {
+                              // If the material has a classDate, check if it matches the current date
+                              if (material.classDate) {
+                                const materialDate = material.classDate instanceof Date 
+                                  ? material.classDate 
+                                  : new Date(material.classDate);
+                                
+                                // Set both dates to midnight for comparison
+                                const materialDateMidnight = new Date(materialDate);
+                                materialDateMidnight.setHours(0, 0, 0, 0);
+                                
+                                const displayDateMidnight = new Date(date);
+                                displayDateMidnight.setHours(0, 0, 0, 0);
+                                
+                                // Compare dates
+                                return materialDateMidnight.getTime() === displayDateMidnight.getTime();
+                              }
+                              
+                              // If no classDate, show on all dates (backward compatibility)
+                              return true;
+                            })
+                            .map((material, index) => (
                               <div key={`material-${index}`} className="flex flex-col space-y-2">
                                 {material.slides && material.slides.length > 0 && (
                                   <div className="space-y-1">
@@ -398,7 +492,7 @@ export const ClassSection = ({
                             href="#"
                             onClick={(e) => {
                               e.preventDefault();
-                              onOpenUploadForm(classSession.id);
+                              onOpenUploadForm(`${classSession.id}-${date.getTime()}`);
                             }}
                             className="flex items-center text-blue-600 hover:text-blue-800"
                           >
@@ -407,7 +501,7 @@ export const ClassSection = ({
                           </a>
                         </div>
                       )}
-                      {isAdmin && renderUploadMaterialsSection(classSession, date ? new Date(date) : new Date())}
+                      {isAdmin && renderUploadMaterialsSection(classSession, date)}
                     </div>
                   </div>
                 </div>

@@ -19,6 +19,12 @@ export interface ClassSession {
   updatedAt?: Timestamp;
   endDate?: Timestamp;
   startDate?: Timestamp;
+  scheduleType?: 'single' | 'multiple';  // Type of schedule (single day or multiple days per week)
+  schedules?: Array<{
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+  }>;  // For multiple days per week
   frequency?: {
     type: 'weekly' | 'biweekly' | 'custom';
     every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks

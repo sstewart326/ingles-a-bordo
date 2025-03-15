@@ -18,6 +18,9 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
   studentEmails,
   onUploadSuccess
 }) => {
+  // Extract the actual class ID from the combined format (classId-timestamp) if needed
+  const actualClassId = classId.includes('-') ? classId.split('-')[0] : classId;
+  
   const [slideFiles, setSlideFiles] = useState<File[]>([]);
   const [links, setLinks] = useState<string[]>([]);
   const [newLink, setNewLink] = useState('');
@@ -64,8 +67,14 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (slideFiles.length === 0 && links.length === 0) {
+      toast.error(t.noMaterialsFound || 'No materials to upload');
+      return;
+    }
+    
     setUploading(true);
-
+    
     try {
       // Extract the date components directly to avoid timezone issues
       const year = classDate.getFullYear();
@@ -75,9 +84,15 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
       // Create a new date using UTC to avoid timezone issues
       const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
       
-      await addClassMaterials(classId, utcDate, studentEmails, slideFiles, links);
+      await addClassMaterials(actualClassId, utcDate, studentEmails, slideFiles, links);
+      
       toast.success('Materials uploaded successfully');
-      onUploadSuccess?.();
+      setSlideFiles([]);
+      setLinks([]);
+      
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      }
     } catch (error) {
       console.error('Error uploading materials:', error);
       toast.error('Failed to upload materials');

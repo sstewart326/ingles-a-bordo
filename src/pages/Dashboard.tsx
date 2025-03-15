@@ -329,14 +329,19 @@ export const Dashboard = () => {
         debugLog('closeModal - Starting refresh of materials');
         debugLog('visibleUploadForm: ' + visibleUploadForm);
         
+        // Extract the actual class ID from the combined format (classId-timestamp)
+        const actualClassId = visibleUploadForm.includes('-') 
+          ? visibleUploadForm.split('-')[0] 
+          : visibleUploadForm;
+        
         // Fetch updated materials for this class without date filtering
-        const updatedMaterials = await getClassMaterials(visibleUploadForm);
-        debugMaterials(visibleUploadForm, updatedMaterials, 'updatedMaterials');
+        const updatedMaterials = await getClassMaterials(actualClassId);
+        debugMaterials(actualClassId, updatedMaterials, 'updatedMaterials');
         
         // Update the materials in the selectedDayDetails
         const updatedMaterialsMap = {
           ...selectedDayDetails.materials,
-          [visibleUploadForm]: updatedMaterials
+          [actualClassId]: updatedMaterials
         };
         
         // Update the selected day details with the new materials
@@ -348,12 +353,12 @@ export const Dashboard = () => {
         // Update the class materials state
         setClassMaterials({
           ...classMaterials,
-          [visibleUploadForm]: updatedMaterials
+          [actualClassId]: updatedMaterials
         });
         
         // Update the upcoming classes with the new materials
         const updatedUpcomingClasses = upcomingClasses.map(c => 
-          c.id === visibleUploadForm 
+          c.id === actualClassId 
             ? { ...c, materials: updatedMaterials } 
             : c
         );
@@ -362,7 +367,7 @@ export const Dashboard = () => {
         
         // Update the past classes with the new materials
         const updatedPastClasses = pastClasses.map(c => 
-          c.id === visibleUploadForm 
+          c.id === actualClassId 
             ? { ...c, materials: updatedMaterials } 
             : c
         );
