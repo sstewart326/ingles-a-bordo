@@ -1,8 +1,10 @@
 import { Navigate } from 'react-router-dom';
 import { useAdmin } from '../hooks/useAdmin';
+import { useMasquerade } from '../hooks/useMasquerade';
 
 export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAdmin, loading } = useAdmin();
+  const { isMasquerading } = useMasquerade();
 
   if (loading) {
     return (
@@ -12,7 +14,7 @@ export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAdmin || isMasquerading) {
     return <Navigate to="/schedule" />;
   }
 

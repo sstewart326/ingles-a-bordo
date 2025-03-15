@@ -58,4 +58,15 @@ export const cacheDocumentSnapshot = (
 ): void => {
   const data = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
   setCached(key, data, collectionPath);
+};
+
+/**
+ * Clears all cache entries that have keys starting with the given prefix
+ */
+export const clearCacheByPrefix = (prefix: string): void => {
+  for (const [key] of cache.entries()) {
+    if (key.startsWith(prefix)) {
+      cache.delete(key);
+    }
+  }
 }; 

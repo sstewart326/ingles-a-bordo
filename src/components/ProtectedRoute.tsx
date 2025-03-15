@@ -1,8 +1,8 @@
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading } = useAuthWithMasquerade();
 
   if (loading) {
     return (

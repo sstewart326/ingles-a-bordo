@@ -15,7 +15,7 @@ import {
   uploadBytes, 
   getDownloadURL
 } from 'firebase/storage';
-import { getCached, setCached, invalidateCache } from './cacheUtils';
+import { getCached, setCached, invalidateCache, clearCacheByPrefix } from './cacheUtils';
 import { ClassMaterial } from '../types/interfaces';
 
 const COLLECTION_PATH = 'classMaterials';
@@ -320,8 +320,27 @@ export const deleteClassMaterial = async (
 
 export const getStudentClassMaterials = async (studentEmail: string): Promise<ClassMaterial[]> => {
   try {
+    // Check if we're masquerading
+    let masqueradingEmail = null;
+    const masqueradeUserStr = sessionStorage.getItem('masqueradeUser');
+    if (masqueradeUserStr) {
+      try {
+        const masqueradeUser = JSON.parse(masqueradeUserStr);
+        if (masqueradeUser && masqueradeUser.email) {
+          // If masquerading, use the masqueraded user's email
+          masqueradingEmail = masqueradeUser.email;
+          logMaterialsUtil('Using masqueraded user email for materials:', masqueradingEmail);
+        }
+      } catch (error) {
+        console.error('Error parsing masquerade user from session storage:', error);
+      }
+    }
+
+    // Use masqueraded email if available, otherwise use provided email
+    const emailToUse = masqueradingEmail || studentEmail;
+    
     // Check cache first
-    const cacheKey = `student_${COLLECTION_PATH}_${studentEmail}`;
+    const cacheKey = `student_${COLLECTION_PATH}_${emailToUse}`;
     const cachedData = getCached<ClassMaterial[]>(cacheKey);
     if (cachedData) {
       return cachedData;
@@ -330,7 +349,7 @@ export const getStudentClassMaterials = async (studentEmail: string): Promise<Cl
     // First get the student's classes
     const classesQuery = query(
       collection(db, 'classes'),
-      where('studentEmails', 'array-contains', studentEmail)
+      where('studentEmails', 'array-contains', emailToUse)
     );
     
     try {
@@ -346,7 +365,7 @@ export const getStudentClassMaterials = async (studentEmail: string): Promise<Cl
       const materialsQuery = query(
         collection(db, COLLECTION_PATH),
         where('classId', 'in', classIds),
-        where('studentEmails', 'array-contains', studentEmail)
+        where('studentEmails', 'array-contains', emailToUse)
       );
 
       const materialsSnapshot = await getDocs(materialsQuery);
@@ -457,4 +476,11 @@ export const updateClassMaterialItem = async (
     console.error('Error updating class material item:', error);
     throw error;
   }
+};
+
+/**
+ * Clears the class materials cache
+ */
+export const clearMaterialsCache = () => {
+  clearCacheByPrefix(COLLECTION_PATH);
 }; 

@@ -13,6 +13,7 @@ import { cache } from '../utils/cache';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 import Modal from '../components/Modal';
+import { MasqueradeButton } from '../components/MasqueradeButton';
 
 interface User {
   id: string;
@@ -615,12 +616,21 @@ export const AdminUsers = () => {
 
       <div className="flex justify-end gap-2 mt-4">
         {user.status === 'active' ? (
-          <button
-            onClick={() => deleteUser(user.id)}
-            className={`${styles.buttons.danger} w-[130px]`}
-          >
-            {t.delete}
-          </button>
+          <>
+            {!user.isAdmin && (
+              <MasqueradeButton 
+                userId={user.id} 
+                userName={user.name} 
+                userEmail={user.email} 
+              />
+            )}
+            <button
+              onClick={() => deleteUser(user.id)}
+              className={`${styles.buttons.danger} w-[130px]`}
+            >
+              {t.delete}
+            </button>
+          </>
         ) : (
           <>
             <div className="relative group">
@@ -1013,17 +1023,25 @@ export const AdminUsers = () => {
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="flex flex-col items-center space-y-2">
-                            {user.status === 'active' && (
-                              <button
-                                onClick={() => deleteUser(user.id)}
-                                className={`${styles.buttons.danger} w-[130px]`}
-                              >
-                                {t.delete}
-                              </button>
-                            )}
-                            {user.status === 'pending' && (
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex flex-col gap-2 items-end">
+                            {user.status === 'active' ? (
+                              <>
+                                {!user.isAdmin && (
+                                  <MasqueradeButton 
+                                    userId={user.id} 
+                                    userName={user.name} 
+                                    userEmail={user.email} 
+                                  />
+                                )}
+                                <button
+                                  onClick={() => deleteUser(user.id)}
+                                  className={`${styles.buttons.danger} w-[130px]`}
+                                >
+                                  {t.delete}
+                                </button>
+                              </>
+                            ) : (
                               <>
                                 <div className="relative group">
                                   <button

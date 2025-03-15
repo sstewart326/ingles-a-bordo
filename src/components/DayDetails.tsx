@@ -1019,7 +1019,7 @@ export const DayDetails = ({
                                 </a>
                                 {isAdmin && (
                                   <button
-                                    onClick={(e) => {
+                                    onClick={(_) => {
                                       onDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
                                     }}
                                     disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}

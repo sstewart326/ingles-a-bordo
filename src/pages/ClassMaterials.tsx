@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { useLanguage } from '../hooks/useLanguage';
 import { getCachedDocument } from '../utils/firebaseUtils';
-import { getStudentClassMaterials } from '../utils/classMaterialsUtils';
+import { getStudentClassMaterials, clearMaterialsCache } from '../utils/classMaterialsUtils';
 import { FaFilePdf, FaLink } from 'react-icons/fa';
 import { useTranslation } from '../translations';
 import { formatDateWithTime } from '../utils/dateUtils';
@@ -22,7 +22,7 @@ const logMaterials = (message: string, data?: any) => {
 };
 
 export const ClassMaterials = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isMasquerading, masqueradingAs } = useAuthWithMasquerade();
   const { language } = useLanguage();
   const t = useTranslation(language);
   const [loading, setLoading] = useState(true);
@@ -105,6 +105,12 @@ export const ClassMaterials = () => {
 
     fetchData();
   }, [currentUser, t]);
+
+  // Clear materials cache when masquerading status changes
+  useEffect(() => {
+    // Clear the materials cache when masquerading status changes
+    clearMaterialsCache();
+  }, [isMasquerading, masqueradingAs?.id]);
 
   // Get unique month/year combinations from materials
   const availableMonths = React.useMemo(() => {

@@ -7,7 +7,7 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
+import { onRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import * as cors from 'cors';
@@ -248,7 +248,8 @@ export const getClassScheduleHttp = onRequest({
           // Add payment dates to the overall list
           paymentDueDates.push(...paymentDates.map(date => ({
             date,
-            classId
+            classId,
+            paymentLink: classData.paymentConfig?.paymentLink || null
           })));
         }
       }
@@ -775,7 +776,8 @@ export const getCalendarDataHttp = onRequest({
           // Add payment dates to the overall list
           paymentDueDates.push(...paymentDates.map(date => ({
             date,
-            classId
+            classId,
+            paymentLink: classData.paymentConfig?.paymentLink || null
           })));
         }
       }

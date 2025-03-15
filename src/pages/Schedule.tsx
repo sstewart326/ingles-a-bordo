@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { Calendar } from '../components/Calendar';
 import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';
 import '../styles/calendar.css';
@@ -8,7 +8,7 @@ import { FaFilePdf, FaLink, FaFileAlt } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { getCalendarData } from '../services/calendarService';
+import { getCalendarData, clearCalendarCache } from '../services/calendarService';
 import { ClassSession } from '../utils/scheduleUtils';
 
 // Define types for the calendar data from the server
@@ -63,6 +63,7 @@ interface CalendarMaterial {
 interface PaymentDueDate {
   date: string;
   classId: string;
+  paymentLink: string | null;
 }
 
 interface CompletedPayment {
@@ -122,7 +123,7 @@ export const Schedule = () => {
     isPaymentSoon: boolean;
   } | null>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
-  const { currentUser } = useAuth();
+  const { currentUser, isMasquerading, masqueradingAs } = useAuthWithMasquerade();
   const { language } = useLanguage();
   const t = useTranslation(language);
 
@@ -159,6 +160,12 @@ export const Schedule = () => {
     setLoading(true);
     fetchCalendarData();
   }, [currentUser, selectedDate]);
+
+  // Clear calendar cache when masquerading status changes
+  useEffect(() => {
+    // Clear the calendar cache when masquerading status changes
+    clearCalendarCache();
+  }, [isMasquerading, masqueradingAs?.id]);
 
   const getClassesForDate = (date: Date): CalendarClass[] => {
     if (!calendarData?.classes) return [];
@@ -384,14 +391,47 @@ export const Schedule = () => {
                 </h3>
 
                 {selectedDayDetails.isPaymentDay && (
-                  <div className="flex items-center gap-2 bg-[#fffbeb] p-3 rounded-lg mb-4">
-                    <div className={`w-2 h-2 rounded-full ${selectedDayDetails.isPaymentSoon ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`} />
-                    <div>
-                      <span className="text-sm font-medium text-[#f59e0b]">{t.paymentDue}</span>
-                      {selectedDayDetails.isPaymentSoon && (
-                        <span className="text-xs ml-2 text-[#ef4444]">Due soon</span>
-                      )}
+                  <div className="flex flex-col bg-[#fffbeb] p-3 rounded-lg mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${selectedDayDetails.isPaymentSoon ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`} />
+                      <div>
+                        <span className="text-sm font-medium text-[#f59e0b]">{t.paymentDue}</span>
+                        {selectedDayDetails.isPaymentSoon && (
+                          <span className="text-xs ml-2 text-[#ef4444]">Due soon</span>
+                        )}
+                      </div>
                     </div>
+                    
+                    {/* Payment Link Section */}
+                    {calendarData?.paymentDueDates && calendarData.paymentDueDates.some(payment => {
+                      const paymentDateStr = payment.date.split('T')[0];
+                      const selectedDateStr = selectedDayDetails.date.toISOString().split('T')[0];
+                      return paymentDateStr === selectedDateStr && payment.paymentLink;
+                    }) && (
+                      <div className="mt-2 ml-4">
+                        {calendarData.paymentDueDates
+                          .filter(payment => {
+                            const paymentDateStr = payment.date.split('T')[0];
+                            const selectedDateStr = selectedDayDetails.date.toISOString().split('T')[0];
+                            return paymentDateStr === selectedDateStr && payment.paymentLink;
+                          })
+                          .map((payment, index) => (
+                            <a 
+                              key={index}
+                              href={payment.paymentLink || '#'} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 flex items-center text-sm"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              {t.paymentLink || 'Payment Link'}
+                            </a>
+                          ))
+                        }
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
@@ -15,7 +15,7 @@ function classNames(...classes: string[]) {
 export const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, isMasquerading, masqueradingAs } = useAuthWithMasquerade();
   const { isAdmin } = useAdmin();
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -29,8 +29,11 @@ export const Header = () => {
     }
   };
 
+  // When masquerading, show student navigation regardless of admin status
+  const showAdminNav = isAdmin && !isMasquerading;
+
   const navigation = [
-    ...(isAdmin ? [
+    ...(showAdminNav ? [
       { name: t.home, href: '/dashboard', current: location.pathname === '/dashboard' },
       { name: t.manageUsers, href: '/admin/users', current: location.pathname === '/admin/users' },
       { name: t.manageSchedules, href: '/admin/schedule', current: location.pathname === '/admin/schedule' },
@@ -40,7 +43,7 @@ export const Header = () => {
     ])
   ];
 
-  const dashboardPath = isAdmin ? '/dashboard' : '/schedule';
+  const dashboardPath = showAdminNav ? '/dashboard' : '/schedule';
 
   return (
     <Disclosure as="nav" className="header-nav">

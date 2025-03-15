@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
 import { Header } from './components/Header';
 import Footer from './components/Footer';
+import { MasqueradeIndicator } from './components/MasqueradeIndicator';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Dashboard } from './pages/Dashboard';
@@ -27,6 +28,7 @@ const LoadingSpinner = () => (
 export const AppRoutes = () => {
   return (
     <div className="flex flex-col flex-1 w-full m-0 p-0 overflow-x-hidden">
+      <MasqueradeIndicator />
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<><Login /><Footer /></>} />

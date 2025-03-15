@@ -96,19 +96,40 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
       throw new Error('No authenticated user');
     }
 
-    // Get the user's document ID from Firestore
-    const userDocs = await getCachedCollection('users', [
-      where('email', '==', user.email)
-    ], {
-      includeIds: true
-    });
-
-    const userDoc = userDocs[0];
-    if (!userDoc) {
-      throw new Error('User not found');
+    // Check if we're masquerading
+    let userId;
+    
+    // Get masquerade state from session storage
+    const masqueradeUserStr = sessionStorage.getItem('masqueradeUser');
+    if (masqueradeUserStr) {
+      try {
+        const masqueradeUser = JSON.parse(masqueradeUserStr);
+        if (masqueradeUser && masqueradeUser.id) {
+          // If masquerading, use the masqueraded user's ID
+          userId = masqueradeUser.id;
+          console.log('Using masqueraded user ID for calendar data:', userId);
+        }
+      } catch (error) {
+        console.error('Error parsing masquerade user from session storage:', error);
+      }
     }
     
-    const url = `${baseUrl}/getCalendarDataHttp?month=${month}&year=${year}&userId=${userDoc.id}`;
+    // If not masquerading, get the current user's document ID
+    if (!userId) {
+      const userDocs = await getCachedCollection('users', [
+        where('email', '==', user.email)
+      ], {
+        includeIds: true
+      });
+
+      const userDoc = userDocs[0];
+      if (!userDoc) {
+        throw new Error('User not found');
+      }
+      userId = userDoc.id;
+    }
+    
+    const url = `${baseUrl}/getCalendarDataHttp?month=${month}&year=${year}&userId=${userId}`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -184,4 +205,11 @@ export const getAllClassesForMonth = async (month: number, year: number, options
     console.error('Error fetching all classes for month:', error);
     throw error;
   }
+};
+
+/**
+ * Clears the calendar cache
+ */
+export const clearCalendarCache = () => {
+  calendarCache.invalidate();
 }; 
