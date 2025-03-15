@@ -23,6 +23,7 @@ import { ClassesSection } from '../components/ClassesSection';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { debugLog, debugMaterials } from '../utils/debugUtils';
 import { getPaymentsDueForDay } from '../utils/paymentUtils';
+import { useLocation } from 'react-router-dom';
 
 export const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -36,6 +37,10 @@ export const Dashboard = () => {
   const [upcomingClassesPage, setUpcomingClassesPage] = useState(0);
   const [pastClassesPage, setPastClassesPage] = useState(0);
   const [initialDataFetched, setInitialDataFetched] = useState(false);
+  const [lastVisitTimestamp, setLastVisitTimestamp] = useState<number>(Date.now());
+  
+  const location = useLocation();
+  const prevPathRef = useRef<string | null>(null);
   
   const { currentUser, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -72,6 +77,41 @@ export const Dashboard = () => {
       setInitialDataFetched(true);
     }
   }, [authLoading, adminLoading, currentUser, initialDataFetched, fetchClasses]);
+
+  // Track navigation to/from dashboard
+  useEffect(() => {
+    const currentPath = location.pathname;
+    
+    // If we're coming back to the dashboard from another page
+    if (currentPath === '/dashboard' && prevPathRef.current && prevPathRef.current !== '/dashboard') {
+      debugLog('Returning to dashboard from another page');
+      fetchClasses(selectedDate);
+      setLastVisitTimestamp(Date.now());
+    }
+    
+    prevPathRef.current = currentPath;
+  }, [location.pathname, fetchClasses, selectedDate]);
+
+  // Handle page visibility changes (tab switching, etc.)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        // If it's been more than 5 minutes since last visit, refresh data
+        if (now - lastVisitTimestamp > 5 * 60 * 1000) {
+          debugLog('Page became visible after extended absence, refreshing data');
+          fetchClasses(selectedDate);
+          setLastVisitTimestamp(now);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchClasses, lastVisitTimestamp, selectedDate]);
 
   // Add resize event listener to update mobile view state
   useEffect(() => {
@@ -118,16 +158,51 @@ export const Dashboard = () => {
     const fetchMaterials = async () => {
       const materialsMap: Record<string, ClassMaterial[]> = {};
       
-      for (const classSession of classes) {
-        try {
-          const materials = await getClassMaterials(classSession.id, date);
+      // Check if we already have materials for these classes
+      const classesNeedingMaterials = classes.filter(classSession => 
+        !classMaterials[classSession.id] || classMaterials[classSession.id].length === 0
+      );
+      
+      // Use existing materials for classes that already have them
+      classes.forEach(classSession => {
+        if (classMaterials[classSession.id] && classMaterials[classSession.id].length > 0) {
+          // Filter materials for this specific date if needed
+          const dateStr = date.toISOString().split('T')[0];
+          const materialsForDate = classMaterials[classSession.id].filter(material => {
+            const materialDateStr = material.classDate.toISOString().split('T')[0];
+            return materialDateStr === dateStr;
+          });
           
-          if (materials.length > 0) {
-            materialsMap[classSession.id] = materials;
+          if (materialsForDate.length > 0) {
+            materialsMap[classSession.id] = materialsForDate;
           }
-        } catch (error) {
-          console.error('Error fetching materials for class:', classSession.id, error);
         }
+      });
+      
+      // Only fetch materials for classes that don't have them yet
+      if (classesNeedingMaterials.length > 0) {
+        debugLog(`Fetching materials for ${classesNeedingMaterials.length} classes out of ${classes.length} total`);
+        
+        for (const classSession of classesNeedingMaterials) {
+          try {
+            const materials = await getClassMaterials(classSession.id, date);
+            
+            if (materials.length > 0) {
+              materialsMap[classSession.id] = materials;
+              
+              // Update the global materials cache
+              const updatedMaterials = {
+                ...classMaterials,
+                [classSession.id]: materials
+              };
+              setClassMaterials(updatedMaterials);
+            }
+          } catch (error) {
+            console.error('Error fetching materials for class:', classSession.id, error);
+          }
+        }
+      } else {
+        debugLog('All materials already loaded, skipping fetch');
       }
       
       if (!materialsAlreadyLoaded) {
@@ -150,19 +225,12 @@ export const Dashboard = () => {
       date,
       classes,
       paymentsDue: paymentsDueForDay,
-      materials: selectedDayDetails?.materials || {},
+      materials: {},
       birthdays
     });
-
+    
     // Then fetch materials asynchronously
     fetchMaterials();
-
-    // Always scroll to details section, regardless of screen size
-    if (detailsRef.current) {
-      setTimeout(() => {
-        detailsRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    }
   };
 
   const handleEditNotes = useCallback((classSession: ClassSession) => {

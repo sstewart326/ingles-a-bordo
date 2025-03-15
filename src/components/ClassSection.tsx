@@ -6,7 +6,7 @@ import { FaLink, FaPlus, FaTrash, FaFilePowerpoint } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
 import { UploadMaterialsForm } from './UploadMaterialsForm';
-import { debugLog, debugMaterials, debugClassSession } from '../utils/debugUtils';
+import { debugMaterials, debugClassSession } from '../utils/debugUtils';
 
 // Extended interface to include dates property
 interface ExtendedClassSession extends ClassSession {
@@ -105,10 +105,6 @@ export const ClassSection = ({
       [key]: !prev[key]
     }));
   };
-
-  // Add debugging logs
-  debugLog(`ClassSection rendering: ${title}`);
-  debugLog(`Classes count: ${classes.length}`);
   
   // Calculate pagination
   const startIndex = currentPage * pageSize;
@@ -186,11 +182,6 @@ export const ClassSection = ({
   // Use the expanded classes for pagination
   const displayedClasses = expandedClasses.slice(startIndex, endIndex);
   const totalPages = Math.ceil(expandedClasses.length / pageSize);
-
-  // Log only if the displayed classes count is different from total
-  if (displayedClasses.length !== expandedClasses.length) {
-    debugLog(`Displayed classes count: ${displayedClasses.length} of ${expandedClasses.length}`);
-  }
   
   // Log only the first class's materials to avoid spam
   if (displayedClasses.length > 0) {

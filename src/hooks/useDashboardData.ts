@@ -41,7 +41,7 @@ interface UseDashboardDataReturn extends DashboardData {
   setClassMaterials: (materials: Record<string, ClassMaterial[]>) => void;
   fetchClasses: (targetDate: Date) => Promise<void>;
   getClassesForDay: (dayOfWeek: number, date: Date) => ClassSession[];
-  isDateInRelevantMonthRange: (date: Date) => boolean;
+  isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
   getRelevantMonthKeys: (date: Date) => string[];
   getMonthKey: (date: Date, offset?: number) => string;
 }
@@ -83,22 +83,24 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     ];
   };
 
-  const isDateInRelevantMonthRange = (date: Date): boolean => {
+  const isDateInRelevantMonthRange = (date: Date, selectedDate: Date = new Date()): boolean => {
     const dateMonth = date.getMonth();
     const dateYear = date.getFullYear();
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
     
-    // Allow any future date
-    if (dateYear > currentYear || (dateYear === currentYear && dateMonth > currentMonth)) {
+    // Use the selected date from the calendar instead of the current date
+    const selectedMonth = selectedDate.getMonth();
+    const selectedYear = selectedDate.getFullYear();
+    
+    // Allow any future date relative to the selected date
+    if (dateYear > selectedYear || (dateYear === selectedYear && dateMonth > selectedMonth)) {
       return true;
     }
     
-    // For past dates, only show one month back
+    // For past dates, only show one month back from the selected date
     return (
-      (dateMonth === currentMonth && dateYear === currentYear) ||
-      (dateMonth === currentMonth - 1 && dateYear === currentYear) ||
-      (dateMonth === 11 && currentMonth === 0 && dateYear === currentYear - 1)
+      (dateMonth === selectedMonth && dateYear === selectedYear) ||
+      (dateMonth === selectedMonth - 1 && dateYear === selectedYear) ||
+      (dateMonth === 11 && selectedMonth === 0 && dateYear === selectedYear - 1)
     );
   };
 
@@ -117,14 +119,18 @@ export const useDashboardData = (): UseDashboardDataReturn => {
       const monthsToLoad = getRelevantMonthKeys(targetDate);
       console.log('Months to load:', monthsToLoad);
       
-      if (monthsToLoad.length > 0) {
+      // Filter out months that have already been loaded
+      const newMonthsToLoad = monthsToLoad.filter(month => !loadedMonths.has(month));
+      console.log('New months to load:', newMonthsToLoad);
+      
+      if (newMonthsToLoad.length > 0) {
         let transformedClasses: ExtendedClassSession[] = [];
         let userDocs: User[] = [];
-        let combinedDailyClassMap: Record<string, any[]> = {};
+        let combinedDailyClassMap: Record<string, any[]> = { ...dailyClassMap };
         
         if (isAdmin) {
           // For admin users, fetch data for all relevant months
-          const fetchPromises = monthsToLoad.map(async (monthKey) => {
+          const fetchPromises = newMonthsToLoad.map(async (monthKey) => {
             const [year, month] = monthKey.split('-').map(Number);
             try {
               const response = await getAllClassesForMonth(month, year, { bypassCache: true });
@@ -198,22 +204,49 @@ export const useDashboardData = (): UseDashboardDataReturn => {
           newUserNames[user.email] = user.name;
         });
 
+        // Log the number of classes fetched
+        console.log(`Fetched ${transformedClasses.length} classes for months: ${newMonthsToLoad.join(', ')}`);
+        
+        // Ensure classes have payment config
+        transformedClasses = transformedClasses.map(classSession => {
+          if (!classSession.paymentConfig) {
+            return {
+              ...classSession,
+              paymentConfig: {
+                type: 'monthly',
+                monthlyOption: 'first',
+                startDate: classSession.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+              }
+            };
+          }
+          return classSession;
+        });
+
         // Batch state updates to reduce re-renders
         const updates = () => {
-          setUserNames(newUserNames);
-          setUsers(userDocs);
+          setUserNames(prev => ({ ...prev, ...newUserNames }));
+          setUsers(prev => {
+            // Merge new users with existing users, avoiding duplicates
+            const emailMap = new Map(prev.map(user => [user.email, user]));
+            userDocs.forEach(user => emailMap.set(user.email, user));
+            return Array.from(emailMap.values());
+          });
           
           // Update class lists using the updateClassList function
           updateClassList({
             classes: transformedClasses,
-            upcomingClasses: [],  // Start with empty arrays to ensure fresh data
-            pastClasses: [],
+            upcomingClasses,  // Use existing arrays instead of empty ones
+            pastClasses,
             setUpcomingClasses,
             setPastClasses
           });
           
-          // Update loaded months
-          setLoadedMonths(new Set(monthsToLoad));  // Only keep the current relevant months
+          // Update loaded months - add new months to the existing set
+          setLoadedMonths(prev => {
+            const updatedSet = new Set(prev);
+            newMonthsToLoad.forEach(month => updatedSet.add(month));
+            return updatedSet;
+          });
         };
 
         // Perform all state updates in one go
@@ -223,8 +256,8 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         await fetchMaterialsForClasses({
           classes: transformedClasses,
           state: {
-            upcomingClasses: [],  // Start with empty arrays to ensure fresh data
-            pastClasses: [],
+            upcomingClasses,  // Use existing arrays instead of empty ones
+            pastClasses,
             classMaterials,
             loadedMaterialMonths
           },
@@ -239,7 +272,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
-  }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails]);
+  }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails, loadedMonths, upcomingClasses, pastClasses, dailyClassMap]);
 
   return {
     // State

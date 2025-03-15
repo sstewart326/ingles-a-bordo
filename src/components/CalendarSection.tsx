@@ -11,7 +11,7 @@ interface CalendarSectionProps {
   upcomingClasses: ClassSession[];
   onMonthChange: (date: Date) => void;
   onDayClick: (date: Date, classes: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
-  isDateInRelevantMonthRange: (date: Date) => boolean;
+  isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
   getClassesForDay: (dayOfWeek: number, date: Date) => ClassSession[];
   users: User[];
 }
@@ -44,13 +44,18 @@ export const CalendarSection = ({
     const lastDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
     
     for (let date = new Date(firstDay); date <= lastDay; date.setDate(date.getDate() + 1)) {
-      const paymentsDue = getPaymentsDueForDay(new Date(date), upcomingClasses, users, isDateInRelevantMonthRange);
+      const paymentsDue = getPaymentsDueForDay(
+        new Date(date), 
+        upcomingClasses, 
+        users, 
+        (date) => isDateInRelevantMonthRange(date, selectedDate)
+      );
       if (paymentsDue.length > 0) {
         datesWithPayments.push(new Date(date));
         paymentsDue.forEach(({ classSession }) => classSessionIds.add(classSession.id));
       }
     }
-
+    
     setMonthPaymentDueDates({
       datesWithPayments,
       classSessionIds: Array.from(classSessionIds)
@@ -109,9 +114,14 @@ export const CalendarSection = ({
 
   const handleDayClick = useCallback((date: Date) => {
     const classes = getClassesForDayWithCache(date);
-    const paymentsDue = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
+    const paymentsDue = getPaymentsDueForDay(
+      date, 
+      upcomingClasses, 
+      users, 
+      (date) => isDateInRelevantMonthRange(date, selectedDate)
+    );
     onDayClick(date, classes, paymentsDue);
-  }, [getClassesForDayWithCache, upcomingClasses, users, isDateInRelevantMonthRange, onDayClick]);
+  }, [getClassesForDayWithCache, upcomingClasses, users, isDateInRelevantMonthRange, onDayClick, selectedDate]);
 
   return (
     <Calendar
@@ -119,18 +129,27 @@ export const CalendarSection = ({
       onMonthChange={onMonthChange}
       onDayClick={handleDayClick}
       isLoading={isLoadingPayments}
-      renderDay={(date, isToday) => (
-        <CalendarDay
-          date={date}
-          isToday={isToday}
-          classes={getClassesForDayWithCache(date)}
-          paymentsDue={getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange)}
-          isDateInRelevantMonthRange={isDateInRelevantMonthRange}
-          completedPayments={completedPayments}
-          isLoading={isLoadingPayments}
-          users={users}
-        />
-      )}
+      renderDay={(date, isToday) => {
+        const dayPaymentsDue = getPaymentsDueForDay(
+          date, 
+          upcomingClasses, 
+          users, 
+          (date) => isDateInRelevantMonthRange(date, selectedDate)
+        );
+        
+        return (
+          <CalendarDay
+            date={date}
+            isToday={isToday}
+            classes={getClassesForDayWithCache(date)}
+            paymentsDue={dayPaymentsDue}
+            isDateInRelevantMonthRange={isDateInRelevantMonthRange}
+            completedPayments={completedPayments}
+            isLoading={isLoadingPayments}
+            users={users}
+          />
+        );
+      }}
     />
   );
 }; 

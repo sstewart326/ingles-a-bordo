@@ -76,26 +76,26 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
     .filter(c => {
       const extendedClass = c as ExtendedClassSession;
       
-      // If the class has specific dates, check if any are in the future but within the next 7 days
+      // If the class has specific dates, check if any are today or in the future
       if (extendedClass.dates && extendedClass.dates.length > 0) {
-        // Check if any dates are today or in the future but within 7 days
-        const hasUpcomingDate = extendedClass.dates.some(date => {
+        // Check if any dates are today or in the future
+        const hasFutureDate = extendedClass.dates.some(date => {
           const dateToCheck = new Date(date);
           // Ensure we're comparing dates at midnight in the local timezone
           dateToCheck.setHours(0, 0, 0, 0);
-          const isUpcoming = dateToCheck.getTime() >= todayTime && dateToCheck.getTime() <= sevenDaysFromNowTime;
+          const isFuture = dateToCheck.getTime() >= todayTime;
           
-          if (isUpcoming) {
-            console.log(`\nFound upcoming date for class ${c.id}:`);
+          if (isFuture) {
+            console.log(`\nFound future date for class ${c.id}:`);
             console.log('Date:', dateToCheck.toISOString());
             console.log('Today:', new Date(todayTime).toISOString());
-            console.log('Is upcoming within 7 days:', isUpcoming);
+            console.log('Is in the future:', isFuture);
           }
           
-          return isUpcoming;
+          return isFuture;
         });
         
-        return hasUpcomingDate;
+        return hasFutureDate;
       }
       
       return false;
@@ -109,23 +109,23 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       const extendedA = a as ExtendedClassSession;
       const extendedB = b as ExtendedClassSession;
       
-      // If both classes have specific dates, sort by the earliest upcoming date
+      // If both classes have specific dates, sort by the earliest future date
       if (extendedA.dates && extendedA.dates.length > 0 && extendedB.dates && extendedB.dates.length > 0) {
-        // Find the earliest upcoming date for each class
-        const upcomingDatesA = extendedA.dates.filter(date => {
+        // Find the earliest future date for each class
+        const futureDatesA = extendedA.dates.filter(date => {
           const dateObj = new Date(date);
           dateObj.setHours(0, 0, 0, 0);
-          return dateObj.getTime() >= todayTime && dateObj.getTime() <= sevenDaysFromNowTime;
+          return dateObj.getTime() >= todayTime;
         });
-        const upcomingDatesB = extendedB.dates.filter(date => {
+        const futureDatesB = extendedB.dates.filter(date => {
           const dateObj = new Date(date);
           dateObj.setHours(0, 0, 0, 0);
-          return dateObj.getTime() >= todayTime && dateObj.getTime() <= sevenDaysFromNowTime;
+          return dateObj.getTime() >= todayTime;
         });
         
-        if (upcomingDatesA.length > 0 && upcomingDatesB.length > 0) {
-          const earliestA = new Date(Math.min(...upcomingDatesA.map(d => new Date(d).getTime())));
-          const earliestB = new Date(Math.min(...upcomingDatesB.map(d => new Date(d).getTime())));
+        if (futureDatesA.length > 0 && futureDatesB.length > 0) {
+          const earliestA = new Date(Math.min(...futureDatesA.map(d => new Date(d).getTime())));
+          const earliestB = new Date(Math.min(...futureDatesB.map(d => new Date(d).getTime())));
           return earliestA.getTime() - earliestB.getTime();
         }
       }
@@ -227,6 +227,31 @@ export const fetchMaterialsForClass = async ({
   setSelectedDayDetails
 }: FetchMaterialsParams) => {
   try {
+    // Check if materials are already loaded for this class
+    if (state.classMaterials[classId] && state.classMaterials[classId].length > 0) {
+      console.log(`Materials already loaded for class ${classId}, skipping fetch`);
+      
+      // Update selected day details if they exist and match the current class
+      if (selectedDayDetails && selectedDayDetails.classes.some((c: ClassSession) => c.id === classId)) {
+        setSelectedDayDetails({
+          ...selectedDayDetails,
+          materials: {
+            ...selectedDayDetails.materials,
+            [classId]: state.classMaterials[classId]
+          }
+        });
+      }
+      
+      // Update the loaded material months
+      const monthKey = getMonthKey(date);
+      setState({
+        loadedMaterialMonths: new Set([...state.loadedMaterialMonths, monthKey])
+      });
+      
+      return state.classMaterials[classId];
+    }
+    
+    // If not loaded, fetch materials
     const materials = await getClassMaterials(classId);
     
     // Update the materials state
@@ -277,7 +302,19 @@ export const fetchMaterialsForClasses = async ({
   selectedDayDetails,
   setSelectedDayDetails
 }: FetchMaterialsForClassesParams) => {
-  const promises = classes.map(async (classSession) => {
+  // Filter out classes that already have materials loaded
+  const classesToFetch = classes.filter(classSession => 
+    !state.classMaterials[classSession.id] || state.classMaterials[classSession.id].length === 0
+  );
+  
+  if (classesToFetch.length === 0) {
+    console.log('All materials already loaded, skipping fetch');
+    return;
+  }
+  
+  console.log(`Fetching materials for ${classesToFetch.length} classes out of ${classes.length} total`);
+  
+  const promises = classesToFetch.map(async (classSession) => {
     // Get materials for this class without date filtering
     const materials = await getClassMaterials(classSession.id);
     

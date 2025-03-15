@@ -74,6 +74,12 @@ export const getNextPaymentDates = (paymentConfig: User['paymentConfig'], classS
     const interval = paymentConfig.weeklyInterval || 1;
     let currentPaymentDate = new Date(paymentStartDate);
 
+    // Calculate the next payment date after the start date
+    while (currentPaymentDate < monthStart) {
+      currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * interval));
+    }
+
+    // Add all payment dates within the month
     while (currentPaymentDate <= monthEnd) {
       if (currentPaymentDate >= monthStart) {
         dates.push(new Date(currentPaymentDate));
@@ -112,11 +118,20 @@ export const getPaymentsDueForDay = (
   date: Date,
   upcomingClasses: ClassSession[],
   users: User[],
-  isDateInRelevantMonthRange: (date: Date) => boolean
+  isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean
 ): PaymentDue[] => {
   // Check if the date is within the current month or adjacent months
-  if (!isDateInRelevantMonthRange(date)) {
+  if (!isDateInRelevantMonthRange(date, date)) {
     return [];
+  }
+  
+  // Debug log for May 11, 2025
+  if (date.getFullYear() === 2025 && date.getMonth() === 4 && date.getDate() === 11) {
+    console.log(`getPaymentsDueForDay called for May 11, 2025 with ${upcomingClasses.length} classes`);
+    if (upcomingClasses.length > 0) {
+      console.log('First class ID:', upcomingClasses[0].id);
+      console.log('First class payment config:', upcomingClasses[0].paymentConfig);
+    }
   }
   
   const paymentsDue: PaymentDue[] = [];
@@ -130,6 +145,7 @@ export const getPaymentsDueForDay = (
     
     if (classSession.paymentConfig) {
       const paymentDates = getNextPaymentDates(classSession.paymentConfig, classSession, date);
+      
       const isPaymentDue = paymentDates.some(paymentDate => 
         paymentDate.getFullYear() === date.getFullYear() &&
         paymentDate.getMonth() === date.getMonth() &&
@@ -150,6 +166,11 @@ export const getPaymentsDueForDay = (
       }
     }
   });
+  
+  // Debug log for May 11, 2025
+  if (date.getFullYear() === 2025 && date.getMonth() === 4 && date.getDate() === 11) {
+    console.log(`Found ${paymentsDue.length} payments due for May 11, 2025`);
+  }
   
   return paymentsDue;
 }; 

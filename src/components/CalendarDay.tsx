@@ -11,7 +11,7 @@ export interface CalendarDayProps<T extends ClassSession> {
   onDayClick?: (date: Date, classes: T[]) => void;
   completedPayments?: Payment[];
   isLoading?: boolean;
-  isDateInRelevantMonthRange: (date: Date) => boolean;
+  isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
   users?: User[];
 }
 
@@ -93,7 +93,7 @@ export function CalendarDay<T extends ClassSession>({
     }).join('\n');
   };
 
-  const isRelevant = isDateInRelevantMonthRange(date);
+  const isRelevant = isDateInRelevantMonthRange(date, date);
   const hasClasses = classes.length > 0;
 
   return (
