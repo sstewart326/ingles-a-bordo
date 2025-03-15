@@ -1,5 +1,7 @@
 import { getFunctions } from 'firebase/functions';
 import { getAuth } from 'firebase/auth';
+import { getCachedCollection } from '../utils/firebaseUtils';
+import { where } from 'firebase/firestore';
 
 // Cache implementation
 interface CacheEntry<T> {
@@ -93,8 +95,20 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
     if (!user) {
       throw new Error('No authenticated user');
     }
+
+    // Get the user's document ID from Firestore
+    const userDocs = await getCachedCollection('users', [
+      where('email', '==', user.email)
+    ], {
+      includeIds: true
+    });
+
+    const userDoc = userDocs[0];
+    if (!userDoc) {
+      throw new Error('User not found');
+    }
     
-    const url = `${baseUrl}/getCalendarDataHttp?month=${month}&year=${year}&userId=${user.uid}`;
+    const url = `${baseUrl}/getCalendarDataHttp?month=${month}&year=${year}&userId=${userDoc.id}`;
     
     const response = await fetch(url, {
       method: 'GET',

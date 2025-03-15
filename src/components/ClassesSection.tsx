@@ -34,6 +34,7 @@ interface ClassesSectionProps {
   textareaRefs: { [key: string]: HTMLTextAreaElement | null };
   onUpcomingClassesPageChange: (page: number) => void;
   onPastClassesPageChange: (page: number) => void;
+  selectedDate?: Date;
   t: {
     upcomingClasses: string;
     pastClasses: string;
@@ -86,6 +87,7 @@ export const ClassesSection = ({
   textareaRefs,
   onUpcomingClassesPageChange,
   onPastClassesPageChange,
+  selectedDate,
   t
 }: ClassesSectionProps) => {
   const upcomingClassesSectionRef = useRef<HTMLDivElement>(null);
@@ -124,6 +126,7 @@ export const ClassesSection = ({
           onPageChange={onPastClassesPageChange}
           sectionRef={pastClassesSectionRef}
           t={t}
+          selectedDate={selectedDate}
         />
       </div>
 
@@ -158,6 +161,7 @@ export const ClassesSection = ({
           onPageChange={onUpcomingClassesPageChange}
           sectionRef={upcomingClassesSectionRef}
           t={t}
+          selectedDate={selectedDate}
         />
       </div>
     </>

@@ -392,20 +392,14 @@ export const DayDetails = ({
           paymentsDue: updatedPaymentsDue
         };
         
-        console.log('Updating selectedDayDetails with new payment link');
-        
         // Update the local state first
         if (setSelectedDayDetails) {
           setSelectedDayDetails(updatedSelectedDayDetails);
-          console.log('selectedDayDetails updated');
-        } else {
-          console.log('setSelectedDayDetails is not available');
         }
         
         // Then notify parent component to refresh calendar
         if (onPaymentStatusChange) {
           onPaymentStatusChange(selectedDayDetails.date);
-          console.log('Calendar refresh triggered');
         }
       }
       
@@ -432,16 +426,24 @@ export const DayDetails = ({
     });
   };
 
-  const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (
-    <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
-      <UploadMaterialsForm
-        classId={classSession.id}
-        classDate={date}
-        studentEmails={classSession.studentEmails || []}
-        onUploadSuccess={onCloseUploadForm}
-      />
-    </Modal>
-  );
+  const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => {
+    // Create a UTC date to avoid timezone issues
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+    const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+    
+    return (
+      <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
+        <UploadMaterialsForm
+          classId={classSession.id}
+          classDate={utcDate}
+          studentEmails={classSession.studentEmails || []}
+          onUploadSuccess={onCloseUploadForm}
+        />
+      </Modal>
+    );
+  };
 
   // Reset pagination when selected day changes
   useEffect(() => {
@@ -501,19 +503,17 @@ export const DayDetails = ({
     }
   };
 
-  // Log when selectedDayDetails changes
+  // Check for changes in selectedDayDetails
   useEffect(() => {
     if (selectedDayDetails) {
-      console.log('selectedDayDetails changed:', selectedDayDetails);
-      
-      // Log payment links for all classes
+      // Initialize payment links for all classes
       selectedDayDetails.classes.forEach(classSession => {
-        console.log(`Class ${classSession.id} payment link:`, classSession.paymentConfig?.paymentLink);
-      });
-      
-      // Log payment links for all payment due classes
-      selectedDayDetails.paymentsDue.forEach(({ classSession }) => {
-        console.log(`Payment due class ${classSession.id} payment link:`, classSession.paymentConfig?.paymentLink);
+        if (classSession.paymentConfig?.paymentLink) {
+          setPaymentLinks(prev => ({
+            ...prev,
+            [classSession.id]: classSession.paymentConfig?.paymentLink || null
+          }));
+        }
       });
     }
   }, [selectedDayDetails]);

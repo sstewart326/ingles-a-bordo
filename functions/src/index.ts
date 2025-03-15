@@ -319,6 +319,9 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
   if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
     // Use the schedules array for multiple schedule type
     daysOfWeek.push(...classData.schedules.map((schedule: any) => schedule.dayOfWeek));
+    
+    // Log for debugging
+    logger.info(`Multiple schedule type detected with days: ${daysOfWeek.join(', ')}`);
   } else if (Array.isArray(classData.daysOfWeek) && classData.daysOfWeek.length > 0) {
     // Use the daysOfWeek array if it exists
     daysOfWeek.push(...classData.daysOfWeek);
@@ -327,6 +330,7 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
     daysOfWeek.push(classData.dayOfWeek);
   } else {
     // No valid day of week information
+    logger.warn(`No valid day of week information found for class: ${JSON.stringify(classData)}`);
     return dates;
   }
 
@@ -335,6 +339,9 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
   const isBiweekly = frequency.type === 'biweekly';
   const isCustom = frequency.type === 'custom';
   const interval = isBiweekly ? 2 : (isCustom ? frequency.every : recurrenceInterval);
+  
+  // Log frequency information for debugging
+  logger.info(`Class frequency: ${JSON.stringify(frequency)}, calculated interval: ${interval}`);
   
   // Get the class start date for reference
   const classStartDate = classData.startDate ? classData.startDate.toDate() : new Date(startDate);
@@ -404,6 +411,9 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
       }
     }
   }
+  
+  // Log the calculated dates for debugging
+  logger.info(`Calculated ${dates.length} class dates`);
   
   // Sort dates chronologically
   return dates.sort((a, b) => a.getTime() - b.getTime());
@@ -679,10 +689,13 @@ export const getCalendarDataHttp = onRequest({
       const endDate = new Date(yearInt, monthInt + 1, 0); // Last day of the month
 
       // Get user data for payment configuration
-      let userData = null;
+      let userData: any = null;
+      let userEmail = null;
+      
       if (email) {
+        userEmail = email as string;
         const usersSnapshot = await admin.firestore().collection('users')
-          .where('email', '==', email)
+          .where('email', '==', userEmail)
           .limit(1)
           .get();
         
@@ -700,6 +713,7 @@ export const getCalendarDataHttp = onRequest({
             id: userDoc.id,
             ...userDoc.data()
           };
+          userEmail = userData.email;
         }
       }
 
@@ -708,11 +722,12 @@ export const getCalendarDataHttp = onRequest({
         return;
       }
 
-      // Query classes based on user identifier
+      // Query classes based on user identifier - try both studentIds and studentEmails
       let classesQuery: admin.firestore.Query;
-      if (email) {
+      
+      if (userEmail) {
         classesQuery = admin.firestore().collection('classes')
-          .where('studentEmails', 'array-contains', email);
+          .where('studentEmails', 'array-contains', userEmail);
       } else {
         classesQuery = admin.firestore().collection('classes')
           .where('studentIds', 'array-contains', userId);
@@ -729,6 +744,9 @@ export const getCalendarDataHttp = onRequest({
         const classData = doc.data();
         const classId = doc.id;
         classIds.push(classId);
+        
+        // Log class data for debugging
+        logger.info(`Processing class: ${classId}`, classData);
         
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
@@ -767,9 +785,14 @@ export const getCalendarDataHttp = onRequest({
           );
 
           classSchedule.push({
+            id: classId,
             classDetails: {
+              id: classId,
               dayOfWeek: classData.dayOfWeek,
               daysOfWeek: classData.daysOfWeek,
+              scheduleType: classData.scheduleType,
+              schedules: classData.schedules,
+              frequency: classData.frequency,
               startTime: classData.startTime,
               endTime: classData.endTime,
               courseType: classData.courseType,
@@ -835,27 +858,76 @@ export const getCalendarDataHttp = onRequest({
         }
       }
 
-      // Get completed payments for the month
+      // Get completed payments for the month - check both userId as ID and email
       const completedPayments = [];
       
-      if (userData.id) {
-        const paymentsQuery: admin.firestore.Query = admin.firestore().collection('payments')
-          .where('userId', '==', userData.id)
-          .where('dueDate', '>=', admin.firestore.Timestamp.fromDate(startDate))
-          .where('dueDate', '<=', admin.firestore.Timestamp.fromDate(endDate));
-        
-        const paymentsSnapshot = await paymentsQuery.get();
-        
-        for (const doc of paymentsSnapshot.docs) {
-          const paymentData = doc.data();
-          completedPayments.push({
-            id: doc.id,
-            ...paymentData,
-            dueDate: paymentData.dueDate.toDate(),
-            completedAt: paymentData.completedAt ? paymentData.completedAt.toDate() : null,
-            createdAt: paymentData.createdAt.toDate(),
-            updatedAt: paymentData.updatedAt.toDate()
-          });
+      if (userData.id || userEmail) {
+        try {
+          // Check if we should query by ID or email
+          if (userEmail) {
+            // Try both userId field formats
+            const paymentsSnapshotByEmail = await admin.firestore().collection('payments')
+              .where('userId', '==', userEmail)
+              .where('dueDate', '>=', startDate)
+              .where('dueDate', '<=', endDate)
+              .get();
+              
+            // Process payments by email
+            for (const doc of paymentsSnapshotByEmail.docs) {
+              const paymentData = doc.data();
+              const paymentId = doc.id;
+              
+              if (paymentData.dueDate) {
+                try {
+                  completedPayments.push({
+                    id: paymentId,
+                    ...paymentData,
+                    dueDate: paymentData.dueDate.toDate(),
+                    completedAt: paymentData.completedAt ? paymentData.completedAt.toDate() : null,
+                    createdAt: paymentData.createdAt.toDate(),
+                    updatedAt: paymentData.updatedAt.toDate()
+                  });
+                } catch (dateError) {
+                  logger.error("Error processing payment date:", dateError);
+                  // Skip this payment if there's an issue with the date
+                }
+              }
+            }
+          }
+          
+          // Also try with user ID if available
+          if (userData.id) {
+            const paymentsSnapshotById = await admin.firestore().collection('payments')
+              .where('userId', '==', userData.id)
+              .where('dueDate', '>=', startDate)
+              .where('dueDate', '<=', endDate)
+              .get();
+              
+            // Process payments by ID
+            for (const doc of paymentsSnapshotById.docs) {
+              const paymentData = doc.data();
+              const paymentId = doc.id;
+              
+              if (paymentData.dueDate) {
+                try {
+                  completedPayments.push({
+                    id: paymentId,
+                    ...paymentData,
+                    dueDate: paymentData.dueDate.toDate(),
+                    completedAt: paymentData.completedAt ? paymentData.completedAt.toDate() : null,
+                    createdAt: paymentData.createdAt.toDate(),
+                    updatedAt: paymentData.updatedAt.toDate()
+                  });
+                } catch (dateError) {
+                  logger.error("Error processing payment date:", dateError);
+                  // Skip this payment if there's an issue with the date
+                }
+              }
+            }
+          }
+        } catch (queryError) {
+          logger.error("Error querying payments:", queryError);
+          // Continue with empty payments rather than failing the whole request
         }
       }
 

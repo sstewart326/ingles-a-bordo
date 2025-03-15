@@ -1,24 +1,17 @@
-import { useState, useEffect } from 'react';
-import { where } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Calendar } from '../components/Calendar';
 import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';
 import '../styles/calendar.css';
-import { getStudentClassMaterials } from '../utils/classMaterialsUtils';
 import { styles } from '../styles/styleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { FaFilePdf, FaLink, FaFileAlt } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-import {
-  User,
-  ClassWithStudents,
-  getClassesForDay,
-  getNextPaymentDates,
-} from '../utils/scheduleUtils';
 import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { getCachedCollection } from '../utils/firebaseUtils';
+import { getCalendarData } from '../services/calendarService';
+import { ClassSession } from '../utils/scheduleUtils';
 
 const logSchedule = (message: string, data?: any) => {
   if (process.env.NODE_ENV === 'development') {
@@ -26,168 +19,199 @@ const logSchedule = (message: string, data?: any) => {
   }
 };
 
+// Define types for the calendar data from the server
+interface CalendarClass extends ClassSession {
+  classDetails: {
+    id: string;
+    dayOfWeek: number;
+    scheduleType: string;
+    schedules: Array<{
+      dayOfWeek: number;
+      startTime: string;
+      endTime: string;
+    }>;
+    frequency: {
+      type: string;
+      every: number;
+    };
+    startTime: string;
+    endTime: string;
+    courseType: string;
+    notes: string;
+    studentEmails: string[];
+    startDate: string | null;
+    endDate: string | null;
+    recurrencePattern: string;
+    recurrenceInterval: number;
+    paymentConfig: {
+      amount: number;
+      weeklyInterval: number | null;
+      monthlyOption: string | null;
+      currency: string;
+      paymentLink: string;
+      type: string;
+      startDate: string;
+    };
+  };
+  dates: string[];
+  paymentDueDates: string[];
+}
+
+interface CalendarMaterial {
+  id: string;
+  createdAt: string;
+  classId: string;
+  slides: string[];
+  classDate: string;
+  studentEmails: string[];
+  links: string[];
+  updatedAt: string;
+}
+
+interface PaymentDueDate {
+  date: string;
+  classId: string;
+}
+
+interface CompletedPayment {
+  id: string;
+  createdAt: string;
+  amount: number;
+  completedAt: string;
+  dueDate: string;
+  classSessionId: string;
+  currency: string;
+  userId: string;
+  status: string;
+  updatedAt: string;
+}
+
+interface Birthday {
+  userId: string;
+  name: string;
+  email: string;
+  birthdate: string;
+  day: number;
+}
+
+interface UserData {
+  id: string;
+  createdAt: string;
+  uid: string;
+  teacher: string;
+  birthdate: string;
+  name: string;
+  isAdmin: boolean;
+  isTeacher: boolean;
+  email: string;
+  status: string;
+  updatedAt: string;
+}
+
+interface CalendarData {
+  classes: CalendarClass[];
+  materials: Record<string, CalendarMaterial[]>;
+  paymentDueDates: PaymentDueDate[];
+  completedPayments: CompletedPayment[];
+  birthdays: Birthday[];
+  userData: UserData;
+  month: number;
+  year: number;
+}
+
 export const Schedule = () => {
-  const [classes, setClasses] = useState<ClassWithStudents[]>([]);
+  const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedDayDetails, setSelectedDayDetails] = useState<{
     date: Date;
-    classes: ClassWithStudents[];
+    classes: CalendarClass[];
     isPaymentDay: boolean;
     isPaymentSoon: boolean;
   } | null>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useAuth();
   const { isAdmin } = useAdmin();
   const { language } = useLanguage();
   const t = useTranslation(language);
 
   // Class Materials Modal State
-  const [selectedClass, setSelectedClass] = useState<ClassWithStudents | null>(null);
-  const [selectedMaterial, setSelectedMaterial] = useState<ClassMaterial | null>(null);
+  const [selectedClass, setSelectedClass] = useState<CalendarClass | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<CalendarMaterial | null>(null);
   const [loadingMaterial, setLoadingMaterial] = useState(false);
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null);
-  const [classesWithMaterials, setClassesWithMaterials] = useState<Set<string>>(new Set());
-  const [materialsInfo, setMaterialsInfo] = useState<Map<string, { hasSlides: boolean; hasLinks: boolean }>>(new Map());
 
   const DAYS_OF_WEEK_FULL = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCalendarData = async () => {
       if (!currentUser) {
-        setClasses([]);
+        setCalendarData(null);
         setLoading(false);
         return;
       }
 
       try {
-        // First get the user's document
-        const usersData = await getCachedCollection<User>('users', [
-          where('email', '==', currentUser.email)
-        ], {
-          includeIds: true
-        });
+        const month = selectedDate.getMonth();
+        const year = selectedDate.getFullYear();
         
-        const currentUserDoc = usersData.find(u => u.email === currentUser.email);
-        
-        if (!currentUserDoc && !isAdmin) {
-          console.error('Could not find user document');
-          setClasses([]);
-          setLoading(false);
-          return;
-        }
-
-        // Then fetch classes using email
-        const queryConstraints = isAdmin 
-          ? []
-          : [where('studentEmails', 'array-contains', currentUser.email)];
-        
-
-        const classesData = await getCachedCollection<ClassWithStudents>('classes', queryConstraints, {
-          includeIds: true
-        });
-
-        if (classesData.length > 0) {
-          // Fetch all users that are students in any class
-          const allStudentEmails = new Set<string>();
-          classesData.forEach(classItem => {
-            classItem.studentEmails.forEach(email => allStudentEmails.add(email));
-          });
-                    
-          // Get all users data in one query
-          const usersData = await getCachedCollection<User>('users', [
-            where('email', 'in', Array.from(allStudentEmails))
-          ], {
-            includeIds: true
-          });
-
-          // Create a map of user data
-          const usersMap = new Map(
-            usersData.map(user => [user.email, user])
-          );
-
-          // Populate students array for each class
-          classesData.forEach(classItem => {
-            classItem.students = classItem.studentEmails
-              .map(email => {
-                const user = usersMap.get(email);
-                return user ? { 
-                  id: user.id, 
-                  name: user.name, 
-                  email: email
-                } : {
-                  id: email, // Use email as fallback id
-                  email: email
-                };
-              });
-          });
-        } else {
-          logSchedule('No classes found for the current user');
-        }
-        
-        setClasses(classesData);
+        const data = await getCalendarData(month, year);
+        setCalendarData(data);
       } catch (error) {
-        console.error('Error fetching schedule data:', error);
-        setClasses([]);
+        console.error('Error fetching calendar data:', error);
+        toast.error(t.failedToLoad);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [currentUser, isAdmin]);
+    setLoading(true);
+    fetchCalendarData();
+  }, [currentUser, selectedDate]);
 
-  // Update the materials info effect
-  useEffect(() => {
-    const fetchMaterialsInfo = async () => {
-      if (!currentUser?.email) return;
-
-      try {
-        const materials = await getStudentClassMaterials(currentUser.email);
-        const materialsMap = new Map<string, { hasSlides: boolean; hasLinks: boolean }>();
-        
-        materials.forEach(material => {
-          const dateStr = material.classDate.toISOString().split('T')[0];
-          const key = `${material.classId}_${dateStr}`;
-          materialsMap.set(key, {
-            hasSlides: !!material.slides,
-            hasLinks: Array.isArray(material.links) && material.links.length > 0
-          });
-        });
-        
-        setMaterialsInfo(materialsMap);
-        setClassesWithMaterials(new Set(materialsMap.keys()));
-      } catch (error) {
-        console.error('Error fetching materials info:', error);
-      }
-    };
-
-    fetchMaterialsInfo();
-  }, [currentUser]);
-
-  const handleClassClick = async (classItem: ClassWithStudents, date: Date) => {
-    // Check if this class has materials before proceeding
+  const getClassesForDate = (date: Date): CalendarClass[] => {
+    if (!calendarData?.classes) return [];
+    
     const dateStr = date.toISOString().split('T')[0];
-    const key = `${classItem.id}_${dateStr}`;
-    if (!classesWithMaterials.has(key)) return;
+    
+    return calendarData.classes.filter(classItem => 
+      classItem.dates.some(classDate => 
+        classDate.split('T')[0] === dateStr
+      )
+    );
+  };
 
+  const isPaymentDueOnDate = (date: Date): boolean => {
+    if (!calendarData?.paymentDueDates) return false;
+    
+    const dateStr = date.toISOString().split('T')[0];
+    
+    return calendarData.paymentDueDates.some(payment => 
+      payment.date.split('T')[0] === dateStr
+    );
+  };
+
+  const handleClassClick = async (classItem: CalendarClass, date: Date) => {
+    if (!calendarData?.materials) return;
+    
+    const classId = classItem.id;
+    if (!calendarData.materials[classId]) return;
+    
     setSelectedClass(classItem);
     setLoadingMaterial(true);
 
     try {
-      if (!currentUser?.email) return;
-
-      const materials = await getStudentClassMaterials(currentUser.email);
+      const dateStr = date.toISOString().split('T')[0];
       
       // Find material for this specific class and date
-      const material = materials.find(m => {
-        const materialDateStr = m.classDate.toISOString().split('T')[0];
-        const classDateStr = date.toISOString().split('T')[0];
-        return m.classId === classItem.id && materialDateStr === classDateStr;
+      const material = calendarData.materials[classId].find(m => {
+        const materialDateStr = m.classDate.split('T')[0];
+        return materialDateStr === dateStr;
       });
 
       if (material) {
         setSelectedMaterial(material);
-        if (material.slides) {
+        if (material.slides && material.slides.length > 0) {
           setSlidesUrl(material.slides[0]);
         }
       } else {
@@ -195,62 +219,97 @@ export const Schedule = () => {
         setSlidesUrl(null);
       }
     } catch (error) {
-      console.error('Error fetching class materials:', error);
+      console.error('Error handling class materials:', error);
       toast.error(t.failedToLoad);
     } finally {
       setLoadingMaterial(false);
     }
   };
 
-  const handleDayClick = (date: Date, classes: ClassWithStudents[], isPaymentDay: boolean, isPaymentSoon: boolean) => {
+  const handleDayClick = (date: Date, classes: CalendarClass[], isPaymentDay: boolean, isPaymentSoon: boolean) => {
     setSelectedDayDetails({
       date,
       classes,
       isPaymentDay,
       isPaymentSoon
     });
+    
+    // Scroll to details section with smooth behavior
+    setTimeout(() => {
+      detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const renderCalendarDay = (date: Date, isToday: boolean) => {
-    const dayOfWeek = date.getDay();
-    const dayClasses = getClassesForDay(classes, dayOfWeek, date);
+    const dayClasses = getClassesForDate(date);
+    const isPaymentDay = isPaymentDueOnDate(date);
     
-    // Calculate payment dates
-    const paymentDates = classes.length > 0 ? 
-      classes.flatMap(classItem => {
-        if (!classItem.startDate) return [];
-        return getNextPaymentDates(classItem.paymentConfig, classItem, selectedDate);
-      }) : [];
-
-    const isPaymentDay = paymentDates.some(paymentDate => 
-      date.getFullYear() === paymentDate.getFullYear() &&
-      date.getMonth() === paymentDate.getMonth() &&
-      date.getDate() === paymentDate.getDate()
-    );
-
-    // Handle class count click
-    const handleClassCountClick = (e: React.MouseEvent, classes: ClassWithStudents[], date: Date) => {
-      e.stopPropagation();
-      // For Schedule, we'll just show the day details when clicking on class count
-      handleDayClick(date, classes, isPaymentDay, isPaymentDay && daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0);
-    };
-
-    // Handle payment pill click
-    const handlePaymentPillClick = (e: React.MouseEvent, date: Date, classes: ClassWithStudents[]) => {
-      e.stopPropagation();
-      // For Schedule, we'll just show the day details when clicking on payment pill
-      handleDayClick(date, classes, isPaymentDay, isPaymentDay && daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0);
-    };
-
+    // Calculate if payment is soon (within 3 days)
     const daysUntilPayment = isPaymentDay ? 
       Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
     const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
+    // Handle class count click
+    const handleClassCountClick = (e: React.MouseEvent, classes: CalendarClass[], date: Date) => {
+      e.stopPropagation();
+      handleDayClick(date, classes, isPaymentDay, isPaymentSoon);
+    };
+
+    // Handle payment pill click
+    const handlePaymentPillClick = (e: React.MouseEvent, date: Date, classes: CalendarClass[]) => {
+      e.stopPropagation();
+      handleDayClick(date, classes, isPaymentDay, isPaymentSoon);
+    };
+
+    // Create materials info map for the ScheduleCalendarDay component
+    const materialsInfo = new Map<string, { hasSlides: boolean; hasLinks: boolean }>();
+    
+    if (calendarData?.materials) {
+      dayClasses.forEach(classItem => {
+        const dateStr = date.toISOString().split('T')[0];
+        const key = `${classItem.id}_${dateStr}`;
+        
+        if (calendarData.materials[classItem.id]) {
+          const material = calendarData.materials[classItem.id].find(m => 
+            m.classDate.split('T')[0] === dateStr
+          );
+          
+          if (material) {
+            materialsInfo.set(key, {
+              hasSlides: Array.isArray(material.slides) && material.slides.length > 0,
+              hasLinks: Array.isArray(material.links) && material.links.length > 0
+            });
+          }
+        }
+      });
+    }
+
+    // Map the calendar classes to include required ClassSession properties
+    const mappedClasses = dayClasses.map(classItem => ({
+      ...classItem,
+      name: classItem.classDetails.courseType || 'Class',
+      studentEmails: classItem.classDetails.studentEmails,
+      dayOfWeek: classItem.classDetails.dayOfWeek,
+      startTime: classItem.classDetails.startTime,
+      endTime: classItem.classDetails.endTime,
+      courseType: classItem.classDetails.courseType,
+      notes: classItem.classDetails.notes,
+      paymentConfig: classItem.classDetails.paymentConfig ? {
+        type: classItem.classDetails.paymentConfig.type as 'weekly' | 'monthly',
+        weeklyInterval: classItem.classDetails.paymentConfig.weeklyInterval || undefined,
+        monthlyOption: classItem.classDetails.paymentConfig.monthlyOption as 'first' | 'fifteen' | 'last' | undefined,
+        startDate: classItem.classDetails.paymentConfig.startDate,
+        paymentLink: classItem.classDetails.paymentConfig.paymentLink,
+        amount: classItem.classDetails.paymentConfig.amount,
+        currency: classItem.classDetails.paymentConfig.currency
+      } : undefined
+    }));
+
     return (
-      <ScheduleCalendarDay<ClassWithStudents>
+      <ScheduleCalendarDay<CalendarClass>
         date={date}
         isToday={isToday}
-        classes={dayClasses}
+        classes={mappedClasses}
         paymentsDue={isPaymentDay}
         onClassCountClick={handleClassCountClick}
         onPaymentPillClick={handlePaymentPillClick}
@@ -288,21 +347,27 @@ export const Schedule = () => {
           <div>
             <Calendar
               selectedDate={selectedDate}
-              onMonthChange={setSelectedDate}
+              onMonthChange={(date) => {
+                setSelectedDate(date);
+                // Fetch new data when month changes
+                setLoading(true);
+                const month = date.getMonth();
+                const year = date.getFullYear();
+                getCalendarData(month, year)
+                  .then(data => {
+                    setCalendarData(data);
+                    setLoading(false);
+                  })
+                  .catch(error => {
+                    console.error('Error fetching calendar data:', error);
+                    toast.error(t.failedToLoad);
+                    setLoading(false);
+                  });
+              }}
               onDayClick={(date: Date) => {
-                const dayClasses = getClassesForDay(classes, date.getDay(), date);
-                const paymentDates = classes.length > 0 ? 
-                  classes.flatMap(classItem => {
-                    if (!classItem.startDate) return [];
-                    return getNextPaymentDates(classItem.paymentConfig, classItem, selectedDate);
-                  }) : [];
-
-                const isPaymentDay = paymentDates.some(paymentDate => 
-                  date.getFullYear() === paymentDate.getFullYear() &&
-                  date.getMonth() === paymentDate.getMonth() &&
-                  date.getDate() === paymentDate.getDate()
-                );
-
+                const dayClasses = getClassesForDate(date);
+                const isPaymentDay = isPaymentDueOnDate(date);
+                
                 const daysUntilPayment = isPaymentDay ? 
                   Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
                 const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
@@ -316,7 +381,7 @@ export const Schedule = () => {
           </div>
 
           {/* Details section */}
-          <div>
+          <div ref={detailsRef}>
             {selectedDayDetails ? (
               <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <h3 className={styles.headings.h3}>
@@ -343,8 +408,50 @@ export const Schedule = () => {
                   selectedDayDetails.classes.map(classItem => {
                     const dateStr = selectedDayDetails.date.toISOString().split('T')[0];
                     const key = `${classItem.id}_${dateStr}`;
-                    const materialInfo = materialsInfo.get(key);
-                    const hasMaterials = !!materialInfo;
+                    
+                    // Check if this class has materials
+                    let hasMaterials = false;
+                    if (calendarData?.materials && calendarData.materials[classItem.id]) {
+                      hasMaterials = calendarData.materials[classItem.id].some(m => 
+                        m.classDate.split('T')[0] === dateStr
+                      );
+                    }
+
+                    // Get material info for display
+                    let materialInfo = { hasSlides: false, hasLinks: false };
+                    if (hasMaterials && calendarData?.materials) {
+                      const material = calendarData.materials[classItem.id].find(m => 
+                        m.classDate.split('T')[0] === dateStr
+                      );
+                      
+                      if (material) {
+                        materialInfo = {
+                          hasSlides: Array.isArray(material.slides) && material.slides.length > 0,
+                          hasLinks: Array.isArray(material.links) && material.links.length > 0
+                        };
+                      }
+                    }
+
+                    // Map the class to include required ClassSession properties
+                    const mappedClass = {
+                      ...classItem,
+                      name: classItem.classDetails.courseType || 'Class',
+                      studentEmails: classItem.classDetails.studentEmails,
+                      dayOfWeek: classItem.classDetails.dayOfWeek,
+                      startTime: classItem.classDetails.startTime,
+                      endTime: classItem.classDetails.endTime,
+                      courseType: classItem.classDetails.courseType,
+                      notes: classItem.classDetails.notes,
+                      paymentConfig: classItem.classDetails.paymentConfig ? {
+                        type: classItem.classDetails.paymentConfig.type as 'weekly' | 'monthly',
+                        weeklyInterval: classItem.classDetails.paymentConfig.weeklyInterval || undefined,
+                        monthlyOption: classItem.classDetails.paymentConfig.monthlyOption as 'first' | 'fifteen' | 'last' | undefined,
+                        startDate: classItem.classDetails.paymentConfig.startDate,
+                        paymentLink: classItem.classDetails.paymentConfig.paymentLink,
+                        amount: classItem.classDetails.paymentConfig.amount,
+                        currency: classItem.classDetails.paymentConfig.currency
+                      } : undefined
+                    };
 
                     return (
                       <div
@@ -366,15 +473,17 @@ export const Schedule = () => {
                           <span className="text-sm text-[#1a1a1a]">{DAYS_OF_WEEK_FULL[selectedDayDetails.date.getDay()]}</span>
                           
                           <span className="text-sm font-medium text-[#4b5563]">{t.time}</span>
-                          <span className="text-sm text-[#1a1a1a]">{classItem.startTime} - {classItem.endTime}</span>
+                          <span className="text-sm text-[#1a1a1a]">
+                            {mappedClass.startTime} - {mappedClass.endTime}
+                          </span>
 
                           <span className="text-sm font-medium text-[#4b5563]">{t.class}</span>
-                          <span className="text-sm text-[#1a1a1a]">{classItem.courseType || t.class}</span>
+                          <span className="text-sm text-[#1a1a1a]">{mappedClass.courseType || t.class}</span>
 
-                          {classItem.notes && (
+                          {mappedClass.notes && (
                             <>
                               <span className="text-sm font-medium text-[#4b5563]">{t.notes}</span>
-                              <span className="text-sm text-[#1a1a1a]">{classItem.notes}</span>
+                              <span className="text-sm text-[#1a1a1a]">{mappedClass.notes}</span>
                             </>
                           )}
                         </div>
@@ -436,7 +545,7 @@ export const Schedule = () => {
             ) : selectedMaterial ? (
               <div className="space-y-6">
                 {/* Slides */}
-                {selectedMaterial.slides && (
+                {selectedMaterial.slides && selectedMaterial.slides.length > 0 && (
                   <div>
                     {slidesUrl && (
                       <a

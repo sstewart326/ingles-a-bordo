@@ -49,12 +49,50 @@ export const validateFile = (file: File): string | null => {
 
 export const addClassMaterials = async (
   classId: string,
-  classDate: Date,
+  classDate: Date | string,
   studentEmails: string[],
   slideFiles?: File[],
   links?: string[]
 ): Promise<void> => {
   try {
+    // Extract the date components directly to avoid timezone issues
+    let dateObj: Date;
+    
+    if (classDate instanceof Date) {
+      // Get the date components directly
+      const year = classDate.getFullYear();
+      const month = classDate.getMonth();
+      const day = classDate.getDate();
+      
+      // Create a new date using UTC to avoid timezone issues
+      dateObj = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+      
+      console.log('Original date:', classDate.toString());
+      console.log('Original day of week:', classDate.getDay());
+    } else {
+      // Parse the string date
+      const parsedDate = new Date(classDate);
+      const year = parsedDate.getFullYear();
+      const month = parsedDate.getMonth();
+      const day = parsedDate.getDate();
+      
+      // Create a new date using UTC to avoid timezone issues
+      dateObj = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+      
+      console.log('Original date string:', classDate);
+      console.log('Parsed date:', parsedDate.toString());
+      console.log('Original day of week:', parsedDate.getDay());
+    }
+    
+    if (isNaN(dateObj.getTime())) {
+      throw new Error('Invalid date provided');
+    }
+
+    // Log the date for debugging
+    console.log('Class material date (UTC):', dateObj.toUTCString());
+    console.log('Class material date (ISO):', dateObj.toISOString());
+    console.log('Class material date day of week (UTC):', dateObj.getUTCDay(), '(0=Sunday, 1=Monday, etc.)');
+
     let slidesUrls: string[] = [];
     
     if (slideFiles && slideFiles.length > 0) {
@@ -65,10 +103,9 @@ export const addClassMaterials = async (
         }
 
         // Create a clean filename with date
-        const dateStr = classDate.toISOString().split('T')[0];
         const cleanFileName = slideFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const timestamp = Date.now();
-        const finalFileName = `${dateStr}_${timestamp}_${cleanFileName}`;
+        const finalFileName = `${dateObj.toISOString().split('T')[0]}_${timestamp}_${cleanFileName}`;
 
         // Create storage reference with cleaned filename
         const storageRef = ref(storage, `slides/${classId}/${finalFileName}`);
@@ -99,7 +136,7 @@ export const addClassMaterials = async (
       links: links || [],
       createdAt: new Date(),
       updatedAt: new Date(),
-      classDate: classDate,
+      classDate: dateObj,
       studentEmails: studentEmails,
     };
 
@@ -109,7 +146,7 @@ export const addClassMaterials = async (
     invalidateCache(COLLECTION_PATH);
     
     // Also invalidate the specific class cache
-    const cacheKey = `${COLLECTION_PATH}_${classId}_${classDate.toISOString()}`;
+    const cacheKey = `${COLLECTION_PATH}_${classId}_${dateObj.toISOString()}`;
     invalidateCache(cacheKey);
     
     // And invalidate the "all" cache for this class

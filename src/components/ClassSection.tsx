@@ -41,6 +41,7 @@ interface ClassSectionProps {
   currentPage: number;
   onPageChange: (page: number) => void;
   sectionRef: React.RefObject<HTMLDivElement | null>;
+  selectedDate?: Date;
   t: {
     upcomingClasses: string;
     pastClasses: string;
@@ -92,6 +93,7 @@ export const ClassSection = ({
   currentPage,
   onPageChange,
   sectionRef,
+  selectedDate,
   t
 }: ClassSectionProps) => {
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
@@ -133,16 +135,27 @@ export const ClassSection = ({
     }
   };
 
-  const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => (
-    <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
-      <UploadMaterialsForm
-        classId={classSession.id}
-        classDate={date}
-        studentEmails={classSession.studentEmails}
-        onUploadSuccess={onCloseUploadForm}
-      />
-    </Modal>
-  );
+  const renderUploadMaterialsSection = (classSession: ClassSession, date: Date | null | undefined) => {
+    // Use selectedDate if available, otherwise fall back to the provided date or create a new date
+    const dateToUse = selectedDate || (date instanceof Date ? date : new Date());
+    
+    // Create a UTC date to avoid timezone issues
+    const year = dateToUse.getFullYear();
+    const month = dateToUse.getMonth();
+    const day = dateToUse.getDate();
+    const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+    
+    return (
+      <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
+        <UploadMaterialsForm
+          classId={classSession.id}
+          classDate={utcDate}
+          studentEmails={classSession.studentEmails}
+          onUploadSuccess={onCloseUploadForm}
+        />
+      </Modal>
+    );
+  };
 
   return (
     <div className="max-w-2xl bg-white rounded-lg p-6 shadow-md border border-gray-200" ref={sectionRef}>
@@ -394,7 +407,7 @@ export const ClassSection = ({
                           </a>
                         </div>
                       )}
-                      {isAdmin && renderUploadMaterialsSection(classSession, date || new Date())}
+                      {isAdmin && renderUploadMaterialsSection(classSession, date ? new Date(date) : new Date())}
                     </div>
                   </div>
                 </div>

@@ -627,6 +627,7 @@ export const Dashboard = () => {
           textareaRefs={textareaRefs.current}
           onUpcomingClassesPageChange={handleUpcomingClassesPagination}
           onPastClassesPageChange={handlePastClassesPagination}
+          selectedDate={selectedDate}
           t={{
             upcomingClasses: t.upcomingClasses,
             pastClasses: t.pastClasses,

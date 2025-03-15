@@ -144,7 +144,16 @@ export const ClassDatePicker: React.FC<ClassDatePickerProps> = ({
           return (
             <div key={date.toISOString()} className="relative">
               <button
-                onClick={() => isClassDay && (allowPastDates || !isPast) && onDateSelect(date)}
+                onClick={() => {
+                  if (isClassDay && (allowPastDates || !isPast)) {
+                    const year = date.getFullYear();
+                    const month = date.getMonth();
+                    const day = date.getDate();
+                    const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+                    
+                    onDateSelect(utcDate);
+                  }
+                }}
                 disabled={!isClassDay || (!allowPastDates && isPast)}
                 type="button"
                 className={`

@@ -216,55 +216,46 @@ const AdminMaterials = () => {
         }
       }
 
-      // Create date object for the selected date and set the time from the class schedule
-      const classDateTime = new Date(selectedDate);
+      // Extract the date components directly to avoid timezone issues
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth();
+      const day = selectedDate.getDate();
+      
+      // Create a new date using UTC to avoid timezone issues
+      const classDateTime = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+      
       // Validate the date is valid before proceeding
       if (isNaN(classDateTime.getTime())) {
         toast.error('Invalid class date selected');
         return;
       }
-
-      // Parse time handling both 12-hour and 24-hour formats
-      const timeStr = selectedClass.startTime.trim().toUpperCase();
-      let hours: number;
-      let minutes: number;
-
-      // Check if time is in 12-hour format (contains AM/PM)
-      if (timeStr.includes('AM') || timeStr.includes('PM')) {
-        const [time, period] = timeStr.split(' ');
-        const [h, m] = time.split(':').map(num => parseInt(num, 10));
+      
+      // Check if the selected date matches the class schedule
+      // Use type assertion since the Class interface doesn't include scheduleType and schedules
+      const classWithSchedules = selectedClass as unknown as {
+        scheduleType?: string;
+        schedules?: Array<{ dayOfWeek: number; startTime: string; endTime: string }>;
+        dayOfWeek: number;
+      };
+      
+      if (classWithSchedules.scheduleType === 'multiple' && Array.isArray(classWithSchedules.schedules)) {
+        // For classes with multiple schedules
+        const matchingSchedule = classWithSchedules.schedules.find(
+          schedule => schedule.dayOfWeek === selectedDate.getDay()
+        );
         
-        if (isNaN(h) || isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) {
-          console.error('Invalid 12-hour time values:', { hours: h, minutes: m, timeStr });
-          toast.error('Invalid class time values');
-          return;
+        if (!matchingSchedule) {
+          console.warn(
+            `Warning: Selected date (${selectedDate.toDateString()}) has day of week ${selectedDate.getDay()}, ` +
+            `but class schedules are for days: ${classWithSchedules.schedules.map(s => s.dayOfWeek).join(', ')}`
+          );
         }
-
-        // Convert to 24-hour format
-        hours = h % 12;
-        if (period === 'PM') hours += 12;
-        minutes = m;
-      } else {
-        // 24-hour format
-        const [h, m] = timeStr.split(':').map(num => parseInt(num, 10));
-        
-        if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
-          console.error('Invalid 24-hour time values:', { hours: h, minutes: m, timeStr });
-          toast.error('Invalid class time values');
-          return;
-        }
-
-        hours = h;
-        minutes = m;
-      }
-
-      // Set the time
-      classDateTime.setHours(hours, minutes, 0, 0);
-
-      // Final validation before upload
-      if (isNaN(classDateTime.getTime())) {
-        toast.error('Invalid date/time combination');
-        return;
+      } else if (selectedClass.dayOfWeek !== selectedDate.getDay()) {
+        // For classes with a single schedule
+        console.warn(
+          `Warning: Selected date (${selectedDate.toDateString()}) has day of week ${selectedDate.getDay()}, ` +
+          `but class is scheduled for day ${selectedClass.dayOfWeek}`
+        );
       }
 
       await addClassMaterials(

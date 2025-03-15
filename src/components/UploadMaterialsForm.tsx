@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, useEffect } from 'react';
 import { addClassMaterials } from '../utils/classMaterialsUtils';
 import toast from 'react-hot-toast';
 import { FaTrash } from 'react-icons/fa';
@@ -67,7 +67,15 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
     setUploading(true);
 
     try {
-      await addClassMaterials(classId, classDate, studentEmails, slideFiles, links);
+      // Extract the date components directly to avoid timezone issues
+      const year = classDate.getFullYear();
+      const month = classDate.getMonth();
+      const day = classDate.getDate();
+      
+      // Create a new date using UTC to avoid timezone issues
+      const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+      
+      await addClassMaterials(classId, utcDate, studentEmails, slideFiles, links);
       toast.success('Materials uploaded successfully');
       onUploadSuccess?.();
     } catch (error) {
