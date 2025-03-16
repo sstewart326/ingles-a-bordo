@@ -248,7 +248,6 @@ export const getClassScheduleHttp = onRequest({
           // Add payment dates to the overall list
           paymentDueDates.push(...paymentDates.map(date => ({
             date,
-            classId,
             paymentLink: classData.paymentConfig?.paymentLink || null
           })));
         }
@@ -587,7 +586,6 @@ export const getClassMaterialsHttp = onRequest({
             }
             
             materialsByClass[materialData.classId].push({
-              id: materialId,
               ...materialData,
               classDate: materialData.classDate.toDate(),
               createdAt: materialData.createdAt.toDate(),
@@ -667,7 +665,6 @@ export const getCalendarDataHttp = onRequest({
         if (!usersSnapshot.empty) {
           const userDoc = usersSnapshot.docs[0];
           userData = {
-            id: userDoc.id,
             ...userDoc.data()
           };
         }
@@ -675,7 +672,6 @@ export const getCalendarDataHttp = onRequest({
         const userDoc = await admin.firestore().collection('users').doc(userId as string).get();
         if (userDoc.exists) {
           userData = {
-            id: userDoc.id,
             ...userDoc.data()
           };
           userEmail = userData.email;
@@ -750,9 +746,7 @@ export const getCalendarDataHttp = onRequest({
           );
 
           classSchedule.push({
-            id: classId,
             classDetails: {
-              id: classId,
               dayOfWeek: classData.dayOfWeek,
               daysOfWeek: classData.daysOfWeek,
               scheduleType: classData.scheduleType,
@@ -776,7 +770,6 @@ export const getCalendarDataHttp = onRequest({
           // Add payment dates to the overall list
           paymentDueDates.push(...paymentDates.map(date => ({
             date,
-            classId,
             paymentLink: classData.paymentConfig?.paymentLink || null
           })));
         }
@@ -812,7 +805,6 @@ export const getCalendarDataHttp = onRequest({
                 }
                 
                 materialsByClass[materialData.classId].push({
-                  id: materialId,
                   ...materialData,
                   classDate: materialData.classDate.toDate(),
                   createdAt: materialData.createdAt.toDate(),
@@ -846,7 +838,6 @@ export const getCalendarDataHttp = onRequest({
               if (paymentData.dueDate) {
                 try {
                   completedPayments.push({
-                    id: paymentId,
                     ...paymentData,
                     dueDate: paymentData.dueDate.toDate(),
                     completedAt: paymentData.completedAt ? paymentData.completedAt.toDate() : null,
@@ -877,7 +868,6 @@ export const getCalendarDataHttp = onRequest({
               if (paymentData.dueDate) {
                 try {
                   completedPayments.push({
-                    id: paymentId,
                     ...paymentData,
                     dueDate: paymentData.dueDate.toDate(),
                     completedAt: paymentData.completedAt ? paymentData.completedAt.toDate() : null,
@@ -899,7 +889,6 @@ export const getCalendarDataHttp = onRequest({
 
       // Get birthdays for the month
       const birthdays: Array<{
-        userId: string;
         name: string;
         email: string;
         birthdate: string;
@@ -919,7 +908,6 @@ export const getCalendarDataHttp = onRequest({
           // Check if the birthday is in the requested month
           if (birthMonth === monthInt + 1) {
             birthdays.push({
-              userId: doc.id,
               name: userData.name,
               email: userData.email,
               birthdate: userData.birthdate,
@@ -1020,7 +1008,6 @@ export const getAllClassesForMonthHttp = onRequest({
 
         // Get birthdays for the month - only for users taught by this admin
         const birthdays: Array<{
-          userId: string;
           name: string;
           email: string;
           birthdate: string;
@@ -1065,7 +1052,6 @@ export const getAllClassesForMonthHttp = onRequest({
             // Check if the birthday is in the requested month
             if (birthMonth === monthInt + 1) {
               birthdays.push({
-                userId: doc.id,
                 name: userData.name,
                 email: userData.email,
                 birthdate: userData.birthdate,
@@ -1179,7 +1165,6 @@ export const getAllClassesForMonthHttp = onRequest({
 
             // Create a class object that matches the ClassSession interface in the frontend
             const classInfo = {
-              id: classId,
               dayOfWeek: classData.dayOfWeek,
               daysOfWeek: classData.daysOfWeek,
               startTime: classData.startTime,
@@ -1210,7 +1195,6 @@ export const getAllClassesForMonthHttp = onRequest({
               }
               
               dailyClassMap[dateString].push({
-                id: classId,
                 startTime: classData.startTime,
                 endTime: classData.endTime,
                 courseType: classData.courseType,

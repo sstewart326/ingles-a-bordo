@@ -51,6 +51,38 @@ export const getStudentClassPlans = async (studentEmail: string, month: number, 
   }
 };
 
+// Get all class plans for a specific student (without month/year filtering)
+export const getAllStudentClassPlans = async (studentEmail: string): Promise<ClassPlan[]> => {
+  try {
+    logOperation('Getting all class plans for student', { studentEmail });
+    const plansRef = collection(db, COLLECTION_PLANS);
+    const q = query(
+      plansRef, 
+      where('studentEmail', '==', studentEmail)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const plans: ClassPlan[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      plans.push({ id: doc.id, ...doc.data() } as ClassPlan);
+    });
+    
+    // Sort plans by year (descending) and month (descending)
+    plans.sort((a, b) => {
+      if (a.year !== b.year) {
+        return b.year - a.year; // Most recent year first
+      }
+      return b.month - a.month; // Most recent month first
+    });
+    
+    return plans;
+  } catch (error) {
+    logOperation('Error getting all class plans for student', error);
+    throw error;
+  }
+};
+
 // Create a new class plan
 export const createClassPlan = async (
   studentEmail: string, 

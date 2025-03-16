@@ -16,7 +16,8 @@ import {
   deleteClassPlanTemplate,
   addChildItem,
   toggleItemExpanded,
-  insertItemBefore
+  insertItemBefore,
+  getAllStudentClassPlans
 } from '../services/classPlanService';
 import { ClassPlan, ClassPlanItem, ClassPlanTemplate } from '../types/interfaces';
 import { collection, getDocs } from 'firebase/firestore';
@@ -72,6 +73,9 @@ export const AdminClassPlans = () => {
   const { language } = useLanguage();
   const t = useTranslation(language);
   
+  // View mode state
+  const [viewMode, setViewMode] = useState<'monthly' | 'all'>('monthly');
+  
   // State for month/year selection
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
@@ -83,6 +87,7 @@ export const AdminClassPlans = () => {
   
   // State for class plans
   const [classPlan, setClassPlan] = useState<ClassPlan | null>(null);
+  const [allClassPlans, setAllClassPlans] = useState<ClassPlan[]>([]);
   const [loading, setLoading] = useState(true);
   
   // State for modals
@@ -186,29 +191,40 @@ export const AdminClassPlans = () => {
     }
   }, [selectedStudent, selectedMonth, selectedYear]);
   
+  // Fetch all class plans for selected student
+  const fetchAllClassPlans = useCallback(async () => {
+    if (!selectedStudent) return;
+    
+    setLoading(true);
+    try {
+      const plans = await getAllStudentClassPlans(selectedStudent.value);
+      setAllClassPlans(plans);
+    } catch (error) {
+      console.error('Error fetching all class plans:', error);
+      toast.error('Failed to load all class plans');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedStudent]);
+  
   // Combined function to create a class plan and add the first item
   const handleAddFirstItem = async () => {
     if (!selectedStudent || !currentUser) return;
     
     try {
       // First create the class plan
-      await createClassPlan(
+      const newPlanId = await createClassPlan(
         selectedStudent.value,
         selectedMonth,
         selectedYear,
         currentUser.email || ''
       );
       
-      // Fetch the updated plan
-      await fetchClassPlan();
+      // Add the item directly to the newly created plan using the returned ID
+      await addClassPlanItem(newPlanId, newItemTitle, newItemDescription);
       
-      // Add the item directly to the newly created plan
-      if (classPlan) {
-        await addClassPlanItem(classPlan.id, newItemTitle, newItemDescription);
-        
-        // Fetch the updated plan again
-        await fetchClassPlan();
-      }
+      // Fetch the updated plan after both operations are complete
+      await fetchClassPlan();
       
       // Reset form and close modal
       setNewItemTitle('');
@@ -555,7 +571,7 @@ export const AdminClassPlans = () => {
               <div className="flex-1">
                 <div className="flex items-center">
                   <p className={`text-sm font-medium mr-2 ${
-                    item.completed ? 'line-through text-gray-500' : 'text-gray-900'
+                    item.completed ? 'text-gray-500' : 'text-gray-900'
                   }`}>
                     {item.title}
                   </p>
@@ -590,7 +606,7 @@ export const AdminClassPlans = () => {
                 
                 {item.description && (
                   <p className={`mt-1 text-sm ${
-                    item.completed ? 'line-through text-gray-400' : 'text-gray-500'
+                    item.completed ? 'text-gray-400' : 'text-gray-500'
                   }`}>
                     {item.description}
                   </p>
@@ -732,9 +748,20 @@ export const AdminClassPlans = () => {
   // Fetch class plan when selection changes
   useEffect(() => {
     if (selectedStudent) {
-      fetchClassPlan();
+      if (viewMode === 'monthly') {
+        fetchClassPlan();
+      } else {
+        fetchAllClassPlans();
+      }
     }
-  }, [selectedStudent, selectedMonth, selectedYear, fetchClassPlan]);
+  }, [selectedStudent, selectedMonth, selectedYear, fetchClassPlan, fetchAllClassPlans, viewMode]);
+  
+  // Fetch all class plans when view mode changes to 'all'
+  useEffect(() => {
+    if (viewMode === 'all' && selectedStudent) {
+      fetchAllClassPlans();
+    }
+  }, [viewMode, selectedStudent, fetchAllClassPlans]);
   
   // Generate years for dropdown (current year - 1 to current year + 5)
   const years = Array.from(
@@ -769,6 +796,95 @@ export const AdminClassPlans = () => {
     }),
   };
   
+  // Helper function to get month name
+  const getMonthName = (month: number) => {
+    return months[month];
+  };
+  
+  // Render a single class plan in the all plans view
+  const renderClassPlanCard = (plan: ClassPlan) => {
+    const completedItems = plan.items.filter(item => item.completed).length;
+    const totalItems = plan.items.length;
+    const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+    
+    // Helper function to recursively render items and their children
+    const renderPlanItem = (item: ClassPlanItem, isChild: boolean = false) => {
+      return (
+        <li key={item.id} className={`py-2 ${isChild ? 'ml-6 border-l border-gray-200 pl-4' : ''}`}>
+          <div className="flex items-start">
+            <div className={`flex-shrink-0 w-4 h-4 mt-1 mr-2 rounded-full flex items-center justify-center ${item.completed ? 'bg-green-500' : 'bg-gray-300'}`}>
+              {item.completed && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
+            </div>
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${item.completed ? 'text-gray-400' : 'text-gray-700'}`}>
+                {item.title}
+              </p>
+              {item.description && (
+                <p className={`text-xs mt-1 ${item.completed ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {item.description}
+                </p>
+              )}
+              
+              {/* Render children recursively if they exist */}
+              {item.children && item.children.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {item.children.map(child => renderPlanItem(child, true))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </li>
+      );
+    };
+    
+    return (
+      <div key={plan.id} className="border rounded-lg p-4 mb-4 hover:shadow-md transition-shadow">
+        <div className="mb-3 group">
+          <h3 
+            className="text-lg font-medium text-gray-900 hover:text-indigo-600 cursor-pointer flex items-center group"
+            onClick={() => {
+              setSelectedMonth(plan.month);
+              setSelectedYear(plan.year);
+              setViewMode('monthly');
+            }}
+            title="Click to edit in monthly view"
+          >
+            <span>{getMonthName(plan.month)} {plan.year}</span>
+            <div className="ml-2 flex items-center text-indigo-500">
+              <PencilIcon className="h-4 w-4 mr-1" />
+              <span className="text-xs font-normal opacity-0 group-hover:opacity-100 transition-opacity">Edit</span>
+              <ChevronRightIcon className="h-4 w-4 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </h3>
+        </div>
+        
+        <div className="mb-3">
+          <div className="flex justify-between text-sm text-gray-500 mb-1">
+            <span>{completedItems} of {totalItems} items completed</span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-green-500 h-2 rounded-full" 
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        </div>
+        
+        {plan.items.length > 0 ? (
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">Items:</p>
+            <ul className="divide-y divide-gray-100">
+              {plan.items.map(item => renderPlanItem(item))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">No items in this plan.</p>
+        )}
+      </div>
+    );
+  };
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className={`${styles.headings.h1} mb-6`}>{t.classPlans}</h1>
@@ -792,192 +908,259 @@ export const AdminClassPlans = () => {
             />
           </div>
           
-          {/* Month Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Month
-            </label>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 transition-all duration-300 ${
-                highlightMonth ? 'bg-indigo-50 border-indigo-300' : ''
-              }`}
-            >
-              {months.map((month, index) => (
-                <option key={index} value={index}>
-                  {month}
-                </option>
-              ))}
-            </select>
+          {/* View Mode Toggle */}
+          <div className="flex items-end">
+            <div className="inline-flex rounded-md shadow-sm" role="group">
+              <button
+                type="button"
+                onClick={() => setViewMode('monthly')}
+                className={`px-4 py-2 text-sm font-medium rounded-l-md focus:z-10 focus:ring-2 focus:ring-indigo-500 focus:outline-none
+                  ${viewMode === 'monthly' 
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'}`}
+              >
+                Monthly View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('all')}
+                className={`px-4 py-2 text-sm font-medium rounded-r-md focus:z-10 focus:ring-2 focus:ring-indigo-500 focus:outline-none
+                  ${viewMode === 'all' 
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'}`}
+              >
+                All Plans
+              </button>
+            </div>
           </div>
           
-          {/* Year Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Year
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 transition-all duration-300 ${
-                highlightYear ? 'bg-indigo-50 border-indigo-300' : ''
-              }`}
-            >
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Month/Year Selection - Only show in monthly view */}
+          {viewMode === 'monthly' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Month
+                </label>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 transition-all duration-300 ${
+                    highlightMonth ? 'bg-indigo-50 border-indigo-300' : ''
+                  }`}
+                >
+                  {months.map((month, index) => (
+                    <option key={index} value={index}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Year
+                </label>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 transition-all duration-300 ${
+                    highlightYear ? 'bg-indigo-50 border-indigo-300' : ''
+                  }`}
+                >
+                  {years.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
         </div>
       </div>
       
       {/* Class Plan Content */}
       {selectedStudent ? (
-        <div 
-          className="bg-white rounded-lg shadow-md p-6"
-          tabIndex={0}
-          onKeyDown={handleKeyDown}
-          aria-label={`Class plan for ${selectedStudent.label}, ${months[selectedMonth]} ${selectedYear}`}
-        >
-          <div className="mb-6">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center">
-                <button
-                  onClick={handlePreviousMonth}
-                  className="p-2 mr-2 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-                  title="Previous month"
-                  aria-label="Go to previous month"
-                >
-                  <ChevronLeftIcon className="h-5 w-5" />
-                </button>
+        viewMode === 'monthly' ? (
+          <div 
+            className="bg-white rounded-lg shadow-md p-6"
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+            aria-label={`Class plan for ${selectedStudent.label}, ${months[selectedMonth]} ${selectedYear}`}
+          >
+            <div className="mb-6">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center">
+                  <button
+                    onClick={handlePreviousMonth}
+                    className="p-2 mr-2 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                    title="Previous month"
+                    aria-label="Go to previous month"
+                  >
+                    <ChevronLeftIcon className="h-5 w-5" />
+                  </button>
+                  
+                  <h2 className={styles.headings.h2}>
+                    {months[selectedMonth]} {selectedYear}
+                  </h2>
+                  
+                  <button
+                    onClick={handleNextMonth}
+                    className="p-2 ml-2 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                    title="Next month"
+                    aria-label="Go to next month"
+                  >
+                    <ChevronRightIcon className="h-5 w-5" />
+                  </button>
+                </div>
                 
-                <h2 className={styles.headings.h2}>
-                  {months[selectedMonth]} {selectedYear}
-                </h2>
-                
-                <button
-                  onClick={handleNextMonth}
-                  className="p-2 ml-2 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-                  title="Next month"
-                  aria-label="Go to next month"
-                >
-                  <ChevronRightIcon className="h-5 w-5" />
-                </button>
+                <div className="flex space-x-2">
+                  {classPlan && (
+                    <>
+                      <button
+                        onClick={() => setShowTemplateModal(true)}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                        Save as Template
+                        <Tooltip text="Save the current class plan structure as a reusable template that can be applied to other students or months.">
+                          <InformationCircleIcon className="h-4 w-4 ml-1 text-indigo-200" />
+                        </Tooltip>
+                      </button>
+                      
+                      <button
+                        onClick={() => setShowDeletePlanModal(true)}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      >
+                        <TrashIcon className="h-4 w-4 mr-1" />
+                        Delete Plan
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               
-              <div className="flex space-x-2">
-                {classPlan && (
-                  <>
-                    <button
-                      onClick={() => setShowTemplateModal(true)}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                      Save as Template
-                      <Tooltip text="Save the current class plan structure as a reusable template that can be applied to other students or months.">
-                        <InformationCircleIcon className="h-4 w-4 ml-1 text-indigo-200" />
-                      </Tooltip>
-                    </button>
-                    
-                    <button
-                      onClick={() => setShowDeletePlanModal(true)}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    >
-                      <TrashIcon className="h-4 w-4 mr-1" />
-                      Delete Plan
-                    </button>
-                  </>
-                )}
+              <div className="flex items-center mt-2">
+                <p className="text-sm text-gray-500">
+                  Plan for {selectedStudent.label}
+                </p>
+                <span className="mx-2 text-xs text-gray-400">•</span>
               </div>
             </div>
             
-            <div className="flex items-center mt-2">
-              <p className="text-sm text-gray-500">
-                Plan for {selectedStudent.label}
-              </p>
-              <span className="mx-2 text-xs text-gray-400">•</span>
-            </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex justify-center items-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            </div>
-          ) : classPlan ? (
-            <>
-              {classPlan.items.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No items in this plan yet. Add your first item to get started.</p>
-                  <div className="flex justify-center space-x-3 mt-4">
-                    <button
-                      onClick={() => {
-                        setNewItemTitle('');
-                        setNewItemDescription('');
-                        setShowAddItemModal(true);
-                      }}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    >
-                      <PlusIcon className="h-4 w-4 mr-1" />
-                      Add First Item
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedTemplate('');
-                        setShowApplyTemplateModal(true);
-                      }}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                      Apply Template
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <ul className="divide-y divide-gray-200">
-                  {classPlan.items.map((item, index) => 
-                    renderItem(item, index, false)
-                  )}
-                </ul>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-500 mb-4">No class plan exists for this student in {months[selectedMonth]} {selectedYear}.</p>
-              <div className="flex justify-center space-x-3">
-                <button
-                  onClick={() => {
-                    setNewItemTitle('');
-                    setNewItemDescription('');
-                    setShowAddItemModal(true);
-                  }}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  <PlusIcon className="h-4 w-4 mr-1" />
-                  Add First Item
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => {
-                    // When clicking "Create Plan with Template", we want to directly
-                    // open the template selection modal with the context that we're creating a new plan
-                    setSelectedTemplate('');
-                    setShowApplyTemplateModal(true);
-                  }}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                  Create Plan with Template
-                </button>
+            {loading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
               </div>
+            ) : classPlan ? (
+              <>
+                {classPlan.items.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No items in this plan yet. Add your first item to get started.</p>
+                    <div className="flex justify-center space-x-3 mt-4">
+                      <button
+                        onClick={() => {
+                          setNewItemTitle('');
+                          setNewItemDescription('');
+                          setShowAddItemModal(true);
+                        }}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      >
+                        <PlusIcon className="h-4 w-4 mr-1" />
+                        Add First Item
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTemplate('');
+                          setShowApplyTemplateModal(true);
+                        }}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                        Apply Template
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-gray-200">
+                    {classPlan.items.map((item, index) => 
+                      renderItem(item, index, false)
+                    )}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">No class plan exists for this student in {months[selectedMonth]} {selectedYear}.</p>
+                <div className="flex justify-center space-x-3">
+                  <button
+                    onClick={() => {
+                      setNewItemTitle('');
+                      setNewItemDescription('');
+                      setShowAddItemModal(true);
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1" />
+                    Add First Item
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // When clicking "Create Plan with Template", we want to directly
+                      // open the template selection modal with the context that we're creating a new plan
+                      setSelectedTemplate('');
+                      setShowApplyTemplateModal(true);
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                    Create Plan with Template
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          // All Plans View
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="mb-6">
+              <h2 className={styles.headings.h2}>
+                All Study Plans for {selectedStudent.label}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Showing all study plans ordered by most recent. Click on a month to view in monthly mode.
+              </p>
             </div>
-          )}
-        </div>
+            
+            {loading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : allClassPlans.length > 0 ? (
+              <div className="max-h-[800px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                {allClassPlans.map(plan => renderClassPlanCard(plan))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">No class plans exist for this student yet.</p>
+                <div className="flex justify-center space-x-3">
+                  <button
+                    onClick={() => {
+                      setViewMode('monthly');
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Switch to Monthly View
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )
       ) : (
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <p className="text-gray-500">Please select a student to view or create a class plan.</p>
