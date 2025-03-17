@@ -15,7 +15,7 @@ function classNames(...classes: string[]) {
 export const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, logout, isMasquerading, masqueradingAs } = useAuthWithMasquerade();
+  const { currentUser, logout, isMasquerading } = useAuthWithMasquerade();
   const { isAdmin } = useAdmin();
   const { language } = useLanguage();
   const t = useTranslation(language);

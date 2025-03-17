@@ -341,10 +341,27 @@ export const AdminClassPlans = () => {
   
   // Apply a template to the current plan
   const handleApplyTemplate = async () => {
-    if (!classPlan || !selectedTemplate) return;
+    if (!selectedStudent || !selectedTemplate || !currentUser) return;
     
     try {
-      await applyTemplateToClassPlan(classPlan.id, selectedTemplate);
+      let planId;
+      
+      // If no class plan exists, create one first
+      if (!classPlan) {
+        planId = await createClassPlan(
+          selectedStudent.value,
+          selectedMonth,
+          selectedYear,
+          currentUser.email || ''
+        );
+      } else {
+        planId = classPlan.id;
+      }
+      
+      // Apply the template to the plan
+      await applyTemplateToClassPlan(planId, selectedTemplate);
+      
+      // Fetch the updated plan
       await fetchClassPlan();
       setSelectedTemplate('');
       setShowApplyTemplateModal(false);
@@ -352,33 +369,6 @@ export const AdminClassPlans = () => {
     } catch (error) {
       console.error('Error applying template:', error);
       toast.error('Failed to apply template');
-    }
-  };
-  
-  // Create a new class plan and apply a template to it
-  const handleApplyTemplateToNewPlan = async () => {
-    if (!selectedStudent || !currentUser || !selectedTemplate) return;
-    
-    try {
-      // First create the class plan
-      const newPlanId = await createClassPlan(
-        selectedStudent.value,
-        selectedMonth,
-        selectedYear,
-        currentUser.email || ''
-      );
-      
-      // Immediately apply the template to the new plan without fetching in between
-      await applyTemplateToClassPlan(newPlanId, selectedTemplate);
-      
-      // Now fetch the updated plan with the template applied
-      await fetchClassPlan();
-      
-      setShowApplyTemplateModal(false);
-      toast.success('Plan created with template');
-    } catch (error) {
-      console.error('Error creating plan with template:', error);
-      toast.error('Failed to create plan with template');
     }
   };
   
@@ -1110,15 +1100,13 @@ export const AdminClassPlans = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      // When clicking "Create Plan with Template", we want to directly
-                      // open the template selection modal with the context that we're creating a new plan
                       setSelectedTemplate('');
                       setShowApplyTemplateModal(true);
                     }}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
                     <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                    Create Plan with Template
+                    Apply Template
                   </button>
                 </div>
               </div>
@@ -1348,7 +1336,7 @@ export const AdminClassPlans = () => {
       >
         <div>
           <h2 className="text-lg font-medium text-gray-900 mb-4">
-            {!classPlan ? 'Create Plan with Template' : 'Apply Template'}
+            Apply Template to Plan
           </h2>
           <div className="space-y-4">
             <div>
@@ -1376,6 +1364,21 @@ export const AdminClassPlans = () => {
               </p>
             )}
             
+            {!classPlan && (
+              <div className="bg-blue-50 p-4 rounded-md">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <InformationCircleIcon className="h-5 w-5 text-blue-400" aria-hidden="true" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-blue-700">
+                      No plan exists for {months[selectedMonth]} {selectedYear}. A new plan will be created when you apply this template.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
@@ -1387,11 +1390,11 @@ export const AdminClassPlans = () => {
               
               <button
                 type="button"
-                onClick={!classPlan ? handleApplyTemplateToNewPlan : handleApplyTemplate}
+                onClick={handleApplyTemplate}
                 disabled={!selectedTemplate}
                 className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                {!classPlan ? 'Create Plan with Template' : 'Apply Template'}
+                Apply Template
               </button>
             </div>
           </div>
@@ -1572,11 +1575,9 @@ export const AdminClassPlans = () => {
                         setShowApplyTemplateModal(true);
                       }}
                       className="px-2 py-1 text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      title={classPlan 
-                        ? 'Add all items from this template to the current class plan'
-                        : 'Create a new class plan using this template'}
+                      title="Add all items from this template to the current class plan"
                     >
-                      {classPlan ? 'Apply to plan' : 'Create plan'}
+                      Apply to plan
                     </button>
                   )}
                 </div>

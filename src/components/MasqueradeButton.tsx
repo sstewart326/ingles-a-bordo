@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMasquerade } from '../hooks/useMasquerade';
-import { useLanguage } from '../hooks/useLanguage';
-import { useTranslation } from '../translations';
 import toast from 'react-hot-toast';
 
 interface MasqueradeButtonProps {
@@ -13,8 +11,6 @@ interface MasqueradeButtonProps {
 
 export const MasqueradeButton = ({ userId, userName, userEmail }: MasqueradeButtonProps) => {
   const { startMasquerade } = useMasquerade();
-  const { language } = useLanguage();
-  const t = useTranslation(language);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
