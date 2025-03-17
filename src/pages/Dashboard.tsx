@@ -38,6 +38,7 @@ export const Dashboard = () => {
   const [initialDataFetched, setInitialDataFetched] = useState(false);
   const [lastVisitTimestamp, setLastVisitTimestamp] = useState<number>(Date.now());
   const prevPathRef = useRef<string | null>(null);
+  const isFetchingRef = useRef<boolean>(false);
   
   const { currentUser, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -197,9 +198,12 @@ export const Dashboard = () => {
 
   // Add a specific effect to handle initial data loading after auth and admin status are determined
   useEffect(() => {
-    if (!authLoading && !adminLoading && currentUser && !initialDataFetched) {
+    if (!authLoading && !adminLoading && currentUser && !initialDataFetched && !isFetchingRef.current) {
       debugLog('Dashboard - Initial data fetch triggered');
-      fetchClasses(new Date(), true);
+      isFetchingRef.current = true;
+      fetchClasses(new Date(), true).finally(() => {
+        isFetchingRef.current = false;
+      });
       setInitialDataFetched(true);
     }
   }, [authLoading, adminLoading, currentUser, initialDataFetched, fetchClasses]);
@@ -229,9 +233,12 @@ export const Dashboard = () => {
     const currentPath = location.pathname;
     
     // If we're coming back to the dashboard from another page
-    if (currentPath === '/dashboard' && prevPathRef.current && prevPathRef.current !== '/dashboard') {
+    if (currentPath === '/dashboard' && prevPathRef.current && prevPathRef.current !== '/dashboard' && !isFetchingRef.current) {
       debugLog('Returning to dashboard from another page');
-      fetchClasses(selectedDate, false);
+      isFetchingRef.current = true;
+      fetchClasses(selectedDate, false).finally(() => {
+        isFetchingRef.current = false;
+      });
       setLastVisitTimestamp(Date.now());
     }
     
@@ -241,12 +248,15 @@ export const Dashboard = () => {
   // Handle page visibility changes (tab switching, etc.)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && !isFetchingRef.current) {
         const now = Date.now();
         // If it's been more than 5 minutes since last visit, refresh data
         if (now - lastVisitTimestamp > 5 * 60 * 1000) {
           debugLog('Page became visible after extended absence, refreshing data');
-          fetchClasses(selectedDate, false);
+          isFetchingRef.current = true;
+          fetchClasses(selectedDate, false).finally(() => {
+            isFetchingRef.current = false;
+          });
           setLastVisitTimestamp(now);
         }
       }
@@ -291,9 +301,12 @@ export const Dashboard = () => {
       
       // Check if we've already loaded this month
       const monthKey = getMonthKey(newDate);
-      if (!loadedMonths.has(monthKey)) {
+      if (!loadedMonths.has(monthKey) && !isFetchingRef.current) {
         debugLog(`Month ${monthKey} not loaded yet, fetching data`);
-        fetchClasses(newDate, false);
+        isFetchingRef.current = true;
+        fetchClasses(newDate, false).finally(() => {
+          isFetchingRef.current = false;
+        });
       } else {
         debugLog(`Month ${monthKey} already loaded, skipping fetch`);
       }

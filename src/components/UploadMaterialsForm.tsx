@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { FaTrash } from 'react-icons/fa';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
+import { invalidateCalendarCache } from '../services/calendarService';
 
 interface UploadMaterialsFormProps {
   classId: string;
@@ -85,6 +86,9 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
       const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
       
       await addClassMaterials(actualClassId, utcDate, studentEmails, slideFiles, links);
+      
+      // Invalidate the calendar cache to refresh dashboard data
+      invalidateCalendarCache('getAllClassesForMonthHttp');
       
       toast.success('Materials uploaded successfully');
       setSlideFiles([]);

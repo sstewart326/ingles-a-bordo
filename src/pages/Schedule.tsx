@@ -8,7 +8,7 @@ import { FaFilePdf, FaLink, FaFileAlt } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { getCalendarData, clearCalendarCache } from '../services/calendarService';
+import { getCalendarData, invalidateCalendarCache } from '../services/calendarService';
 import { ClassSession } from '../utils/scheduleUtils';
 
 // Define types for the calendar data from the server
@@ -196,7 +196,7 @@ export const Schedule = () => {
   // Clear calendar cache when masquerading status changes
   useEffect(() => {
     // Clear the calendar cache when masquerading status changes
-    clearCalendarCache();
+    invalidateCalendarCache();
     
     // Reset the initial load flag to force a new data fetch
     isInitialLoadRef.current = true;

@@ -6,7 +6,7 @@ import { getCachedCollection } from '../utils/firebaseUtils';
 import { ClassSession, User } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
 import { updateClassList, fetchMaterialsForClasses } from '../utils/classUtils';
-import { getAllClassesForMonth } from '../services/calendarService';
+import { getAllClassesForMonth, invalidateCalendarCache } from '../services/calendarService';
 
 // Extend the ClassSession interface to include the additional properties we need
 interface ExtendedClassSession extends ClassSession {
@@ -39,11 +39,12 @@ interface UseDashboardDataReturn extends DashboardData {
   setLoadedMaterialMonths: (months: Set<string>) => void;
   setSelectedDayDetails: (details: DashboardData['selectedDayDetails']) => void;
   setClassMaterials: (materials: Record<string, ClassMaterial[]>) => void;
-  fetchClasses: (targetDate: Date, isInitialLoad?: boolean) => Promise<void>;
+  fetchClasses: (targetDate: Date, isInitialLoad?: boolean, shouldBypassCache?: boolean) => Promise<void>;
   getClassesForDay: (dayOfWeek: number, date: Date) => ClassSession[];
   isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
   getRelevantMonthKeys: (date: Date) => string[];
   getMonthKey: (date: Date, offset?: number) => string;
+  invalidateCache: () => void;
 }
 
 export const useDashboardData = (): UseDashboardDataReturn => {
@@ -112,7 +113,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     return [];
   }, [dailyClassMap, isAdmin]);
 
-  const fetchClasses = useCallback(async (targetDate: Date = new Date(), isInitialLoad: boolean = false) => {
+  const fetchClasses = useCallback(async (targetDate: Date = new Date(), isInitialLoad: boolean = false, shouldBypassCache: boolean = false) => {
     if (!currentUser || adminLoading) return;
 
     try {
@@ -133,7 +134,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
           const fetchPromises = newMonthsToLoad.map(async (monthKey) => {
             const [year, month] = monthKey.split('-').map(Number);
             try {
-              const response = await getAllClassesForMonth(month, year, { bypassCache: true });
+              const response = await getAllClassesForMonth(month, year, { bypassCache: shouldBypassCache });
               return response;
             } catch (error) {
               console.error(`Error fetching classes for ${monthKey}:`, error);
@@ -277,6 +278,14 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     }
   }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails, loadedMonths, upcomingClasses, pastClasses, dailyClassMap]);
 
+  const invalidateCache = useCallback(() => {
+    // Invalidate the calendar cache to force a fresh fetch on the next request
+    invalidateCalendarCache('getAllClassesForMonthHttp');
+    // Clear our internal record of loaded months
+    setLoadedMonths(new Set());
+    setLoadedMaterialMonths(new Set());
+  }, []);
+
   return {
     // State
     upcomingClasses,
@@ -302,6 +311,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     getClassesForDay,
     isDateInRelevantMonthRange,
     getRelevantMonthKeys,
-    getMonthKey
+    getMonthKey,
+    invalidateCache,
   };
 }; 

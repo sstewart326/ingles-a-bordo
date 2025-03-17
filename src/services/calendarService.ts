@@ -72,9 +72,34 @@ class CalendarCache {
     this.cache.clear();
     // We don't clear in-flight requests as they should be allowed to complete
   }
+  
+  // Invalidate specific cache entries
+  invalidateByEndpoint(endpoint: string, params?: Record<string, any>): void {
+    if (params) {
+      // Invalidate specific endpoint + params
+      const key = this.createKey(endpoint, params);
+      this.cache.delete(key);
+    } else {
+      // Invalidate all entries for this endpoint
+      for (const key of this.cache.keys()) {
+        if (key.startsWith(`${endpoint}?`)) {
+          this.cache.delete(key);
+        }
+      }
+    }
+  }
 }
 
 const calendarCache = new CalendarCache();
+
+// Export function to invalidate specific calendar data
+export const invalidateCalendarCache = (endpoint?: string, params?: Record<string, any>): void => {
+  if (endpoint) {
+    calendarCache.invalidateByEndpoint(endpoint, params);
+  } else {
+    calendarCache.invalidate();
+  }
+};
 
 // Helper function to get the base URL for Firebase Functions
 const getFunctionBaseUrl = () => {
@@ -254,11 +279,4 @@ export const getAllClassesForMonth = async (month: number, year: number, options
     console.error('Error fetching all classes for month:', error);
     throw error;
   }
-};
-
-/**
- * Clears the calendar cache
- */
-export const clearCalendarCache = () => {
-  calendarCache.invalidate();
 }; 
