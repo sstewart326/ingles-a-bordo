@@ -13,6 +13,8 @@ interface CacheEntry<T> {
 class CalendarCache {
   private cache: Map<string, CacheEntry<any>> = new Map();
   private readonly DEFAULT_EXPIRY = 5 * 60 * 1000; // 5 minutes in milliseconds
+  // Track in-flight requests to prevent duplicates
+  private inFlightRequests: Map<string, Promise<any>> = new Map();
 
   private createKey(endpoint: string, params: Record<string, any>): string {
     const sortedParams = Object.entries(params)
@@ -47,8 +49,28 @@ class CalendarCache {
     });
   }
 
+  // Get an in-flight request if one exists
+  getInFlightRequest(endpoint: string, params: Record<string, any>): Promise<any> | null {
+    const key = this.createKey(endpoint, params);
+    return this.inFlightRequests.get(key) || null;
+  }
+
+  // Set an in-flight request
+  setInFlightRequest(endpoint: string, params: Record<string, any>, promise: Promise<any>): void {
+    const key = this.createKey(endpoint, params);
+    this.inFlightRequests.set(key, promise);
+    
+    // Clean up the in-flight request when it completes
+    promise.finally(() => {
+      if (this.inFlightRequests.get(key) === promise) {
+        this.inFlightRequests.delete(key);
+      }
+    });
+  }
+
   invalidate(): void {
     this.cache.clear();
+    // We don't clear in-flight requests as they should be allowed to complete
   }
 }
 
@@ -87,6 +109,12 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
       return cachedData;
     }
     
+    // Check if there's already an in-flight request for this data
+    const inFlightRequest = calendarCache.getInFlightRequest('getCalendarDataHttp', { month, year });
+    if (inFlightRequest) {
+      return inFlightRequest;
+    }
+    
     const baseUrl = getFunctionBaseUrl();
     const idToken = await getIdToken();
     const auth = getAuth();
@@ -107,7 +135,6 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
         if (masqueradeUser && masqueradeUser.id) {
           // If masquerading, use the masqueraded user's ID
           userId = masqueradeUser.id;
-          console.log('Using masqueraded user ID for calendar data:', userId);
         }
       } catch (error) {
         console.error('Error parsing masquerade user from session storage:', error);
@@ -131,25 +158,32 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
     
     const url = `${baseUrl}/getCalendarDataHttp?month=${month}&year=${year}&userId=${userId}`;
     
-    const response = await fetch(url, {
+    // Create the fetch promise
+    const fetchPromise = fetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${idToken}`,
         'Content-Type': 'application/json'
       }
+    })
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(errorData => {
+          throw new Error(errorData.error || 'Failed to fetch calendar data');
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      // Store in cache
+      calendarCache.set('getCalendarDataHttp', { month, year }, data);
+      return data;
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch calendar data');
-    }
+    // Register this as an in-flight request
+    calendarCache.setInFlightRequest('getCalendarDataHttp', { month, year }, fetchPromise);
     
-    const data = await response.json();
-    
-    // Store in cache
-    calendarCache.set('getCalendarDataHttp', { month, year }, data);
-    
-    return data;
+    return fetchPromise;
   } catch (error) {
     console.error('Error fetching calendar data:', error);
     throw error;
@@ -167,6 +201,12 @@ export const getAllClassesForMonth = async (month: number, year: number, options
       if (cachedData) {
         return cachedData;
       }
+      
+      // Check if there's already an in-flight request for this data
+      const inFlightRequest = calendarCache.getInFlightRequest('getAllClassesForMonthHttp', { month, year });
+      if (inFlightRequest) {
+        return inFlightRequest;
+      }
     }
     
     const baseUrl = getFunctionBaseUrl();
@@ -180,27 +220,36 @@ export const getAllClassesForMonth = async (month: number, year: number, options
     
     const url = `${baseUrl}/getAllClassesForMonthHttp?month=${month}&year=${year}&adminId=${user.uid}`;
     
-    const response = await fetch(url, {
+    // Create the fetch promise
+    const fetchPromise = fetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${idToken}`,
         'Content-Type': 'application/json'
       }
+    })
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(errorData => {
+          throw new Error(errorData.error || 'Failed to fetch all classes for month');
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      // Store in cache if not bypassing
+      if (!options.bypassCache) {
+        calendarCache.set('getAllClassesForMonthHttp', { month, year }, data);
+      }
+      return data;
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch all classes for month');
-    }
-    
-    const data = await response.json();
-    
-    // Store in cache if not bypassing
+    // Register this as an in-flight request if not bypassing cache
     if (!options.bypassCache) {
-      calendarCache.set('getAllClassesForMonthHttp', { month, year }, data);
+      calendarCache.setInFlightRequest('getAllClassesForMonthHttp', { month, year }, fetchPromise);
     }
     
-    return data;
+    return fetchPromise;
   } catch (error) {
     console.error('Error fetching all classes for month:', error);
     throw error;

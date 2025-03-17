@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { getDaysInMonth } from '../utils/dateUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
@@ -24,8 +24,35 @@ export const Calendar: React.FC<CalendarProps> = ({
   const { language } = useLanguage();
   const t = useTranslation(language);
   const DAYS_OF_WEEK = [t.sundayShort, t.mondayShort, t.tuesdayShort, t.wednesdayShort, t.thursdayShort, t.fridayShort, t.saturdayShort];
+  
+  // Add a ref to track initial render
+  const isInitialRender = useRef(true);
+  // Store the previous date to detect actual changes
+  const prevDateRef = useRef<Date | null>(null);
 
   const { days, firstDay } = getDaysInMonth(selectedDate);
+  
+  // Check if the month actually changed to avoid unnecessary callbacks
+  useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      prevDateRef.current = selectedDate;
+      return;
+    }
+    
+    // Only trigger onMonthChange if the month or year actually changed
+    if (prevDateRef.current) {
+      const prevMonth = prevDateRef.current.getMonth();
+      const prevYear = prevDateRef.current.getFullYear();
+      const currentMonth = selectedDate.getMonth();
+      const currentYear = selectedDate.getFullYear();
+      
+      if (prevMonth !== currentMonth || prevYear !== currentYear) {
+        // Update the previous date reference
+        prevDateRef.current = selectedDate;
+      }
+    }
+  }, [selectedDate, onMonthChange]);
 
   const handlePreviousMonth = () => {
     onMonthChange(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1));

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { Calendar } from '../components/Calendar';
 import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';
@@ -126,6 +126,11 @@ export const Schedule = () => {
   const { currentUser, isMasquerading, masqueradingAs } = useAuthWithMasquerade();
   const { language } = useLanguage();
   const t = useTranslation(language);
+  
+  // Add a ref to track if we're handling the initial load
+  const isInitialLoadRef = useRef(true);
+  // Add a ref to track the current request parameters to avoid duplicate requests
+  const currentRequestRef = useRef<{month: number, year: number} | null>(null);
 
   // Class Materials Modal State
   const [selectedClass, setSelectedClass] = useState<CalendarClass | null>(null);
@@ -135,37 +140,74 @@ export const Schedule = () => {
 
   const DAYS_OF_WEEK_FULL = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
 
+  // Create a memoized fetch function to avoid duplicate requests
+  const fetchCalendarDataSafely = useCallback(async (month: number, year: number) => {
+    // Check if we're already fetching this exact data
+    if (currentRequestRef.current && 
+        currentRequestRef.current.month === month && 
+        currentRequestRef.current.year === year) {
+      return;
+    }
+
+    // Set the current request parameters
+    currentRequestRef.current = { month, year };
+    
+    if (!currentUser) {
+      setCalendarData(null);
+      setLoading(false);
+      currentRequestRef.current = null;
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await getCalendarData(month, year);
+      setCalendarData(data);
+    } catch (error) {
+      console.error('Error fetching calendar data:', error);
+      toast.error(t.failedToLoad);
+    } finally {
+      setLoading(false);
+      currentRequestRef.current = null;
+    }
+  }, [currentUser, t]);
+
+  // Handle initial data loading
   useEffect(() => {
-    const fetchCalendarData = async () => {
-      if (!currentUser) {
-        setCalendarData(null);
-        setLoading(false);
-        return;
-      }
+    if (isInitialLoadRef.current && currentUser) {
+      const month = selectedDate.getMonth();
+      const year = selectedDate.getFullYear();
+      
+      fetchCalendarDataSafely(month, year);
+      isInitialLoadRef.current = false;
+    }
+  }, [currentUser, selectedDate, fetchCalendarDataSafely]);
 
-      try {
-        const month = selectedDate.getMonth();
-        const year = selectedDate.getFullYear();
-        
-        const data = await getCalendarData(month, year);
-        setCalendarData(data);
-      } catch (error) {
-        console.error('Error fetching calendar data:', error);
-        toast.error(t.failedToLoad);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    setLoading(true);
-    fetchCalendarData();
-  }, [currentUser, selectedDate]);
+  // Handle date changes after initial load
+  useEffect(() => {
+    if (!isInitialLoadRef.current && currentUser) {
+      const month = selectedDate.getMonth();
+      const year = selectedDate.getFullYear();
+      
+      fetchCalendarDataSafely(month, year);
+    }
+  }, [selectedDate, currentUser, fetchCalendarDataSafely]);
 
   // Clear calendar cache when masquerading status changes
   useEffect(() => {
     // Clear the calendar cache when masquerading status changes
     clearCalendarCache();
-  }, [isMasquerading, masqueradingAs?.id]);
+    
+    // Reset the initial load flag to force a new data fetch
+    isInitialLoadRef.current = true;
+    
+    // If we have a current user, fetch the data again
+    if (currentUser) {
+      const month = selectedDate.getMonth();
+      const year = selectedDate.getFullYear();
+      fetchCalendarDataSafely(month, year);
+    }
+  }, [isMasquerading, masqueradingAs?.id, currentUser, selectedDate, fetchCalendarDataSafely]);
 
   const getClassesForDate = (date: Date): CalendarClass[] => {
     if (!calendarData?.classes) return [];
@@ -346,21 +388,8 @@ export const Schedule = () => {
             <Calendar
               selectedDate={selectedDate}
               onMonthChange={(date) => {
+                // Just update the selected date, the useEffect will handle the data fetching
                 setSelectedDate(date);
-                // Fetch new data when month changes
-                setLoading(true);
-                const month = date.getMonth();
-                const year = date.getFullYear();
-                getCalendarData(month, year)
-                  .then(data => {
-                    setCalendarData(data);
-                    setLoading(false);
-                  })
-                  .catch(error => {
-                    console.error('Error fetching calendar data:', error);
-                    toast.error(t.failedToLoad);
-                    setLoading(false);
-                  });
               }}
               onDayClick={(date: Date) => {
                 const dayClasses = getClassesForDate(date);
