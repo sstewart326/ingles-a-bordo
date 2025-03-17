@@ -188,7 +188,6 @@ export const getClassScheduleHttp = onRequest({
       
       for (const doc of classesSnapshot.docs) {
         const classData = doc.data();
-        const classId = doc.id;
         
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
@@ -239,7 +238,12 @@ export const getClassScheduleHttp = onRequest({
               endDate: classData.endDate ? classData.endDate.toDate() : null,
               recurrencePattern: classData.recurrencePattern || 'weekly',
               recurrenceInterval: classData.recurrenceInterval || 1,
-              paymentConfig: classData.paymentConfig || null
+              paymentConfig: classData.paymentConfig || {
+                type: 'monthly',
+                monthlyOption: 'first',
+                startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+              },
+              dates: classDates
             },
             dates: classDates,
             paymentDueDates: paymentDates
@@ -574,7 +578,6 @@ export const getClassMaterialsHttp = onRequest({
       
       for (const doc of materialsSnapshot.docs) {
         const materialData = doc.data();
-        const materialId = doc.id;
         
         // Check if the material date is within the requested month
         if (materialData.classDate) {
@@ -761,7 +764,12 @@ export const getCalendarDataHttp = onRequest({
               endDate: classData.endDate ? classData.endDate.toDate() : null,
               recurrencePattern: classData.recurrencePattern || 'weekly',
               recurrenceInterval: classData.recurrenceInterval || 1,
-              paymentConfig: classData.paymentConfig || null
+              paymentConfig: classData.paymentConfig || {
+                type: 'monthly',
+                monthlyOption: 'first',
+                startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+              },
+              dates: classDates
             },
             dates: classDates,
             paymentDueDates: paymentDates
@@ -793,7 +801,6 @@ export const getCalendarDataHttp = onRequest({
           
           for (const doc of materialsSnapshot.docs) {
             const materialData = doc.data();
-            const materialId = doc.id;
             
             // Check if the material date is within the requested month
             if (materialData.classDate) {
@@ -833,7 +840,6 @@ export const getCalendarDataHttp = onRequest({
             // Process payments by email
             for (const doc of paymentsSnapshotByEmail.docs) {
               const paymentData = doc.data();
-              const paymentId = doc.id;
               
               if (paymentData.dueDate) {
                 try {
@@ -863,7 +869,6 @@ export const getCalendarDataHttp = onRequest({
             // Process payments by ID
             for (const doc of paymentsSnapshotById.docs) {
               const paymentData = doc.data();
-              const paymentId = doc.id;
               
               if (paymentData.dueDate) {
                 try {
@@ -1164,7 +1169,7 @@ export const getAllClassesForMonthHttp = onRequest({
             });
 
             // Create a class object that matches the ClassSession interface in the frontend
-            const classInfo = {
+            const classInfo: any = {
               dayOfWeek: classData.dayOfWeek,
               daysOfWeek: classData.daysOfWeek,
               startTime: classData.startTime,
@@ -1185,7 +1190,27 @@ export const getAllClassesForMonthHttp = onRequest({
               dates: classDates
             };
 
-            classSchedule.push(classInfo);
+            // Add schedule type and schedules for multiple schedule classes
+            if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
+              // For multiple schedules, create a separate class object for each day
+              classData.schedules.forEach((schedule: any) => {
+                const dayClassInfo = {
+                  ...classInfo,
+                  id: `${classId}-${schedule.dayOfWeek}`, // Create a unique ID for each day
+                  dayOfWeek: schedule.dayOfWeek,
+                  startTime: schedule.startTime,
+                  endTime: schedule.endTime,
+                  scheduleType: 'multiple',
+                  schedules: classData.schedules,
+                  // Filter dates to only include those matching this day of week
+                  dates: classDates.filter(date => date.getDay() === schedule.dayOfWeek)
+                };
+                classSchedule.push(dayClassInfo);
+              });
+            } else {
+              // For single schedule classes, just add the original class info
+              classSchedule.push(classInfo);
+            }
 
             // Add to daily class map
             classDates.forEach(date => {
@@ -1194,9 +1219,29 @@ export const getAllClassesForMonthHttp = onRequest({
                 dailyClassMap[dateString] = [];
               }
               
+              // Get the day of week for this date
+              const dayOfWeek = date.getDay();
+              
+              // Determine the correct start and end times based on schedule type
+              let startTime = classData.startTime;
+              let endTime = classData.endTime;
+              
+              // For multiple schedules, find the matching schedule for this day of week
+              if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
+                const matchingSchedule = classData.schedules.find((schedule: any) => 
+                  schedule.dayOfWeek === dayOfWeek
+                );
+                
+                if (matchingSchedule) {
+                  startTime = matchingSchedule.startTime;
+                  endTime = matchingSchedule.endTime;
+                }
+              }
+              
               dailyClassMap[dateString].push({
-                startTime: classData.startTime,
-                endTime: classData.endTime,
+                id: classId, // Add class ID for reference
+                startTime: startTime,
+                endTime: endTime,
                 courseType: classData.courseType,
                 students: relevantStudentEmails.map((email: string) => {
                   const user = usersMap.get(email);

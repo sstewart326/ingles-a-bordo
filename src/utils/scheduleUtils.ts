@@ -82,7 +82,22 @@ export interface ClassWithStudents extends ClassSession {
 }
 
 export const formatClassTime = (classSession: ClassSession): string => {
-  if (classSession.dayOfWeek !== undefined && classSession.startTime && classSession.endTime) {
+  // For classes with multiple schedules, find the matching schedule for the day of week
+  let startTime = classSession.startTime;
+  let endTime = classSession.endTime;
+  
+  if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) && classSession.dayOfWeek !== undefined) {
+    const matchingSchedule = classSession.schedules.find(schedule => 
+      schedule.dayOfWeek === classSession.dayOfWeek
+    );
+    
+    if (matchingSchedule) {
+      startTime = matchingSchedule.startTime;
+      endTime = matchingSchedule.endTime;
+    }
+  }
+  
+  if (classSession.dayOfWeek !== undefined && startTime && endTime) {
     // Get timezone abbreviation
     const timezone = new Intl.DateTimeFormat('en', {
       timeZoneName: 'short',
@@ -99,8 +114,8 @@ export const formatClassTime = (classSession: ClassSession): string => {
       return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
     };
 
-    const formattedStartTime = formatTimeString(classSession.startTime);
-    const formattedEndTime = formatTimeString(classSession.endTime);
+    const formattedStartTime = formatTimeString(startTime);
+    const formattedEndTime = formatTimeString(endTime);
 
     return `${formattedStartTime} - ${formattedEndTime} ${timezone}`;
   }

@@ -66,6 +66,110 @@ export const Dashboard = () => {
     getMonthKey,
   } = useDashboardData();
 
+  // Define handleDayClick with useCallback
+  const handleDayClick = useCallback((date: Date, classes: ClassSession[]) => {
+    // Don't reset selected date if it's the same date
+    if (!selectedDayDetails || selectedDayDetails.date.getTime() !== date.getTime()) {
+      setSelectedDate(date);
+    }
+    
+    const monthKey = getMonthKey(date);
+    const materialsAlreadyLoaded = loadedMaterialMonths.has(monthKey);
+    
+    // Get birthdays for the selected date
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const dateString = `${month}-${day}`;
+    const birthdays = users.filter(user => user.birthdate === dateString);
+    
+    // Get payments due for the day
+    const paymentsDueForDay = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
+    
+    // Ensure that the dayOfWeek property of each class matches the day of the week of the selected date
+    const selectedDayOfWeek = date.getDay();
+    const updatedClasses = classes.map(classSession => {
+      // Create a new object to avoid mutating the original
+      const updatedClass = { ...classSession };
+      
+      // Set the dayOfWeek to match the selected date
+      updatedClass.dayOfWeek = selectedDayOfWeek;
+      
+      // For classes with multiple schedules, find the matching schedule
+      if (updatedClass.scheduleType === 'multiple' && Array.isArray(updatedClass.schedules)) {
+        const matchingSchedule = updatedClass.schedules.find(schedule => 
+          schedule.dayOfWeek === selectedDayOfWeek
+        );
+        
+        // If a matching schedule is found, update the startTime and endTime
+        if (matchingSchedule) {
+          updatedClass.startTime = matchingSchedule.startTime;
+          updatedClass.endTime = matchingSchedule.endTime;
+        }
+      }
+      
+      return updatedClass;
+    });
+    
+    const fetchMaterials = async () => {
+      const materialsMap: Record<string, ClassMaterial[]> = {};
+      
+      for (const classSession of updatedClasses) {
+        try {
+          const materials = await getClassMaterials(classSession.id, date);
+          
+          if (materials.length > 0) {
+            materialsMap[classSession.id] = materials;
+          }
+        } catch (error) {
+          console.error('Error fetching materials for class:', classSession.id, error);
+        }
+      }
+      
+      if (!materialsAlreadyLoaded) {
+        const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
+        updatedLoadedMaterialMonths.add(monthKey);
+        setLoadedMaterialMonths(updatedLoadedMaterialMonths);
+      }
+      
+      setSelectedDayDetails({
+        date,
+        classes: updatedClasses,
+        paymentsDue: paymentsDueForDay,
+        materials: materialsMap,
+        birthdays
+      });
+    };
+
+    // Set initial state immediately with empty materials
+    setSelectedDayDetails({
+      date,
+      classes: updatedClasses,
+      paymentsDue: paymentsDueForDay,
+      materials: selectedDayDetails?.materials || {},
+      birthdays
+    });
+
+    // Then fetch materials asynchronously
+    fetchMaterials();
+
+    // Always scroll to details section, regardless of screen size
+    if (detailsRef.current) {
+      setTimeout(() => {
+        detailsRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [
+    selectedDayDetails, 
+    setSelectedDate, 
+    getMonthKey, 
+    loadedMaterialMonths, 
+    users, 
+    upcomingClasses, 
+    isDateInRelevantMonthRange, 
+    setLoadedMaterialMonths, 
+    setSelectedDayDetails
+  ]);
+
   // Add a specific effect to handle initial data loading after auth and admin status are determined
   useEffect(() => {
     if (!authLoading && !adminLoading && currentUser && !initialDataFetched) {
@@ -74,6 +178,24 @@ export const Dashboard = () => {
       setInitialDataFetched(true);
     }
   }, [authLoading, adminLoading, currentUser, initialDataFetched, fetchClasses]);
+
+  // Add a new effect to select the current day by default after classes are loaded
+  useEffect(() => {
+    // Only proceed if we have loaded classes and no day is currently selected
+    if (upcomingClasses.length > 0 && !selectedDayDetails) {
+      const today = new Date();
+      const todayDayOfWeek = today.getDay();
+      
+      // Get classes for today
+      const classesForToday = getClassesForDay(todayDayOfWeek, today);
+      
+      // If there are classes for today, select today
+      if (classesForToday.length > 0) {
+        debugLog('Selecting current day by default');
+        handleDayClick(today, classesForToday);
+      }
+    }
+  }, [upcomingClasses, selectedDayDetails, getClassesForDay, handleDayClick]);
 
   // Track navigation to/from dashboard
   useEffect(() => {
@@ -151,74 +273,6 @@ export const Dashboard = () => {
     } else {
       // If only the day changed, just update the selected date
       setSelectedDate(newDate);
-    }
-  };
-
-  const handleDayClick = (date: Date, classes: ClassSession[]) => {
-    // Don't reset selected date if it's the same date
-    if (!selectedDayDetails || selectedDayDetails.date.getTime() !== date.getTime()) {
-      setSelectedDate(date);
-    }
-    
-    const monthKey = getMonthKey(date);
-    const materialsAlreadyLoaded = loadedMaterialMonths.has(monthKey);
-    
-    // Get birthdays for the selected date
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const dateString = `${month}-${day}`;
-    const birthdays = users.filter(user => user.birthdate === dateString);
-    
-    // Get payments due for the day
-    const paymentsDueForDay = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
-    
-    const fetchMaterials = async () => {
-      const materialsMap: Record<string, ClassMaterial[]> = {};
-      
-      for (const classSession of classes) {
-        try {
-          const materials = await getClassMaterials(classSession.id, date);
-          
-          if (materials.length > 0) {
-            materialsMap[classSession.id] = materials;
-          }
-        } catch (error) {
-          console.error('Error fetching materials for class:', classSession.id, error);
-        }
-      }
-      
-      if (!materialsAlreadyLoaded) {
-        const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
-        updatedLoadedMaterialMonths.add(monthKey);
-        setLoadedMaterialMonths(updatedLoadedMaterialMonths);
-      }
-      
-      setSelectedDayDetails({
-        date,
-        classes,
-        paymentsDue: paymentsDueForDay,
-        materials: materialsMap,
-        birthdays
-      });
-    };
-
-    // Set initial state immediately with empty materials
-    setSelectedDayDetails({
-      date,
-      classes,
-      paymentsDue: paymentsDueForDay,
-      materials: selectedDayDetails?.materials || {},
-      birthdays
-    });
-
-    // Then fetch materials asynchronously
-    fetchMaterials();
-
-    // Always scroll to details section, regardless of screen size
-    if (detailsRef.current) {
-      setTimeout(() => {
-        detailsRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
     }
   };
 
@@ -464,7 +518,22 @@ export const Dashboard = () => {
   };
 
   const formatClassTime = (classSession: ClassSession) => {
-    if (classSession.dayOfWeek !== undefined && classSession.startTime && classSession.endTime) {
+    // For classes with multiple schedules, find the matching schedule for the day of week
+    let startTime = classSession.startTime;
+    let endTime = classSession.endTime;
+    
+    if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) && classSession.dayOfWeek !== undefined) {
+      const matchingSchedule = classSession.schedules.find(schedule => 
+        schedule.dayOfWeek === classSession.dayOfWeek
+      );
+      
+      if (matchingSchedule) {
+        startTime = matchingSchedule.startTime;
+        endTime = matchingSchedule.endTime;
+      }
+    }
+    
+    if (classSession.dayOfWeek !== undefined && startTime && endTime) {
       const timezone = new Intl.DateTimeFormat('en', {
         timeZoneName: 'short',
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -479,8 +548,8 @@ export const Dashboard = () => {
         return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
       };
 
-      const formattedStartTime = formatTimeString(classSession.startTime);
-      const formattedEndTime = formatTimeString(classSession.endTime);
+      const formattedStartTime = formatTimeString(startTime);
+      const formattedEndTime = formatTimeString(endTime);
 
       return `${formattedStartTime} - ${formattedEndTime} ${timezone}`;
     }

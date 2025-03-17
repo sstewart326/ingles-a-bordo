@@ -714,9 +714,7 @@ export const DayDetails = ({
                         {/* Add class day and time details */}
                         <div className="text-sm text-gray-600">
                           <div className="font-medium">{t.dayOfWeek}: {getDayName(classSession.dayOfWeek)}</div>
-                          {classSession.startTime && classSession.endTime && (
-                            <div className="mt-1">{t.time}: {classSession.startTime} - {classSession.endTime}</div>
-                          )}
+                          <div className="mt-1">{t.time}: {formatClassTime(classSession)}</div>
                           {classSession.paymentConfig?.amount && classSession.paymentConfig?.currency && (
                             <div className="mt-1">
                               {t.amount || "Amount"}: {classSession.paymentConfig.currency} {classSession.paymentConfig.amount.toFixed(2)}

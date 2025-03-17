@@ -105,7 +105,22 @@ export function ScheduleCalendarDay<T extends ClassSession>({
 
   // Format time for a single class
   const formatSingleClassTime = (classItem: ClassSession): string => {
-    if (!classItem.startTime || !classItem.endTime) return '';
+    // For classes with multiple schedules, find the matching schedule for the day of week
+    let startTime = classItem.startTime;
+    let endTime = classItem.endTime;
+    
+    if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules) && classItem.dayOfWeek !== undefined) {
+      const matchingSchedule = classItem.schedules.find(schedule => 
+        schedule.dayOfWeek === classItem.dayOfWeek
+      );
+      
+      if (matchingSchedule) {
+        startTime = matchingSchedule.startTime;
+        endTime = matchingSchedule.endTime;
+      }
+    }
+    
+    if (!startTime || !endTime) return '';
     
     // Format times to be simpler (without leading zeros and AM/PM when possible)
     const formatTimeString = (timeStr: string): { display: string; period: string } => {
@@ -150,8 +165,8 @@ export function ScheduleCalendarDay<T extends ClassSession>({
       }
     };
 
-    const startTimeInfo = formatTimeString(classItem.startTime);
-    const endTimeInfo = formatTimeString(classItem.endTime);
+    const startTimeInfo = formatTimeString(startTime);
+    const endTimeInfo = formatTimeString(endTime);
     
     // If both periods are the same, only show it once at the end
     if (startTimeInfo.period === endTimeInfo.period) {
