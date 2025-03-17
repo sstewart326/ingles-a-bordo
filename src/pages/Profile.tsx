@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { updatePassword } from 'firebase/auth';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { Language } from '../contexts/LanguageContext';
@@ -19,6 +19,17 @@ interface UserProfile {
   updatedAt: string;
 }
 
+interface ClassContract {
+  id: string;
+  contractUrl: string;
+  courseType: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  scheduleType: 'single' | 'multiple';
+  schedules?: any[];
+}
+
 const logProfile = (message: string, data?: any) => {
   if (process.env.NODE_ENV === 'development') {
     console.log(`[PROFILE] ${message}`, data ? data : '');
@@ -26,7 +37,7 @@ const logProfile = (message: string, data?: any) => {
 };
 
 export const Profile = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isMasquerading, masqueradingAs } = useAuthWithMasquerade();
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -39,21 +50,38 @@ export const Profile = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [updateSuccessful, setUpdateSuccessful] = useState(false);
+  const [contracts, setContracts] = useState<ClassContract[]>([]);
+  const [loadingContracts, setLoadingContracts] = useState(false);
+
+  // Memoize the filtered contracts to prevent unnecessary re-renders
+  const memoizedContracts = useMemo(() => {
+    return contracts.filter(c => c && c.contractUrl);
+  }, [contracts]);
 
   const fetchProfile = useCallback(async () => {
     if (!currentUser) {
       logProfile('No current user found, returning early');
+      setLoading(false);
       return;
     }
 
     try {
-      logProfile('Attempting to fetch user documents for uid:', currentUser.uid);
+      // If masquerading, use the masqueraded user's ID
+      const userIdToFetch = isMasquerading && masqueradingAs ? masqueradingAs.uid || masqueradingAs.id : currentUser.uid;
+      
+      if (!userIdToFetch) {
+        logProfile('No user ID to fetch, returning early');
+        setLoading(false);
+        return;
+      }
+      
+      logProfile('Attempting to fetch user documents for uid:', userIdToFetch);
       const users = await getCachedCollection<UserProfile>('users', [
-        where('uid', '==', currentUser.uid)
+        where('uid', '==', userIdToFetch)
       ], { userId: currentUser.uid });
       
       if (!users || users.length === 0) {
-        logProfile('No user document found for uid:', currentUser.uid);
+        logProfile('No user document found for uid:', userIdToFetch);
         throw new Error('User document not found');
       }
 
@@ -76,6 +104,9 @@ export const Profile = () => {
       });
       
       setLoading(false);
+      
+      // Fetch contracts for this user
+      await fetchContracts(userDoc.email);
     } catch (error) {
       logProfile('Profile fetch - Error:', error);
       if (error instanceof Error) {
@@ -87,11 +118,49 @@ export const Profile = () => {
       }
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, isMasquerading, masqueradingAs]);
+  
+  const fetchContracts = async (email: string) => {
+    if (!email) {
+      setLoadingContracts(false);
+      return;
+    }
+    
+    setLoadingContracts(true);
+    try {
+      logProfile('Fetching contracts for user:', email);
+      
+      // Fetch classes without a limit since the CacheOptions doesn't support it
+      const classes = await getCachedCollection<ClassContract>(
+        'classes', 
+        [where('studentEmails', 'array-contains', email)], 
+        { userId: currentUser?.uid }
+      );
+      
+      // Set contracts directly without filtering here
+      // The filtering is now handled by the memoizedContracts
+      logProfile('Found classes:', classes.length);
+      setContracts(classes);
+      setLoadingContracts(false);
+    } catch (error) {
+      logProfile('Contracts fetch - Error:', error);
+      if (error instanceof Error) {
+        logProfile('Contracts fetch - Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+      }
+      // Ensure we set loading to false and set contracts to empty array on error
+      setContracts([]);
+      setLoadingContracts(false);
+    }
+  };
 
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid, isMasquerading, masqueradingAs?.id]);
 
   // Add new useEffect to handle success message after language updates
   useEffect(() => {
@@ -156,12 +225,17 @@ export const Profile = () => {
           logProfile('Profile update - Language context updated successfully');
         }
 
-        if (newPassword) {
+        // Only attempt to update password if not masquerading and password fields are filled
+        if (newPassword && !isMasquerading && 'updatePassword' in currentUser) {
           if (newPassword !== confirmPassword) {
             setError(t.error);
             return;
           }
           await updatePassword(currentUser, newPassword);
+        } else if (newPassword && isMasquerading) {
+          // Show a message that password can't be updated while masquerading
+          setError('Password cannot be updated while impersonating a user');
+          return;
         }
 
         await fetchProfile();
@@ -199,6 +273,12 @@ export const Profile = () => {
       setError('Failed to update profile');
     }
   };
+  
+  // Helper function to get day name
+  const getDayName = (dayOfWeek: number) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[dayOfWeek];
+  };
 
   if (loading) {
     return (
@@ -214,6 +294,14 @@ export const Profile = () => {
         <div className="md:flex md:flex-col">
           <div className="mb-8">
             <h3 className="text-2xl font-medium leading-6 text-gray-900">{t.profile}</h3>
+            {isMasquerading && masqueradingAs && (
+              <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-md p-3">
+                <p className="text-sm text-indigo-700">
+                  You are viewing {masqueradingAs.name || masqueradingAs.email}'s profile as an administrator.
+                  Some actions like password changes are disabled while impersonating.
+                </p>
+              </div>
+            )}
             <p className="mt-2 text-sm text-gray-600">
               {t.updateProfile}
             </p>
@@ -255,6 +343,63 @@ export const Profile = () => {
                         </dd>
                       </div>
                     </dl>
+                    
+                    {/* Contracts Section */}
+                    {!profile?.isAdmin && (
+                      <div className="mt-8">
+                        <h4 className="text-lg font-medium text-gray-900 mb-4">Your Contracts</h4>
+                        {loadingContracts ? (
+                          <div className="flex items-center justify-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                          </div>
+                        ) : memoizedContracts && memoizedContracts.length > 0 ? (
+                          <div className="bg-gray-50 shadow rounded-lg overflow-hidden">
+                            <ul className="divide-y divide-gray-200">
+                              {memoizedContracts.slice(0, 10).map((contract) => (
+                                <li key={contract.id} className="px-4 py-4">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {contract.courseType || 'Class'} Class
+                                      </p>
+                                      <p className="text-sm text-gray-500">
+                                        {contract.scheduleType === 'single' ? (
+                                          <>
+                                            {getDayName(contract.dayOfWeek)} at {contract.startTime || '00:00'} - {contract.endTime || '00:00'}
+                                          </>
+                                        ) : (
+                                          <>
+                                            Multiple days schedule
+                                          </>
+                                        )}
+                                      </p>
+                                    </div>
+                                    {contract.contractUrl && (
+                                      <a
+                                        href={contract.contractUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                      >
+                                        View Contract
+                                      </a>
+                                    )}
+                                  </div>
+                                </li>
+                              ))}
+                              {memoizedContracts.length > 10 && (
+                                <li className="px-4 py-2 text-center text-sm text-gray-500">
+                                  Showing 10 of {memoizedContracts.length} contracts
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">No contracts available.</p>
+                        )}
+                      </div>
+                    )}
+                    
                     <div className="mt-6">
                       <button
                         onClick={() => setEditing(true)}
@@ -320,8 +465,12 @@ export const Profile = () => {
                         id="new-password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        disabled={isMasquerading}
+                        className={`mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md ${isMasquerading ? 'bg-gray-50' : ''}`}
                       />
+                      {isMasquerading && (
+                        <p className="mt-1 text-xs text-gray-500">Password changes are disabled while impersonating a user.</p>
+                      )}
                     </div>
 
                     <div>
@@ -334,7 +483,8 @@ export const Profile = () => {
                         id="confirm-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        disabled={isMasquerading}
+                        className={`mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md ${isMasquerading ? 'bg-gray-50' : ''}`}
                       />
                     </div>
 

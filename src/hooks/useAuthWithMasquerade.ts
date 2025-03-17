@@ -5,6 +5,15 @@ export const useAuthWithMasquerade = () => {
   const auth = useAuth();
   const { isMasquerading, masqueradingAs } = useMasquerade();
 
+  // If not authenticated, don't apply masquerade
+  if (!auth.currentUser) {
+    return {
+      ...auth,
+      isMasquerading: false,
+      masqueradingAs: null
+    };
+  }
+
   // If masquerading, override the currentUser with masqueraded user data
   if (isMasquerading && masqueradingAs) {
     // Create a proxy object that mimics the Firebase User object

@@ -19,6 +19,8 @@ import { getDayName } from '../utils/dateUtils';
 import Modal from '../components/Modal';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { ClassSchedule } from '../types/interfaces';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../config/firebase';
 
 interface User {
   id: string;
@@ -54,6 +56,7 @@ interface Class {
   endDate?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  contractUrl?: string;  // URL to the contract document
   paymentConfig: PaymentConfig;
   frequency: {
     type: 'weekly' | 'biweekly' | 'custom';
@@ -112,6 +115,8 @@ export const AdminSchedule = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<any>(null);
   const [deletingClassId, setDeletingClassId] = useState<string | null>(null);
+  const [contractFile, setContractFile] = useState<File | null>(null);
+  const [editContractFile, setEditContractFile] = useState<File | null>(null);
   const [newClass, setNewClass] = useState<any>({
     scheduleType: 'single',
     dayOfWeek: 1,
@@ -123,6 +128,7 @@ export const AdminSchedule = () => {
     studentEmails: [],
     startDate: getNextDayOccurrence(1),
     endDate: null,
+    contractUrl: '',
     paymentConfig: {
       type: 'weekly',
       weeklyInterval: 1,
@@ -445,6 +451,40 @@ export const AdminSchedule = () => {
         currency: newClass.paymentConfig.currency || 'BRL'
       };
       
+      // Generate a unique ID for the new class
+      const classId = Date.now().toString();
+      
+      // Upload contract file if provided
+      let contractUrl = '';
+      if (contractFile) {
+        try {
+          // Create a clean filename with date
+          const cleanFileName = contractFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const timestamp = Date.now();
+          const finalFileName = `${timestamp}_${cleanFileName}`;
+          
+          // Create storage reference with cleaned filename
+          const storageRef = ref(storage, `contracts/${classId}/${finalFileName}`);
+          
+          // Upload with metadata
+          const metadata = {
+            contentType: contractFile.type,
+            customMetadata: {
+              originalName: contractFile.name,
+              uploadedAt: new Date().toISOString()
+            }
+          };
+          
+          await uploadBytes(storageRef, contractFile, metadata);
+          contractUrl = await getDownloadURL(storageRef);
+        } catch (uploadError) {
+          console.error('Contract upload error:', uploadError);
+          toast.error('Failed to upload contract file. Please try again.');
+          setIsCreating(false);
+          return;
+        }
+      }
+      
       const classData = {
         scheduleType: newClass.scheduleType,
         dayOfWeek: newClass.dayOfWeek,
@@ -458,12 +498,11 @@ export const AdminSchedule = () => {
         ...(newClass.endDate ? { endDate: Timestamp.fromDate(newClass.endDate) } : {}),
         createdAt: now,
         updatedAt: now,
+        contractUrl,
         paymentConfig,
         frequency: newClass.frequency
       };
 
-      // Generate a unique ID for the new class
-      const classId = Date.now().toString();
       await setCachedDocument('classes', classId, classData);
       
       await fetchClasses();
@@ -485,6 +524,7 @@ export const AdminSchedule = () => {
         studentEmails: [],
         startDate: getNextDayOccurrence(1),
         endDate: null,
+        contractUrl: '',
         paymentConfig: {
           type: paymentType,
           weeklyInterval: 1,
@@ -499,6 +539,7 @@ export const AdminSchedule = () => {
           every: 1
         }
       });
+      setContractFile(null);
       toast.success('Class created successfully');
     } catch (error) {
       console.error('Error creating class:', error);
@@ -733,6 +774,7 @@ export const AdminSchedule = () => {
       studentEmails: classItem.studentEmails,
       startDate: classItem.startDate.toDate(),
       endDate: classItem.endDate?.toDate() || null,
+      contractUrl: classItem.contractUrl || '',
       paymentConfig: paymentConfig,
       frequency: frequency
     });
@@ -790,6 +832,37 @@ export const AdminSchedule = () => {
         type: editingClass.frequency?.type || 'weekly',
         every: editingClass.frequency?.every || 1
       };
+      
+      // Upload contract file if provided
+      let contractUrl = editingClass.contractUrl || '';
+      if (editContractFile) {
+        try {
+          // Create a clean filename with date
+          const cleanFileName = editContractFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const timestamp = Date.now();
+          const finalFileName = `${timestamp}_${cleanFileName}`;
+          
+          // Create storage reference with cleaned filename
+          const storageRef = ref(storage, `contracts/${editingClass.id}/${finalFileName}`);
+          
+          // Upload with metadata
+          const metadata = {
+            contentType: editContractFile.type,
+            customMetadata: {
+              originalName: editContractFile.name,
+              uploadedAt: new Date().toISOString()
+            }
+          };
+          
+          await uploadBytes(storageRef, editContractFile, metadata);
+          contractUrl = await getDownloadURL(storageRef);
+        } catch (uploadError) {
+          console.error('Contract upload error:', uploadError);
+          toast.error('Failed to upload contract file. Please try again.');
+          setIsSaving(false);
+          return;
+        }
+      }
 
       const updateData = {
         scheduleType: editingClass.scheduleType || 'single',
@@ -809,6 +882,7 @@ export const AdminSchedule = () => {
         studentEmails: editingClass.studentEmails || [],
         startDate: Timestamp.fromDate(editingClass.startDate),
         endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate) : null,
+        contractUrl,
         paymentConfig: paymentConfig,
         updatedAt: Timestamp.now(),
         frequency: frequency
@@ -817,12 +891,55 @@ export const AdminSchedule = () => {
       await updateCachedDocument('classes', editingClass.id, updateData);
       await fetchClasses();
       setEditingClass(null);
+      setEditContractFile(null);
       toast.success(t.updateSuccessful);
     } catch (error) {
       console.error('Error updating class:', error);
       toast.error(t.updateFailed);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Handle contract file change
+  const handleContractFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      // Check file size (5MB limit)
+      const fileSizeInMB = file.size / (1024 * 1024);
+      if (fileSizeInMB > 5) {
+        toast.error('Contract file size must be less than 5MB');
+        return;
+      }
+      
+      // Check file type (PDF only)
+      if (file.type !== 'application/pdf') {
+        toast.error('Contract file must be a PDF');
+        return;
+      }
+      
+      setContractFile(file);
+    }
+  };
+  
+  // Handle edit contract file change
+  const handleEditContractFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      // Check file size (5MB limit)
+      const fileSizeInMB = file.size / (1024 * 1024);
+      if (fileSizeInMB > 5) {
+        toast.error('Contract file size must be less than 5MB');
+        return;
+      }
+      
+      // Check file type (PDF only)
+      if (file.type !== 'application/pdf') {
+        toast.error('Contract file must be a PDF');
+        return;
+      }
+      
+      setEditContractFile(file);
     }
   };
 
@@ -944,7 +1061,7 @@ export const AdminSchedule = () => {
                     : classItem.paymentConfig?.monthlyOption === 'fifteen'
                       ? '15th day of month'
                       : 'Last day of month'
-                }
+                  }
               </div>
             </div>
             <div className="mt-2">
@@ -1220,6 +1337,7 @@ export const AdminSchedule = () => {
                     studentEmails: [],
                     startDate: getNextDayOccurrence(1),
                     endDate: null,
+                    contractUrl: '',
                     paymentConfig: {
                       type: 'weekly',
                       weeklyInterval: 1,
@@ -1461,7 +1579,7 @@ export const AdminSchedule = () => {
                                   className="text-red-600 hover:text-red-800 bg-transparent"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                   </svg>
                                 </button>
                               </div>
@@ -1581,6 +1699,28 @@ export const AdminSchedule = () => {
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       rows={3}
                     />
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className={styles.form.label}>
+                      Contract (PDF, max 5MB)
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleContractFileChange}
+                      className="mt-1 block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-indigo-50 file:text-indigo-700
+                        hover:file:bg-indigo-100"
+                    />
+                    {contractFile && (
+                      <div className="mt-2 text-sm text-gray-700">
+                        Selected file: {contractFile.name}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1920,9 +2060,6 @@ export const AdminSchedule = () => {
                         {t.dayAndTime}
                       </th>
                       <th scope="col" className={styles.table.header}>
-                        {t.courseType}
-                      </th>
-                      <th scope="col" className={styles.table.header}>
                         Frequency
                       </th>
                       <th scope="col" className={styles.table.header}>
@@ -1936,6 +2073,9 @@ export const AdminSchedule = () => {
                       </th>
                       <th scope="col" className={styles.table.header}>
                         Payment Day
+                      </th>
+                      <th scope="col" className={styles.table.header}>
+                        Contract
                       </th>
                       <th scope="col" className={`${styles.table.header} text-center`}>
                         {t.actions}
@@ -1968,9 +2108,6 @@ export const AdminSchedule = () => {
                               )}
                             </div>
                           )}
-                        </td>
-                        <td className={styles.table.cell}>
-                          {classItem.courseType}
                         </td>
                         <td className={styles.table.cell}>
                           {classItem.frequency?.type === 'weekly' ? 'Weekly' : 
@@ -2023,6 +2160,20 @@ export const AdminSchedule = () => {
                                 ? '15th day of month'
                                 : 'Last day of month'
                             }
+                        </td>
+                        <td className={styles.table.cell}>
+                          {classItem.contractUrl ? (
+                            <a 
+                              href={classItem.contractUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 hover:text-indigo-800"
+                            >
+                              View Contract
+                            </a>
+                          ) : (
+                            <span className="text-gray-500">No contract</span>
+                          )}
                         </td>
                         <td className={`${styles.table.cell} text-center`}>
                           <div className="flex justify-center gap-2">
@@ -2470,6 +2621,45 @@ export const AdminSchedule = () => {
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     rows={3}
                   />
+                </div>
+                
+                <div>
+                  <label className={styles.form.label}>
+                    Contract (PDF, max 5MB)
+                  </label>
+                  <div className="flex flex-col space-y-2">
+                    {editingClass?.contractUrl && (
+                      <div className="flex items-center">
+                        <a 
+                          href={editingClass.contractUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 hover:text-indigo-800 mr-2"
+                        >
+                          View Current Contract
+                        </a>
+                        <span className="text-sm text-gray-500">
+                          (Upload a new file to replace)
+                        </span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleEditContractFileChange}
+                      className="mt-1 block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-indigo-50 file:text-indigo-700
+                        hover:file:bg-indigo-100"
+                    />
+                    {editContractFile && (
+                      <div className="mt-2 text-sm text-gray-700">
+                        Selected file: {editContractFile.name}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

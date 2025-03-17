@@ -419,6 +419,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
+    // Clear masquerade state from session storage
+    sessionStorage.removeItem('masqueradeUser');
     await signOut(auth);
     setCurrentUser(null);
   };

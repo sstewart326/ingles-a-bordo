@@ -40,6 +40,15 @@ export const MasqueradeProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Clear masquerade state when user is no longer authenticated
+  useEffect(() => {
+    if (!currentUser && isMasquerading) {
+      setIsMasquerading(false);
+      setMasqueradingAs(null);
+      sessionStorage.removeItem('masqueradeUser');
+    }
+  }, [currentUser, isMasquerading]);
+
   const startMasquerade = async (userId: string) => {
     try {
       // Fetch the user document

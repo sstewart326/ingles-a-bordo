@@ -26,12 +26,14 @@ export const MasqueradeIndicator = () => {
           Impersonating <strong className="break-all">{masqueradingAs.name || masqueradingAs.email}</strong>
         </span>
       </div>
-      <button
-        onClick={handleStopMasquerade}
-        className="bg-white text-indigo-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-white w-full sm:w-auto"
-      >
-        Stop Impersonating
-      </button>
+      <div className="flex space-x-2">
+        <button
+          onClick={handleStopMasquerade}
+          className="bg-white text-indigo-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-white w-full sm:w-auto"
+        >
+          Stop Impersonating
+        </button>
+      </div>
     </div>
   );
 }; 
