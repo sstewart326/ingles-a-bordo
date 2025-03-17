@@ -597,8 +597,11 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
     font-size: 0.875rem;
   }
 
-  .calendar-day {
+  .calendar-day,
+  .calendar-day.empty {
     padding: 0.25rem;
+    min-height: unset;
+    aspect-ratio: 1/1;
   }
 
   .calendar-day > div {

@@ -66,8 +66,13 @@ export const Dashboard = () => {
     getMonthKey,
   } = useDashboardData();
 
-  // Define handleDayClick with useCallback
-  const handleDayClick = useCallback((date: Date, classes: ClassSession[]) => {
+  // Define the internal handleDayClick implementation with the shouldScroll parameter
+  const handleDayClickInternal = useCallback((
+    date: Date, 
+    classes: ClassSession[], 
+    paymentsDue: any[], // Use any[] to avoid type errors
+    shouldScroll: boolean = true
+  ) => {
     // Don't reset selected date if it's the same date
     if (!selectedDayDetails || selectedDayDetails.date.getTime() !== date.getTime()) {
       setSelectedDate(date);
@@ -81,9 +86,6 @@ export const Dashboard = () => {
     const day = date.getDate().toString().padStart(2, '0');
     const dateString = `${month}-${day}`;
     const birthdays = users.filter(user => user.birthdate === dateString);
-    
-    // Get payments due for the day
-    const paymentsDueForDay = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
     
     // Ensure that the dayOfWeek property of each class matches the day of the week of the selected date
     const selectedDayOfWeek = date.getDay();
@@ -134,7 +136,7 @@ export const Dashboard = () => {
       setSelectedDayDetails({
         date,
         classes: updatedClasses,
-        paymentsDue: paymentsDueForDay,
+        paymentsDue: paymentsDue,
         materials: materialsMap,
         birthdays
       });
@@ -144,7 +146,7 @@ export const Dashboard = () => {
     setSelectedDayDetails({
       date,
       classes: updatedClasses,
-      paymentsDue: paymentsDueForDay,
+      paymentsDue: paymentsDue,
       materials: selectedDayDetails?.materials || {},
       birthdays
     });
@@ -152,10 +154,23 @@ export const Dashboard = () => {
     // Then fetch materials asynchronously
     fetchMaterials();
 
-    // Always scroll to details section, regardless of screen size
-    if (detailsRef.current) {
+    // Only scroll to details section if shouldScroll is true (user clicked on a day)
+    if (shouldScroll && detailsRef.current) {
       setTimeout(() => {
-        detailsRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // Calculate the position to scroll to
+        const detailsElement = detailsRef.current;
+        if (detailsElement) {
+          const detailsRect = detailsElement.getBoundingClientRect();
+          const detailsBottom = detailsRect.bottom;
+          const viewportHeight = window.innerHeight;
+          const scrollPosition = window.scrollY + detailsBottom - viewportHeight;
+          
+          // Scroll to position that aligns the bottom of the details section with the bottom of the viewport
+          window.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+          });
+        }
       }, 100);
     }
   }, [
@@ -170,6 +185,16 @@ export const Dashboard = () => {
     setSelectedDayDetails
   ]);
 
+  // Create a wrapper function that matches the expected signature for CalendarSection
+  const handleDayClick = useCallback((
+    date: Date, 
+    classes: ClassSession[], 
+    paymentsDue: any[] // Use any[] to avoid type errors
+  ) => {
+    // Call the internal implementation with shouldScroll=true for user clicks
+    handleDayClickInternal(date, classes, paymentsDue, true);
+  }, [handleDayClickInternal]);
+
   // Add a specific effect to handle initial data loading after auth and admin status are determined
   useEffect(() => {
     if (!authLoading && !adminLoading && currentUser && !initialDataFetched) {
@@ -179,7 +204,7 @@ export const Dashboard = () => {
     }
   }, [authLoading, adminLoading, currentUser, initialDataFetched, fetchClasses]);
 
-  // Add a new effect to select the current day by default after classes are loaded
+  // Add a new effect to select the current day by default after classes are loaded, but don't scroll
   useEffect(() => {
     // Only proceed if we have loaded classes and no day is currently selected
     if (upcomingClasses.length > 0 && !selectedDayDetails) {
@@ -189,13 +214,15 @@ export const Dashboard = () => {
       // Get classes for today
       const classesForToday = getClassesForDay(todayDayOfWeek, today);
       
-      // If there are classes for today, select today
+      // If there are classes for today, select today but don't scroll
       if (classesForToday.length > 0) {
-        debugLog('Selecting current day by default');
-        handleDayClick(today, classesForToday);
+        debugLog('Selecting current day by default without scrolling');
+        const paymentsDueForToday = getPaymentsDueForDay(today, upcomingClasses, users, isDateInRelevantMonthRange);
+        // Call the internal implementation directly with shouldScroll=false
+        handleDayClickInternal(today, classesForToday, paymentsDueForToday, false);
       }
     }
-  }, [upcomingClasses, selectedDayDetails, getClassesForDay, handleDayClick]);
+  }, [upcomingClasses, selectedDayDetails, getClassesForDay, handleDayClickInternal, users, isDateInRelevantMonthRange]);
 
   // Track navigation to/from dashboard
   useEffect(() => {
@@ -699,29 +726,36 @@ export const Dashboard = () => {
         
         {/* Day details section */}
         <div ref={detailsRef} className="mt-8 lg:mt-0">
-          <DayDetails
-            selectedDayDetails={selectedDayDetails}
-            setSelectedDayDetails={setSelectedDayDetails}
-            isAdmin={isAdmin}
-            editingNotes={editingNotes}
-            savingNotes={savingNotes}
-            editingPrivateNotes={editingPrivateNotes}
-            savingPrivateNotes={savingPrivateNotes}
-            deletingMaterial={deletingMaterial}
-            onDeleteMaterial={handleDeleteMaterial}
-            onOpenUploadForm={openModal}
-            onCloseUploadForm={closeModal}
-            visibleUploadForm={visibleUploadForm}
-            onEditNotes={handleEditNotes}
-            onSaveNotes={handleSaveNotes}
-            onCancelEditNotes={handleCancelEditNotes}
-            onEditPrivateNotes={handleEditPrivateNotes}
-            onSavePrivateNotes={handleSavePrivateNotes}
-            onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
-            textareaRefs={textareaRefs.current}
-            onPaymentStatusChange={handlePaymentStatusChange}
-            formatClassTime={formatClassTime}
-          />
+          {selectedDayDetails ? (
+            <DayDetails
+              selectedDayDetails={selectedDayDetails}
+              setSelectedDayDetails={setSelectedDayDetails}
+              isAdmin={isAdmin}
+              editingNotes={editingNotes}
+              savingNotes={savingNotes}
+              editingPrivateNotes={editingPrivateNotes}
+              savingPrivateNotes={savingPrivateNotes}
+              deletingMaterial={deletingMaterial}
+              onDeleteMaterial={handleDeleteMaterial}
+              onOpenUploadForm={openModal}
+              onCloseUploadForm={closeModal}
+              visibleUploadForm={visibleUploadForm}
+              onEditNotes={handleEditNotes}
+              onSaveNotes={handleSaveNotes}
+              onCancelEditNotes={handleCancelEditNotes}
+              onEditPrivateNotes={handleEditPrivateNotes}
+              onSavePrivateNotes={handleSavePrivateNotes}
+              onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
+              textareaRefs={textareaRefs.current}
+              onPaymentStatusChange={handlePaymentStatusChange}
+              formatClassTime={formatClassTime}
+            />
+          ) : (
+            <div className="bg-white rounded-lg shadow p-6 text-center">
+              <h2 className={styles.headings.h2}>{'Select a day'}</h2>
+              <p className="text-gray-500 mt-2">{'Click on a day in the calendar to view details'}</p>
+            </div>
+          )}
         </div>
       </div>
       
