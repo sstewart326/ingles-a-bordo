@@ -748,7 +748,8 @@ export const getCalendarDataHttp = onRequest({
             endDate
           );
 
-          classSchedule.push({
+          // Create a base class object
+          const baseClassInfo = {
             classDetails: {
               dayOfWeek: classData.dayOfWeek,
               daysOfWeek: classData.daysOfWeek,
@@ -773,7 +774,35 @@ export const getCalendarDataHttp = onRequest({
             },
             dates: classDates,
             paymentDueDates: paymentDates
-          });
+          };
+
+          // Handle multiple schedule types
+          if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
+            // For multiple schedules, create a separate class object for each day
+            classData.schedules.forEach((schedule: any) => {
+              // Filter dates to only include those matching this day of week
+              const dayDates = classDates.filter(date => date.getDay() === schedule.dayOfWeek);
+              
+              if (dayDates.length > 0) {
+                const dayClassInfo = {
+                  classDetails: {
+                    ...baseClassInfo.classDetails,
+                    id: `${classId}-${schedule.dayOfWeek}`, // Create a unique ID for each day
+                    dayOfWeek: schedule.dayOfWeek,
+                    startTime: schedule.startTime,
+                    endTime: schedule.endTime,
+                    dates: dayDates
+                  },
+                  dates: dayDates,
+                  paymentDueDates: paymentDates
+                };
+                classSchedule.push(dayClassInfo);
+              }
+            });
+          } else {
+            // For single schedule classes, just add the original class info
+            classSchedule.push(baseClassInfo);
+          }
 
           // Add payment dates to the overall list
           paymentDueDates.push(...paymentDates.map(date => ({
