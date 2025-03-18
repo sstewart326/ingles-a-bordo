@@ -2674,6 +2674,297 @@ export const AdminSchedule = () => {
               </div>
             </div>
             
+            {/* Payment Configuration Section */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
+                {"Payment Configuration"}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={styles.form.label}>{"Payment Type"}</label>
+                  <select
+                    value={editingClass?.paymentConfig.type}
+                    onChange={(e) => {
+                      if (!editingClass) return;
+                      const type = e.target.value as 'weekly' | 'monthly';
+                      setEditingClass((prev: any) => {
+                        if (type === 'monthly') {
+                          // If switching to monthly, adjust the start date to a valid day (1, 15, or last day)
+                          const currentDate = (() => {
+                            const [year, month, day] = prev.paymentConfig.startDate.split('-').map(Number);
+                            const date = new Date();
+                            date.setFullYear(year);
+                            date.setMonth(month - 1); // Month is 0-indexed in JavaScript
+                            date.setDate(day);
+                            return date;
+                          })();
+                          
+                          const day = currentDate.getDate();
+                          const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+                          
+                          // Determine the closest valid day (1, 15, or last day)
+                          let newDay: number;
+                          if (day <= 8) {
+                            newDay = 1;
+                          } else if (day <= 23) {
+                            newDay = 15;
+                          } else {
+                            newDay = lastDayOfMonth;
+                          }
+                          
+                          const newCurrentDate = new Date(currentDate);
+                          newCurrentDate.setDate(newDay);
+                          
+                          const monthlyOption = newDay === 1 ? 'first' : newDay === 15 ? 'fifteen' : 'last';
+                          
+                          const startDateStr = newCurrentDate.toISOString().split('T')[0];
+                          
+                          return {
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              type,
+                              startDate: startDateStr,
+                              monthlyOption,
+                              weeklyInterval: undefined
+                            }
+                          };
+                        } else {
+                          return {
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              type,
+                              monthlyOption: undefined,
+                              weeklyInterval: 1
+                            }
+                          };
+                        }
+                      });
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className={styles.form.label}>{"Payment Start Date"}</label>
+                  <DatePicker
+                    selected={(() => {
+                      if (!editingClass) return new Date();
+                      try {
+                        const [year, month, day] = editingClass.paymentConfig.startDate.split('-').map(Number);
+                        const date = new Date();
+                        date.setFullYear(year);
+                        date.setMonth(month - 1); // Month is 0-indexed in JavaScript
+                        date.setDate(day);
+                        return date;
+                      } catch (e) {
+                        return new Date();
+                      }
+                    })()}
+                    onChange={(date: Date | null) => {
+                      if (!editingClass || !date) return;
+                      
+                      // Format as YYYY-MM-DD
+                      const startDateStr = date.toISOString().split('T')[0];
+                      
+                      // For monthly payments, automatically select the appropriate option based on the day
+                      if (editingClass.paymentConfig.type === 'monthly') {
+                        const day = date.getDate();
+                        const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                        
+                        let monthlyOption: 'first' | 'fifteen' | 'last';
+                        if (day === 1) monthlyOption = 'first';
+                        else if (day === 15) monthlyOption = 'fifteen';
+                        else if (day === lastDayOfMonth) monthlyOption = 'last';
+                        else {
+                          // If not a valid day, adjust to the closest valid day
+                          if (day < 8) {
+                            date.setDate(1);
+                            monthlyOption = 'first';
+                          } else if (day < 23) {
+                            date.setDate(15);
+                            monthlyOption = 'fifteen';
+                          } else {
+                            date.setDate(lastDayOfMonth);
+                            monthlyOption = 'last';
+                          }
+                          // Update the date string after adjustment
+                          const adjustedDateStr = date.toISOString().split('T')[0];
+                          setEditingClass((prev: any) => ({
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              startDate: adjustedDateStr,
+                              monthlyOption
+                            }
+                          }));
+                          return;
+                        }
+                        
+                        setEditingClass((prev: any) => ({
+                          ...prev,
+                          paymentConfig: {
+                            ...prev.paymentConfig,
+                            startDate: startDateStr,
+                            monthlyOption
+                          }
+                        }));
+                      } else {
+                        setEditingClass((prev: any) => ({
+                          ...prev,
+                          paymentConfig: {
+                            ...prev.paymentConfig,
+                            startDate: startDateStr
+                          }
+                        }));
+                      }
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    showTimeSelect={false}
+                    dateFormat="MMMM d, yyyy"
+                    filterDate={(date) => {
+                      // For monthly payments, only allow selecting 1st, 15th, or last day of month
+                      if (editingClass?.paymentConfig.type === 'monthly') {
+                        const day = date.getDate();
+                        const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                        return day === 1 || day === 15 || day === lastDayOfMonth;
+                      }
+                      return true; // No filter for weekly payments
+                    }}
+                  />
+                </div>
+                
+                {editingClass?.paymentConfig.type === 'weekly' ? (
+                  <div>
+                    <label htmlFor="editWeeklyInterval" className={styles.form.label}>
+                      {t.weeklyInterval || "Payment Frequency"}
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        id="editWeeklyInterval"
+                        min="1"
+                        value={editingClass?.paymentConfig.weeklyInterval || 1}
+                        onChange={(e) => {
+                          if (!editingClass) return;
+                          setEditingClass((prev: any) => ({
+                            ...prev,
+                            paymentConfig: {
+                              ...prev.paymentConfig,
+                              weeklyInterval: parseInt(e.target.value) || 1
+                            }
+                          }));
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <span className="ml-2">weeks</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label htmlFor="editMonthlyOption" className={styles.form.label}>
+                      {t.selectPaymentDay || "Payment Day"}
+                      <span className="ml-1 text-gray-500 text-xs">
+                        (auto-set)
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-500 px-3 py-2 sm:text-sm flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        {editingClass?.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
+                        {editingClass?.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
+                        {editingClass?.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                      </div>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Payment day is automatically set based on the selected payment start date.
+                    </p>
+                  </div>
+                )}
+                
+                <div>
+                  <label htmlFor="editPaymentLink" className={styles.form.label}>
+                    Payment Link
+                  </label>
+                  <input
+                    type="url"
+                    id="editPaymentLink"
+                    value={editingClass?.paymentConfig.paymentLink || ''}
+                    onChange={(e) => {
+                      if (!editingClass) return;
+                      setEditingClass((prev: any) => ({
+                        ...prev,
+                        paymentConfig: {
+                          ...prev.paymentConfig,
+                          paymentLink: e.target.value
+                        }
+                      }));
+                    }}
+                    placeholder="https://payment-provider.com/your-payment-link"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Enter a URL where students can make payments
+                  </p>
+                </div>
+                
+                <div>
+                  <label htmlFor="editPaymentAmount" className={styles.form.label}>
+                    Payment Amount
+                  </label>
+                  <input
+                    type="number"
+                    id="editPaymentAmount"
+                    min="0"
+                    step="0.01"
+                    value={editingClass?.paymentConfig.amount || 0}
+                    onChange={(e) => {
+                      if (!editingClass) return;
+                      setEditingClass((prev: any) => ({
+                        ...prev,
+                        paymentConfig: {
+                          ...prev.paymentConfig,
+                          amount: parseFloat(e.target.value) || 0
+                        }
+                      }));
+                    }}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="editPaymentCurrency" className={styles.form.label}>
+                    Currency
+                  </label>
+                  <select
+                    id="editPaymentCurrency"
+                    value={editingClass?.paymentConfig.currency || 'BRL'}
+                    onChange={(e) => {
+                      if (!editingClass) return;
+                      setEditingClass((prev: any) => ({
+                        ...prev,
+                        paymentConfig: {
+                          ...prev.paymentConfig,
+                          currency: e.target.value
+                        }
+                      }));
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="BRL">BRL (R$)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
             {/* Buttons */}
             <div className="flex justify-end space-x-3 mt-6">
               <button
