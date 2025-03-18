@@ -137,7 +137,7 @@ export const AdminSchedule = () => {
       startDate: new Date().toISOString().split('T')[0],
       paymentLink: '',
       amount: 0,
-      currency: 'BRL'
+      currency: 'USD'
     },
     frequency: {
       type: 'weekly',
@@ -1355,7 +1355,7 @@ export const AdminSchedule = () => {
                       startDate: today.toISOString().split('T')[0],
                       paymentLink: '',
                       amount: 0,
-                      currency: 'BRL'
+                      currency: 'USD'
                     },
                     frequency: {
                       type: 'weekly',
@@ -1908,14 +1908,17 @@ export const AdminSchedule = () => {
                           type="number"
                           id="weeklyInterval"
                           min="1"
-                          value={newClass.paymentConfig.weeklyInterval || 1}
-                          onChange={(e) => setNewClass((prev: typeof newClass) => ({
-                            ...prev,
-                            paymentConfig: {
-                              ...prev.paymentConfig,
-                              weeklyInterval: parseInt(e.target.value) || 1
-                            }
-                          }))}
+                          value={newClass.paymentConfig.weeklyInterval === undefined ? '' : newClass.paymentConfig.weeklyInterval}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setNewClass((prev: typeof newClass) => ({
+                              ...prev,
+                              paymentConfig: {
+                                ...prev.paymentConfig,
+                                weeklyInterval: value === '' ? undefined : Math.max(1, parseInt(value))
+                              }
+                            }));
+                          }}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                         />
                         <span className="ml-2">weeks</span>
@@ -1977,14 +1980,17 @@ export const AdminSchedule = () => {
                       id="paymentAmount"
                       min="0"
                       step="0.01"
-                      value={newClass.paymentConfig.amount || 0}
-                      onChange={(e) => setNewClass((prev: typeof newClass) => ({
-                        ...prev,
-                        paymentConfig: {
-                          ...prev.paymentConfig,
-                          amount: parseFloat(e.target.value) || 0
-                        }
-                      }))}
+                      value={newClass.paymentConfig.amount === undefined ? '' : newClass.paymentConfig.amount}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setNewClass((prev: typeof newClass) => ({
+                          ...prev,
+                          paymentConfig: {
+                            ...prev.paymentConfig,
+                            amount: value === '' ? undefined : parseFloat(value)
+                          }
+                        }));
+                      }}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     />
                   </div>
@@ -2848,14 +2854,15 @@ export const AdminSchedule = () => {
                         type="number"
                         id="editWeeklyInterval"
                         min="1"
-                        value={editingClass?.paymentConfig.weeklyInterval || 1}
+                        value={editingClass?.paymentConfig.weeklyInterval === undefined ? '' : editingClass?.paymentConfig.weeklyInterval}
                         onChange={(e) => {
                           if (!editingClass) return;
+                          const value = e.target.value;
                           setEditingClass((prev: any) => ({
                             ...prev,
                             paymentConfig: {
                               ...prev.paymentConfig,
-                              weeklyInterval: parseInt(e.target.value) || 1
+                              weeklyInterval: value === '' ? undefined : Math.max(1, parseInt(value))
                             }
                           }));
                         }}
@@ -2923,14 +2930,15 @@ export const AdminSchedule = () => {
                     id="editPaymentAmount"
                     min="0"
                     step="0.01"
-                    value={editingClass?.paymentConfig.amount || 0}
+                    value={editingClass?.paymentConfig.amount === undefined ? '' : editingClass?.paymentConfig.amount}
                     onChange={(e) => {
                       if (!editingClass) return;
+                      const value = e.target.value;
                       setEditingClass((prev: any) => ({
                         ...prev,
                         paymentConfig: {
                           ...prev.paymentConfig,
-                          amount: parseFloat(e.target.value) || 0
+                          amount: value === '' ? undefined : parseFloat(value)
                         }
                       }));
                     }}
