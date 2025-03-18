@@ -173,8 +173,8 @@ export const Dashboard = () => {
     // Then fetch materials asynchronously
     fetchMaterials();
 
-    // Only scroll to details section if shouldScroll is true (user clicked on a day)
-    if (shouldScroll && detailsRef.current) {
+    // Only scroll to details section if shouldScroll is true (user clicked on a day) AND we're on mobile
+    if (shouldScroll && detailsRef.current && window.innerWidth < 768) {
       setTimeout(() => {
         // Calculate the position to scroll to
         const detailsElement = detailsRef.current;

@@ -80,14 +80,9 @@
         {
           "fieldPath": "classDate",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ]
     }
-    
   ],
   "fieldOverrides": []
 } 
