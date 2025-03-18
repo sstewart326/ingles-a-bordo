@@ -28,53 +28,15 @@ const ALLOWED_FILE_TYPES = [
 ];
 
 /**
- * Extracts the storage path from a Firebase Storage URL
- * @param url The Firebase Storage URL
- * @returns The decoded storage path or null if the URL is invalid
- */
-const extractStoragePathFromUrl = (url: string): string | null => {
-  if (!url || !url.startsWith('https://firebasestorage.googleapis.com')) {
-    return null;
-  }
-  
-  try {
-    // Firebase Storage URLs format: 
-    // https://firebasestorage.googleapis.com/v0/b/[PROJECT_ID].appspot.com/o/[ENCODED_FILE_PATH]?alt=media&token=[TOKEN]
-    
-    // Extract path after "/o/"
-    const pathStartIndex = url.indexOf('/o/') + 3;
-    if (pathStartIndex <= 3) return null;
-    
-    // Find the end of the path (where the query parameters start)
-    const pathEndIndex = url.indexOf('?', pathStartIndex);
-    if (pathEndIndex <= pathStartIndex) return null;
-    
-    // Extract the encoded path and decode it
-    const encodedPath = url.substring(pathStartIndex, pathEndIndex);
-    return decodeURIComponent(encodedPath);
-  } catch (error) {
-    console.error('Error extracting storage path from URL:', error);
-  }
-  
-  return null;
-};
-
-/**
  * Deletes a file from Firebase Storage using its URL
  * @param url The Firebase Storage URL of the file to delete
  * @returns A promise that resolves when the file is deleted, or rejects with an error
  */
 const deleteFileFromStorage = async (url: string): Promise<void> => {
-  const path = extractStoragePathFromUrl(url);
-  
-  if (!path) {
-    throw new Error('Invalid storage URL');
-  }
-  
   try {
-    const fileRef = ref(storage, path);
+    const fileRef = ref(storage, url);
     await deleteObject(fileRef);
-    logMaterialsUtil(`File deleted from storage: ${path}`);
+    logMaterialsUtil(`File deleted from storage: ${fileRef.fullPath}`);
   } catch (error) {
     console.error('Error during file deletion:', error);
     throw error;
@@ -524,9 +486,11 @@ export const updateClassMaterialItem = async (
       // Try to delete from storage if it's a valid URL
       if (slideUrl) {
         try {
+          console.log('Attempting to delete file with URL:', slideUrl);
           await deleteFileFromStorage(slideUrl);
         } catch (storageError) {
           console.error('Error deleting file from storage:', storageError);
+          console.error('Problematic URL:', slideUrl);
         }
       }
       
