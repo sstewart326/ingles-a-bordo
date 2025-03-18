@@ -13,6 +13,34 @@ export interface ClassMaterial {
   studentIds?: string[]; // Keep for backward compatibility
 }
 
+// New interface for homework assignments
+export interface Homework {
+  id: string;
+  classId: string;
+  title: string;
+  description: string;
+  documents?: { url: string; name: string; type: string; size: number }[]; // Files attached to homework
+  classDate: Date; // The date this homework is assigned for
+  allowTextSubmission: boolean; // Whether students can submit text responses
+  allowFileSubmission: boolean; // Whether students can upload files
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Interface for student homework submissions
+export interface HomeworkSubmission {
+  id: string;
+  homeworkId: string;
+  studentEmail: string;
+  textResponse?: string;
+  files?: { url: string; name: string; type: string; size: number }[];
+  submittedAt: Date;
+  updatedAt: Date;
+  status: 'submitted' | 'reviewed' | 'graded';
+  feedback?: string;
+  grade?: string;
+}
+
 export interface Class {
   id: string;
   dayOfWeek: number;

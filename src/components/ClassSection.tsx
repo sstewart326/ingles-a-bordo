@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ClassSession } from '../utils/scheduleUtils';
-import { ClassMaterial } from '../types/interfaces';
+import { ClassMaterial, Homework } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
-import { FaLink, FaPlus, FaTrash, FaFilePowerpoint } from 'react-icons/fa';
+import { FaLink, FaPlus, FaTrash, FaFilePowerpoint, FaFilePdf, FaExternalLinkAlt, FaPaperclip, FaInfoCircle } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
 import { UploadMaterialsForm } from './UploadMaterialsForm';
 import { debugMaterials, debugClassSession } from '../utils/debugUtils';
+import { HomeworkManager } from './HomeworkManager';
+import { toast } from 'react-hot-toast';
 
 // Extended interface to include dates property
 interface ExtendedClassSession extends ClassSession {
@@ -43,6 +45,8 @@ interface ClassSectionProps {
   onPageChange: (page: number) => void;
   sectionRef: React.RefObject<HTMLDivElement | null>;
   selectedDate?: Date;
+  homeworkByClassId?: Record<string, Homework[]>;
+  refreshHomework?: () => Promise<void>;
   t: {
     upcomingClasses: string;
     pastClasses: string;
@@ -95,6 +99,8 @@ export const ClassSection = ({
   onPageChange,
   sectionRef,
   selectedDate,
+  homeworkByClassId,
+  refreshHomework,
   t
 }: ClassSectionProps) => {
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
@@ -499,6 +505,14 @@ export const ClassSection = ({
                         </div>
                       )}
                       {isAdmin && renderUploadMaterialsSection(classSession, date)}
+
+                      {/* Homework Section */}
+                      <HomeworkManager
+                        classId={classSession.id}
+                        classDate={date} 
+                        isAdmin={isAdmin}
+                        onAddSuccess={refreshHomework}
+                      />
                     </div>
                   </div>
                 </div>

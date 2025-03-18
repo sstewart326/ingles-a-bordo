@@ -8,7 +8,7 @@ import '../styles/calendar.css';
 import { ClassSession } from '../utils/scheduleUtils';
 import { styles } from '../styles/styleUtils';
 import { getClassMaterials } from '../utils/classMaterialsUtils';
-import { ClassMaterial } from '../types/interfaces';
+import { ClassMaterial, Homework } from '../types/interfaces';
 import {
   handleDeleteMaterial as deleteMaterial,
   MaterialsState
@@ -23,6 +23,8 @@ import { ClassesSection } from '../components/ClassesSection';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { debugLog, debugMaterials } from '../utils/debugUtils';
 import { getPaymentsDueForDay } from '../utils/paymentUtils';
+import { StudentHomework } from '../components/StudentHomework';
+import { getHomeworkForClass, subscribeToHomeworkChanges } from '../utils/homeworkUtils';
 
 export const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -39,6 +41,9 @@ export const Dashboard = () => {
   const [lastVisitTimestamp, setLastVisitTimestamp] = useState<number>(Date.now());
   const prevPathRef = useRef<string | null>(null);
   const isFetchingRef = useRef<boolean>(false);
+  
+  const [homeworkByClassId, setHomeworkByClassId] = useState<Record<string, Homework[]>>({});
+  const [isLoadingHomework, setIsLoadingHomework] = useState<boolean>(false);
   
   const { currentUser, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -469,11 +474,11 @@ export const Dashboard = () => {
     });
   };
 
-  const openModal = (classId: string) => {
+  const handleOpenUploadForm = (classId: string) => {
     setVisibleUploadForm(classId);
   };
 
-  const closeModal = async () => {
+  const handleCloseUploadForm = async () => {
     // If we have a visible upload form (meaning a class ID), refresh the materials for that class
     if (visibleUploadForm && selectedDayDetails) {
       try {
@@ -705,6 +710,94 @@ export const Dashboard = () => {
     }
   }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, upcomingClasses, users, isDateInRelevantMonthRange, setSelectedDate, setSelectedDayDetails]);
 
+  // Add a function to fetch homework for a class and update the state
+  const fetchHomeworkForClass = async (classId: string) => {
+    try {
+      const baseClassId = classId.split('-')[0]; // Extract base class ID in case we have a dated class ID
+      const homework = await getHomeworkForClass(baseClassId);
+      
+      setHomeworkByClassId(prevState => ({
+        ...prevState,
+        [baseClassId]: homework
+      }));
+      
+      // Also store it under the original class ID to make lookup easier
+      if (baseClassId !== classId) {
+        setHomeworkByClassId(prevState => ({
+          ...prevState,
+          [classId]: homework
+        }));
+      }
+      
+      return homework;
+    } catch (error) {
+      console.error(`Error fetching homework for class ${classId}:`, error);
+      return [];
+    }
+  };
+  
+  // Function to refresh all homework data
+  const refreshAllHomework = async () => {
+    console.log('Dashboard: Refreshing all homework data');
+    setIsLoadingHomework(true);
+    
+    try {
+      // First, collect all unique class IDs that we need to fetch homework for
+      const uniqueClassIds = new Set<string>();
+      
+      // Add class IDs from upcoming classes
+      upcomingClasses.forEach(classSession => {
+        uniqueClassIds.add(classSession.id);
+      });
+      
+      // Add class IDs from past classes
+      pastClasses.forEach(classSession => {
+        uniqueClassIds.add(classSession.id);
+      });
+      
+      // If we have selected day details with classes, add those too
+      if (selectedDayDetails && selectedDayDetails.classes) {
+        selectedDayDetails.classes.forEach(classSession => {
+          uniqueClassIds.add(classSession.id);
+        });
+      }
+      
+      // Fetch homework for all unique class IDs
+      const fetchPromises = Array.from(uniqueClassIds).map(classId => 
+        fetchHomeworkForClass(classId)
+      );
+      
+      await Promise.all(fetchPromises);
+      console.log('Dashboard: All homework refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing homework:', error);
+    } finally {
+      setIsLoadingHomework(false);
+    }
+  };
+  
+  // Set up homework change listener
+  useEffect(() => {
+    // Fetch homework data initially
+    refreshAllHomework();
+    
+    // Subscribe to homework changes
+    const unsubscribe = subscribeToHomeworkChanges((updatedClassId) => {
+      console.log(`Dashboard: Received homework change notification for class ${updatedClassId}`);
+      
+      if (updatedClassId) {
+        // If we have a specific class ID, just refresh that one
+        fetchHomeworkForClass(updatedClassId);
+      } else {
+        // Otherwise refresh all homework
+        refreshAllHomework();
+      }
+    });
+    
+    // Clean up subscription
+    return () => unsubscribe();
+  }, [upcomingClasses, pastClasses]); // Re-run when the classes change
+
   // Show loading state if auth or admin status is still loading
   if (authLoading || adminLoading) {
     return (
@@ -749,19 +842,21 @@ export const Dashboard = () => {
               editingPrivateNotes={editingPrivateNotes}
               savingPrivateNotes={savingPrivateNotes}
               deletingMaterial={deletingMaterial}
-              onDeleteMaterial={handleDeleteMaterial}
-              onOpenUploadForm={openModal}
-              onCloseUploadForm={closeModal}
-              visibleUploadForm={visibleUploadForm}
+              formatClassTime={formatClassTime}
               onEditNotes={handleEditNotes}
               onSaveNotes={handleSaveNotes}
               onCancelEditNotes={handleCancelEditNotes}
               onEditPrivateNotes={handleEditPrivateNotes}
               onSavePrivateNotes={handleSavePrivateNotes}
               onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
+              onDeleteMaterial={handleDeleteMaterial}
+              onOpenUploadForm={handleOpenUploadForm}
+              onCloseUploadForm={handleCloseUploadForm}
+              visibleUploadForm={visibleUploadForm}
               textareaRefs={textareaRefs.current}
               onPaymentStatusChange={handlePaymentStatusChange}
-              formatClassTime={formatClassTime}
+              homeworkByClassId={homeworkByClassId}
+              refreshHomework={refreshAllHomework}
             />
           ) : (
             <div className="bg-white rounded-lg shadow p-6 text-center">
@@ -799,13 +894,15 @@ export const Dashboard = () => {
           onSavePrivateNotes={handleSavePrivateNotes}
           onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
           onDeleteMaterial={handleDeleteMaterial}
-          onOpenUploadForm={openModal}
-          onCloseUploadForm={closeModal}
+          onOpenUploadForm={handleOpenUploadForm}
+          onCloseUploadForm={handleCloseUploadForm}
           visibleUploadForm={visibleUploadForm}
           textareaRefs={textareaRefs.current}
           onUpcomingClassesPageChange={handleUpcomingClassesPagination}
           onPastClassesPageChange={handlePastClassesPagination}
           selectedDate={selectedDate}
+          homeworkByClassId={homeworkByClassId}
+          refreshHomework={refreshAllHomework}
           t={{
             upcomingClasses: t.upcomingClasses,
             pastClasses: t.pastClasses,
@@ -829,6 +926,13 @@ export const Dashboard = () => {
           }}
         />
       </div>
+      
+      {/* Homework section - only show for non-admin users */}
+      {!isAdmin && currentUser && currentUser.email && (
+        <div className="mt-8 pt-8 border-t-4 border-gray-200">
+          <StudentHomework studentEmail={currentUser.email} />
+        </div>
+      )}
     </div>
   );
 

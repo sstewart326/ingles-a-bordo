@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ClassSession, User } from '../utils/scheduleUtils';
-import { ClassMaterial } from '../types/interfaces';
+import { ClassMaterial, Homework } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
@@ -11,6 +11,8 @@ import Modal from './Modal';
 import { Payment } from '../types/payment';
 import { createPayment, getPaymentsByDueDate, deletePayment } from '../services/paymentService';
 import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
+import { HomeworkManager } from './HomeworkManager';
+import { toast } from 'react-hot-toast';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -46,6 +48,8 @@ interface DayDetailsProps {
   visibleUploadForm: string | null;
   textareaRefs: { [key: string]: HTMLTextAreaElement | null };
   onPaymentStatusChange?: (date: Date) => void;
+  homeworkByClassId?: Record<string, Homework[]>;
+  refreshHomework?: () => Promise<void>;
 }
 
 export const DayDetails = ({
@@ -69,7 +73,9 @@ export const DayDetails = ({
   onCloseUploadForm,
   visibleUploadForm,
   textareaRefs,
-  onPaymentStatusChange
+  onPaymentStatusChange,
+  homeworkByClassId,
+  refreshHomework
 }: DayDetailsProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -810,22 +816,21 @@ export const DayDetails = ({
       )}
 
       {/* Classes Section */}
-      {paginatedClasses.map((classSession) => (
-        <div key={classSession.id} className="mb-8 last:mb-0">
-          <div className="flex justify-between items-start w-full">
-            <div className="w-full overflow-hidden">
-              <div className="text-sm font-bold text-black mb-2">
-                {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
-                  weekday: 'long', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </div>
-              <div className={styles.card.title}>
-                {(classSession.students || []).join(', ')}
-              </div>
-              <div className={styles.card.subtitle}>
-                {formatClassTime(classSession)}
+      {selectedDayDetails.classes.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-4">
+            {t.class || 'Classes'}
+          </h3>
+          
+          {totalPages > 1 && <ClassesPagination />}
+          
+          {paginatedClasses.map((classSession) => (
+            <div key={classSession.id} className="mb-8 last:mb-0">
+              <div className="mb-2">
+                <h4 className="text-lg font-semibold">{classSession.studentEmails && classSession.studentEmails.length > 0 ? classSession.studentEmails.join(', ') : ''}</h4>
+                <div className="text-sm text-gray-600">
+                  {formatClassTime(classSession)}
+                </div>
               </div>
               
               {/* Notes section */}
@@ -1054,13 +1059,22 @@ export const DayDetails = ({
                 </div>
               )}
               {isAdmin && renderUploadMaterialsSection(classSession, selectedDayDetails.date)}
+              
+              {/* Homework Section */}
+              <div className="mt-3" style={{ position: 'relative', width: '100%' }}>
+                <HomeworkManager
+                  classId={classSession.id}
+                  classDate={selectedDayDetails.date}
+                  isAdmin={isAdmin}
+                  onAddSuccess={refreshHomework}
+                />
+              </div>
             </div>
-          </div>
+          ))}
+          
+          {totalPages > 1 && <ClassesPagination />}
         </div>
-      ))}
-      
-      {/* Classes Pagination */}
-      {totalPages > 1 && <ClassesPagination />}
+      )}
     </div>
   );
 }; 

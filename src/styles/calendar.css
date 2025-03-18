@@ -123,6 +123,14 @@
   background-color: #4f46e5;
 }
 
+.calendar-day-indicators .homework-indicator {
+  background-color: #10b981; /* green-500 */
+}
+
+.calendar-day-indicators .feedback-indicator {
+  background-color: #8b5cf6; /* purple-500 */
+}
+
 /* Payment Due Label */
 .payment-due-label {
   font-size: 0.6rem;
@@ -212,6 +220,37 @@
 
 .payment-pill.soon:hover {
   background-color: #dc2626;
+}
+
+/* Homework Pill */
+.homework-pill {
+  background-color: #10b981; /* green-500 */
+}
+
+.homework-pill:hover {
+  background-color: #059669; /* green-600 */
+}
+
+.homework-pill .homework-icon {
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.homework-pill.has-feedback {
+  background-color: #8b5cf6; /* purple-500 */
+}
+
+.homework-pill.has-feedback:hover {
+  background-color: #7c3aed; /* purple-600 */
+}
+
+.feedback-icon {
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .time-slots-container {

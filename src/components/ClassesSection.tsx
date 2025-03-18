@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { ClassSection } from './ClassSection';
 import { ClassSession } from '../utils/scheduleUtils';
 import { ClassMaterial } from '../types/interfaces';
+import { Homework } from '../types/interfaces';
 
 interface ClassesSectionProps {
   upcomingClasses: ClassSession[];
@@ -35,6 +36,8 @@ interface ClassesSectionProps {
   onUpcomingClassesPageChange: (page: number) => void;
   onPastClassesPageChange: (page: number) => void;
   selectedDate?: Date;
+  homeworkByClassId?: Record<string, Homework[]>;
+  refreshHomework?: () => Promise<void>;
   t: {
     upcomingClasses: string;
     pastClasses: string;
@@ -88,6 +91,8 @@ export const ClassesSection = ({
   onUpcomingClassesPageChange,
   onPastClassesPageChange,
   selectedDate,
+  homeworkByClassId,
+  refreshHomework,
   t
 }: ClassesSectionProps) => {
   const upcomingClassesSectionRef = useRef<HTMLDivElement>(null);

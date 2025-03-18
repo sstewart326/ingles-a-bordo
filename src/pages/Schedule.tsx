@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { Calendar } from '../components/Calendar';
 import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';
@@ -10,6 +10,9 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { getCalendarData, invalidateCalendarCache } from '../services/calendarService';
 import { ClassSession } from '../utils/scheduleUtils';
+import { getHomeworkForClass, getHomeworkForDate, getHomeworkSubmissions } from '../utils/homeworkUtils';
+import { Homework, HomeworkSubmission } from '../types/interfaces';
+import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
@@ -110,6 +113,7 @@ interface CalendarData {
   userData: UserData;
   month: number;
   year: number;
+  homework?: Record<string, Homework[]>;
 }
 
 export const Schedule = () => {
@@ -137,8 +141,46 @@ export const Schedule = () => {
   const [selectedMaterial, setSelectedMaterial] = useState<CalendarMaterial | null>(null);
   const [loadingMaterial, setLoadingMaterial] = useState(false);
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null);
+  
+  // Homework State
+  const [homeworkByClass, setHomeworkByClass] = useState<Record<string, Homework[]>>({});
+  const [selectedHomeworkClass, setSelectedHomeworkClass] = useState<CalendarClass | null>(null);
+  const [selectedHomeworkDate, setSelectedHomeworkDate] = useState<Date | null>(null);
+  const [homeworkFeedbackByClass, setHomeworkFeedbackByClass] = useState<Record<string, Map<string, boolean>>>({});
 
   const DAYS_OF_WEEK_FULL = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
+
+  // Function to format dates to YYYY-MM-DD for comparison
+  const formatDateForComparison = (date: any): string => {
+    if (!date) return '';
+    
+    try {
+      // If it's a Date object
+      if (date instanceof Date) {
+        return date.toISOString().split('T')[0];
+      }
+      // If it's a string, try to create a Date
+      else if (typeof date === 'string') {
+        return new Date(date).toISOString().split('T')[0];
+      }
+      // If it's a Firestore Timestamp (has toDate method)
+      else if (typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+        return date.toDate().toISOString().split('T')[0];
+      }
+      // If it's a number, treat as milliseconds
+      else if (typeof date === 'number') {
+        return new Date(date).toISOString().split('T')[0];
+      }
+      // If we can't determine the type, try to stringify and log
+      else {
+        console.warn('Unknown date format:', date, typeof date);
+        return '';
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error, date);
+      return '';
+    }
+  };
 
   // Create a memoized fetch function to avoid duplicate requests
   const fetchCalendarDataSafely = useCallback(async (month: number, year: number) => {
@@ -212,40 +254,42 @@ export const Schedule = () => {
   const getClassesForDate = (date: Date): CalendarClass[] => {
     if (!calendarData?.classes) return [];
     
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatDateForComparison(date);
     
     return calendarData.classes.filter(classItem => 
-      classItem.dates.some(classDate => 
-        classDate.split('T')[0] === dateStr
-      )
+      classItem.dates.some(classDate => {
+        const classDateStr = classDate?.split('T')[0] || '';
+        return classDateStr === dateStr;
+      })
     );
   };
 
   const isPaymentDueOnDate = (date: Date): boolean => {
     if (!calendarData?.paymentDueDates) return false;
     
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatDateForComparison(date);
     
-    return calendarData.paymentDueDates.some(payment => 
-      payment.date.split('T')[0] === dateStr
-    );
+    return calendarData.paymentDueDates.some(payment => {
+      const paymentDateStr = payment.date?.split('T')[0] || '';
+      return paymentDateStr === dateStr;
+    });
   };
 
   const handleClassClick = async (classItem: CalendarClass, date: Date) => {
     if (!calendarData?.materials) return;
     
-    const classId = classItem.id;
+    const classId = classItem.classDetails.id;
     if (!calendarData.materials[classId]) return;
     
     setSelectedClass(classItem);
     setLoadingMaterial(true);
 
     try {
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatDateForComparison(date);
       
       // Find material for this specific class and date
       const material = calendarData.materials[classId].find(m => {
-        const materialDateStr = m.classDate.split('T')[0];
+        const materialDateStr = m.classDate?.split('T')[0] || '';
         return materialDateStr === dateStr;
       });
 
@@ -266,7 +310,44 @@ export const Schedule = () => {
     }
   };
 
-  const handleDayClick = (date: Date, classes: CalendarClass[], isPaymentDay: boolean, isPaymentSoon: boolean) => {
+  const handleDayClick = (date: Date, classes: CalendarClass[], isPaymentDay: boolean, isPaymentSoon: boolean, shouldScroll: boolean = true) => {
+    const dateString = date.toISOString().split('T')[0];
+    console.log(`Day clicked: ${dateString} with ${classes.length} classes`);
+    
+    // Update the selectedDate to match the clicked date
+    setSelectedDate(date);
+    
+    // Also update the selectedHomeworkDate to match the clicked date
+    // This ensures the homework section is displayed
+    setSelectedHomeworkDate(date);
+    
+    // If there are classes, set the first one as the selected homework class
+    if (classes.length > 0) {
+      setSelectedHomeworkClass(classes[0]);
+    }
+    
+    // Check for homework on this date
+    classes.forEach(classItem => {
+      // Safely handle potential undefined id
+      const id = classItem.classDetails.id || '';
+      const baseClassId = id ? id.split('-')[0] : '';
+      console.log(`Checking for homework on class ${baseClassId} (original: ${id})`);
+      
+      if (homeworkByClass[baseClassId]) {
+        const homeworkForDate = homeworkByClass[baseClassId].filter(hw => {
+          const hwDateStr = hw.classDate.toISOString().split('T')[0];
+          return hwDateStr === dateString;
+        });
+        
+        console.log(`Found ${homeworkForDate.length} homework assignments for class ${baseClassId} on ${dateString}`);
+        if (homeworkForDate.length > 0) {
+          console.log(`Homework titles: ${homeworkForDate.map(hw => hw.title).join(', ')}`);
+        }
+      } else {
+        console.log(`No homework found in state for class ${baseClassId}`);
+      }
+    });
+    
     setSelectedDayDetails({
       date,
       classes,
@@ -274,11 +355,277 @@ export const Schedule = () => {
       isPaymentSoon
     });
     
-    // Scroll to details section with smooth behavior
-    setTimeout(() => {
-      detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
+    // Only scroll if explicitly requested
+    if (shouldScroll) {
+      // Scroll to details section with smooth behavior
+      setTimeout(() => {
+        detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   };
+
+  // Function to fetch homework for all classes
+  const fetchHomeworkForAllClasses = useCallback(async () => {
+    if (!calendarData?.classes || calendarData.classes.length === 0) {
+      console.log('No classes found, returning empty homework');
+      setHomeworkByClass({});
+      return Promise.resolve(); // Make sure we return a Promise
+    }
+    
+    console.log('Fetching homework for all classes...');
+    const newHomeworkByClass: Record<string, Homework[]> = {};
+    const newHomeworkFeedbackByClass: Record<string, Map<string, boolean>> = {};
+    
+    // Get unique class IDs (base IDs)
+    const uniqueClassIds = Array.from(new Set(
+      calendarData.classes
+        .map(classItem => classItem.classDetails)
+        .filter(classItem => classItem.id) // Filter out entries without an id
+        .map(classItem => classItem.id ? classItem.id.split('-')[0] : '')
+    ));
+    
+    console.log(`Found ${uniqueClassIds.length} unique class IDs`);
+    
+    // If there are no unique class IDs, just update the state and return early
+    if (uniqueClassIds.length === 0) {
+      console.log('No classes with IDs found, skipping homework fetch');
+      setHomeworkByClass({});
+      return Promise.resolve(); // Make sure we return a Promise
+    }
+    
+    // Fetch homework for each class
+    const fetchPromises = uniqueClassIds.map(async (classId) => {
+      try {
+        console.log(`Fetching homework for class ${classId}...`);
+        const homework = await getHomeworkForClass(classId);
+        console.log(`Found ${homework.length} homework assignments for class ${classId}`);
+
+        // For each homework, check for submissions with feedback
+        const feedbackMap = new Map<string, boolean>();
+        for (const hw of homework) {
+          if (hw.id) {
+            try {
+              const submissions = await getHomeworkSubmissions(hw.id);
+              const hasFeedback = submissions.some((sub: HomeworkSubmission) => 
+                sub.status === 'graded' && sub.feedback && sub.feedback.trim() !== ''
+              );
+              
+              if (hasFeedback) {
+                // Key is homeworkId_dateStr
+                const dateStr = hw.classDate ? hw.classDate.toISOString().split('T')[0] : '';
+                feedbackMap.set(`${hw.id}_${dateStr}`, true);
+                console.log(`Homework ${hw.id} for date ${dateStr} has feedback`);
+              }
+            } catch (error) {
+              console.error(`Error fetching submissions for homework ${hw.id}:`, error);
+            }
+          }
+        }
+        
+        if (feedbackMap.size > 0) {
+          newHomeworkFeedbackByClass[classId] = feedbackMap;
+        }
+        
+        return { classId, homework };
+      } catch (error) {
+        console.error(`Error fetching homework for class ${classId}:`, error);
+        return { classId, homework: [] };
+      }
+    });
+    
+    try {
+      const results = await Promise.all(fetchPromises);
+      
+      // Process results
+      results.forEach(({ classId, homework }) => {
+        newHomeworkByClass[classId] = homework;
+      });
+      
+      console.log('Setting homework by class state');
+      setHomeworkByClass(newHomeworkByClass);
+      setHomeworkFeedbackByClass(newHomeworkFeedbackByClass);
+      return Promise.resolve(); // Make sure we return a Promise
+    } catch (error) {
+      console.error('Error fetching homework:', error);
+      return Promise.reject(error); // Return rejected promise on error
+    }
+  }, [calendarData?.classes, setHomeworkByClass, setHomeworkFeedbackByClass]);
+
+  // Add a ref to track if we've initialized the current day details
+  const hasInitializedDayDetailsRef = useRef<string | false>(false);
+  
+  // Use useState to track which calendar data we've already fetched homework for
+  const [fetchedDataKeys, setFetchedDataKeys] = useState<Set<string>>(new Set());
+  
+  // Memoize the current data key
+  const currentDataKey = useMemo(() => {
+    if (!calendarData) return '';
+    return `${calendarData.month}_${calendarData.year}`;
+  }, [calendarData]);
+
+  // Add an effect to reset initialization flag when month/year changes
+  useEffect(() => {
+    if (calendarData) {
+      // Store the current month/year
+      const currentCalendarKey = `${calendarData.month}_${calendarData.year}`;
+      
+      // Store this on the ref object
+      if (!hasInitializedDayDetailsRef.current || 
+          hasInitializedDayDetailsRef.current !== currentCalendarKey) {
+        // Reset the initialization flag but use the key to remember which month we initialized
+        hasInitializedDayDetailsRef.current = false;
+      }
+    }
+  }, [calendarData?.month, calendarData?.year]);
+  
+  // Modify the homework fetching effect to work better with initialization
+  useEffect(() => {
+    // Skip if we have no data or are loading
+    if (!calendarData || loading) return;
+    
+    // Skip if we've already fetched for this month/year
+    if (fetchedDataKeys.has(currentDataKey)) {
+      console.log(`Already fetched homework for ${currentDataKey}`);
+      return;
+    }
+    
+    console.log(`Fetching homework for ${currentDataKey} (month=${calendarData.month}, year=${calendarData.year})`);
+    fetchHomeworkForAllClasses()
+      .then(() => {
+        // Mark this data key as fetched
+        setFetchedDataKeys(prev => {
+          const newSet = new Set(prev);
+          newSet.add(currentDataKey);
+          return newSet;
+        });
+        console.log(`Marked ${currentDataKey} as fetched for homework`);
+      });
+      
+  }, [calendarData, loading, currentDataKey, fetchedDataKeys, fetchHomeworkForAllClasses]);
+  
+  // Add a new useEffect to set the initial day details for the current day
+  useEffect(() => {
+    // Only proceed if calendar data is loaded, not loading anymore, and we haven't initialized yet
+    if (calendarData && !loading && !hasInitializedDayDetailsRef.current) {
+      const today = new Date();
+      
+      // Check if the loaded calendar data contains the current month/year
+      if (calendarData.month === today.getMonth() && calendarData.year === today.getFullYear()) {
+        console.log('Initializing day details for the current day');
+        
+        // Make sure homework is fetched first if needed
+        if (!fetchedDataKeys.has(currentDataKey)) {
+          console.log('Fetching homework data before initializing day details');
+          fetchHomeworkForAllClasses()
+            .then(() => {
+              console.log('Homework fetch completed, now setting day details');
+              
+              // After homework is fetched, now set up the day details
+              const todayClasses = getClassesForDate(today);
+              console.log(`Found ${todayClasses.length} classes for today`);
+              
+              // Debug: Check if any of these classes have homework
+              todayClasses.forEach(classItem => {
+                const id = classItem.classDetails.id || '';
+                const baseClassId = id ? id.split('-')[0] : '';
+                const homeworkCount = homeworkByClass[baseClassId]?.length || 0;
+                console.log(`Class ${baseClassId} has ${homeworkCount} homework assignments`);
+              });
+              
+              const isPaymentDay = isPaymentDueOnDate(today);
+              
+              // Calculate if payment is soon (within 3 days)
+              const daysUntilPayment = isPaymentDay ? 
+                Math.ceil((today.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+              const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+              
+              // Update the day details
+              setSelectedDate(today);
+              setSelectedHomeworkDate(today);
+              
+              if (todayClasses.length > 0) {
+                setSelectedHomeworkClass(todayClasses[0]);
+              }
+              
+              setSelectedDayDetails({
+                date: today,
+                classes: todayClasses,
+                isPaymentDay,
+                isPaymentSoon
+              });
+              
+              // Mark as initialized
+              hasInitializedDayDetailsRef.current = `${calendarData.month}_${calendarData.year}`;
+              
+              // Mark this data key as fetched
+              setFetchedDataKeys(prev => {
+                const newSet = new Set(prev);
+                newSet.add(currentDataKey);
+                return newSet;
+              });
+              
+              console.log(`Auto-selected today's date with homework: ${today.toISOString().split('T')[0]} with ${todayClasses.length} classes`);
+            })
+            .catch(error => {
+              console.error('Error initializing day details after homework fetch:', error);
+              // Still try to initialize even if homework fetch failed
+              if (calendarData) {
+                initializeDayDetails(today);
+              }
+            });
+        } else {
+          // Homework is already fetched, just set up the day details
+          initializeDayDetails(today);
+        }
+      }
+    }
+    
+    // Helper function to initialize day details
+    function initializeDayDetails(today: Date) {
+      // Safety check to make sure calendarData is still available
+      if (!calendarData) {
+        console.error('Calendar data not available when initializing day details');
+        return;
+      }
+      
+      console.log('Initializing day details with existing homework data');
+      const todayClasses = getClassesForDate(today);
+      const isPaymentDay = isPaymentDueOnDate(today);
+      
+      // Debug: Check if any of these classes have homework
+      todayClasses.forEach(classItem => {
+        const id = classItem.classDetails.id || '';
+        const baseClassId = id ? id.split('-')[0] : '';
+        const homeworkCount = homeworkByClass[baseClassId]?.length || 0;
+        console.log(`Class ${baseClassId} has ${homeworkCount} homework assignments`);
+      });
+      
+      // Calculate if payment is soon (within 3 days)
+      const daysUntilPayment = isPaymentDay ? 
+        Math.ceil((today.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+      
+      // Update the day details
+      setSelectedDate(today);
+      setSelectedHomeworkDate(today);
+      
+      if (todayClasses.length > 0) {
+        setSelectedHomeworkClass(todayClasses[0]);
+      }
+      
+      setSelectedDayDetails({
+        date: today,
+        classes: todayClasses,
+        isPaymentDay,
+        isPaymentSoon
+      });
+      
+      // Mark as initialized
+      hasInitializedDayDetailsRef.current = `${calendarData.month}_${calendarData.year}`;
+      
+      console.log(`Auto-selected today's date: ${today.toISOString().split('T')[0]} with ${todayClasses.length} classes`);
+    }
+  }, [calendarData, loading, currentDataKey, fetchedDataKeys, fetchHomeworkForAllClasses, getClassesForDate, isPaymentDueOnDate, homeworkByClass]);
 
   const renderCalendarDay = (date: Date, isToday: boolean) => {
     const dayClasses = getClassesForDate(date);
@@ -289,30 +636,19 @@ export const Schedule = () => {
       Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
     const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
-    // Handle class count click
-    const handleClassCountClick = (e: React.MouseEvent, classes: CalendarClass[], date: Date) => {
-      e.stopPropagation();
-      handleDayClick(date, classes, isPaymentDay, isPaymentSoon);
-    };
-
-    // Handle payment pill click
-    const handlePaymentPillClick = (e: React.MouseEvent, date: Date, classes: CalendarClass[]) => {
-      e.stopPropagation();
-      handleDayClick(date, classes, isPaymentDay, isPaymentSoon);
-    };
-
     // Create materials info map for the ScheduleCalendarDay component
     const materialsInfo = new Map<string, { hasSlides: boolean; hasLinks: boolean }>();
     
     if (calendarData?.materials) {
       dayClasses.forEach(classItem => {
-        const dateStr = date.toISOString().split('T')[0];
-        const key = `${classItem.id}_${dateStr}`;
+        const dateStr = formatDateForComparison(date);
+        const key = `${classItem.classDetails.id}_${dateStr}`;
         
-        if (calendarData.materials[classItem.id]) {
-          const material = calendarData.materials[classItem.id].find(m => 
-            m.classDate.split('T')[0] === dateStr
-          );
+        if (calendarData.materials[classItem.classDetails.id]) {
+          const material = calendarData.materials[classItem.classDetails.id].find(m => {
+            const materialDateStr = m.classDate?.split('T')[0] || '';
+            return materialDateStr === dateStr;
+          });
           
           if (material) {
             materialsInfo.set(key, {
@@ -324,9 +660,72 @@ export const Schedule = () => {
       });
     }
 
+    // Create homework info map for the ScheduleCalendarDay component
+    const homeworkInfo = new Map<string, number>();
+    
+    // Check for homework for each class on this day
+    dayClasses.forEach(classItem => {
+      const dateStr = formatDateForComparison(date);
+      // Safely handle potential undefined id
+      const id = classItem.classDetails.id || '';
+      
+      // Important: This key must match the format used in ScheduleCalendarDay component
+      // In ScheduleCalendarDay, it uses: `${classItem.id}_${dateStr}`
+      const key = `${id}_${dateStr}`;
+      
+      const baseClassId = id ? id.split('-')[0] : '';
+      
+      if (homeworkByClass[baseClassId]) {
+        // Filter homework by date
+        const homeworksForDate = homeworkByClass[baseClassId].filter(hw => {
+          const hwDateStr = formatDateForComparison(hw.classDate);
+          return hwDateStr === dateStr;
+        });
+        
+        if (homeworksForDate.length > 0) {
+          homeworkInfo.set(key, homeworksForDate.length);
+        }
+      }
+    });
+    
+    // Create feedback info map for the ScheduleCalendarDay component
+    const homeworkFeedbackInfo = new Map<string, boolean>();
+    
+    // Check for homework feedback for each class on this day
+    dayClasses.forEach(classItem => {
+      const dateStr = formatDateForComparison(date);
+      // Safely handle potential undefined id
+      const id = classItem.classDetails.id || '';
+      const key = `${id}_${dateStr}`;
+      const baseClassId = id ? id.split('-')[0] : '';
+      
+      if (homeworkFeedbackByClass[baseClassId]) {
+        // Check if any homework for this class on this date has feedback
+        const feedbackMap = homeworkFeedbackByClass[baseClassId];
+        
+        // Get all homework for this class on this date
+        const homeworksForDate = homeworkByClass[baseClassId]?.filter(hw => {
+          const hwDateStr = formatDateForComparison(hw.classDate);
+          return hwDateStr === dateStr;
+        }) || [];
+        
+        // Check if any of these homework assignments have feedback
+        const hasAnyFeedback = homeworksForDate.some(hw => {
+          const hwId = hw.id;
+          const hwDateStr = formatDateForComparison(hw.classDate);
+          return feedbackMap.has(`${hwId}_${hwDateStr}`);
+        });
+        
+        if (hasAnyFeedback) {
+          homeworkFeedbackInfo.set(key, true);
+        }
+      }
+    });
+    
     // Map the calendar classes to include required ClassSession properties
     const mappedClasses = dayClasses.map(classItem => ({
       ...classItem,
+      id: classItem.classDetails.id,
       name: classItem.classDetails.courseType || 'Class',
       studentEmails: classItem.classDetails.studentEmails,
       dayOfWeek: classItem.classDetails.dayOfWeek,
@@ -344,6 +743,28 @@ export const Schedule = () => {
         currency: classItem.classDetails.paymentConfig.currency
       } : undefined
     }));
+    
+    // Verify mappedClasses have the correct ID format
+    if (mappedClasses.length > 0 && homeworkInfo.size > 0) {
+      console.log(`Verifying mapped classes for date ${formatDateForComparison(date)}:`);
+      mappedClasses.forEach(cls => {
+        console.log(`  - Mapped class: id=${cls.id}, baseId=${cls.id ? cls.id.split('-')[0] : 'none'}`);
+      });
+      
+      // Debug log for homework pills
+      console.log(`Calendar day ${date.toISOString().split('T')[0]} has ${homeworkInfo.size} homework entries:`);
+      homeworkInfo.forEach((count, key) => {
+        console.log(`  - Key: ${key}, Count: ${count}`);
+      });
+      
+      // Debug log for feedback pills
+      if (homeworkFeedbackInfo.size > 0) {
+        console.log(`Calendar day ${date.toISOString().split('T')[0]} has feedback for homework:`);
+        homeworkFeedbackInfo.forEach((hasFeedback, key) => {
+          console.log(`  - Key: ${key}, Has Feedback: ${hasFeedback}`);
+        });
+      }
+    }
 
     return (
       <ScheduleCalendarDay<CalendarClass>
@@ -353,11 +774,155 @@ export const Schedule = () => {
         paymentsDue={isPaymentDay}
         onClassCountClick={handleClassCountClick}
         onPaymentPillClick={handlePaymentPillClick}
-        onDayClick={(date, classes) => handleDayClick(date, classes, isPaymentDay, isPaymentSoon)}
+        onDayClick={(date, classes) => {
+          setSelectedDate(date);
+          handleDayClick(date, classes, isPaymentDay, isPaymentSoon, true);
+        }}
         materialsInfo={materialsInfo}
+        homeworkInfo={homeworkInfo}
+        homeworkFeedbackInfo={homeworkFeedbackInfo}
+        onHomeworkPillClick={handleHomeworkPillClick}
       />
     );
   };
+
+  // Handle homework pill click
+  const handleHomeworkPillClick = (e: React.MouseEvent, date: Date, classes: CalendarClass[]) => {
+    e.stopPropagation();
+    
+    const dateStr = date.toISOString().split('T')[0];
+    console.log(`Homework pill clicked for date: ${dateStr} with ${classes.length} classes`);
+    console.log(`Date details - year: ${date.getFullYear()}, month: ${date.getMonth()}, day: ${date.getDate()}`);
+    
+    // Update the selectedDate to match the clicked date
+    setSelectedDate(date);
+    
+    // Check for homework on this date
+    classes.forEach(classItem => {
+      // Safely handle potential undefined id
+      const id = classItem.classDetails.id || '';
+      const baseClassId = id ? id.split('-')[0] : '';
+      console.log(`Class in pill: ${baseClassId} (original: ${id})`);
+      
+      if (homeworkByClass[baseClassId]) {
+        const homeworkForDate = homeworkByClass[baseClassId].filter(hw => {
+          const hwDateStr = hw.classDate.toISOString().split('T')[0];
+          return hwDateStr === dateStr;
+        });
+        
+        console.log(`Found ${homeworkForDate.length} homework assignments for class ${baseClassId} on ${dateStr}`);
+        if (homeworkForDate.length > 0) {
+          homeworkForDate.forEach(hw => {
+            console.log(`Homework: ${hw.title}, ID: ${hw.id}, Date: ${hw.classDate.toISOString().split('T')[0]}`);
+          });
+        }
+      }
+    });
+    
+    // Set selected date for homework and show day details
+    setSelectedHomeworkDate(date);
+    handleDayClick(date, classes, isPaymentDueOnDate(date), false, true);
+  };
+
+  // Handle class count click
+  const handleClassCountClick = (e: React.MouseEvent, classes: CalendarClass[], date: Date) => {
+    e.stopPropagation();
+    setSelectedDate(date);
+    const isPaymentDay = isPaymentDueOnDate(date);
+    
+    // Calculate if payment is soon (within 3 days)
+    const daysUntilPayment = isPaymentDay ? 
+      Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+    
+    handleDayClick(date, classes, isPaymentDay, isPaymentSoon, true);
+  };
+
+  // Handle payment pill click
+  const handlePaymentPillClick = (e: React.MouseEvent, date: Date, classes: CalendarClass[]) => {
+    e.stopPropagation();
+    setSelectedDate(date);
+    const isPaymentDay = isPaymentDueOnDate(date);
+    
+    // Calculate if payment is soon (within 3 days)
+    const daysUntilPayment = isPaymentDay ? 
+      Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+    
+    handleDayClick(date, classes, isPaymentDay, isPaymentSoon, true);
+  };
+
+  // Add a debug function to window to manually set homework class and date
+  useEffect(() => {
+    // Only add in development mode
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Adding debug functions for homework selection');
+      
+      // @ts-ignore - Adding to window for debugging
+      window.debugHomework = {
+        setHomeworkClass: (classId: string, date: string) => {
+          console.log(`Debug: Setting homework class to ${classId} for date ${date}`);
+          
+          // Find the class with this ID
+          const matchingClass = calendarData?.classes.find(c => {
+            const cId = c.id || '';
+            return cId === classId || (cId ? cId.split('-')[0] === classId : false);
+          });
+          
+          if (matchingClass) {
+            setSelectedHomeworkClass(matchingClass);
+            const newDate = new Date(date);
+            setSelectedHomeworkDate(newDate);
+            
+            // Set selected day details if needed
+            const dayClasses = getClassesForDate(newDate);
+            setSelectedDayDetails({
+              date: newDate,
+              classes: dayClasses,
+              isPaymentDay: isPaymentDueOnDate(newDate),
+              isPaymentSoon: false
+            });
+            
+            console.log(`Debug: Set homework class to ${matchingClass.id} and date to ${newDate.toISOString()}`);
+            return true;
+          } else {
+            console.log(`Debug: Could not find class with ID ${classId}`);
+            return false;
+          }
+        },
+        showHomeworkForDate: (date: string) => {
+          console.log(`Debug: Finding homework for date ${date}`);
+          const allHomework: {classId: string, homework: Homework[]}[] = [];
+          
+          // Check all class IDs for homework on this date
+          Object.entries(homeworkByClass).forEach(([classId, homeworkList]) => {
+            const homeworkForDate = homeworkList.filter(hw => {
+              const hwDateStr = hw.classDate.toISOString().split('T')[0];
+              return hwDateStr === date;
+            });
+            
+            if (homeworkForDate.length > 0) {
+              allHomework.push({classId, homework: homeworkForDate});
+              console.log(`Debug: Found ${homeworkForDate.length} homework assignments for class ${classId} on ${date}`);
+              homeworkForDate.forEach(hw => {
+                console.log(`- ${hw.title} (ID: ${hw.id}), Date: ${hw.classDate.toISOString().split('T')[0]}`);
+              });
+            }
+          });
+          
+          return allHomework;
+        }
+      };
+    }
+    
+    return () => {
+      // @ts-ignore - Cleanup
+      if (window.debugHomework) {
+        // @ts-ignore
+        delete window.debugHomework;
+      }
+    };
+  }, [calendarData?.classes, getClassesForDate, homeworkByClass, isPaymentDueOnDate]);
 
   if (loading) {
     return (
@@ -392,6 +957,9 @@ export const Schedule = () => {
                 setSelectedDate(date);
               }}
               onDayClick={(date: Date) => {
+                // Update selectedDate
+                setSelectedDate(date);
+                
                 const dayClasses = getClassesForDate(date);
                 const isPaymentDay = isPaymentDueOnDate(date);
                 
@@ -399,7 +967,7 @@ export const Schedule = () => {
                   Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
                 const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
-                handleDayClick(date, dayClasses, isPaymentDay, isPaymentSoon);
+                handleDayClick(date, dayClasses, isPaymentDay, isPaymentSoon, true);
               }}
               renderDay={(date: Date, isToday: boolean) => (
                 renderCalendarDay(date, isToday)
@@ -433,15 +1001,15 @@ export const Schedule = () => {
                     
                     {/* Payment Link Section */}
                     {calendarData?.paymentDueDates && calendarData.paymentDueDates.some(payment => {
-                      const paymentDateStr = payment.date.split('T')[0];
-                      const selectedDateStr = selectedDayDetails.date.toISOString().split('T')[0];
+                      const paymentDateStr = payment.date?.split('T')[0] || '';
+                      const selectedDateStr = formatDateForComparison(selectedDayDetails.date);
                       return paymentDateStr === selectedDateStr && payment.paymentLink;
                     }) && (
                       <div className="mt-2 ml-4">
                         {calendarData.paymentDueDates
                           .filter(payment => {
-                            const paymentDateStr = payment.date.split('T')[0];
-                            const selectedDateStr = selectedDayDetails.date.toISOString().split('T')[0];
+                            const paymentDateStr = payment.date?.split('T')[0] || '';
+                            const selectedDateStr = formatDateForComparison(selectedDayDetails.date);
                             return paymentDateStr === selectedDateStr && payment.paymentLink;
                           })
                           .map((payment, index) => (
@@ -466,22 +1034,26 @@ export const Schedule = () => {
 
                 {selectedDayDetails.classes.length > 0 ? (
                   selectedDayDetails.classes.map(classItem => {
-                    const dateStr = selectedDayDetails.date.toISOString().split('T')[0];
+                    const dateStr = formatDateForComparison(selectedDayDetails.date);
+                    const id = classItem.classDetails.id || '';
+                    const classBaseId = id ? id.split('-')[0] : '';
                     
                     // Check if this class has materials
                     let hasMaterials = false;
-                    if (calendarData?.materials && calendarData.materials[classItem.id]) {
-                      hasMaterials = calendarData.materials[classItem.id].some(m => 
-                        m.classDate.split('T')[0] === dateStr
-                      );
+                    if (calendarData?.materials && calendarData.materials[id]) {
+                      hasMaterials = calendarData.materials[id].some(m => {
+                        const materialDateStr = m.classDate?.split('T')[0] || '';
+                        return materialDateStr === dateStr;
+                      });
                     }
 
                     // Get material info for display
                     let materialInfo = { hasSlides: false, hasLinks: false };
                     if (hasMaterials && calendarData?.materials) {
-                      const material = calendarData.materials[classItem.id].find(m => 
-                        m.classDate.split('T')[0] === dateStr
-                      );
+                      const material = calendarData.materials[id].find(m => {
+                        const materialDateStr = m.classDate?.split('T')[0] || '';
+                        return materialDateStr === dateStr;
+                      });
                       
                       if (material) {
                         materialInfo = {
@@ -490,10 +1062,17 @@ export const Schedule = () => {
                         };
                       }
                     }
+                    
+                    // Check if this class has homework
+                    const hasHomework = homeworkByClass[classBaseId] && homeworkByClass[classBaseId].some(hw => {
+                      const hwDateStr = hw.classDate.toISOString().split('T')[0];
+                      return hwDateStr === dateStr;
+                    });
 
                     // Map the class to include required ClassSession properties
                     const mappedClass = {
                       ...classItem,
+                      id: classItem.classDetails.id,
                       name: classItem.classDetails.courseType || 'Class',
                       studentEmails: classItem.classDetails.studentEmails,
                       dayOfWeek: classItem.classDetails.dayOfWeek,
@@ -514,7 +1093,7 @@ export const Schedule = () => {
 
                     return (
                       <div
-                        key={classItem.id}
+                        key={classItem.classDetails.id}
                         onClick={() => hasMaterials && handleClassClick(classItem, selectedDayDetails.date)}
                         className={`p-4 rounded-xl mb-4 last:mb-0 border ${
                           hasMaterials 
@@ -561,6 +1140,22 @@ export const Schedule = () => {
                                 Links
                               </span>
                             )}
+                          </div>
+                        )}
+                        
+                        {/* Show homework for this class if available */}
+                        {hasHomework && selectedHomeworkDate && (
+                          <div className="mt-4 pt-4 border-t border-[#e5e7eb]">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-2 h-2 rounded-full bg-[#6366f1]" />
+                              <h4 className="text-sm font-medium text-[#1a1a1a]">Homework</h4>
+                            </div>
+                            <ScheduleHomeworkView 
+                              classId={classBaseId}
+                              classDate={selectedDayDetails.date}
+                              studentEmail={currentUser?.email || null}
+                              isOpen={true}
+                            />
                           </div>
                         )}
                       </div>

@@ -2,7 +2,7 @@ import React from 'react';
 import { ClassSession, User } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { FaFileAlt } from 'react-icons/fa';
+import { FaFileAlt, FaBook, FaCommentAlt } from 'react-icons/fa';
 
 export interface ScheduleCalendarDayProps<T extends ClassSession> {
   date: Date;
@@ -13,6 +13,9 @@ export interface ScheduleCalendarDayProps<T extends ClassSession> {
   onPaymentPillClick?: (e: React.MouseEvent, date: Date, classes: T[]) => void;
   onDayClick?: (date: Date, classes: T[]) => void;
   materialsInfo?: Map<string, { hasSlides: boolean; hasLinks: boolean }>;
+  homeworkInfo?: Map<string, number>; // Map of classId to homework count for this date
+  onHomeworkPillClick?: (e: React.MouseEvent, date: Date, classes: T[]) => void;
+  homeworkFeedbackInfo?: Map<string, boolean>; // Map of classId_date to boolean indicating if feedback exists
 }
 
 export function ScheduleCalendarDay<T extends ClassSession>({
@@ -24,6 +27,9 @@ export function ScheduleCalendarDay<T extends ClassSession>({
   onPaymentPillClick,
   onDayClick,
   materialsInfo,
+  homeworkInfo,
+  onHomeworkPillClick,
+  homeworkFeedbackInfo,
 }: ScheduleCalendarDayProps<T>) {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -45,6 +51,50 @@ export function ScheduleCalendarDay<T extends ClassSession>({
     });
   }, [classes, date, materialsInfo]);
 
+  // Check if any class on this day has homework
+  const hasHomework = React.useMemo(() => {
+    if (!homeworkInfo || classes.length === 0) return false;
+    
+    const dateStr = date.toISOString().split('T')[0];
+    
+    const result = classes.some(classItem => {
+      const key = `${classItem.id}_${dateStr}`;
+      const hasHw = homeworkInfo.has(key) && homeworkInfo.get(key)! > 0;
+      return hasHw;
+    });
+    
+    return result;
+  }, [classes, date, homeworkInfo]);
+
+  // Check if any homework on this day has feedback
+  const hasHomeworkFeedback = React.useMemo(() => {
+    if (!homeworkFeedbackInfo || classes.length === 0) return false;
+    
+    const dateStr = date.toISOString().split('T')[0];
+    
+    return classes.some(classItem => {
+      const key = `${classItem.id}_${dateStr}`;
+      return homeworkFeedbackInfo.has(key) && homeworkFeedbackInfo.get(key) === true;
+    });
+  }, [classes, date, homeworkFeedbackInfo]);
+
+  // Get total homework count for this day
+  const getTotalHomeworkCount = (): number => {
+    if (!homeworkInfo || classes.length === 0) return 0;
+    
+    const dateStr = date.toISOString().split('T')[0];
+    let count = 0;
+    
+    classes.forEach(classItem => {
+      const key = `${classItem.id}_${dateStr}`;
+      if (homeworkInfo.has(key)) {
+        count += homeworkInfo.get(key)!;
+      }
+    });
+    
+    return count;
+  };
+
   // Handle day click
   const handleDayClick = () => {
     if (onDayClick) {
@@ -65,6 +115,14 @@ export function ScheduleCalendarDay<T extends ClassSession>({
     e.stopPropagation(); // Prevent triggering the calendar day click
     if (onPaymentPillClick) {
       onPaymentPillClick(e, date, classes);
+    }
+  };
+
+  // Handle homework pill click
+  const handleHomeworkPillClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the calendar day click
+    if (onHomeworkPillClick) {
+      onHomeworkPillClick(e, date, classes);
     }
   };
   
@@ -182,16 +240,23 @@ export function ScheduleCalendarDay<T extends ClassSession>({
       {/* Indicators */}
       <div className="calendar-day-indicators">
         {classes.length > 0 && (
-          <div className="indicator class-indicator" title="Has classes" />
+          <div key="class-indicator" className="indicator class-indicator" title="Has classes" />
         )}
         {isPaymentDay && (
           <div 
+            key="payment-indicator"
             className={`indicator ${isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'}`}
             title={isPaymentSoon ? 'Payment due soon' : 'Payment due'}
           />
         )}
         {hasMaterials && (
-          <div className="indicator material-indicator" title="Has materials" />
+          <div key="materials-indicator" className="indicator material-indicator" title="Has materials" />
+        )}
+        {hasHomework && (
+          <div key="homework-indicator" className="indicator homework-indicator" title="Has homework" />
+        )}
+        {hasHomeworkFeedback && (
+          <div key="feedback-indicator" className="indicator feedback-indicator" title="Has feedback from teacher" />
         )}
       </div>
 
@@ -207,6 +272,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
         <div className="flex flex-col items-center gap-2">
           {classes.length > 0 && (
             <div 
+              key="class-count-pill"
               className="calendar-pill class-count-pill"
               onClick={handleClassCountClick}
             >
@@ -224,6 +290,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
           
           {isPaymentDay && (
             <div 
+              key="payment-pill"
               className={`calendar-pill payment-pill ${isPaymentSoon ? 'soon' : 'normal'}`}
               onClick={handlePaymentPillClick}
               title={createPaymentTooltip()}
@@ -252,6 +319,24 @@ export function ScheduleCalendarDay<T extends ClassSession>({
                   })()
                 : 'Payment Due'
               }
+            </div>
+          )}
+
+          {hasHomework && (
+            <div 
+              key="homework-pill"
+              className={`calendar-pill homework-pill ${hasHomeworkFeedback ? 'has-feedback' : ''}`}
+              onClick={handleHomeworkPillClick}
+            >
+              Homework ({getTotalHomeworkCount()})
+              <span className="homework-icon text-white ml-1">
+                <FaBook className="inline-block w-3 h-3" />
+              </span>
+              {hasHomeworkFeedback && (
+                <span className="feedback-icon text-white ml-1">
+                  <FaCommentAlt className="inline-block w-3 h-3" />
+                </span>
+              )}
             </div>
           )}
         </div>
