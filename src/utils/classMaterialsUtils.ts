@@ -15,7 +15,6 @@ import {
   uploadBytes, 
   getDownloadURL,
   deleteObject,
-  getMetadata
 } from 'firebase/storage';
 import { getCached, setCached, invalidateCache, clearCacheByPrefix } from './cacheUtils';
 import { ClassMaterial } from '../types/interfaces';

@@ -1199,6 +1199,7 @@ export const getAllClassesForMonthHttp = onRequest({
 
             // Create a class object that matches the ClassSession interface in the frontend
             const classInfo: any = {
+              id: classId, // Add ID for single schedule classes
               dayOfWeek: classData.dayOfWeek,
               daysOfWeek: classData.daysOfWeek,
               startTime: classData.startTime,
@@ -1237,7 +1238,8 @@ export const getAllClassesForMonthHttp = onRequest({
                 classSchedule.push(dayClassInfo);
               });
             } else {
-              // For single schedule classes, just add the original class info
+              // For single schedule classes, just add the original class info with scheduleType
+              classInfo.scheduleType = 'single';
               classSchedule.push(classInfo);
             }
 
@@ -1254,6 +1256,7 @@ export const getAllClassesForMonthHttp = onRequest({
               // Determine the correct start and end times based on schedule type
               let startTime = classData.startTime;
               let endTime = classData.endTime;
+              let classEntryId = classId; // Default to base ID
               
               // For multiple schedules, find the matching schedule for this day of week
               if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
@@ -1264,11 +1267,12 @@ export const getAllClassesForMonthHttp = onRequest({
                 if (matchingSchedule) {
                   startTime = matchingSchedule.startTime;
                   endTime = matchingSchedule.endTime;
+                  classEntryId = `${classId}-${dayOfWeek}`; // Use day-specific ID for multiple schedule
                 }
               }
               
               dailyClassMap[dateString].push({
-                id: classId, // Add class ID for reference
+                id: classEntryId, // Use consistent ID format
                 startTime: startTime,
                 endTime: endTime,
                 courseType: classData.courseType,

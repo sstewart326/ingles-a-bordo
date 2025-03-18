@@ -1,6 +1,5 @@
-import { ClassSession, ClassWithStudents, getBaseClassId } from './scheduleUtils';
+import { ClassSession, getBaseClassId } from './scheduleUtils';
 import { getClassMaterials } from './classMaterialsUtils';
-import { getMonthKey } from './calendarUtils';
 import toast from 'react-hot-toast';
 import { ClassMaterial } from '../types/interfaces';
 

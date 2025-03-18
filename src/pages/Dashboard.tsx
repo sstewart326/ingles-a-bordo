@@ -499,6 +499,72 @@ export const Dashboard = () => {
     setVisibleUploadForm(classId);
   };
 
+  // Add a listener for 'materials-updated' events to ensure we catch all materials updates
+  useEffect(() => {
+    // Use a debounce mechanism to prevent multiple refreshes in quick succession
+    let refreshTimeoutId: NodeJS.Timeout | null = null;
+    let pendingClassIds = new Set<string>();
+    
+    const debounceRefresh = (classId: string) => {
+      // Add the classId to the pending set
+      pendingClassIds.add(classId);
+      
+      // Clear any existing timeout
+      if (refreshTimeoutId) {
+        clearTimeout(refreshTimeoutId);
+      }
+      
+      // Set a new timeout to do the actual refresh after a delay
+      refreshTimeoutId = setTimeout(() => {
+        debugLog(`Debounced refresh for classes: ${Array.from(pendingClassIds).join(', ')}`);
+        
+        // If we have any pending classIds, refresh the first one
+        // The refresh will capture all related class IDs anyway
+        if (pendingClassIds.size > 0) {
+          const firstClassId = Array.from(pendingClassIds)[0];
+          
+          // Temporarily set the visibleUploadForm to trigger the refresh
+          setVisibleUploadForm(firstClassId);
+          
+          // Run the refresh after a small delay to ensure state has updated
+          setTimeout(() => {
+            refreshMaterialsForClass();
+            // Clear the pending set after refresh
+            pendingClassIds.clear();
+          }, 50);
+        }
+      }, 300); // 300ms debounce time
+    };
+    
+    const handleMaterialsUpdated = (event: CustomEvent) => {
+      try {
+        const { classId, action } = event.detail;
+        debugLog('Materials updated event received:', event.detail);
+        
+        if (!classId) {
+          debugLog('No classId provided in materials-updated event, skipping refresh');
+          return;
+        }
+        
+        debugLog(`Queueing refresh for class ${classId} after material ${action || 'update'} event`);
+        debounceRefresh(classId);
+      } catch (error) {
+        console.error('Error handling materials-updated event:', error);
+      }
+    };
+    
+    // Add the event listener
+    window.addEventListener('materials-updated', handleMaterialsUpdated as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('materials-updated', handleMaterialsUpdated as EventListener);
+      if (refreshTimeoutId) {
+        clearTimeout(refreshTimeoutId);
+      }
+    };
+  }, []);
+
   // Renamed function to be more accurate about what it does
   const refreshMaterialsForClass = async (retryCount = 0) => {
     // If we have a visible upload form (meaning a class ID), refresh the materials for that class
@@ -557,106 +623,109 @@ export const Dashboard = () => {
         material.id ? material : { ...material, id: Math.random().toString(36).substring(2) }
       );
       
-      // ============== STEP 1: Find all class IDs that need updates ==============
-      // Find all class IDs that should be updated (original and any variants)
-      const classIdsToUpdate = [
-        actualClassId,
-        baseClassId,
-        ...upcomingClasses.map(c => c.id).filter(id => id.startsWith(baseClassId)),
-        ...pastClasses.map(c => c.id).filter(id => id.startsWith(baseClassId))
-      ];
+      // Use batched state updates to reduce the number of renders
+      const batchStateUpdates = () => {
+        // ============== STEP 1: Find all class IDs that need updates ==============
+        // Find all class IDs that should be updated (original and any variants)
+        const classIdsToUpdate = [
+          actualClassId,
+          baseClassId,
+          ...upcomingClasses.map(c => c.id).filter(id => id.startsWith(baseClassId)),
+          ...pastClasses.map(c => c.id).filter(id => id.startsWith(baseClassId))
+        ];
+        
+        const uniqueClassIdsToUpdate = [...new Set(classIdsToUpdate)];
+        debugLog('Will update materials for these class IDs:', uniqueClassIdsToUpdate);
+        
+        // ============== STEP 2: Update the materials map ==============
+        // Create updated materials map for selectedDayDetails
+        const updatedMaterialsMap = {
+          ...selectedDayDetails.materials
+        };
+        
+        // Add materials for all relevant class IDs
+        uniqueClassIdsToUpdate.forEach(id => {
+          updatedMaterialsMap[id] = materialsWithIds;
+        });
+        
+        // ============== STEP 3: Update class objects with materials ==============
+        // Update selectedDayDetails classes with materials
+        const updatedSelectedDayClasses = selectedDayDetails.classes.map(c => {
+          if (uniqueClassIdsToUpdate.includes(c.id)) {
+            return {
+              ...c,
+              materials: materialsWithIds
+            };
+          }
+          return c;
+        });
+        
+        // Update upcoming classes with materials
+        const updatedUpcomingClasses = upcomingClasses.map(c => { 
+          if (uniqueClassIdsToUpdate.includes(c.id)) {
+            const updatedClass = { 
+              ...c, 
+              materials: materialsWithIds 
+            };
+            debugLog(`Updated upcoming class ${c.id} with ${materialsWithIds.length} materials`);
+            return updatedClass;
+          }
+          return c;
+        });
+        
+        // Update past classes with materials
+        const updatedPastClasses = pastClasses.map(c => {
+          if (uniqueClassIdsToUpdate.includes(c.id)) {
+            const updatedClass = { 
+              ...c, 
+              materials: materialsWithIds 
+            };
+            debugLog(`Updated past class ${c.id} with ${materialsWithIds.length} materials`);
+            return updatedClass;
+          }
+          return c;
+        });
+        
+        // ============== STEP 4: Update global class materials state ==============
+        // Update the global classMaterials state
+        const updatedClassMaterials = { ...classMaterials };
+        
+        // Add materials for all relevant class IDs
+        uniqueClassIdsToUpdate.forEach(id => {
+          updatedClassMaterials[id] = materialsWithIds;
+        });
       
-      const uniqueClassIdsToUpdate = [...new Set(classIdsToUpdate)];
-      debugLog('Will update materials for these class IDs:', uniqueClassIdsToUpdate);
-      
-      // ============== STEP 2: Update the materials map ==============
-      // Create updated materials map for selectedDayDetails
-      const updatedMaterialsMap = {
-        ...selectedDayDetails.materials
+        // ============== STEP 5: Batch all state updates together ==============
+        // Batch all state updates in a single React cycle to minimize renders
+        // React will batch these updates when they're called synchronously
+        setSelectedDayDetails({
+          ...selectedDayDetails,
+          materials: updatedMaterialsMap,
+          classes: updatedSelectedDayClasses
+        });
+        setClassMaterials(updatedClassMaterials);
+        setUpcomingClasses(updatedUpcomingClasses);
+        setPastClasses(updatedPastClasses);
+        
+        // ============== STEP 6: Invalidate cache for future loads ==============
+        // Invalidate the loaded material months to force a refresh on next load
+        const monthKey = getMonthKey(selectedDayDetails.date);
+        const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
+        updatedLoadedMaterialMonths.delete(monthKey); // Remove this month to force refresh on next load
+        setLoadedMaterialMonths(updatedLoadedMaterialMonths);
       };
       
-      // Add materials for all relevant class IDs
-      uniqueClassIdsToUpdate.forEach(id => {
-        updatedMaterialsMap[id] = materialsWithIds;
-      });
-      
-      // ============== STEP 3: Update class objects with materials ==============
-      // Update selectedDayDetails classes with materials
-      const updatedSelectedDayClasses = selectedDayDetails.classes.map(c => {
-        if (uniqueClassIdsToUpdate.includes(c.id)) {
-          return {
-            ...c,
-            materials: materialsWithIds
-          };
-        }
-        return c;
-      });
-      
-      // Update upcoming classes with materials
-      const updatedUpcomingClasses = upcomingClasses.map(c => { 
-        if (uniqueClassIdsToUpdate.includes(c.id)) {
-          const updatedClass = { 
-            ...c, 
-            materials: materialsWithIds 
-          };
-          debugLog(`Updated upcoming class ${c.id} with ${materialsWithIds.length} materials`);
-          return updatedClass;
-        }
-        return c;
-      });
-      
-      // Update past classes with materials
-      const updatedPastClasses = pastClasses.map(c => {
-        if (uniqueClassIdsToUpdate.includes(c.id)) {
-          const updatedClass = { 
-            ...c, 
-            materials: materialsWithIds 
-          };
-          debugLog(`Updated past class ${c.id} with ${materialsWithIds.length} materials`);
-          return updatedClass;
-        }
-        return c;
-      });
-      
-      // ============== STEP 4: Update global class materials state ==============
-      // Update the global classMaterials state
-      const updatedClassMaterials = { ...classMaterials };
-      
-      // Add materials for all relevant class IDs
-      uniqueClassIdsToUpdate.forEach(id => {
-        updatedClassMaterials[id] = materialsWithIds;
-      });
-      
-      // ============== STEP 5: Batch all state updates together ==============
-      // Update selected day details with both updated materials map and updated classes
-      setSelectedDayDetails({
-        ...selectedDayDetails,
-        materials: updatedMaterialsMap,
-        classes: updatedSelectedDayClasses
-      });
-      
-      // Update global class materials state
-      setClassMaterials(updatedClassMaterials);
-      
-      // Update upcoming and past classes
-      setUpcomingClasses(updatedUpcomingClasses);
-      setPastClasses(updatedPastClasses);
+      // Execute the batch update
+      batchStateUpdates();
       
       // Log a summary of all updates
       debugLog('Material updates complete:', {
         selectedDayDetailsUpdated: true,
         classMaterialsUpdated: true,
-        upcomingClassesUpdated: updatedUpcomingClasses.length,
-        pastClassesUpdated: updatedPastClasses.length,
+        upcomingClassesUpdated: true,
+        pastClassesUpdated: true,
         materialCount: materialsWithIds.length
       });
-      
-      // ============== STEP 6: Invalidate cache for future loads ==============
-      // Invalidate the loaded material months to force a refresh on next load
-      const monthKey = getMonthKey(selectedDayDetails.date);
-      const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
-      updatedLoadedMaterialMonths.delete(monthKey); // Remove this month to force refresh on next load
-      setLoadedMaterialMonths(updatedLoadedMaterialMonths);
       
     } catch (error) {
       console.error('Error refreshing materials:', error);
@@ -926,61 +995,6 @@ export const Dashboard = () => {
     // Clean up subscription
     return () => unsubscribe();
   }, [upcomingClasses, pastClasses]); // Re-run when the classes change
-
-  // Add a listener for 'materials-updated' events to ensure we catch all materials updates
-  useEffect(() => {
-    // Keep track of the latest refresh timestamp to prevent duplicate refreshes
-    const refreshTimestamps = new Map<string, number>();
-    
-    const handleMaterialsUpdated = (event: CustomEvent) => {
-      try {
-        const { classId, date, action, timestamp } = event.detail;
-        debugLog('Materials updated event received:', event.detail);
-        
-        if (!classId) {
-          debugLog('No classId provided in materials-updated event, skipping refresh');
-          return;
-        }
-        
-        // Prevent duplicate refreshes for the same class within a short time window
-        const lastRefreshTime = refreshTimestamps.get(classId) || 0;
-        const now = Date.now();
-        const timeSinceLastRefresh = now - lastRefreshTime;
-        
-        // If we've refreshed this class recently (within 1 second), skip this refresh
-        if (timeSinceLastRefresh < 1000) {
-          debugLog(`Skipping refresh for ${classId} - last refresh was ${timeSinceLastRefresh}ms ago`);
-          return;
-        }
-        
-        // Update the timestamp for this class
-        refreshTimestamps.set(classId, now);
-        
-        // Always force a refresh, even if the class isn't in selectedDayDetails
-        // (it could be in upcoming or past classes)
-        debugLog(`Force refreshing materials for class ${classId} after material ${action || 'update'} event`);
-        
-        // Create a fake visibleUploadForm value that will be parsed by refreshMaterialsForClass
-        const tempVisibleUploadForm = `${classId}-${now}`;
-        setVisibleUploadForm(tempVisibleUploadForm);
-        
-        // Run the refresh handler after a small delay to ensure state has updated
-        setTimeout(() => {
-          refreshMaterialsForClass();
-        }, 100);
-      } catch (error) {
-        console.error('Error handling materials-updated event:', error);
-      }
-    };
-    
-    // Add the event listener
-    window.addEventListener('materials-updated', handleMaterialsUpdated as EventListener);
-    
-    // Clean up
-    return () => {
-      window.removeEventListener('materials-updated', handleMaterialsUpdated as EventListener);
-    };
-  }, [refreshMaterialsForClass]);
 
   // Show loading state if auth or admin status is still loading
   if (authLoading || adminLoading) {
