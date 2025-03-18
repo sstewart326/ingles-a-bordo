@@ -108,7 +108,21 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const getClassesForDay = useCallback((_: number, date: Date): ClassSession[] => {
     if (isAdmin) {
       const dateString = date.toISOString().split('T')[0];
-      return dailyClassMap[dateString] || [];
+      const classesForDay = dailyClassMap[dateString] || [];
+      
+      // Process the classes to ensure student information is complete
+      return classesForDay.map(classObj => {
+        // If studentEmails is missing or empty but we have students, populate from students
+        if ((!classObj.studentEmails || classObj.studentEmails.length === 0) && classObj.students && classObj.students.length > 0) {
+          return {
+            ...classObj,
+            studentEmails: classObj.students.map((student: any) => 
+              typeof student === 'string' ? student : student.email || '')
+              .filter((email: string) => email !== '')
+          };
+        }
+        return classObj;
+      });
     }
     return [];
   }, [dailyClassMap, isAdmin]);

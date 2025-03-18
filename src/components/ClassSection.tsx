@@ -47,6 +47,8 @@ interface ClassSectionProps {
   selectedDate?: Date;
   homeworkByClassId?: Record<string, Homework[]>;
   refreshHomework?: () => Promise<void>;
+  hideDateDisplay?: boolean;
+  noContainer?: boolean; // Add this prop to optionally hide the container
   t: {
     upcomingClasses: string;
     pastClasses: string;
@@ -101,6 +103,8 @@ export const ClassSection = ({
   selectedDate,
   homeworkByClassId,
   refreshHomework,
+  hideDateDisplay = false,
+  noContainer = false, // Default to false to maintain backward compatibility
   t
 }: ClassSectionProps) => {
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
@@ -119,6 +123,12 @@ export const ClassSection = ({
   // Create an expanded list of classes with separate entries for each date
   const expandedClasses: ClassSession[] = [];
   classes.forEach(classSession => {
+    // If the class already has _displayDate set (like in DayDetails), use it directly
+    if ((classSession as ExtendedClassSession)._displayDate) {
+      expandedClasses.push(classSession);
+      return;
+    }
+    
     const extendedClass = classSession as ExtendedClassSession;
     const dates = extendedClass.dates || [];
     const now = new Date();
@@ -229,25 +239,30 @@ export const ClassSection = ({
     );
   };
 
-  return (
-    <div className="max-w-2xl bg-white rounded-lg p-6 shadow-md border border-gray-200" ref={sectionRef}>
-      <h2 className={styles.headings.h2}>{title}</h2>
+  // Content to render
+  const content = (
+    <>
+      {title && <h2 className={styles.headings.h2}>{title}</h2>}
       <div className="mt-4 space-y-4">
         {displayedClasses.length === 0 ? (
-          <p className="text-gray-500">{title === t.upcomingClasses ? t.noUpcomingClasses : t.noPastClasses}</p>
+          <p className="text-gray-500">
+            {title ? (title === t.upcomingClasses ? t.noUpcomingClasses : t.noPastClasses) : t.noUpcomingClasses}
+          </p>
         ) : (
           <>
             {displayedClasses.map((classSession) => {
               // Get the date from the _displayDate property
-              const date = (classSession as any)._displayDate;
+              const date = (classSession as any)._displayDate || selectedDate || new Date();
               
               return (
-                <div key={`${classSession.id}-${date.getTime()}`} className={styles.card.container}>
+                <div key={`${classSession.id}-${date.getTime ? date.getTime() : Date.now()}`} className={styles.card.container}>
                   <div className="flex justify-between items-start w-full">
                     <div className="w-full">
-                      <div className="text-sm font-bold text-black mb-2">
-                        {formatClassDate(date)}
-                      </div>
+                      {!hideDateDisplay && (
+                        <div className="text-sm font-bold text-black mb-2">
+                          {formatClassDate(date)}
+                        </div>
+                      )}
                       <div className={styles.card.title}>
                         {formatStudentNames(classSession.studentEmails)}
                       </div>
@@ -544,6 +559,17 @@ export const ClassSection = ({
           </>
         )}
       </div>
+    </>
+  );
+
+  // Conditionally render with or without the container based on the noContainer prop
+  return noContainer ? (
+    <div ref={sectionRef}>
+      {content}
+    </div>
+  ) : (
+    <div className="max-w-2xl bg-white rounded-lg p-6 shadow-md border border-gray-200" ref={sectionRef}>
+      {content}
     </div>
   );
 }; 

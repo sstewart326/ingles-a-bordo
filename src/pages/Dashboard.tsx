@@ -93,6 +93,13 @@ export const Dashboard = () => {
     const dateString = `${month}-${day}`;
     const birthdays = users.filter(user => user.birthdate === dateString);
     
+    // Debug log the original classes
+    console.log('handleDayClickInternal - Original classes:', classes.map(c => ({ 
+      id: c.id, 
+      studentEmails: c.studentEmails ? c.studentEmails.length : 0,
+      studentEmailsData: c.studentEmails 
+    })));
+    
     // Ensure that the dayOfWeek property of each class matches the day of the week of the selected date
     const selectedDayOfWeek = date.getDay();
     const updatedClasses = classes.map(classSession => {
@@ -197,6 +204,14 @@ export const Dashboard = () => {
     classes: ClassSession[], 
     paymentsDue: any[] // Use any[] to avoid type errors
   ) => {
+    // Debug logging to check the classes data
+    console.log('Day clicked - classes:', classes.map(c => ({ 
+      id: c.id, 
+      studentEmails: c.studentEmails,
+      studentIds: c.studentIds,
+      students: c.students 
+    })));
+    
     // Call the internal implementation with shouldScroll=true for user clicks
     handleDayClickInternal(date, classes, paymentsDue, true);
   }, [handleDayClickInternal]);
@@ -554,9 +569,13 @@ export const Dashboard = () => {
   };
 
   const formatStudentNames = (studentEmails: string[]) => {
+    // Return a default if studentEmails is null or empty
+    if (!studentEmails || studentEmails.length === 0) {
+      return t.class || 'Class';
+    }
+    
     const names = studentEmails.map(email => userNames[email] || email);
 
-    if (names.length === 0) return t.class;
     if (names.length === 1) return names[0];
     if (names.length === 2) return `${t.pair}: ${names.join(' & ')}`;
     return `${t.group}: ${names.join(', ')}`;
@@ -843,6 +862,7 @@ export const Dashboard = () => {
               savingPrivateNotes={savingPrivateNotes}
               deletingMaterial={deletingMaterial}
               formatClassTime={formatClassTime}
+              formatStudentNames={formatStudentNames}
               onEditNotes={handleEditNotes}
               onSaveNotes={handleSaveNotes}
               onCancelEditNotes={handleCancelEditNotes}

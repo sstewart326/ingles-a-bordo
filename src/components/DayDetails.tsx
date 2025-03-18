@@ -13,6 +13,7 @@ import { createPayment, getPaymentsByDueDate, deletePayment } from '../services/
 import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
 import { HomeworkManager } from './HomeworkManager';
 import { toast } from 'react-hot-toast';
+import { ClassSection } from './ClassSection';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -50,6 +51,7 @@ interface DayDetailsProps {
   onPaymentStatusChange?: (date: Date) => void;
   homeworkByClassId?: Record<string, Homework[]>;
   refreshHomework?: () => Promise<void>;
+  formatStudentNames: (emails: string[]) => string;
 }
 
 export const DayDetails = ({
@@ -75,7 +77,8 @@ export const DayDetails = ({
   textareaRefs,
   onPaymentStatusChange,
   homeworkByClassId,
-  refreshHomework
+  refreshHomework,
+  formatStudentNames
 }: DayDetailsProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -822,255 +825,66 @@ export const DayDetails = ({
             {t.class || 'Classes'}
           </h3>
           
-          {totalPages > 1 && <ClassesPagination />}
-          
-          {paginatedClasses.map((classSession) => (
-            <div key={classSession.id} className="mb-8 last:mb-0">
-              <div className="mb-2">
-                <h4 className="text-lg font-semibold">{classSession.studentEmails && classSession.studentEmails.length > 0 ? classSession.studentEmails.join(', ') : ''}</h4>
-                <div className="text-sm text-gray-600">
-                  {formatClassTime(classSession)}
-                </div>
-              </div>
-              
-              {/* Notes section */}
-              <div className="mt-4 w-full">
-                <div className={styles.card.label}>
-                  {t.notes || 'Notes'}
-                  <span className="inline-block ml-1 relative group">
-                    <InformationCircleIcon 
-                      className="h-4 w-4 text-gray-400 inline-block hover:text-gray-600 cursor-pointer" 
-                      onClick={() => toggleTooltip(`notes-${classSession.id}`)}
-                    />
-                    <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-36 p-1.5 bg-gray-800 text-white text-xs rounded shadow-lg ${activeTooltips[`notes-${classSession.id}`] ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} z-10 whitespace-normal pointer-events-none transition-opacity duration-150 normal-case`}>
-                      {t.notesInfo || 'Notes will be shared with students'}
-                      <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></span>
-                    </span>
-                  </span>
-                </div>
-                
-                {editingNotes[classSession.id] !== undefined ? (
-                  <div className="mt-1 w-full">
-                    <textarea
-                      ref={(el) => { textareaRefs[classSession.id] = el; }}
-                      defaultValue={editingNotes[classSession.id]}
-                      className="w-full p-2 border border-gray-300 rounded text-sm"
-                      rows={3}
-                    />
-                    <div className="flex justify-end mt-2 space-x-2">
-                      <button
-                        onClick={() => onCancelEditNotes(classSession.id)}
-                        className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                        disabled={savingNotes[classSession.id]}
-                      >
-                        {t.cancel || 'Cancel'}
-                      </button>
-                      <button
-                        onClick={() => onSaveNotes(classSession)}
-                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                        disabled={savingNotes[classSession.id]}
-                      >
-                        {savingNotes[classSession.id] 
-                          ? 'Saving...' 
-                          : 'Save'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-gray-700 text-sm mt-1 flex items-center">
-                    <span>{classSession.notes || (t.noNotes || 'No notes available')}</span>
-                    {!editingNotes[classSession.id] && (
-                      <PencilIcon
-                        onClick={() => onEditNotes(classSession)}
-                        className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
-                        title={t.edit || 'Edit'}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Private Notes section */}
-              <div className="mt-4 w-full">
-                <div className={styles.card.label}>
-                  {t.privateNotes || 'Private notes'}
-                  <span className="inline-block ml-1 relative group">
-                    <InformationCircleIcon 
-                      className="h-4 w-4 text-gray-400 inline-block hover:text-gray-600 cursor-pointer" 
-                      onClick={() => toggleTooltip(`private-notes-${classSession.id}`)}
-                    />
-                    <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-36 p-1.5 bg-gray-800 text-white text-xs rounded shadow-lg ${activeTooltips[`private-notes-${classSession.id}`] ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} z-10 whitespace-normal pointer-events-none transition-opacity duration-150 normal-case`}>
-                      {t.privateNotesInfo || 'Private notes will not be shared with students'}
-                      <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></span>
-                    </span>
-                  </span>
-                </div>
-                
-                {editingPrivateNotes[classSession.id] !== undefined ? (
-                  <div className="mt-1 w-full">
-                    <textarea
-                      ref={(el) => { textareaRefs[`private_${classSession.id}`] = el; }}
-                      defaultValue={editingPrivateNotes[classSession.id]}
-                      className="w-full p-2 border border-gray-300 rounded text-sm"
-                      rows={3}
-                    />
-                    <div className="flex justify-end mt-2 space-x-2">
-                      <button
-                        onClick={() => onCancelEditPrivateNotes(classSession.id)}
-                        className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                        disabled={savingPrivateNotes[classSession.id]}
-                      >
-                        {t.cancel || 'Cancel'}
-                      </button>
-                      <button
-                        onClick={() => onSavePrivateNotes(classSession)}
-                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                        disabled={savingPrivateNotes[classSession.id]}
-                      >
-                        {savingPrivateNotes[classSession.id]
-                          ? 'Saving...'
-                          : 'Save'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-gray-700 text-sm mt-1 flex items-center">
-                    <span>{classSession.privateNotes || (t.noNotes || 'No private notes available')}</span>
-                    {!editingPrivateNotes[classSession.id] && (
-                      <PencilIcon
-                        onClick={() => onEditPrivateNotes(classSession)}
-                        className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
-                        title={t.edit || 'Edit'}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              {/* Materials Section */}
-              {selectedDayDetails.materials[classSession.id] && selectedDayDetails.materials[classSession.id].length > 0 && (
-                <div className="mt-3">
-                  <div className="flex justify-between items-center">
-                    <div className={styles.card.label}>{t.materials || "Materials"}</div>
-                    {isAdmin && (
-                      <a 
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          onOpenUploadForm(classSession.id);
-                        }}
-                        className="text-sm text-blue-600 hover:text-blue-800"
-                      >
-                        {t.addMaterials}
-                      </a>
-                    )}
-                  </div>
-                  <div className="mt-1 space-y-2 overflow-hidden" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
-                    {selectedDayDetails.materials[classSession.id].map((material, index) => (
-                      <div key={index} className="flex flex-col space-y-2">
-                        {material.slides && material.slides.length > 0 && (
-                          <div className="space-y-1">
-                            {material.slides.map((slideUrl, slideIndex) => (
-                              <div 
-                                key={slideIndex}
-                                className="flex items-center group"
-                              >
-                                <FaFilePdf className="mr-2 flex-shrink-0 text-blue-600" />
-                                <a 
-                                  href={slideUrl} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800"
-                                >
-                                  <span className="text-sm overflow-hidden whitespace-nowrap text-ellipsis" style={{ maxWidth: '250px', display: 'inline-block', wordBreak: 'break-all' }}>
-                                    {t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}
-                                  </span>
-                                </a>
-                                {isAdmin && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      onDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
-                                    }}
-                                    disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
-                                    className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                    title="Delete material"
-                                  >
-                                    <FaTrash className="h-2.5 w-2.5" />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {material.links && material.links.length > 0 && (
-                          <div className="space-y-1">
-                            {material.links.map((link, linkIndex) => (
-                              <div 
-                                key={linkIndex}
-                                className="flex items-center group"
-                              >
-                                <FaLink className="mr-2 flex-shrink-0 text-blue-600" />
-                                <a 
-                                  href={link} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800"
-                                >
-                                  <span className="text-sm overflow-hidden whitespace-nowrap text-ellipsis" style={{ maxWidth: '250px', display: 'inline-block', wordBreak: 'break-all' }}>{link}</span>
-                                </a>
-                                {isAdmin && (
-                                  <button
-                                    onClick={(_) => {
-                                      onDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
-                                    }}
-                                    disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
-                                    className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                    title="Delete link"
-                                  >
-                                    <FaTrash className="h-2.5 w-2.5" />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Add materials link when no materials exist */}
-              {isAdmin && (!selectedDayDetails.materials[classSession.id] || selectedDayDetails.materials[classSession.id].length === 0) && (
-                <div className="mt-3">
-                  <a 
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onOpenUploadForm(classSession.id);
-                    }}
-                    className="flex items-center text-blue-600 hover:text-blue-800"
-                  >
-                    <FaPlus className="mr-2" />
-                    <span className="text-sm">{t.addMaterials}</span>
-                  </a>
-                </div>
-              )}
-              {isAdmin && renderUploadMaterialsSection(classSession, selectedDayDetails.date)}
-              
-              {/* Homework Section */}
-              <div className="mt-3" style={{ position: 'relative', width: '100%' }}>
-                <HomeworkManager
-                  classId={classSession.id}
-                  classDate={selectedDayDetails.date}
-                  isAdmin={isAdmin}
-                  onAddSuccess={refreshHomework}
-                />
-              </div>
-            </div>
-          ))}
+          <ClassSection
+            title=""
+            classes={paginatedClasses.map(classSession => ({
+              ...classSession,
+              _displayDate: selectedDayDetails.date
+            }))}
+            classMaterials={selectedDayDetails.materials}
+            editingNotes={editingNotes}
+            savingNotes={savingNotes}
+            editingPrivateNotes={editingPrivateNotes}
+            savingPrivateNotes={savingPrivateNotes}
+            deletingMaterial={deletingMaterial}
+            isAdmin={isAdmin}
+            formatStudentNames={formatStudentNames}
+            formatClassTime={formatClassTime}
+            formatClassDate={() => ''}
+            onEditNotes={onEditNotes}
+            onSaveNotes={onSaveNotes}
+            onCancelEditNotes={onCancelEditNotes}
+            onEditPrivateNotes={onEditPrivateNotes}
+            onSavePrivateNotes={onSavePrivateNotes}
+            onCancelEditPrivateNotes={onCancelEditPrivateNotes}
+            onDeleteMaterial={(material, index, classId, type = 'slides', itemIndex) => 
+              onDeleteMaterial(material, index, classId, type, itemIndex)
+            }
+            onOpenUploadForm={onOpenUploadForm}
+            onCloseUploadForm={onCloseUploadForm}
+            visibleUploadForm={visibleUploadForm}
+            textareaRefs={textareaRefs}
+            pageSize={1000}
+            currentPage={0}
+            onPageChange={() => {}}
+            sectionRef={detailsContainerRef}
+            selectedDate={selectedDayDetails.date}
+            homeworkByClassId={homeworkByClassId}
+            refreshHomework={refreshHomework}
+            noContainer={true}
+            hideDateDisplay={true}
+            t={{
+              upcomingClasses: '',
+              pastClasses: '',
+              noUpcomingClasses: 'No classes for this day',
+              noPastClasses: 'No classes for this day',
+              addNotes: t.edit || 'Edit',
+              addPrivateNotes: t.edit || 'Edit',
+              materials: t.materials || 'Materials',
+              addMaterials: t.addMaterials || 'Add Materials',
+              slides: t.slides || 'Slides',
+              link: 'Link',
+              previous: t.previous || 'Previous',
+              next: t.next || 'Next',
+              notes: t.notes || 'Notes',
+              notesInfo: t.notesInfo || 'Notes will be shared with students',
+              cancel: t.cancel || 'Cancel',
+              noNotes: t.noNotes || 'No notes available',
+              edit: t.edit || 'Edit',
+              privateNotes: t.privateNotes || 'Private notes',
+              privateNotesInfo: t.privateNotesInfo || 'Private notes will not be shared with students'
+            }}
+          />
           
           {totalPages > 1 && <ClassesPagination />}
         </div>

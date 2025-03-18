@@ -309,35 +309,33 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
 
   return (
     <div className="mt-4 w-full overflow-hidden" style={{ position: 'relative', zIndex: 10, boxSizing: 'border-box', maxWidth: '100%' }}>
-      <div className="flex justify-between items-center">
-        <div className={styles.card.label}>Homework</div>
-        {isAdmin && !showAddForm && (
-          <a 
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              handleAddHomework();
-            }}
-            className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-          >
-            <FaPlus className="mr-1 h-3 w-3" />
-            <span>Add Homework</span>
-          </a>
-        )}
-        {isAdmin && showAddForm && (
-          <a 
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              handleCloseForm();
-            }}
-            className="text-sm text-gray-600 hover:text-gray-800 flex items-center"
-          >
-            <FaTimes className="mr-1 h-3 w-3" />
-            <span>Cancel</span>
-          </a>
-        )}
-      </div>
+      <div className={styles.card.label}>Homework</div>
+      {isAdmin && !showAddForm && (
+        <a 
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleAddHomework();
+          }}
+          className="text-sm text-blue-600 hover:text-blue-800 flex items-center mt-1"
+        >
+          <FaPlus className="mr-1 h-3 w-3" />
+          <span>Add Homework</span>
+        </a>
+      )}
+      {isAdmin && showAddForm && (
+        <a 
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleCloseForm();
+          }}
+          className="text-sm text-gray-600 hover:text-gray-800 flex items-center mt-1"
+        >
+          <FaTimes className="mr-1 h-3 w-3" />
+          <span>Cancel</span>
+        </a>
+      )}
       
       {/* Add Homework Form */}
       {isAdmin && showAddForm && (
