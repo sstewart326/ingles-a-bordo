@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ClassSession } from '../utils/scheduleUtils';
 import { ClassMaterial, Homework } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
-import { FaLink, FaPlus, FaTrash, FaFilePowerpoint } from 'react-icons/fa';
+import { FaLink, FaTrash, FaFilePowerpoint } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
 import { UploadMaterialsForm } from './UploadMaterialsForm';

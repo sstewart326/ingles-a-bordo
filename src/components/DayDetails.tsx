@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ClassSession, User, getBaseClassId } from '../utils/scheduleUtils';
 import { ClassMaterial, Homework } from '../types/interfaces';
-import { styles } from '../styles/styleUtils';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
 import { PencilIcon, CheckCircleIcon } from '@heroicons/react/24/outline';

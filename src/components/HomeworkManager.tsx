@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Homework } from '../types/interfaces';
 import { getHomeworkForDate, deleteHomework, getHomeworkSubmissions, addHomeworkFeedback, getHomeworkForClass, subscribeToHomeworkChanges, updateHomework } from '../utils/homeworkUtils';
-import { FaPlus, FaTrash, FaTimes, FaInbox, FaUserGraduate, FaEye } from 'react-icons/fa';
+import { FaTrash, FaInbox, FaUserGraduate } from 'react-icons/fa';
 import { HomeworkForm } from './HomeworkForm';
 import toast from 'react-hot-toast';
 import { styles } from '../styles/styleUtils';
