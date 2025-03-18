@@ -340,17 +340,26 @@ export const DayDetails = ({
       const paymentLink = editingPaymentLink[classSession.id] || '';
       console.log('Saving payment link:', paymentLink);
       
-      await updateClassPaymentLink(classSession.id, paymentLink);
+      // Extract the base class ID for consistency with multiple schedule classes
+      const baseClassId = getBaseClassId(classSession.id);
+      console.log('Using base class ID:', baseClassId);
+      
+      await updateClassPaymentLink(baseClassId, paymentLink);
       console.log('Payment link saved to database');
       
       // Fetch the latest class data from the database to ensure we have the most up-to-date data
-      const latestClassData = await getClassById(classSession.id);
+      const latestClassData = await getClassById(baseClassId);
       
-      // Update our component state with the new payment link
-      setPaymentLinks(prev => ({
-        ...prev,
-        [classSession.id]: latestClassData?.paymentConfig?.paymentLink || null
-      }));
+      // Update our component state with the new payment link for all schedules of this class
+      const allScheduleIds = selectedDayDetails?.classes
+        .filter(c => getBaseClassId(c.id) === baseClassId)
+        .map(c => c.id) || [classSession.id];
+      
+      const newPaymentLinks = { ...paymentLinks };
+      allScheduleIds.forEach(id => {
+        newPaymentLinks[id] = paymentLink;
+      });
+      setPaymentLinks(newPaymentLinks);
       
       // Update the class session in the selected day details
       if (selectedDayDetails && latestClassData) {
@@ -358,10 +367,11 @@ export const DayDetails = ({
         const updatedClassSession: ClassSession = {
           ...classSession,
           ...latestClassData,
-          paymentConfig: latestClassData.paymentConfig || {
-            type: 'monthly', // Default type
-            startDate: new Date().toISOString().split('T')[0], // Default start date
-            paymentLink
+          paymentConfig: {
+            type: latestClassData.paymentConfig?.type || 'monthly',
+            startDate: latestClassData.paymentConfig?.startDate || new Date().toISOString().split('T')[0],
+            paymentLink,
+            ...(latestClassData.paymentConfig || {})
           }
         };
         
@@ -369,13 +379,34 @@ export const DayDetails = ({
         console.log('Updated payment link:', updatedClassSession.paymentConfig?.paymentLink);
         
         // Update the classes array in selectedDayDetails
-        const updatedClasses = selectedDayDetails.classes.map(c => 
-          c.id === classSession.id ? updatedClassSession : c
-        );
+        const updatedClasses = selectedDayDetails.classes.map(c => {
+          if (getBaseClassId(c.id) === baseClassId) {
+            return {
+              ...c,
+              paymentConfig: {
+                type: c.paymentConfig?.type || 'monthly',
+                startDate: c.paymentConfig?.startDate || new Date().toISOString().split('T')[0],
+                paymentLink,
+                ...(c.paymentConfig || {})
+              }
+            } as ClassSession;
+          }
+          return c;
+        });
         
         // Update the paymentsDue array in selectedDayDetails
         const updatedPaymentsDue = selectedDayDetails.paymentsDue.map(item => {
-          if (item.classSession.id === classSession.id) {
+          if (getBaseClassId(item.classSession.id) === baseClassId) {
+            const updatedClassSession = {
+              ...item.classSession,
+              paymentConfig: {
+                type: item.classSession.paymentConfig?.type || 'monthly',
+                startDate: item.classSession.paymentConfig?.startDate || new Date().toISOString().split('T')[0],
+                paymentLink,
+                ...(item.classSession.paymentConfig || {})
+              }
+            } as ClassSession;
+            
             return {
               ...item,
               classSession: updatedClassSession
@@ -519,15 +550,15 @@ export const DayDetails = ({
       }
     }
     
-    // Use the payment link from our component state
+    // Use the payment link from our component state or from the class session
     const isLoading = loadingPaymentLinks[updatedClassSession.id];
-    const paymentLink = paymentLinks[updatedClassSession.id];
+    const paymentLink = paymentLinks[updatedClassSession.id] || updatedClassSession.paymentConfig?.paymentLink;
     
     // Display loading state if needed
     if (isLoading) {
       return (
         <div className="flex items-center">
-          <span className="text-gray-500">Loading payment link...</span>
+          <span className="text-gray-500">{t.loading}</span>
         </div>
       );
     }
@@ -551,24 +582,24 @@ export const DayDetails = ({
             <PencilIcon
               onClick={() => handleEditPaymentLink(updatedClassSession)}
               className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer ml-1 flex-shrink-0"
-              title={t.edit || 'Edit'}
+              title={t.edit}
             />
           )}
         </div>
       );
     } else if (isAdmin) {
       return (
-        <button
+        <div 
           onClick={() => handleEditPaymentLink(updatedClassSession)}
-          className={`${styles.buttons.secondary} flex items-center text-sm py-1 px-3`}
+          className="flex items-center text-gray-500 hover:text-gray-700 cursor-pointer"
         >
-          <PencilIcon className="h-4 w-4 mr-1" />
-          {t.paymentLink || 'Add payment link'}
-        </button>
+          <span className="mr-1">{t.addPaymentLink}</span>
+          <PencilIcon className="h-4 w-4 flex-shrink-0" />
+        </div>
       );
     } else {
       return (
-        <span className="text-gray-500">{'No payment link available'}</span>
+        <span className="text-gray-500">{t.noPaymentLink}</span>
       );
     }
   };
@@ -693,8 +724,31 @@ export const DayDetails = ({
                         <h4 className="text-xl font-semibold mb-2">{user.name}</h4>
                         {/* Add class day and time details */}
                         <div className="text-sm text-gray-600">
-                          <div className="font-medium">{t.dayOfWeek}: {getDayName(classSession.dayOfWeek)}</div>
-                          <div className="mt-1">{t.time}: {formatClassTime(classSession)}</div>
+                          {classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) ? (
+                            <div className="font-medium">
+                              {t.days || 'Days'}: {classSession.schedules
+                                .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+                                .map(schedule => getDayName(schedule.dayOfWeek))
+                                .join(', ')}
+                            </div>
+                          ) : (
+                            <div className="font-medium">{t.dayOfWeek}: {getDayName(classSession.dayOfWeek)}</div>
+                          )}
+                          <div className="mt-1">
+                            {classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) ? (
+                              <div>
+                                {classSession.schedules
+                                  .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+                                  .map((schedule, index) => (
+                                    <div key={index}>
+                                      {getDayName(schedule.dayOfWeek)}: {schedule.startTime} - {schedule.endTime}
+                                    </div>
+                                  ))}
+                              </div>
+                            ) : (
+                              <>{t.time}: {formatClassTime(classSession)}</>
+                            )}
+                          </div>
                           {classSession.paymentConfig?.amount && classSession.paymentConfig?.currency && (
                             <div className="mt-1">
                               {t.amount || "Amount"}: {classSession.paymentConfig.currency} {classSession.paymentConfig.amount.toFixed(2)}
@@ -844,7 +898,7 @@ export const DayDetails = ({
               materials: t.materials || 'Materials',
               addMaterials: t.addMaterials || 'Add Materials',
               slides: t.slides || 'Slides',
-              link: 'Link',
+              link: t.paymentLink || 'Link',
               previous: t.previous || 'Previous',
               next: t.next || 'Next',
               notes: t.notes || 'Notes',

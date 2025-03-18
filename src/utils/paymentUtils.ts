@@ -137,17 +137,9 @@ export const getPaymentsDueForDay = (
   }
   
   const paymentsDue: PaymentDue[] = [];
-  const processedClassIds = new Set<string>();
+  const processedStudentClassPairs = new Set<string>();
   
   upcomingClasses.forEach(classSession => {
-    // Extract the base class ID (for multiple schedule classes, we need to remove the day suffix)
-    const baseClassId = getBaseClassId(classSession.id);
-    
-    // Skip if we've already processed this class or its base class
-    if (processedClassIds.has(baseClassId) || processedClassIds.has(classSession.id)) {
-      return;
-    }
-    
     if (classSession.paymentConfig) {
       const paymentDates = getNextPaymentDates(classSession.paymentConfig, classSession, date);
       
@@ -158,15 +150,30 @@ export const getPaymentsDueForDay = (
       );
       
       if (isPaymentDue) {
-        // Mark both the actual class ID and the base class ID as processed
-        processedClassIds.add(classSession.id);
-        processedClassIds.add(baseClassId);
-        
-        // Add one entry per student
+        // Add one entry per student, but only if we haven't processed this student-class pair yet
         classSession.studentEmails.forEach(email => {
-          const user = users.find(u => u.email === email);
-          if (user) {
-            paymentsDue.push({ user, classSession });
+          const baseClassId = getBaseClassId(classSession.id);
+          const studentClassKey = `${email}-${baseClassId}`;
+          
+          if (!processedStudentClassPairs.has(studentClassKey)) {
+            const user = users.find(u => u.email === email);
+            if (user) {
+              // Create a copy of the class session
+              let classSessionWithSchedules = { ...classSession };
+              
+              // For multiple schedule classes, ensure all schedules are included
+              if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules)) {
+                // Sort schedules by day of week for consistent display
+                const sortedSchedules = [...classSession.schedules].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+                classSessionWithSchedules = {
+                  ...classSession,
+                  schedules: sortedSchedules
+                };
+              }
+              
+              paymentsDue.push({ user, classSession: classSessionWithSchedules });
+              processedStudentClassPairs.add(studentClassKey);
+            }
           }
         });
       }

@@ -63,6 +63,7 @@ interface Translation {
   dayDetails: string;
   noDetailsAvailable: string;
   nothingScheduledForThisDay: string;
+  days: string;
   
   // Schedule
   courseSchedule: string;
@@ -129,6 +130,8 @@ interface Translation {
   weeklyPayment: string;
   monthlyPayment: string;
   paymentLink: string;
+  addPaymentLink: string;
+  noPaymentLink: string;
   amount: string;
 
   // Days of Week - Short Names
@@ -267,6 +270,7 @@ const translations: Record<Language, Translation> = {
     dayDetails: 'Day Details',
     noDetailsAvailable: 'No details available',
     nothingScheduledForThisDay: 'There is nothing scheduled for this day.',
+    days: 'Days',
     
     // Schedule
     courseSchedule: 'Course Schedule',
@@ -333,6 +337,8 @@ const translations: Record<Language, Translation> = {
     weeklyPayment: 'Weekly Payment',
     monthlyPayment: 'Monthly Payment',
     paymentLink: 'Payment Link',
+    addPaymentLink: 'Add payment link',
+    noPaymentLink: 'No payment link available',
     amount: 'Amount',
 
     // Days of Week - Short Names
@@ -469,6 +475,7 @@ const translations: Record<Language, Translation> = {
     dayDetails: 'Detalhes do Dia',
     noDetailsAvailable: 'Nenhum detalhe disponível',
     nothingScheduledForThisDay: 'Não há nada agendado para este dia.',
+    days: 'Dias',
     
     // Schedule
     courseSchedule: 'Agenda de Aulas',
@@ -535,6 +542,8 @@ const translations: Record<Language, Translation> = {
     weeklyPayment: 'Pagamento Semanal',
     monthlyPayment: 'Pagamento Mensal',
     paymentLink: 'Link de Pagamento',
+    addPaymentLink: 'Adicionar link de pagamento',
+    noPaymentLink: 'Link de pagamento não disponível',
     amount: 'Valor',
 
     // Days of Week - Short Names
@@ -575,10 +584,10 @@ const translations: Record<Language, Translation> = {
     enterEmailAddress: 'Digite o endereço de email',
     userStatus: 'Status',
     activeUser: 'Usuário',
-    pendingSignup: 'Cadastro Pendente',
+    pendingSignup: 'Pendente',
     copyLink: 'Copiar Link',
     confirmDelete: 'Tem certeza que deseja excluir {name} ({email})?',
-    signupLinkCopied: 'Link de cadastro copiado',
+    signupLinkCopied: 'Link de cadastro copiado para a área de transferência',
     signupLinkExpires: 'O link expira em 24 horas. Copiar o link estende a data de expiração.',
     failedToCopyLink: 'Falha ao copiar link de cadastro',
     pleaseEnterNameEmail: 'Por favor, preencha nome e email',
