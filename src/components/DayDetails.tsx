@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ClassSession, User } from '../utils/scheduleUtils';
+import { ClassSession, User, getBaseClassId } from '../utils/scheduleUtils';
 import { ClassMaterial, Homework } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
 import { useTranslation } from '../translations';
@@ -205,8 +205,11 @@ export const DayDetails = ({
         return;
       }
       
+      // Extract the base class ID for consistency with multiple schedule classes
+      const baseClassId = getBaseClassId(classSession.id);
+      
       // Use the user's email as the userId since that's what we have
-      const paymentId = await createPayment(userPaymentDue.user.email, classSession.id, amount, currency, selectedDayDetails!.date);
+      const paymentId = await createPayment(userPaymentDue.user.email, baseClassId, amount, currency, selectedDayDetails!.date);
       console.log('Payment created with ID:', paymentId);
       
       // Fetch all completed payments to ensure state is fully up to date
@@ -226,14 +229,14 @@ export const DayDetails = ({
         setCompletedPayments(payments);
       }
       
-      // Notify parent component to refresh calendar
-      if (onPaymentStatusChange && selectedDayDetails) {
-        console.log('Triggering calendar refresh...');
-        onPaymentStatusChange(selectedDayDetails.date);
+      // Notify the parent component that a payment was completed
+      if (onPaymentStatusChange) {
+        onPaymentStatusChange(selectedDayDetails!.date);
       }
+      
+      setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
     } catch (error) {
-      console.error('Error marking payment as completed:', error);
-    } finally {
+      console.error('Error marking payment completed:', error);
       const paymentKey = `${userId}-${classSession.id}`;
       setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
     }

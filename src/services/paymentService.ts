@@ -59,16 +59,61 @@ export const checkExistingPayment = async (userId: string, classSessionId: strin
   const endOfDay = new Date(dueDate);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const q = query(
-    collection(db, PAYMENTS_COLLECTION),
-    where('userId', '==', userId),
-    where('classSessionId', '==', classSessionId),
-    where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
-    where('dueDate', '<=', Timestamp.fromDate(endOfDay))
-  );
+  // Extract the base class ID (for multiple schedule classes)
+  const baseClassId = classSessionId.split('-')[0];
+  
+  // If the classSessionId contains a day suffix, we need to check for both the original and base IDs
+  const hasMultipleSchedules = classSessionId !== baseClassId;
+  
+  let querySnapshot;
+  
+  if (hasMultipleSchedules) {
+    // For multiple schedules, check for payments with either the specific day ID or the base ID
+    const q1 = query(
+      collection(db, PAYMENTS_COLLECTION),
+      where('userId', '==', userId),
+      where('classSessionId', '==', classSessionId),
+      where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('dueDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+    
+    const q2 = query(
+      collection(db, PAYMENTS_COLLECTION),
+      where('userId', '==', userId),
+      where('classSessionId', '==', baseClassId),
+      where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('dueDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+    
+    // Execute both queries
+    const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    
+    // Return the first payment found
+    if (!snapshot1.empty) {
+      const doc = snapshot1.docs[0];
+      return { id: doc.id, ...doc.data() } as Payment;
+    }
+    
+    if (!snapshot2.empty) {
+      const doc = snapshot2.docs[0];
+      return { id: doc.id, ...doc.data() } as Payment;
+    }
+    
+    return null;
+  } else {
+    // For single schedule classes, just check for the exact ID
+    const q = query(
+      collection(db, PAYMENTS_COLLECTION),
+      where('userId', '==', userId),
+      where('classSessionId', '==', classSessionId),
+      where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('dueDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+    
+    querySnapshot = await getDocs(q);
+  }
 
-  const querySnapshot = await getDocs(q);
-  if (!querySnapshot.empty) {
+  if (querySnapshot && !querySnapshot.empty) {
     const doc = querySnapshot.docs[0];
     return { id: doc.id, ...doc.data() } as Payment;
   }
@@ -88,9 +133,14 @@ export const createPayment = async (
     return existingPayment.id;
   }
 
+  // Extract the base class ID for consistency with multiple schedule classes
+  // For classes with multiple schedules (e.g., "classId-1"), we use the base ID ("classId")
+  const baseClassId = classSessionId.split('-')[0];
+  
+  // Use the base class ID for storing the payment to avoid duplicates across different days
   const paymentData: Omit<Payment, 'id'> = {
     userId,
-    classSessionId,
+    classSessionId: baseClassId, // Store with the base class ID
     amount,
     currency,
     status: 'completed',
@@ -162,18 +212,61 @@ export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string
   const endOfDay = new Date(dueDate);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const q = query(
-    collection(db, PAYMENTS_COLLECTION),
-    where('classSessionId', '==', classSessionId),
-    where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
-    where('dueDate', '<=', Timestamp.fromDate(endOfDay))
-  );
+  // Extract the base class ID (for multiple schedule classes)
+  const baseClassId = classSessionId.split('-')[0];
+  
+  // If the classSessionId contains a day suffix, we need to check for both the original and base IDs
+  const hasMultipleSchedules = classSessionId !== baseClassId;
+  
+  let querySnapshot;
+  
+  if (hasMultipleSchedules) {
+    // For multiple schedules, check for payments with either the specific day ID or the base ID
+    const q1 = query(
+      collection(db, PAYMENTS_COLLECTION),
+      where('classSessionId', '==', classSessionId),
+      where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('dueDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+    
+    const q2 = query(
+      collection(db, PAYMENTS_COLLECTION),
+      where('classSessionId', '==', baseClassId),
+      where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('dueDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+    
+    // Execute both queries
+    const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    
+    // Combine and deduplicate results
+    const allDocs = [...snapshot1.docs, ...snapshot2.docs];
+    const uniquePayments = new Map<string, Payment>();
+    
+    allDocs.forEach(doc => {
+      const payment = { id: doc.id, ...doc.data() } as Payment;
+      uniquePayments.set(doc.id, payment);
+    });
+    
+    return Array.from(uniquePayments.values());
+  } else {
+    // For single schedule classes, just check for the exact ID
+    const q = query(
+      collection(db, PAYMENTS_COLLECTION),
+      where('classSessionId', '==', classSessionId),
+      where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('dueDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+    
+    querySnapshot = await getDocs(q);
+  }
 
-  const querySnapshot = await getDocs(q);
   const payments: Payment[] = [];
-  querySnapshot.forEach(doc => {
-    payments.push({ id: doc.id, ...doc.data() } as Payment);
-  });
+  if (querySnapshot) {
+    querySnapshot.forEach(doc => {
+      payments.push({ id: doc.id, ...doc.data() } as Payment);
+    });
+  }
 
   return payments;
 };

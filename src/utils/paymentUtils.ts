@@ -1,5 +1,7 @@
 import { ClassSession, User } from './scheduleUtils';
+import { getBaseClassId } from './scheduleUtils';
 
+// Define the PaymentDue interface locally
 interface PaymentDue {
   user: User;
   classSession: ClassSession;
@@ -138,8 +140,11 @@ export const getPaymentsDueForDay = (
   const processedClassIds = new Set<string>();
   
   upcomingClasses.forEach(classSession => {
-    // Skip if we've already processed this class
-    if (processedClassIds.has(classSession.id)) {
+    // Extract the base class ID (for multiple schedule classes, we need to remove the day suffix)
+    const baseClassId = getBaseClassId(classSession.id);
+    
+    // Skip if we've already processed this class or its base class
+    if (processedClassIds.has(baseClassId) || processedClassIds.has(classSession.id)) {
       return;
     }
     
@@ -153,8 +158,9 @@ export const getPaymentsDueForDay = (
       );
       
       if (isPaymentDue) {
-        // Mark this class as processed
+        // Mark both the actual class ID and the base class ID as processed
         processedClassIds.add(classSession.id);
+        processedClassIds.add(baseClassId);
         
         // Add one entry per student
         classSession.studentEmails.forEach(email => {

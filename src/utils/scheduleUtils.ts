@@ -342,4 +342,11 @@ export const sortClassesByTime = (classes: ClassSession[]): ClassSession[] => {
     };
     return getTime(a.startTime) - getTime(b.startTime);
   });
+};
+
+// Helper function to extract the base class ID from a class ID
+export const getBaseClassId = (classId: string): string => {
+  // For multiple schedule classes, the ID format is "baseId-dayNumber"
+  // We want to extract just the baseId part
+  return classId.split('-')[0];
 }; 
