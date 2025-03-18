@@ -43,7 +43,6 @@ export const Dashboard = () => {
   const isFetchingRef = useRef<boolean>(false);
   
   const [homeworkByClassId, setHomeworkByClassId] = useState<Record<string, Homework[]>>({});
-  const [isLoadingHomework, setIsLoadingHomework] = useState<boolean>(false);
   
   const { currentUser, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -758,7 +757,6 @@ export const Dashboard = () => {
   // Function to refresh all homework data
   const refreshAllHomework = async () => {
     console.log('Dashboard: Refreshing all homework data');
-    setIsLoadingHomework(true);
     
     try {
       // First, collect all unique class IDs that we need to fetch homework for
@@ -790,8 +788,6 @@ export const Dashboard = () => {
       console.log('Dashboard: All homework refreshed successfully');
     } catch (error) {
       console.error('Error refreshing homework:', error);
-    } finally {
-      setIsLoadingHomework(false);
     }
   };
   

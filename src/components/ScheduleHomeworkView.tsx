@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Homework } from '../types/interfaces';
-import { getHomeworkForDate, getHomeworkSubmission } from '../utils/homeworkUtils';
+import { getHomeworkForDate } from '../utils/homeworkUtils';
 import { HomeworkSubmission } from './HomeworkSubmission';
-import { FaFileAlt, FaChevronDown, FaChevronUp, FaFilePdf, FaFileWord, FaFilePowerpoint, FaFileAudio, FaFileVideo, FaFile } from 'react-icons/fa';
+import { FaChevronDown, FaChevronUp, FaFilePdf, FaFileWord, FaFilePowerpoint, FaFileAudio, FaFileVideo, FaFile } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { styles } from '../styles/styleUtils';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, getDocs } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
@@ -29,7 +29,6 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
   const [expandedHomeworkId, setExpandedHomeworkId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [submittedHomework, setSubmittedHomework] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchHomework = async () => {
@@ -41,21 +40,6 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
         
         // First attempt: Try with the original class ID
         let homeworkList = await getHomeworkForDate(classId, normalizedDate);
-        
-        // If we don't have homework, check all homework for this class regardless of date
-        if (homeworkList.length === 0) {
-          const q = query(
-            collection(getFirestore(), 'homework'),
-            where('classId', '==', classId.split('-')[0])
-          );
-          
-          const querySnapshot = await getDocs(q);
-          
-          querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            const hwDate = data.classDate.toDate();
-          });
-        }
         
         // Special direct check for any homework on this date from any class
         const allHomeworkQuery = query(collection(getFirestore(), 'homework'));

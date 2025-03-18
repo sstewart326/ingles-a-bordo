@@ -1,8 +1,6 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
-import { useLanguage } from '../hooks/useLanguage';
-import { useTranslation } from '../translations';
 import { validateHomeworkFile, addHomework } from '../utils/homeworkUtils';
-import { FaPlus, FaTrash, FaCheck, FaUpload, FaFile } from 'react-icons/fa';
+import { FaTrash, FaCheck, FaUpload, FaFile } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { styles, classNames } from '../styles/styleUtils';
 
@@ -19,8 +17,6 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
   onSuccess,
   onCancel
 }) => {
-  const { language } = useLanguage();
-  const t = useTranslation(language);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -28,7 +24,6 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
   const [allowTextSubmission, setAllowTextSubmission] = useState(true);
   const [allowFileSubmission, setAllowFileSubmission] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [fileErrors, setFileErrors] = useState<{ [key: string]: string }>({});
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -46,9 +41,7 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
       // Add only valid files
       const validFiles = newFiles.filter(file => !errors[file.name]);
       
-      setFiles(prev => [...prev, ...validFiles]);
-      setFileErrors(errors);
-      
+      setFiles(prev => [...prev, ...validFiles]);      
       // Show errors if any
       if (Object.keys(errors).length > 0) {
         Object.values(errors).forEach(error => {
@@ -113,15 +106,6 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
     } finally {
       setUploading(false);
     }
-  };
-
-  const getFileTypeIcon = (type: string) => {
-    if (type.includes('pdf')) return 'pdf';
-    if (type.includes('word')) return 'word';
-    if (type.includes('powerpoint')) return 'powerpoint';
-    if (type.includes('audio')) return 'audio';
-    if (type.includes('video')) return 'video';
-    return 'file';
   };
 
   return (

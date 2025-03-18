@@ -10,7 +10,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { getCalendarData, invalidateCalendarCache } from '../services/calendarService';
 import { ClassSession } from '../utils/scheduleUtils';
-import { getHomeworkForClass, getHomeworkForDate, getHomeworkSubmissions } from '../utils/homeworkUtils';
+import { getHomeworkForClass, getHomeworkSubmissions } from '../utils/homeworkUtils';
 import { Homework, HomeworkSubmission } from '../types/interfaces';
 import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 
@@ -144,7 +144,6 @@ export const Schedule = () => {
   
   // Homework State
   const [homeworkByClass, setHomeworkByClass] = useState<Record<string, Homework[]>>({});
-  const [selectedHomeworkClass, setSelectedHomeworkClass] = useState<CalendarClass | null>(null);
   const [selectedHomeworkDate, setSelectedHomeworkDate] = useState<Date | null>(null);
   const [homeworkFeedbackByClass, setHomeworkFeedbackByClass] = useState<Record<string, Map<string, boolean>>>({});
 
@@ -320,11 +319,6 @@ export const Schedule = () => {
     // Also update the selectedHomeworkDate to match the clicked date
     // This ensures the homework section is displayed
     setSelectedHomeworkDate(date);
-    
-    // If there are classes, set the first one as the selected homework class
-    if (classes.length > 0) {
-      setSelectedHomeworkClass(classes[0]);
-    }
     
     // Check for homework on this date
     classes.forEach(classItem => {
@@ -543,10 +537,6 @@ export const Schedule = () => {
               setSelectedDate(today);
               setSelectedHomeworkDate(today);
               
-              if (todayClasses.length > 0) {
-                setSelectedHomeworkClass(todayClasses[0]);
-              }
-              
               setSelectedDayDetails({
                 date: today,
                 classes: todayClasses,
@@ -608,10 +598,6 @@ export const Schedule = () => {
       // Update the day details
       setSelectedDate(today);
       setSelectedHomeworkDate(today);
-      
-      if (todayClasses.length > 0) {
-        setSelectedHomeworkClass(todayClasses[0]);
-      }
       
       setSelectedDayDetails({
         date: today,
@@ -870,7 +856,6 @@ export const Schedule = () => {
           });
           
           if (matchingClass) {
-            setSelectedHomeworkClass(matchingClass);
             const newDate = new Date(date);
             setSelectedHomeworkDate(newDate);
             

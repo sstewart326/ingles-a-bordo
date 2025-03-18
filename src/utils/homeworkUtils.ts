@@ -8,10 +8,8 @@ import {
   doc,
   getDoc,
   updateDoc,
-  Timestamp,
   deleteDoc,
   orderBy,
-  serverTimestamp
 } from 'firebase/firestore';
 import { 
   ref, 

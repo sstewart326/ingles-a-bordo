@@ -91,8 +91,6 @@ export const ClassesSection = ({
   onUpcomingClassesPageChange,
   onPastClassesPageChange,
   selectedDate,
-  homeworkByClassId,
-  refreshHomework,
   t
 }: ClassesSectionProps) => {
   const upcomingClassesSectionRef = useRef<HTMLDivElement>(null);

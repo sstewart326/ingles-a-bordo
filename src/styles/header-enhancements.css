@@ -168,4 +168,58 @@
   background-color: var(--header-hover) !important;
   color: white !important;
   outline: none !important;
+}
+
+/* Mobile specific enhancements */
+@media (max-width: 640px) {
+  /* Reset header height for mobile to avoid overflow issues */
+  .header-nav {
+    height: auto;
+    min-height: 56px;
+    overflow: visible;
+    z-index: 100;
+    position: relative;
+  }
+  
+  /* Make navbar icons more visible */
+  .header-nav .header-nav-button {
+    background-color: transparent !important;
+  }
+  
+  .header-nav .header-nav-button svg {
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
+  }
+  
+  /* Ensure the logo is centered but doesn't overlap */
+  .header-nav .flex-shrink-0 {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  /* Ensure z-index stacking is correct for mobile menu */
+  .header-nav::before {
+    z-index: 0;
+  }
+  
+  /* Ensure user profile icon is visible */
+  .header-nav .header-profile-button > div {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+  }
+  
+  /* Enhanced styling for active menu items on mobile */
+  .header-nav-item.nav-item.active {
+    color: white !important;
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border-left: 3px solid var(--brand-color) !important;
+    padding-left: calc(0.75rem - 3px) !important;
+  }
+}
+
+/* Ensure hamburger menu is always transparent */
+.header-nav .header-nav-button,
+.header-nav .header-nav-button:hover,
+.header-nav .header-nav-button:active,
+.header-nav .header-nav-button:focus {
+  background-color: transparent !important;
+  box-shadow: none !important;
 } 

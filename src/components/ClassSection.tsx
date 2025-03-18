@@ -1,14 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { ClassSession } from '../utils/scheduleUtils';
 import { ClassMaterial, Homework } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
-import { FaLink, FaPlus, FaTrash, FaFilePowerpoint, FaFilePdf, FaExternalLinkAlt, FaPaperclip, FaInfoCircle } from 'react-icons/fa';
+import { FaLink, FaPlus, FaTrash, FaFilePowerpoint } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
 import { UploadMaterialsForm } from './UploadMaterialsForm';
 import { debugMaterials, debugClassSession } from '../utils/debugUtils';
 import { HomeworkManager } from './HomeworkManager';
-import { toast } from 'react-hot-toast';
 
 // Extended interface to include dates property
 interface ExtendedClassSession extends ClassSession {
@@ -101,7 +100,6 @@ export const ClassSection = ({
   onPageChange,
   sectionRef,
   selectedDate,
-  homeworkByClassId,
   refreshHomework,
   hideDateDisplay = false,
   noContainer = false, // Default to false to maintain backward compatibility

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Select, { MultiValue, StylesConfig } from 'react-select';
 import DatePicker from 'react-datepicker';
@@ -13,7 +13,7 @@ import { Timestamp } from 'firebase/firestore';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { db } from '../config/firebase';
-import { getDocs, collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getDocs, collection } from 'firebase/firestore';
 import { styles, classNames } from '../styles/styleUtils';
 import { getDayName } from '../utils/dateUtils';
 import Modal from '../components/Modal';
@@ -21,15 +21,7 @@ import { useDashboardData } from '../hooks/useDashboardData';
 import { ClassSchedule } from '../types/interfaces';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { useAllStudents } from '../hooks/useAllStudents';
-import { generateRandomId } from '../utils/idUtils';
-import { saveContract } from '../utils/contractUtils';
 import { invalidateCalendarCache } from '../services/calendarService';
-import { FaEdit, FaTrash, FaPlus, FaMinus, FaUser, FaUsers, FaRegCalendarAlt, FaRegClock, FaClock, FaFile, FaSpinner } from 'react-icons/fa';
-import { styled } from '@mui/system';
-import { format, setDay, isBefore, startOfToday, parseISO, isValid } from 'date-fns';
 
 interface User {
   id: string;

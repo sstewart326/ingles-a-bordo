@@ -1,6 +1,4 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { useLanguage } from '../hooks/useLanguage';
-import { useTranslation } from '../translations';
 import { 
   getHomeworkSubmission, 
   submitHomework, 
@@ -8,7 +6,6 @@ import {
 } from '../utils/homeworkUtils';
 import { FaUpload, FaFile, FaTrash, FaFilePdf, FaFileWord, FaFilePowerpoint, FaFileAudio, FaFileVideo } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-import { classNames } from '../styles/styleUtils';
 import { Homework, HomeworkSubmission as HomeworkSubmissionType } from '../types/interfaces';
 
 interface HomeworkSubmissionProps {
@@ -19,16 +16,12 @@ interface HomeworkSubmissionProps {
 export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
   homework,
   studentEmail
-}) => {
-  const { language } = useLanguage();
-  const t = useTranslation(language);
-  
+}) => {  
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [textResponse, setTextResponse] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [submission, setSubmission] = useState<HomeworkSubmissionType | null>(null);
-  const [fileErrors, setFileErrors] = useState<{ [key: string]: string }>({});
 
   // Fetch existing submission if any
   useEffect(() => {
@@ -72,7 +65,6 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
       const validFiles = newFiles.filter(file => !errors[file.name]);
       
       setFiles(prev => [...prev, ...validFiles]);
-      setFileErrors(errors);
       
       // Show errors if any
       if (Object.keys(errors).length > 0) {

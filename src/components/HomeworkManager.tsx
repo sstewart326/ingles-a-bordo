@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useLanguage } from '../hooks/useLanguage';
-import { useTranslation } from '../translations';
 import { Homework } from '../types/interfaces';
 import { getHomeworkForDate, deleteHomework, getHomeworkSubmissions, addHomeworkFeedback, getHomeworkForClass, subscribeToHomeworkChanges, updateHomework } from '../utils/homeworkUtils';
-import { FaPlus, FaTrash, FaEdit, FaChevronDown, FaChevronUp, FaTimes, FaCheck, FaInbox, FaUserGraduate, FaEye } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaTimes, FaInbox, FaUserGraduate, FaEye } from 'react-icons/fa';
 import { HomeworkForm } from './HomeworkForm';
 import toast from 'react-hot-toast';
 import { styles } from '../styles/styleUtils';
@@ -73,20 +71,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
   classId,
   classDate,
   isAdmin,
-  className,
-  teacherName,
-  loadingMessage = 'Loading homework assignments...',
   emptyStateMessage = 'No homework assignments found.',
   onAddSuccess,
-  displayMode = 'normal',
 }) => {
-  const { language } = useLanguage();
-  const t = useTranslation(language);
   
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState<boolean>(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedHomework, setSelectedHomework] = useState<Homework | null>(null);
   const [showHomeworkModal, setShowHomeworkModal] = useState(false);
@@ -105,12 +95,10 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
 
   const fetchHomework = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       // Normalize date to midnight to ensure consistent comparison
       const normalizedDate = new Date(classDate);
       normalizedDate.setHours(0, 0, 0, 0);
-      const formattedDate = normalizedDate.toISOString().split('T')[0];
 
       let homework: Homework[];
       if (classDate) {
@@ -121,7 +109,6 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
       setHomeworkList(homework);
     } catch (err) {
       console.error('Error fetching homework:', err);
-      setError('Failed to load homework assignments.');
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +118,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
     fetchHomework();
     
     // Subscribe to homework changes for this class
-    const unsubscribe = subscribeToHomeworkChanges((updatedClassId) => {
+    const unsubscribe = subscribeToHomeworkChanges((_) => {
       // Always refresh when homework changes, regardless of class ID
       // This ensures all homework views stay in sync
       fetchHomework();
@@ -646,8 +633,6 @@ const HomeworkSubmissionsManager: React.FC<HomeworkSubmissionsManagerProps> = ({
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
-  const { language } = useLanguage();
-  const t = useTranslation(language);
   
   useEffect(() => {
     const fetchSubmissions = async () => {

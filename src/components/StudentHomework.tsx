@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useLanguage } from '../hooks/useLanguage';
-import { useTranslation } from '../translations';
 import { Homework } from '../types/interfaces';
 import { getHomeworkForStudent } from '../utils/homeworkUtils';
 import { HomeworkDisplay } from './HomeworkDisplay';
@@ -13,8 +11,6 @@ interface StudentHomeworkProps {
 export const StudentHomework: React.FC<StudentHomeworkProps> = ({
   studentEmail
 }) => {
-  const { language } = useLanguage();
-  const t = useTranslation(language);
   
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
   const [loading, setLoading] = useState(true);

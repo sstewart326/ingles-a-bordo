@@ -4,15 +4,10 @@ import { ClassMaterial, Homework } from '../types/interfaces';
 import { styles } from '../styles/styleUtils';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
-import { FaFilePdf, FaLink, FaPlus, FaTrash } from 'react-icons/fa';
-import { PencilIcon, InformationCircleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import { UploadMaterialsForm } from './UploadMaterialsForm';
-import Modal from './Modal';
+import { PencilIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Payment } from '../types/payment';
 import { createPayment, getPaymentsByDueDate, deletePayment } from '../services/paymentService';
 import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
-import { HomeworkManager } from './HomeworkManager';
-import { toast } from 'react-hot-toast';
 import { ClassSection } from './ClassSection';
 
 interface DayDetailsProps {
@@ -82,7 +77,6 @@ export const DayDetails = ({
 }: DayDetailsProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
-  const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [paymentsPage, setPaymentsPage] = useState(0);
   const [completedPayments, setCompletedPayments] = useState<Record<string, Payment[]>>({});
@@ -94,13 +88,6 @@ export const DayDetails = ({
   const [loadingPaymentIncomplete, setLoadingPaymentIncomplete] = useState<{[key: string]: boolean}>({});
   const CLASSES_PER_PAGE = 3;
   const detailsContainerRef = useRef<HTMLDivElement>(null);
-  
-  const toggleTooltip = (key: string) => {
-    setActiveTooltips(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
 
   // Function to get day name from dayOfWeek number
   const getDayName = (dayOfWeek: number | undefined): string => {
@@ -433,25 +420,6 @@ export const DayDetails = ({
       ...editingPaymentLink,
       [classId]: null
     });
-  };
-
-  const renderUploadMaterialsSection = (classSession: ClassSession, date: Date) => {
-    // Create a UTC date to avoid timezone issues
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const day = date.getDate();
-    const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
-    
-    return (
-      <Modal isOpen={visibleUploadForm === classSession.id} onClose={onCloseUploadForm}>
-        <UploadMaterialsForm
-          classId={classSession.id}
-          classDate={utcDate}
-          studentEmails={classSession.studentEmails || []}
-          onUploadSuccess={onCloseUploadForm}
-        />
-      </Modal>
-    );
   };
 
   // Reset pagination when selected day changes
