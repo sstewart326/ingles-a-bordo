@@ -383,9 +383,14 @@ export const ClassSection = ({
                       </div>
                       
                       {/* Materials Section */}
-                      {(classMaterials[classSession.id]?.length > 0 || (classSession.materials && classSession.materials.length > 0)) && (
+                      {/* Always show Materials section for admins, or if materials exist */}
+                      {(isAdmin || 
+                        (classMaterials[classSession.id] && classMaterials[classSession.id].length > 0) || 
+                        (classSession.materials && classSession.materials.length > 0)
+                      ) && (
                         <div className="mt-3">
                           <div className="flex justify-between items-center">
+                            {/* Always show Materials title for consistency */}
                             <div className={styles.card.label}>{t.materials || "Materials"}</div>
                             {isAdmin && (
                               <a 
@@ -402,33 +407,57 @@ export const ClassSection = ({
                           </div>
                           <div className="mt-1 space-y-2">
                             {/* Display materials - prioritize class.materials, fall back to classMaterials */}
-                            {/* Filter materials to only show those for the current date */}
-                            {((classSession.materials && classSession.materials.length > 0) 
-                              ? classSession.materials 
-                              : classMaterials[classSession.id] || []
-                            )
-                            .filter(material => {
-                              // If the material has a classDate, check if it matches the current date
-                              if (material.classDate) {
+                            {(() => {
+                              // First get materials from either source
+                              const materialsFromClass = classSession.materials || [];
+                              const materialsFromMap = classMaterials[classSession.id] || [];
+                              
+                              // Only log in development and not for every class
+                              if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) {
+                                console.log('ClassSection - Materials for class', classSession.id, {
+                                  materialsFromClass: materialsFromClass.length,
+                                  materialsFromMap: materialsFromMap.length,
+                                  date: date.toISOString().split('T')[0]
+                                });
+                              }
+                              
+                              // For performance, use a Set to track already added material IDs
+                              const addedMaterialIds = new Set<string>();
+                              const allMaterials: ClassMaterial[] = [];
+                              
+                              // First add materials from the class (higher priority)
+                              materialsFromClass.forEach(material => {
+                                if (material.id) {
+                                  addedMaterialIds.add(material.id);
+                                }
+                                allMaterials.push(material);
+                              });
+                              
+                              // Then add materials from the map if not already added
+                              materialsFromMap.forEach(material => {
+                                if (!material.id || !addedMaterialIds.has(material.id)) {
+                                  allMaterials.push(material);
+                                }
+                              });
+                              
+                              // Filter by date - create a function to avoid repeating this logic
+                              const isForCurrentDate = (material: ClassMaterial): boolean => {
+                                // If the material has no date, show it on all dates (legacy support)
+                                if (!material.classDate) return true;
+                                
+                                // Compare dates at midnight for consistency
                                 const materialDate = material.classDate instanceof Date 
                                   ? material.classDate 
                                   : new Date(material.classDate);
                                 
-                                // Set both dates to midnight for comparison
-                                const materialDateMidnight = new Date(materialDate);
-                                materialDateMidnight.setHours(0, 0, 0, 0);
+                                const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
+                                const displayDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
                                 
-                                const displayDateMidnight = new Date(date);
-                                displayDateMidnight.setHours(0, 0, 0, 0);
-                                
-                                // Compare dates
-                                return materialDateMidnight.getTime() === displayDateMidnight.getTime();
-                              }
+                                return materialDay.getTime() === displayDay.getTime();
+                              };
                               
-                              // If no classDate, show on all dates (backward compatibility)
-                              return true;
-                            })
-                            .map((material, index) => (
+                              return allMaterials.filter(isForCurrentDate);
+                            })().map((material, index) => (
                               <div key={`material-${index}`} className="flex flex-col space-y-2">
                                 {material.slides && material.slides.length > 0 && (
                                   <div className="space-y-1">
@@ -497,26 +526,55 @@ export const ClassSection = ({
                                 )}
                               </div>
                             ))}
+                            
+                            {/* Show "no materials" message if no materials are available */}
+                            {(() => {
+                              // Get materials for this specific date from both sources - reuse the logic we defined above
+                              const materialsFromClass = classSession.materials || [];
+                              const materialsFromMap = classMaterials[classSession.id] || [];
+                              
+                              // Combine all materials (we only need to count them, not deduplicate)
+                              const materialsForDate = [...materialsFromClass, ...materialsFromMap].filter(m => {
+                                // If the material has no date, show it on all dates (legacy support)
+                                if (!m.classDate) return true;
+                                
+                                // Compare dates at midnight for consistency  
+                                const materialDate = m.classDate instanceof Date 
+                                  ? m.classDate 
+                                  : new Date(m.classDate);
+                                
+                                const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
+                                const displayDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                                
+                                return materialDay.getTime() === displayDay.getTime();
+                              });
+                              
+                              // Return true if no materials for this date
+                              return materialsForDate.length === 0;
+                            })() && (
+                              <div className="text-gray-500 text-sm">
+                                {isAdmin ? (
+                                  <a 
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      onOpenUploadForm(`${classSession.id}-${date.getTime()}`);
+                                    }}
+                                    className="flex items-center text-blue-600 hover:text-blue-800"
+                                  >
+                                    <FaPlus className="mr-2" />
+                                    <span className="text-sm">{t.addMaterials || 'Add Materials'}</span>
+                                  </a>
+                                ) : (
+                                  <span>No materials available</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
                       
-                      {/* Add Materials Link */}
-                      {isAdmin && (!classMaterials[classSession.id] || classMaterials[classSession.id].length === 0) && (
-                        <div className="mt-3">
-                          <a 
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              onOpenUploadForm(`${classSession.id}-${date.getTime()}`);
-                            }}
-                            className="flex items-center text-blue-600 hover:text-blue-800"
-                          >
-                            <FaPlus className="mr-2" />
-                            <span className="text-sm">{t.addMaterials || 'Add Materials'}</span>
-                          </a>
-                        </div>
-                      )}
+                      {/* Material upload modal */}
                       {isAdmin && renderUploadMaterialsSection(classSession, date)}
 
                       {/* Homework Section */}

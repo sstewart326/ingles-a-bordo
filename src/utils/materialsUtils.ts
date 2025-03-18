@@ -3,6 +3,7 @@ import { ClassMaterial } from '../types/interfaces';
 import { updateClassMaterialItem } from './classMaterialsUtils';
 import { getMonthKey } from './calendarUtils';
 import { toast } from 'react-hot-toast';
+import { debugLog } from './debugUtils';
 
 export interface MaterialsState {
   classMaterials: Record<string, ClassMaterial[]>;
@@ -132,11 +133,18 @@ export const handleDeleteMaterial = async ({
     return;
   }
 
+  // Validate required parameters
+  if (!material || !classId || (type === 'slides' && typeof itemIndex !== 'number') || (type === 'link' && typeof itemIndex !== 'number')) {
+    toast.error('Missing required parameters for deletion');
+    debugLog('Missing required parameters for deletion', { material, index, classId, type, itemIndex });
+    return;
+  }
+
   try {
     // Set deleting state
     const deletingKey = type === 'slides' 
-      ? `${material.classId}${index}_slide_${itemIndex}`
-      : `${material.classId}${index}_link_${itemIndex}`;
+      ? `${material.classId || classId}${index}_slide_${itemIndex}`
+      : `${material.classId || classId}${index}_link_${itemIndex}`;
     
     setState({
       deletingMaterial: {
@@ -145,123 +153,172 @@ export const handleDeleteMaterial = async ({
       }
     });
 
+    // ============== STEP 1: Update the material in the database ==============
+    
+    // Ensure we have a valid classId to match the Firestore document
+    const documentClassId = material.classId || classId;
+    
+    // Ensure we have a valid date for the material
+    let materialDate: Date;
+    if (material.classDate instanceof Date) {
+      materialDate = material.classDate;
+    } else if (typeof material.classDate === 'string') {
+      materialDate = new Date(material.classDate);
+    } else if (material.classDate && typeof material.classDate === 'object' && 'toDate' in material.classDate) {
+      // Handle Firestore Timestamp
+      materialDate = (material.classDate as { toDate: () => Date }).toDate();
+    } else {
+      // If we don't have a valid date, use the current date as a fallback
+      console.warn('No valid date found for material, using current date as fallback');
+      materialDate = new Date();
+    }
+    
+    // Log for debugging
+    debugLog(`Deleting material item: type=${type}, itemIndex=${itemIndex}, classId=${documentClassId}, date=${materialDate.toISOString()}`);
+    
     // Call the utility function to update the material
     if (type === 'slides' && typeof itemIndex === 'number') {
-      await updateClassMaterialItem(material.classId, material.classDate, 'removeSlides', undefined, itemIndex);
+      await updateClassMaterialItem(documentClassId, materialDate, 'removeSlides', undefined, itemIndex);
     } else if (type === 'link' && typeof itemIndex === 'number') {
-      await updateClassMaterialItem(material.classId, material.classDate, 'removeLink', itemIndex);
+      await updateClassMaterialItem(documentClassId, materialDate, 'removeLink', itemIndex);
     }
     
-    // Update local state
-    const updatedMaterials = { ...state.classMaterials };
+    // Dispatch an event to notify other components about the materials update
+    const updateEvent = new CustomEvent('materials-updated', {
+      detail: {
+        classId: documentClassId,
+        date: materialDate,
+        action: 'delete',
+        timestamp: Date.now()
+      }
+    });
+    window.dispatchEvent(updateEvent);
     
-    // Check if we need to update or remove the material from local state
-    if (updatedMaterials[classId]) {
-      // If we're removing slides, update the material
-      if (type === 'slides' && typeof itemIndex === 'number' && material.slides) {
-        updatedMaterials[classId] = updatedMaterials[classId].map((m: ClassMaterial, i: number) => {
-          if (i === index && m.slides) {
+    // ============== STEP 2: Handle class ID variants ==============
+    
+    // Extract the base class ID to handle all variants
+    const baseClassId = classId.includes('-') ? classId.split('-')[0] : classId;
+    
+    // Create a list of all class IDs that need to be updated
+    const classIdsToUpdate = [
+      classId, // Original class ID
+      baseClassId, // Base class ID
+    ];
+    
+    // Add any class IDs from upcoming and past classes that start with the base ID
+    if (upcomingClasses) {
+      upcomingClasses.forEach(c => {
+        if (c.id.startsWith(baseClassId) && !classIdsToUpdate.includes(c.id)) {
+          classIdsToUpdate.push(c.id);
+        }
+      });
+    }
+    
+    if (pastClasses) {
+      pastClasses.forEach(c => {
+        if (c.id.startsWith(baseClassId) && !classIdsToUpdate.includes(c.id)) {
+          classIdsToUpdate.push(c.id);
+        }
+      });
+    }
+    
+    const uniqueClassIdsToUpdate = [...new Set(classIdsToUpdate)];
+    console.log('Update materials for these class IDs after deletion:', uniqueClassIdsToUpdate);
+    
+    // ============== STEP 3: Create updated materials ==============
+    
+    // Start with a copy of the current materials state
+    const updatedMaterialsMap = { ...state.classMaterials };
+    
+    // Function to update or remove the material
+    const updateMaterialsArray = (materials: ClassMaterial[]): ClassMaterial[] => {
+      // First, update the material in place
+      let newMaterials = materials.map((m: ClassMaterial, i: number) => {
+        if (i === index) {
+          if (type === 'slides' && typeof itemIndex === 'number' && m.slides) {
             const updatedSlides = [...m.slides];
             updatedSlides.splice(itemIndex, 1);
             return { ...m, slides: updatedSlides };
-          }
-          return m;
-        });
-        
-        // If this material now has no slides and no links, remove it
-        const materialToCheck = updatedMaterials[classId][index];
-        if ((!materialToCheck.slides || materialToCheck.slides.length === 0) && 
-            (!materialToCheck.links || materialToCheck.links.length === 0)) {
-          updatedMaterials[classId] = updatedMaterials[classId].filter((_: ClassMaterial, i: number) => i !== index);
-        }
-      } 
-      // If we're removing a link, update the material
-      else if (type === 'link' && typeof itemIndex === 'number') {
-        updatedMaterials[classId] = updatedMaterials[classId].map((m: ClassMaterial, i: number) => {
-          if (i === index && m.links) {
+          } else if (type === 'link' && typeof itemIndex === 'number' && m.links) {
             const updatedLinks = [...m.links];
             updatedLinks.splice(itemIndex, 1);
             return { ...m, links: updatedLinks };
           }
-          return m;
-        });
-        
-        // If this material now has no slides and no links, remove it
-        const materialToCheck = updatedMaterials[classId][index];
-        if ((!materialToCheck.slides || materialToCheck.slides.length === 0) && 
-            (!materialToCheck.links || materialToCheck.links.length === 0)) {
-          updatedMaterials[classId] = updatedMaterials[classId].filter((_: ClassMaterial, i: number) => i !== index);
         }
-      }
+        return m;
+      });
       
-      // If no materials left, remove the entry
-      if (updatedMaterials[classId].length === 0) {
-        delete updatedMaterials[classId];
-      }
-    }
+      // Then, filter out any materials that now have no slides and no links
+      newMaterials = newMaterials.filter((m, i) => {
+        if (i === index) {
+          return (m.slides && m.slides.length > 0) || (m.links && m.links.length > 0);
+        }
+        return true;
+      });
+      
+      return newMaterials;
+    };
     
-    setState({ classMaterials: updatedMaterials });
+    // Update all affected class IDs
+    uniqueClassIdsToUpdate.forEach(id => {
+      if (updatedMaterialsMap[id] && updatedMaterialsMap[id].length > 0) {
+        const updated = updateMaterialsArray(updatedMaterialsMap[id]);
+        if (updated.length > 0) {
+          updatedMaterialsMap[id] = updated;
+        } else {
+          delete updatedMaterialsMap[id];
+        }
+      }
+    });
     
-    // Update selected day details if needed
-    if (selectedDayDetails && selectedDayDetails.materials[classId]) {
-      const updatedDayDetails = { ...selectedDayDetails };
+    // ============== STEP 4: Update state in all places ==============
+    
+    // Update the class materials state
+    setState({ classMaterials: updatedMaterialsMap });
+    
+    // Update the selected day details if applicable
+    if (selectedDayDetails) {
+      const updatedDayDetailsMaterials = { ...selectedDayDetails.materials };
       
-      // Apply the same logic to selectedDayDetails
-      if (type === 'slides' && typeof itemIndex === 'number' && material.slides) {
-        updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].map((m: ClassMaterial, i: number) => {
-          if (i === index && m.slides) {
-            const updatedSlides = [...m.slides];
-            updatedSlides.splice(itemIndex, 1);
-            return { ...m, slides: updatedSlides };
+      // Update materials map in selected day details
+      uniqueClassIdsToUpdate.forEach(id => {
+        if (updatedDayDetailsMaterials[id] && updatedDayDetailsMaterials[id].length > 0) {
+          const updated = updateMaterialsArray(updatedDayDetailsMaterials[id]);
+          if (updated.length > 0) {
+            updatedDayDetailsMaterials[id] = updated;
+          } else {
+            delete updatedDayDetailsMaterials[id];
           }
-          return m;
-        });
-        
-        // If this material now has no slides and no links, remove it
-        const materialToCheck = updatedDayDetails.materials[classId][index];
-        if ((!materialToCheck.slides || materialToCheck.slides.length === 0) && 
-            (!materialToCheck.links || materialToCheck.links.length === 0)) {
-          updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_: ClassMaterial, i: number) => i !== index);
         }
-      }
-      else if (type === 'link' && typeof itemIndex === 'number') {
-        updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].map((m: ClassMaterial, i: number) => {
-          if (i === index && m.links) {
-            const updatedLinks = [...m.links];
-            updatedLinks.splice(itemIndex, 1);
-            return { ...m, links: updatedLinks };
-          }
-          return m;
-        });
-        
-        // If this material now has no slides and no links, remove it
-        const materialToCheck = updatedDayDetails.materials[classId][index];
-        if ((!materialToCheck.slides || materialToCheck.slides.length === 0) && 
-            (!materialToCheck.links || materialToCheck.links.length === 0)) {
-          updatedDayDetails.materials[classId] = updatedDayDetails.materials[classId].filter((_: ClassMaterial, i: number) => i !== index);
+      });
+      
+      // Update classes in selected day details to also have the correct materials
+      const updatedDayDetailsClasses = selectedDayDetails.classes.map((c: ClassSession) => {
+        if (uniqueClassIdsToUpdate.includes(c.id)) {
+          return {
+            ...c,
+            materials: updatedMaterialsMap[c.id] || []
+          };
         }
-      }
+        return c;
+      });
       
-      // If no materials left, remove the entry
-      if (updatedDayDetails.materials[classId].length === 0) {
-        delete updatedDayDetails.materials[classId];
-      }
-      
-      setSelectedDayDetails(updatedDayDetails);
+      // Update selected day details with both updated materials and classes
+      setSelectedDayDetails({
+        ...selectedDayDetails,
+        materials: updatedDayDetailsMaterials,
+        classes: updatedDayDetailsClasses
+      });
     }
     
     // Update upcoming classes if provided
     if (upcomingClasses && setUpcomingClasses) {
       const updatedUpcomingClasses = upcomingClasses.map(c => {
-        if (c.id === classId) {
-          // If we have updated materials for this class, use them
-          if (updatedMaterials[classId]) {
-            return { ...c, materials: updatedMaterials[classId] };
-          } 
-          // If we've deleted all materials for this class, set materials to empty array
-          else {
-            return { ...c, materials: [] };
-          }
+        if (uniqueClassIdsToUpdate.includes(c.id)) {
+          return { 
+            ...c, 
+            materials: updatedMaterialsMap[c.id] || [] 
+          };
         }
         return c;
       });
@@ -271,30 +328,50 @@ export const handleDeleteMaterial = async ({
     // Update past classes if provided
     if (pastClasses && setPastClasses) {
       const updatedPastClasses = pastClasses.map(c => {
-        if (c.id === classId) {
-          // If we have updated materials for this class, use them
-          if (updatedMaterials[classId]) {
-            return { ...c, materials: updatedMaterials[classId] };
-          } 
-          // If we've deleted all materials for this class, set materials to empty array
-          else {
-            return { ...c, materials: [] };
-          }
+        if (uniqueClassIdsToUpdate.includes(c.id)) {
+          return { 
+            ...c, 
+            materials: updatedMaterialsMap[c.id] || [] 
+          };
         }
         return c;
       });
       setPastClasses(updatedPastClasses);
     }
     
-    toast.success('Material updated successfully');
+    // ============== STEP 5: Fire event for global notification ==============
+    // Dispatch a custom event to ensure any components listening for materials changes update
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('materials-updated', { 
+        detail: { 
+          classId: documentClassId,
+          date: materialDate,
+          timestamp: new Date().getTime(),
+          action: 'delete',
+          type,
+          itemIndex,
+          materialId: material.id || null,
+          affectedClassIds: uniqueClassIdsToUpdate
+        } 
+      }));
+      debugLog('Dispatched materials-updated event after delete with details:', {
+        classId: documentClassId,
+        action: 'delete',
+        type,
+        affectedClassIds: uniqueClassIdsToUpdate
+      });
+    }, 300); // Increased timeout to ensure state updates have completed
+    
+    // Show a single success message based on type
+    toast.success(`Material deleted successfully`);
   } catch (error) {
     console.error('Error updating material:', error);
-    toast.error('Error updating material');
+    toast.error('Error deleting material');
   } finally {
     // Clear deleting state
     const deletingKey = type === 'slides' 
-      ? `${material.classId}${index}_slide_${itemIndex}`
-      : `${material.classId}${index}_link_${itemIndex}`;
+      ? `${material.classId || classId}${index}_slide_${itemIndex}`
+      : `${material.classId || classId}${index}_link_${itemIndex}`;
     
     setState({
       deletingMaterial: {

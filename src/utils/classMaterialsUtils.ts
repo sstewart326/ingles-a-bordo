@@ -13,7 +13,9 @@ import {
 import { 
   ref, 
   uploadBytes, 
-  getDownloadURL
+  getDownloadURL,
+  deleteObject,
+  getMetadata
 } from 'firebase/storage';
 import { getCached, setCached, invalidateCache, clearCacheByPrefix } from './cacheUtils';
 import { ClassMaterial } from '../types/interfaces';
@@ -25,6 +27,79 @@ const ALLOWED_FILE_TYPES = [
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 ];
+
+/**
+ * Extracts the storage path from a Firebase Storage URL
+ * @param url The Firebase Storage URL
+ * @returns The decoded storage path or null if the URL is invalid
+ */
+const extractStoragePathFromUrl = (url: string): string | null => {
+  if (!url || !url.startsWith('https://firebasestorage.googleapis.com')) {
+    return null;
+  }
+  
+  try {
+    // Firebase Storage URLs format: 
+    // https://firebasestorage.googleapis.com/v0/b/[PROJECT_ID].appspot.com/o/[ENCODED_FILE_PATH]?alt=media&token=[TOKEN]
+    
+    // Extract path after "/o/"
+    const pathStartIndex = url.indexOf('/o/') + 3;
+    if (pathStartIndex <= 3) return null;
+    
+    // Find the end of the path (where the query parameters start)
+    const pathEndIndex = url.indexOf('?', pathStartIndex);
+    if (pathEndIndex <= pathStartIndex) return null;
+    
+    // Extract the encoded path and decode it
+    const encodedPath = url.substring(pathStartIndex, pathEndIndex);
+    return decodeURIComponent(encodedPath);
+  } catch (error) {
+    console.error('Error extracting storage path from URL:', error);
+  }
+  
+  return null;
+};
+
+/**
+ * Deletes a file from Firebase Storage using its URL
+ * @param url The Firebase Storage URL of the file to delete
+ * @returns A promise that resolves when the file is deleted, or rejects with an error
+ */
+const deleteFileFromStorage = async (url: string): Promise<void> => {
+  const path = extractStoragePathFromUrl(url);
+  
+  if (!path) {
+    throw new Error('Invalid storage URL');
+  }
+  
+  try {
+    const fileRef = ref(storage, path);
+    await deleteObject(fileRef);
+    logMaterialsUtil(`File deleted from storage: ${path}`);
+  } catch (error) {
+    console.error('Error during file deletion:', error);
+    throw error;
+  }
+};
+
+/**
+ * Deletes multiple files from Firebase Storage
+ * @param urls Array of Firebase Storage URLs to delete
+ * @returns A promise that resolves when all files are processed
+ */
+const deleteMultipleFilesFromStorage = async (urls: string[]): Promise<void> => {
+  if (!urls || urls.length === 0) {
+    return;
+  }
+  
+  // Process each URL and collect results
+  const results = await Promise.allSettled(
+    urls.map(url => deleteFileFromStorage(url))
+  );
+  
+  const successCount = results.filter(r => r.status === 'fulfilled').length;
+  logMaterialsUtil(`Deleted ${successCount}/${urls.length} files from storage`);
+};
 
 const logMaterialsUtil = (message: string, data?: any) => {
   if (process.env.NODE_ENV === 'development') {
@@ -444,6 +519,18 @@ export const updateClassMaterialItem = async (
     };
     
     if (updateType === 'removeSlides' && typeof slideIndex === 'number' && materialData.slides) {
+      // Get the storage URL before removing it from the array
+      const slideUrl = materialData.slides[slideIndex];
+      
+      // Try to delete from storage if it's a valid URL
+      if (slideUrl) {
+        try {
+          await deleteFileFromStorage(slideUrl);
+        } catch (storageError) {
+          console.error('Error deleting file from storage:', storageError);
+        }
+      }
+      
       // Remove the specific slide at the given index
       const updatedSlides = [...materialData.slides];
       updatedSlides.splice(slideIndex, 1);
@@ -462,18 +549,88 @@ export const updateClassMaterialItem = async (
     
     if (wouldBeEmpty) {
       // If removing this item would leave the document empty, delete the entire document
+      // But first, try to delete any remaining storage files
+      if (materialData.slides && materialData.slides.length > 0) {
+        try {
+          // Delete all slides associated with this document
+          await deleteMultipleFilesFromStorage(materialData.slides);
+        } catch (storageError) {
+          console.error('Error deleting files from storage:', storageError);
+        }
+      }
+      
       await deleteDoc(docRef);
+      logMaterialsUtil('Deleted empty material document');
     } else {
       // Otherwise, update the document with the changes
       await updateDoc(docRef, updates);
+      logMaterialsUtil('Updated material document');
     }
     
     // Invalidate cache after updating material
     invalidateCache(COLLECTION_PATH);
-    
-    logMaterialsUtil('Material item updated successfully', { classId, classDate, updateType });
   } catch (error) {
     console.error('Error updating class material item:', error);
+    throw error;
+  }
+};
+
+/**
+ * Deletes all materials for a class, including all storage files
+ * @param classId The ID of the class
+ * @returns A promise that resolves when all materials are deleted
+ */
+export const deleteAllClassMaterials = async (classId: string): Promise<void> => {
+  if (!classId) {
+    throw new Error('Class ID is required');
+  }
+  
+  try {
+    logMaterialsUtil(`Attempting to delete all materials for class: ${classId}`);
+    
+    // Query for all materials for this class
+    const materialsQuery = query(
+      collection(db, COLLECTION_PATH),
+      where('classId', '==', classId)
+    );
+    
+    const querySnapshot = await getDocs(materialsQuery);
+    
+    if (querySnapshot.empty) {
+      logMaterialsUtil(`No materials found for class: ${classId}`);
+      return;
+    }
+    
+    // Process each document
+    for (const docSnapshot of querySnapshot.docs) {
+      const materialData = docSnapshot.data() as ClassMaterial;
+      
+      // Delete all slides from storage
+      if (materialData.slides && materialData.slides.length > 0) {
+        try {
+          await deleteMultipleFilesFromStorage(materialData.slides);
+        } catch (storageError) {
+          console.error(`Error deleting files for document ${docSnapshot.id}:`, storageError);
+        }
+      }
+      
+      // Delete the document from Firestore
+      await deleteDoc(docSnapshot.ref);
+    }
+    
+    // Invalidate cache
+    invalidateCache(COLLECTION_PATH);
+    
+    // Dispatch event to notify the UI
+    window.dispatchEvent(new CustomEvent('materials-updated', { 
+      detail: { 
+        classId,
+        timestamp: new Date().getTime(),
+        action: 'delete-all'
+      } 
+    }));
+  } catch (error) {
+    console.error(`Error deleting all materials for class ${classId}:`, error);
     throw error;
   }
 };

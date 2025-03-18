@@ -4,6 +4,7 @@
 
 export interface ClassMaterial {
   classId: string;
+  id?: string;
   slides?: string[]; // Array of URLs to slides
   links?: string[];
   createdAt: Date;

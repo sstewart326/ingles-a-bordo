@@ -87,16 +87,29 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
       
       await addClassMaterials(actualClassId, utcDate, studentEmails, slideFiles, links);
       
-      // Invalidate the calendar cache to refresh dashboard data
+      // Invalidate all related caches to ensure data is refreshed
       invalidateCalendarCache('getAllClassesForMonthHttp');
+      
+      // Fire a custom event to signal that materials have been updated
+      window.dispatchEvent(new CustomEvent('materials-updated', { 
+        detail: { 
+          classId: actualClassId,
+          date: utcDate,
+          timestamp: new Date().getTime()
+        } 
+      }));
       
       toast.success('Materials uploaded successfully');
       setSlideFiles([]);
       setLinks([]);
       
-      if (onUploadSuccess) {
-        onUploadSuccess();
-      }
+      // Small delay before calling onUploadSuccess to ensure state updates have time to propagate
+      setTimeout(() => {
+        if (onUploadSuccess) {
+          onUploadSuccess();
+        }
+      }, 300);
+      
     } catch (error) {
       console.error('Error uploading materials:', error);
       toast.error('Failed to upload materials');

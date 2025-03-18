@@ -1,7 +1,7 @@
-import { ClassSession } from './scheduleUtils';
+import { ClassSession, ClassWithStudents, getBaseClassId } from './scheduleUtils';
 import { getClassMaterials } from './classMaterialsUtils';
 import { getMonthKey } from './calendarUtils';
-import { toast } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { ClassMaterial } from '../types/interfaces';
 
 // Extended interface to include dates property
@@ -225,39 +225,43 @@ export const fetchMaterialsForClass = async ({
   selectedDayDetails,
   setSelectedDayDetails
 }: FetchMaterialsParams) => {
+  if (!classId) {
+    console.error('No class ID provided to fetchMaterialsForClass');
+    return null;
+  }
+  
   try {
-    const materials = await getClassMaterials(classId);
+    // For classes with multiple schedules, use the base class ID to fetch materials
+    const baseClassId = getBaseClassId(classId);
     
-    // Update the materials state
+    // Fetch materials for this class using the base class ID
+    const materials = await getClassMaterials(baseClassId, date);
+    
+    // Update the classMaterials state
     setState({
       classMaterials: {
         ...state.classMaterials,
         [classId]: materials
       }
     });
-
-    // Update selected day details if they exist and match the current class
-    if (selectedDayDetails && selectedDayDetails.classes.some((c: ClassSession) => c.id === classId)) {
-      setSelectedDayDetails({
+    
+    // Update the selected day details if available
+    if (selectedDayDetails && selectedDayDetails.classes) {
+      const updatedSelectedDayDetails = {
         ...selectedDayDetails,
         materials: {
           ...selectedDayDetails.materials,
           [classId]: materials
         }
-      });
+      };
+      setSelectedDayDetails(updatedSelectedDayDetails);
     }
-
-    // Update the loaded material months
-    const monthKey = getMonthKey(date);
-    setState({
-      loadedMaterialMonths: new Set([...state.loadedMaterialMonths, monthKey])
-    });
-
+    
     return materials;
   } catch (error) {
-    console.error('Error fetching materials:', error);
+    console.error('Error fetching materials for class:', classId, error);
     toast.error('Error fetching materials');
-    return null;
+    return [];
   }
 };
 
@@ -276,61 +280,109 @@ export const fetchMaterialsForClasses = async ({
   selectedDayDetails,
   setSelectedDayDetails
 }: FetchMaterialsForClassesParams) => {
-  const promises = classes.map(async (classSession) => {
-    // Get materials for this class without date filtering
-    const materials = await getClassMaterials(classSession.id);
+  // First build a map of baseClassId -> all class IDs that share that base
+  const baseClassIdMap: Record<string, string[]> = {};
+  
+  classes.forEach(classSession => {
+    if (!classSession.id) return;
     
-    if (materials && materials.length > 0) {
-      console.log(`Found ${materials.length} materials for class ${classSession.id}`);
-      
-      // Update the classMaterials state
-      setState({
-        classMaterials: {
-          ...state.classMaterials,
-          [classSession.id]: materials
-        }
-      });
-      
-      // Update the upcoming classes with the materials
-      const upcomingClassIndex = state.upcomingClasses.findIndex(c => c.id === classSession.id);
-      if (upcomingClassIndex !== -1) {
-        const updatedUpcomingClasses = [...state.upcomingClasses];
-        updatedUpcomingClasses[upcomingClassIndex] = {
-          ...updatedUpcomingClasses[upcomingClassIndex],
-          materials: materials
-        };
-        console.log(`Updating upcoming class ${classSession.id} with materials`);
-        setState({
-          upcomingClasses: updatedUpcomingClasses
-        });
-      }
-      
-      // Update the past classes with the materials
-      const pastClassIndex = state.pastClasses.findIndex(c => c.id === classSession.id);
-      if (pastClassIndex !== -1) {
-        const updatedPastClasses = [...state.pastClasses];
-        updatedPastClasses[pastClassIndex] = {
-          ...updatedPastClasses[pastClassIndex],
-          materials: materials
-        };
-        console.log(`Updating past class ${classSession.id} with materials`);
-        setState({
-          pastClasses: updatedPastClasses
-        });
-      }
-      
-      // Update selected day details if they exist and match the current class
-      if (selectedDayDetails && selectedDayDetails.classes.some((c: ClassSession) => c.id === classSession.id)) {
-        setSelectedDayDetails({
-          ...selectedDayDetails,
-          materials: {
-            ...selectedDayDetails.materials,
-            [classSession.id]: materials
-          }
-        });
-      }
+    // Get the base class ID
+    const baseClassId = classSession.id.split('-')[0];
+    
+    if (!baseClassIdMap[baseClassId]) {
+      baseClassIdMap[baseClassId] = [];
+    }
+    
+    // Add this class ID to the list for this base class ID
+    if (!baseClassIdMap[baseClassId].includes(classSession.id)) {
+      baseClassIdMap[baseClassId].push(classSession.id);
     }
   });
-
-  await Promise.all(promises);
+  
+  console.log('Base class ID map:', baseClassIdMap);
+  
+  // Create a map to store all materials by class ID
+  const allMaterialsByClassId: Record<string, ClassMaterial[]> = {};
+  
+  // Fetch materials for each base class ID
+  const baseClassPromises = Object.keys(baseClassIdMap).map(async (baseClassId) => {
+    // Get materials for this base class ID
+    const materials = await getClassMaterials(baseClassId);
+    
+    // Make sure all materials have an id for tracking
+    const materialsWithIds = materials.map(material => 
+      material.id ? material : { ...material, id: Math.random().toString(36).substring(2) }
+    );
+    
+    if (materialsWithIds.length > 0) {
+      console.log(`Found ${materialsWithIds.length} materials for base class ${baseClassId}`);
+      
+      // Store materials for all class IDs that share this base
+      baseClassIdMap[baseClassId].forEach(classId => {
+        allMaterialsByClassId[classId] = materialsWithIds;
+      });
+    }
+  });
+  
+  // Wait for all materials to be fetched
+  await Promise.all(baseClassPromises);
+  
+  // Update the classMaterials state with all materials
+  if (Object.keys(allMaterialsByClassId).length > 0) {
+    setState({
+      classMaterials: {
+        ...state.classMaterials,
+        ...allMaterialsByClassId
+      }
+    });
+    
+    // Also update the materials property directly on upcoming and past classes
+    const { upcomingClasses, pastClasses } = state;
+    
+    // Function to attach materials to classes
+    const attachMaterialsToClasses = (classesList: ClassSession[]): ClassSession[] => {
+      return classesList.map(classSession => {
+        if (classSession.id && allMaterialsByClassId[classSession.id]) {
+          return {
+            ...classSession,
+            materials: allMaterialsByClassId[classSession.id]
+          };
+        }
+        return classSession;
+      });
+    };
+    
+    // Update upcoming and past classes with materials
+    setState({
+      upcomingClasses: attachMaterialsToClasses(upcomingClasses),
+      pastClasses: attachMaterialsToClasses(pastClasses)
+    });
+    
+    // If there are selected day details, update the materials there too
+    if (selectedDayDetails) {
+      // Update materials map in selected day details
+      const updatedMaterials = {
+        ...selectedDayDetails.materials,
+        ...allMaterialsByClassId
+      };
+      
+      // Update materials property on classes in selected day details
+      const updatedClasses = selectedDayDetails.classes.map((c: ClassSession) => {
+        if (c.id && allMaterialsByClassId[c.id]) {
+          return {
+            ...c,
+            materials: allMaterialsByClassId[c.id]
+          };
+        }
+        return c;
+      });
+      
+      // Update selected day details
+      setSelectedDayDetails({
+        ...selectedDayDetails,
+        materials: updatedMaterials,
+        classes: updatedClasses
+      });
+    }
+  }
 }; 

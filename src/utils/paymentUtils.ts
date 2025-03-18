@@ -173,10 +173,5 @@ export const getPaymentsDueForDay = (
     }
   });
   
-  // Debug log for May 11, 2025
-  if (date.getFullYear() === 2025 && date.getMonth() === 4 && date.getDate() === 11) {
-    console.log(`Found ${paymentsDue.length} payments due for May 11, 2025`);
-  }
-  
   return paymentsDue;
 }; 
