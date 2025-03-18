@@ -296,33 +296,21 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
 
   return (
     <div className="mt-4 w-full overflow-hidden" style={{ position: 'relative', zIndex: 10, boxSizing: 'border-box', maxWidth: '100%' }}>
-      <div className={styles.card.label}>Homework</div>
-      {isAdmin && !showAddForm && (
-        <a 
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleAddHomework();
-          }}
-          className="text-sm text-blue-600 hover:text-blue-800 flex items-center mt-1"
-        >
-          <FaPlus className="mr-1 h-3 w-3" />
-          <span>Add Homework</span>
-        </a>
-      )}
-      {isAdmin && showAddForm && (
-        <a 
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleCloseForm();
-          }}
-          className="text-sm text-gray-600 hover:text-gray-800 flex items-center mt-1"
-        >
-          <FaTimes className="mr-1 h-3 w-3" />
-          <span>Cancel</span>
-        </a>
-      )}
+      <div className="flex justify-between items-center">
+        <div className={styles.card.label}>Homework</div>
+        {isAdmin && (
+          <a 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              handleAddHomework();
+            }}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            Add Homework
+          </a>
+        )}
+      </div>
       
       {/* Add Homework Form */}
       {isAdmin && showAddForm && (
@@ -338,21 +326,41 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
       
       {/* Homework List */}
       {!showAddForm && (
-        homeworkList.length === 0 ? (
-          <p className="text-gray-700 text-sm mt-1">{emptyStateMessage}</p>
-        ) : (
-          <div className="mt-1 space-y-2">
-            {homeworkList.map((homework) => (
-              <div key={homework.id} className="border rounded-md overflow-hidden bg-white shadow-sm">
-                <div className="flex justify-between bg-gray-50 p-2">
-                  <div className="flex items-center">
-                    <div>
-                      <h4 className="font-medium text-sm">{homework.title}</h4>
-                      <p className="text-xs text-gray-600">
-                        {formatDate(homework.classDate)}
-                      </p>
-                    </div>
-                    {/* Show submission badge in the header for admin */}
+        <div className="mt-2">
+          {homeworkList.length === 0 ? (
+            <p className="text-gray-700 text-sm">{emptyStateMessage}</p>
+          ) : (
+            <div className="space-y-2">
+              {homeworkList.map((homework) => (
+                <div key={homework.id} className="flex items-center group">
+                  <div className="flex items-center flex-1">
+                    <a 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleEditHomework(homework);
+                      }}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <span className="text-sm truncate">{homework.title}</span>
+                    </a>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDelete(homework.id)}
+                        disabled={deletingId === homework.id}
+                        className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                        title="Delete homework"
+                      >
+                        {deletingId === homework.id ? (
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <FaTrash className="h-2.5 w-2.5" />
+                        )}
+                      </button>
+                    )}
                     {isAdmin && (
                       <HomeworkSubmissionBadge 
                         homeworkId={homework.id} 
@@ -362,38 +370,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
                       />
                     )}
                   </div>
-                  
-                  {isAdmin && (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEditHomework(homework)}
-                        className="text-blue-500 hover:text-blue-700"
-                        title="View Details"
-                      >
-                        <FaEye className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(homework.id)}
-                        className="text-red-500 hover:text-red-700"
-                        title="Delete Homework"
-                        disabled={deletingId === homework.id}
-                      >
-                        {deletingId === homework.id ? (
-                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : (
-                          <FaTrash className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )
+              ))}
+            </div>
+          )}
+        </div>
       )}
       
       {/* Homework Details Modal */}

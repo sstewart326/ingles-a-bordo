@@ -405,169 +405,135 @@ export const ClassSection = ({
                               </a>
                             )}
                           </div>
-                          <div className="mt-1 space-y-2">
-                            {/* Display materials - prioritize class.materials, fall back to classMaterials */}
-                            {(() => {
-                              // First get materials from either source
-                              const materialsFromClass = classSession.materials || [];
-                              const materialsFromMap = classMaterials[classSession.id] || [];
-                              
-                              // Only log in development and not for every class
-                              if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) {
-                                console.log('ClassSection - Materials for class', classSession.id, {
-                                  materialsFromClass: materialsFromClass.length,
-                                  materialsFromMap: materialsFromMap.length,
-                                  date: date.toISOString().split('T')[0]
-                                });
-                              }
-                              
-                              // For performance, use a Set to track already added material IDs
-                              const addedMaterialIds = new Set<string>();
-                              const allMaterials: ClassMaterial[] = [];
-                              
-                              // First add materials from the class (higher priority)
-                              materialsFromClass.forEach(material => {
-                                if (material.id) {
-                                  addedMaterialIds.add(material.id);
-                                }
-                                allMaterials.push(material);
-                              });
-                              
-                              // Then add materials from the map if not already added
-                              materialsFromMap.forEach(material => {
-                                if (!material.id || !addedMaterialIds.has(material.id)) {
-                                  allMaterials.push(material);
-                                }
-                              });
-                              
-                              // Filter by date - create a function to avoid repeating this logic
-                              const isForCurrentDate = (material: ClassMaterial): boolean => {
-                                // If the material has no date, show it on all dates (legacy support)
-                                if (!material.classDate) return true;
-                                
-                                // Compare dates at midnight for consistency
-                                const materialDate = material.classDate instanceof Date 
-                                  ? material.classDate 
-                                  : new Date(material.classDate);
-                                
-                                const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
-                                const displayDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-                                
-                                return materialDay.getTime() === displayDay.getTime();
-                              };
-                              
-                              return allMaterials.filter(isForCurrentDate);
-                            })().map((material, index) => (
-                              <div key={`material-${index}`} className="flex flex-col space-y-2">
-                                {material.slides && material.slides.length > 0 && (
-                                  <div className="space-y-1">
-                                    {material.slides.map((slideUrl: string, slideIndex: number) => (
-                                      <div 
-                                        key={slideIndex}
-                                        className="flex items-center group"
-                                      >
-                                        <FaFilePowerpoint className="mr-2 text-blue-600" />
-                                        <a 
-                                          href={slideUrl} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="text-blue-600 hover:text-blue-800"
-                                        >
-                                          <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
-                                        </a>
-                                        {isAdmin && (
-                                          <button
-                                            onClick={(_) => {
-                                              onDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
-                                            }}
-                                            disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
-                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                            title="Delete material"
+
+                          {/* Materials content */}
+                          <div className="mt-2">
+                            {((classMaterials[classSession.id] && classMaterials[classSession.id].length > 0) ||
+                              (classSession.materials && classSession.materials.length > 0)) ? (
+                              <div className="space-y-2">
+                                {(() => {
+                                  // First get materials from either source
+                                  const materialsFromClass = classSession.materials || [];
+                                  const materialsFromMap = classMaterials[classSession.id] || [];
+                                  
+                                  // Only log in development and not for every class
+                                  if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) {
+                                    console.log('ClassSection - Materials for class', classSession.id, {
+                                      materialsFromClass: materialsFromClass.length,
+                                      materialsFromMap: materialsFromMap.length,
+                                      date: date.toISOString().split('T')[0]
+                                    });
+                                  }
+                                  
+                                  // For performance, use a Set to track already added material IDs
+                                  const addedMaterialIds = new Set<string>();
+                                  const allMaterials: ClassMaterial[] = [];
+                                  
+                                  // First add materials from the class (higher priority)
+                                  materialsFromClass.forEach(material => {
+                                    if (material.id) {
+                                      addedMaterialIds.add(material.id);
+                                    }
+                                    allMaterials.push(material);
+                                  });
+                                  
+                                  // Then add materials from the map if not already added
+                                  materialsFromMap.forEach(material => {
+                                    if (!material.id || !addedMaterialIds.has(material.id)) {
+                                      allMaterials.push(material);
+                                    }
+                                  });
+                                  
+                                  // Filter by date - create a function to avoid repeating this logic
+                                  const isForCurrentDate = (material: ClassMaterial): boolean => {
+                                    // If the material has no date, show it on all dates (legacy support)
+                                    if (!material.classDate) return true;
+                                    
+                                    // Compare dates at midnight for consistency
+                                    const materialDate = material.classDate instanceof Date 
+                                      ? material.classDate 
+                                      : new Date(material.classDate);
+                                    
+                                    const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
+                                    const displayDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                                    
+                                    return materialDay.getTime() === displayDay.getTime();
+                                  };
+                                  
+                                  return allMaterials.filter(isForCurrentDate);
+                                })().map((material, index) => (
+                                  <div key={`material-${index}`} className="flex flex-col space-y-2">
+                                    {material.slides && material.slides.length > 0 && (
+                                      <div className="space-y-1">
+                                        {material.slides.map((slideUrl: string, slideIndex: number) => (
+                                          <div 
+                                            key={slideIndex}
+                                            className="flex items-center group"
                                           >
-                                            <FaTrash className="h-2.5 w-2.5" />
-                                          </button>
-                                        )}
+                                            <FaFilePowerpoint className="mr-2 text-blue-600" />
+                                            <a 
+                                              href={slideUrl} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="text-blue-600 hover:text-blue-800"
+                                            >
+                                              <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
+                                            </a>
+                                            {isAdmin && (
+                                              <button
+                                                onClick={(_) => {
+                                                  onDeleteMaterial(material, index, classSession.id, 'slides', slideIndex);
+                                                }}
+                                                disabled={deletingMaterial[material.classId + index + '_slide_' + slideIndex]}
+                                                className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                                title="Delete material"
+                                              >
+                                                <FaTrash className="h-2.5 w-2.5" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        ))}
                                       </div>
-                                    ))}
-                                  </div>
-                                )}
-                                
-                                {material.links && material.links.length > 0 && (
-                                  <div className="space-y-1">
-                                    {material.links.map((link: string, linkIndex: number) => (
-                                      <div 
-                                        key={linkIndex}
-                                        className="flex items-center group"
-                                      >
-                                        <FaLink className="mr-2 text-blue-600" />
-                                        <a 
-                                          href={link} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="text-blue-600 hover:text-blue-800"
-                                        >
-                                          <span className="text-sm truncate max-w-[200px]">{link}</span>
-                                        </a>
-                                        {isAdmin && (
-                                          <button
-                                            onClick={(_) => {
-                                              onDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
-                                            }}
-                                            disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
-                                            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
-                                            title="Delete link"
+                                    )}
+                                    
+                                    {material.links && material.links.length > 0 && (
+                                      <div className="space-y-1">
+                                        {material.links.map((link: string, linkIndex: number) => (
+                                          <div 
+                                            key={linkIndex}
+                                            className="flex items-center group"
                                           >
-                                            <FaTrash className="h-2.5 w-2.5" />
-                                          </button>
-                                        )}
+                                            <FaLink className="mr-2 text-blue-600" />
+                                            <a 
+                                              href={link} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="text-blue-600 hover:text-blue-800"
+                                            >
+                                              <span className="text-sm truncate max-w-[200px]">{link}</span>
+                                            </a>
+                                            {isAdmin && (
+                                              <button
+                                                onClick={(_) => {
+                                                  onDeleteMaterial(material, index, classSession.id, 'link', linkIndex);
+                                                }}
+                                                disabled={deletingMaterial[material.classId + index + '_link_' + linkIndex]}
+                                                className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200 bg-transparent border-0 p-0"
+                                                title="Delete link"
+                                              >
+                                                <FaTrash className="h-2.5 w-2.5" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        ))}
                                       </div>
-                                    ))}
+                                    )}
                                   </div>
-                                )}
+                                ))}
                               </div>
-                            ))}
-                            
-                            {/* Show "no materials" message if no materials are available */}
-                            {(() => {
-                              // Get materials for this specific date from both sources - reuse the logic we defined above
-                              const materialsFromClass = classSession.materials || [];
-                              const materialsFromMap = classMaterials[classSession.id] || [];
-                              
-                              // Combine all materials (we only need to count them, not deduplicate)
-                              const materialsForDate = [...materialsFromClass, ...materialsFromMap].filter(m => {
-                                // If the material has no date, show it on all dates (legacy support)
-                                if (!m.classDate) return true;
-                                
-                                // Compare dates at midnight for consistency  
-                                const materialDate = m.classDate instanceof Date 
-                                  ? m.classDate 
-                                  : new Date(m.classDate);
-                                
-                                const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
-                                const displayDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-                                
-                                return materialDay.getTime() === displayDay.getTime();
-                              });
-                              
-                              // Return true if no materials for this date
-                              return materialsForDate.length === 0;
-                            })() && (
+                            ) : (
                               <div className="text-gray-500 text-sm">
-                                {isAdmin ? (
-                                  <a 
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      onOpenUploadForm(`${classSession.id}-${date.getTime()}`);
-                                    }}
-                                    className="flex items-center text-blue-600 hover:text-blue-800"
-                                  >
-                                    <FaPlus className="mr-2" />
-                                    <span className="text-sm">{t.addMaterials || 'Add Materials'}</span>
-                                  </a>
-                                ) : (
-                                  <span>No materials available</span>
-                                )}
+                                <span>No materials available</span>
                               </div>
                             )}
                           </div>
