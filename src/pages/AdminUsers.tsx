@@ -416,13 +416,13 @@ export const AdminUsers = () => {
     return <div className="text-center p-4">{t.loading}</div>;
   }
 
-  const allUsers = users.sort((a, b) => {
-    if (a.isAdmin && !b.isAdmin) return -1;
-    if (!a.isAdmin && b.isAdmin) return 1;
-    if (a.status === 'pending' && b.status !== 'pending') return -1;
-    if (a.status !== 'pending' && b.status === 'pending') return 1;
-    return a.name.localeCompare(b.name);
-  });
+  const allUsers = users
+    .filter(user => !user.isAdmin) // Filter out admin users
+    .sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      return a.name.localeCompare(b.name);
+    });
 
   const renderMobileCard = (user: User) => (
     <div key={user.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
