@@ -67,26 +67,19 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   return (
-    <div className="relative">
+    <div className="calendar-container">
+      {/* Navigation */}
       {showNavigation && (
-        <div className="flex items-center justify-between mb-6 relative z-10">
-          <h2 className={styles.headings.h2}>
-            {selectedDate.toLocaleString(language === 'pt-BR' ? 'pt-BR' : 'en', { month: 'long', year: 'numeric' })}
-          </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePreviousMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#6B5590] hover:bg-[#7B65A0] text-white transition-colors text-xl relative z-10"
-            >
-              ‹
-            </button>
-            <button
-              onClick={handleNextMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#6B5590] hover:bg-[#7B65A0] text-white transition-colors text-xl relative z-10"
-            >
-              ›
-            </button>
-          </div>
+        <div className="calendar-navigation">
+          <button onClick={handlePreviousMonth} className="nav-button">
+            ←
+          </button>
+          <span className="current-month">
+            {selectedDate.toLocaleString(language, { month: 'long', year: 'numeric' })}
+          </span>
+          <button onClick={handleNextMonth} className="nav-button">
+            →
+          </button>
         </div>
       )}
 
@@ -121,7 +114,6 @@ export const Calendar: React.FC<CalendarProps> = ({
           return (
             <div
               key={index}
-              onClick={() => handleDayClick(date)}
               className={`calendar-day ${isToday ? 'bg-[#f8f8f8]' : ''} ${isSelected ? 'selected' : ''}`}
             >
               {renderDay(date, isToday)}
@@ -136,11 +128,8 @@ export const Calendar: React.FC<CalendarProps> = ({
         
         {/* Loading overlay */}
         {isLoading && (
-          <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-20 rounded-2xl">
-            <div className="flex flex-col items-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#6B5590]"></div>
-              <p className="mt-2 text-[#6B5590] font-medium">{t.loading || 'Loading...'}</p>
-            </div>
+          <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6366f1]"></div>
           </div>
         )}
       </div>

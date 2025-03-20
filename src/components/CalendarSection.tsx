@@ -147,6 +147,7 @@ export const CalendarSection = ({
             completedPayments={completedPayments}
             isLoading={isLoadingPayments}
             users={users}
+            onDayClick={handleDayClick}
           />
         );
       }}

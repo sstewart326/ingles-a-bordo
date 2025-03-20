@@ -55,6 +55,13 @@ export function CalendarDay<T extends ClassSession>({
     }
   };
 
+  // Handle pill click with proper event handling
+  const handlePillClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent any default behavior
+    e.stopPropagation(); // Stop event from bubbling up
+    handleDayClick(); // Trigger the day click handler
+  };
+
   // Don't show payment indicators while loading
   const shouldShowPaymentIndicators = isPaymentDay && !isLoading;
   
@@ -140,10 +147,7 @@ export function CalendarDay<T extends ClassSession>({
           {hasClasses && (
             <div 
               className="calendar-pill class-count-pill"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDayClick();
-              }}
+              onClick={handlePillClick}
             >
               {classes.length} {classes.length === 1 ? t.class : t.class}
             </div>
@@ -156,10 +160,7 @@ export function CalendarDay<T extends ClassSession>({
                 allPaymentsCompleted ? 'bg-green-500 hover:bg-green-600' :
                 isPaymentSoon ? 'soon' : 'normal'
               }`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDayClick();
-              }}
+              onClick={handlePillClick}
               title={createPaymentTooltip()}
             >
               {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue : t.paymentsDue}
@@ -169,10 +170,7 @@ export function CalendarDay<T extends ClassSession>({
           {hasBirthdays && (
             <div 
               className="calendar-pill birthday-pill"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDayClick();
-              }}
+              onClick={handlePillClick}
               title={birthdays.map(user => user.name).join('\n')}
             >
               {birthdays.length} {birthdays.length === 1 ? t.birthday : t.birthdays}
