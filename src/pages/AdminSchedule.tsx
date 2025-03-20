@@ -127,7 +127,6 @@ export const AdminSchedule = () => {
     endTime: timeOptions.find(time => time.includes('10:00') && time.includes('AM')) || '10:00 AM',
     schedules: [], // Start with empty schedules
     courseType: 'Individual',
-    notes: '',
     studentEmails: [],
     startDate: getNextDayOccurrence(1),
     endDate: null,
@@ -496,7 +495,6 @@ export const AdminSchedule = () => {
         endTime: newClass.schedules.length === 1 ? newClass.schedules[0].endTime : '',
         schedules: newClass.schedules,
         courseType: newClass.courseType,
-        notes: newClass.notes,
         studentEmails: studentEmails,
         startDate: Timestamp.fromDate(newClass.startDate),
         ...(newClass.endDate ? { endDate: Timestamp.fromDate(newClass.endDate) } : {}),
@@ -524,7 +522,6 @@ export const AdminSchedule = () => {
         endTime: '10:00 AM',
         schedules: [],
         courseType: 'Individual',
-        notes: '',
         studentEmails: [],
         startDate: getNextDayOccurrence(1),
         endDate: null,
@@ -878,7 +875,6 @@ export const AdminSchedule = () => {
         endTime: editingClass.schedules.length === 1 ? editingClass.schedules[0].endTime : '',
         schedules: editingClass.schedules,
         courseType: editingClass.courseType || 'Individual',
-        notes: editingClass.notes || '',
         studentEmails: editingClass.studentEmails || [],
         startDate: Timestamp.fromDate(editingClass.startDate),
         endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate) : null,
@@ -1066,10 +1062,6 @@ export const AdminSchedule = () => {
                       : 'Last day of month'
                   }
               </div>
-            </div>
-            <div className="mt-2">
-              <div className={styles.card.label}>{t.notes}</div>
-              <div className="text-gray-800">{classItem.notes || t.noNotes}</div>
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -1349,7 +1341,6 @@ export const AdminSchedule = () => {
                     endTime: defaultEndTime,
                     schedules: [initialSchedule], // Start with one schedule
                     courseType: 'Individual',
-                    notes: '',
                     studentEmails: [],
                     startDate: getNextDayOccurrence(1), // Start date is next Monday
                     endDate: null,
@@ -1592,16 +1583,6 @@ export const AdminSchedule = () => {
                       />
                     </div>
                   </div>
-                  <div className="md:col-span-2">
-                    <label className={styles.form.label}>{t.notes}</label>
-                    <textarea
-                      value={newClass.notes}
-                      onChange={(e) => setNewClass((prev: typeof newClass) => ({ ...prev, notes: e.target.value }))}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      rows={3}
-                    />
-                  </div>
-                  
                   <div className="md:col-span-2">
                     <label className={styles.form.label}>
                       Contract (PDF, max 5MB)
@@ -2453,22 +2434,6 @@ export const AdminSchedule = () => {
                       placeholderText={t.noEndDate || "No end date"}
                     />
                   </div>
-                </div>
-                
-                <div>
-                  <label className={styles.form.label}>{t.notes}</label>
-                  <textarea
-                    value={editingClass?.notes}
-                    onChange={(e) => {
-                      if (!editingClass) return;
-                      setEditingClass((prev: any) => ({
-                        ...prev,
-                        notes: e.target.value
-                      }));
-                    }}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    rows={3}
-                  />
                 </div>
                 
                 <div>
