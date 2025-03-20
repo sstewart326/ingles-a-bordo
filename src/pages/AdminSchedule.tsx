@@ -990,10 +990,10 @@ export const AdminSchedule = () => {
             <div className="mt-2">
               <div className={styles.card.label}>{t.students}</div>
               <div className="max-h-24 overflow-y-auto">
-                {classItem.studentEmails?.map(email => {
+                {classItem.studentEmails.map((email: string) => {
                   const student = users.find(u => u.email === email);
                   return student ? (
-                    <div key={`${classItem.id}-${email}`} className="mb-1 text-gray-800">
+                    <div key={`${classItem.id}-${email}`} className="mb-1">
                       {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
                     </div>
                   ) : (
@@ -2003,7 +2003,18 @@ export const AdminSchedule = () => {
                            `Every ${classItem.frequency?.every || 1} weeks`}
                         </td>
                         <td className={styles.table.cell}>
-                          {classItem.studentEmails.join(', ')}
+                          {classItem.studentEmails.map((email: string) => {
+                            const student = users.find(u => u.email === email);
+                            return student ? (
+                              <div key={`${classItem.id}-${email}`} className="mb-1">
+                                {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
+                              </div>
+                            ) : (
+                              <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
+                                {t.unknownEmail}: {email}
+                              </div>
+                            );
+                          })}
                         </td>
                         <td className={styles.table.cell}>
                           {classItem.paymentConfig?.type === 'weekly'
