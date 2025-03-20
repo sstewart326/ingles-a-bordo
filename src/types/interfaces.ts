@@ -47,6 +47,7 @@ export interface Class {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  timezone: string;
   courseType: string;
   notes?: string;
   studentEmails: string[];
@@ -60,6 +61,7 @@ export interface ClassInfo {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  timezone: string;
   studentEmails: string[];
   studentIds?: string[]; // Keep for backward compatibility
   startDate: { toDate: () => Date }; // Firebase Timestamp (required)
@@ -110,4 +112,5 @@ export interface ClassSchedule {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  timezone: string;
 } 

@@ -12,6 +12,7 @@ export interface ClassSession {
   dayOfWeek?: number;
   startTime?: string;
   endTime?: string;
+  timezone?: string; // Add timezone field
   courseType?: string;
   notes?: string;
   privateNotes?: string;
@@ -24,6 +25,7 @@ export interface ClassSession {
     dayOfWeek: number;
     startTime: string;
     endTime: string;
+    timezone?: string; // Add timezone field to schedule
   }>;  // For multiple days per week
   frequency?: {
     type: 'weekly' | 'biweekly' | 'custom';

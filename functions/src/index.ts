@@ -668,14 +668,16 @@ export const getCalendarDataHttp = onRequest({
         if (!usersSnapshot.empty) {
           const userDoc = usersSnapshot.docs[0];
           userData = {
-            ...userDoc.data()
+            ...userDoc.data(),
+            id: userDoc.id
           };
         }
       } else if (userId) {
         const userDoc = await admin.firestore().collection('users').doc(userId as string).get();
         if (userDoc.exists) {
           userData = {
-            ...userDoc.data()
+            ...userDoc.data(),
+            id: userDoc.id
           };
           userEmail = userData.email;
         }
@@ -708,9 +710,6 @@ export const getCalendarDataHttp = onRequest({
         const classData = doc.data();
         const classId = doc.id;
         classIds.push(classId);
-        
-        // Log class data for debugging
-        logger.info(`Processing class: ${classId}`, classData);
         
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
@@ -751,6 +750,7 @@ export const getCalendarDataHttp = onRequest({
           // Create a base class object
           const baseClassInfo = {
             classDetails: {
+              id: classId, // Add ID for tracking
               dayOfWeek: classData.dayOfWeek,
               daysOfWeek: classData.daysOfWeek,
               scheduleType: classData.scheduleType,
@@ -791,22 +791,49 @@ export const getCalendarDataHttp = onRequest({
                     dayOfWeek: schedule.dayOfWeek,
                     startTime: schedule.startTime,
                     endTime: schedule.endTime,
+                    timezone: schedule.timezone || classData.timezone, // Add timezone from schedule or class
                     dates: dayDates
                   },
                   dates: dayDates,
-                  paymentDueDates: paymentDates
+                  paymentDueDates: paymentDates.filter(date => {
+                    // Include payment dates that match this day's dates
+                    return dayDates.some(classDate => 
+                      classDate.toISOString().split('T')[0] === date.toISOString().split('T')[0]
+                    );
+                  })
                 };
                 classSchedule.push(dayClassInfo);
               }
             });
           } else {
             // For single schedule classes, just add the original class info
-            classSchedule.push(baseClassInfo);
+            // Add timezone directly in the classDetails structure
+            const singleClassInfo = {
+              classDetails: {
+                ...baseClassInfo.classDetails,
+                timezone: classData.timezone
+              },
+              dates: classDates,
+              paymentDueDates: paymentDates
+            };
+            classSchedule.push(singleClassInfo);
           }
 
           // Add payment dates to the overall list
           paymentDueDates.push(...paymentDates.map(date => ({
             date,
+            user: {
+              name: userData.name,
+              email: userEmail
+            },
+            classSession: {
+              id: classId,
+              dayOfWeek: classData.dayOfWeek,
+              startTime: classData.startTime,
+              endTime: classData.endTime,
+              courseType: classData.courseType,
+              paymentConfig: classData.paymentConfig
+            },
             paymentLink: classData.paymentConfig?.paymentLink || null
           })));
         }
@@ -842,6 +869,7 @@ export const getCalendarDataHttp = onRequest({
                 
                 materialsByClass[materialData.classId].push({
                   ...materialData,
+                  id: doc.id,
                   classDate: materialData.classDate.toDate(),
                   createdAt: materialData.createdAt.toDate(),
                   updatedAt: materialData.updatedAt.toDate()
@@ -874,6 +902,7 @@ export const getCalendarDataHttp = onRequest({
                 try {
                   completedPayments.push({
                     ...paymentData,
+                    id: doc.id,
                     dueDate: paymentData.dueDate.toDate(),
                     completedAt: paymentData.completedAt ? paymentData.completedAt.toDate() : null,
                     createdAt: paymentData.createdAt.toDate(),
@@ -903,6 +932,7 @@ export const getCalendarDataHttp = onRequest({
                 try {
                   completedPayments.push({
                     ...paymentData,
+                    id: doc.id,
                     dueDate: paymentData.dueDate.toDate(),
                     completedAt: paymentData.completedAt ? paymentData.completedAt.toDate() : null,
                     createdAt: paymentData.createdAt.toDate(),
@@ -951,6 +981,55 @@ export const getCalendarDataHttp = onRequest({
         }
       }
 
+      // Create dailyClassMap - a map of date strings to classes for easy lookup
+      const dailyClassMap: Record<string, any[]> = {};
+      
+      // Process all classes and add them to the daily class map
+      for (const classItem of classSchedule) {
+        // Skip classes without dates
+        if (!classItem.dates || !Array.isArray(classItem.dates)) continue;
+        
+        // Determine if this is a class with classDetails structure or flat structure
+        const isNestedStructure = !!(classItem as any).classDetails;
+        const classDetails = isNestedStructure ? (classItem as any).classDetails : classItem;
+        
+        // Add each class date to the daily map
+        classItem.dates.forEach((date: Date) => {
+          const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
+          if (!dailyClassMap[dateString]) {
+            dailyClassMap[dateString] = [];
+          }
+          
+          // Add class information to the daily map
+          dailyClassMap[dateString].push({
+            id: classDetails.id || '',
+            startTime: classDetails.startTime || '',
+            endTime: classDetails.endTime || '',
+            timezone: classDetails.timezone || 'UTC',
+            courseType: classDetails.courseType || '',
+            students: classDetails.studentEmails || []
+          });
+        });
+      }
+      
+      // Sort classes in each day by start time
+      Object.keys(dailyClassMap).forEach(dateString => {
+        dailyClassMap[dateString].sort((a, b) => {
+          // Parse time strings to compare
+          const timeA = a.startTime ? a.startTime.replace(/[^0-9:]/g, '') : '00:00';
+          const timeB = b.startTime ? b.startTime.replace(/[^0-9:]/g, '') : '00:00';
+          
+          const [hoursA, minutesA] = timeA.split(':').map(Number);
+          const [hoursB, minutesB] = timeB.split(':').map(Number);
+          
+          // Convert to minutes for comparison
+          const totalMinutesA = hoursA * 60 + (minutesA || 0);
+          const totalMinutesB = hoursB * 60 + (minutesB || 0);
+          
+          return totalMinutesA - totalMinutesB;
+        });
+      });
+
       response.status(200).json({ 
         classes: classSchedule,
         materials: materialsByClass,
@@ -959,7 +1038,8 @@ export const getCalendarDataHttp = onRequest({
         birthdays,
         userData,
         month: monthInt,
-        year: yearInt
+        year: yearInt,
+        dailyClassMap // Add dailyClassMap to the response
       });
     } catch (error) {
       logger.error("Error in getCalendarData:", error);
@@ -976,361 +1056,350 @@ export const getAllClassesForMonthHttp = onRequest({
   region: REGION,
   cors: true
 }, async (request, response) => {
-  // Log function start with request details
-  console.info("getAllClassesForMonthHttp called:", {
-    method: request.method,
-    url: request.url,
-    query: request.query
-  });
-  
-  try {
-    // Handle CORS
-    corsHandler(request, response, async () => {
-      try {
-        const { month, year, adminId } = request.query;
+  // Handle CORS
+  corsHandler(request, response, async () => {
+    try {
+      const { month, year, adminId } = request.query;
+      
+      // Validate required parameters
+      if (!month || !year) {
+        response.status(400).json({ error: 'Month and year are required' });
+        return;
+      }
+
+      // Verify admin status
+      if (adminId) {
+        const adminDoc = await admin.firestore().collection('users').doc(adminId as string).get();
         
-        // Validate required parameters
-        if (!month || !year) {
-          console.error("Missing required parameters:", { month, year });
-          response.status(400).json({ error: 'Month and year are required' });
+        if (!adminDoc.exists) {
+          response.status(403).json({ error: 'Unauthorized. Admin not found.' });
           return;
         }
-
-        // Verify admin status
-        if (adminId) {
-          const adminDoc = await admin.firestore().collection('users').doc(adminId as string).get();
-          
-          if (!adminDoc.exists) {
-            console.error(`Admin document does not exist for user: ${adminId}`);
-            response.status(403).json({ error: 'Unauthorized. Admin not found.' });
-            return;
-          }
-          
-          const userData = adminDoc.data();
-          
-          if (!userData?.isAdmin) {
-            console.error(`User ${adminId} is not an admin`);
-            response.status(403).json({ error: 'Unauthorized. Admin access required.' });
-            return;
-          }
-        } else {
-          console.error("No adminId provided");
-          response.status(403).json({ error: 'Unauthorized. Admin ID required.' });
+        
+        const userData = adminDoc.data();
+        
+        if (!userData?.isAdmin) {
+          response.status(403).json({ error: 'Unauthorized. Admin access required.' });
           return;
         }
+      } else {
+        response.status(403).json({ error: 'Unauthorized. Admin ID required.' });
+        return;
+      }
 
-        // Parse month and year to integers
-        const monthInt = parseInt(month as string);
-        const yearInt = parseInt(year as string);
+      // Parse month and year to integers
+      const monthInt = parseInt(month as string);
+      const yearInt = parseInt(year as string);
 
-        // Validate month and year
-        if (isNaN(monthInt) || monthInt < 0 || monthInt > 11) {
-          console.error("Invalid month:", month);
-          response.status(400).json({ error: 'Invalid month. Must be between 0 and 11.' });
-          return;
-        }
+      // Validate month and year
+      if (isNaN(monthInt) || monthInt < 0 || monthInt > 11) {
+        response.status(400).json({ error: 'Invalid month. Must be between 0 and 11.' });
+        return;
+      }
 
-        if (isNaN(yearInt) || yearInt < 2000 || yearInt > 2100) {
-          console.error("Invalid year:", year);
-          response.status(400).json({ error: 'Invalid year. Must be between 2000 and 2100.' });
-          return;
-        }
+      if (isNaN(yearInt) || yearInt < 2000 || yearInt > 2100) {
+        response.status(400).json({ error: 'Invalid year. Must be between 2000 and 2100.' });
+        return;
+      }
 
-        // Create date range for the requested month
-        const startDate = new Date(yearInt, monthInt, 1);
-        const endDate = new Date(yearInt, monthInt + 1, 0); // Last day of the month
+      // Create date range for the requested month
+      const startDate = new Date(yearInt, monthInt, 1);
+      const endDate = new Date(yearInt, monthInt + 1, 0); // Last day of the month
 
-        // Get birthdays for the month - only for users taught by this admin
-        const birthdays: Array<{
-          name: string;
-          email: string;
-          birthdate: string;
-          day: number;
-        }> = [];
+      // Get birthdays for the month - only for users taught by this admin
+      const birthdays: Array<{
+        name: string;
+        email: string;
+        birthdate: string;
+        day: number;
+      }> = [];
 
-        // Get users who have this admin as their teacher
-        const usersSnapshot = await admin.firestore().collection('users')
-          .where('teacher', '==', adminId as string)
-          .get();
-        
-        if (usersSnapshot.empty) {
-          console.info("No users found with this teacher ID");
-          response.status(200).json({ 
-            classes: [],
-            dailyClassMap: {},
-            birthdays,
-            month: monthInt,
-            year: yearInt
-          });
-          return;
-        }
-
-        const usersMap = new Map();
-        const userEmails: string[] = [];
-        
-        usersSnapshot.forEach(doc => {
-          const userData = doc.data();
-          usersMap.set(userData.email, {
-            name: userData.name,
-            email: userData.email,
-            birthdate: userData.birthdate,
-            paymentConfig: userData.paymentConfig
-          });
-          userEmails.push(userData.email);
-          
-          // Process birthdays
-          if (userData.birthdate) {
-            // Birthdate format is MM-DD
-            const [birthMonth, birthDay] = userData.birthdate.split('-').map(Number);
-            
-            // Check if the birthday is in the requested month
-            if (birthMonth === monthInt + 1) {
-              birthdays.push({
-                name: userData.name,
-                email: userData.email,
-                birthdate: userData.birthdate,
-                day: birthDay
-              });
-            }
-          }
-        });
-
-        // Query only classes that have students taught by this admin
-        console.info("Querying classes for students:", userEmails);
-        
-        // Firestore doesn't support direct array containsAny with more than 10 items
-        // So we need to handle this in batches if there are more than 10 emails
-        let classesSnapshot;
-        const batchSize = 10;
-        
-        if (userEmails.length <= batchSize) {
-          // If we have 10 or fewer emails, we can use a single query
-          classesSnapshot = await admin.firestore().collection('classes')
-            .where('studentEmails', 'array-contains-any', userEmails)
-            .get();
-        } else {
-          // If we have more than 10 emails, we need to use multiple queries
-          const batches: string[][] = [];
-          for (let i = 0; i < userEmails.length; i += batchSize) {
-            const batch = userEmails.slice(i, i + batchSize);
-            batches.push(batch);
-          }
-          
-          // Execute all batch queries
-          const batchQueries = batches.map(batch => 
-            admin.firestore().collection('classes')
-              .where('studentEmails', 'array-contains-any', batch)
-              .get()
-          );
-          
-          const batchResults = await Promise.all(batchQueries);
-          
-          // Combine results, avoiding duplicates
-          const classesMap = new Map();
-          batchResults.forEach(querySnapshot => {
-            querySnapshot.forEach(doc => {
-              classesMap.set(doc.id, doc);
-            });
-          });
-          
-          // Convert map back to array format similar to QuerySnapshot
-          classesSnapshot = {
-            docs: Array.from(classesMap.values()),
-            empty: classesMap.size === 0
-          };
-        }
-        
-        if (classesSnapshot.empty) {
-          console.error("No classes found for these students");
-          response.status(200).json({ 
-            classes: [],
-            dailyClassMap: {},
-            birthdays,
-            month: monthInt,
-            year: yearInt
-          });
-          return;
-        }
-
-        // Process classes and map them to dates
-        console.info("Processing classes");
-        const classSchedule = [];
-        const dailyClassMap: Record<string, any[]> = {}; // Map of date strings to classes
-        
-        for (const doc of classesSnapshot.docs) {
-          const classData = doc.data();
-          const classId = doc.id;
-          
-          // Skip classes that have ended before the requested month
-          if (classData.endDate && classData.endDate.toDate() < startDate) {
-            continue;
-          }
-          
-          // Skip classes that start after the requested month
-          if (classData.startDate && classData.startDate.toDate() > endDate) {
-            continue;
-          }
-
-          // Get the actual start date to use (either class start date or month start)
-          const effectiveStartDate = classData.startDate && classData.startDate.toDate() > startDate 
-            ? classData.startDate.toDate() 
-            : new Date(startDate);
-          
-          // Get the actual end date to use (either class end date or month end)
-          const effectiveEndDate = classData.endDate && classData.endDate.toDate() < endDate 
-            ? classData.endDate.toDate() 
-            : new Date(endDate);
-
-          // Calculate class dates based on recurrence pattern
-          const classDates = calculateClassDates(
-            classData,
-            effectiveStartDate,
-            effectiveEndDate
-          );
-          
-          console.info("Class dates:", classDates);
-          if (classDates.length > 0) {
-            // Get student details - only include students taught by this admin
-            const relevantStudentEmails = classData.studentEmails.filter((email: string) => userEmails.includes(email));
-            const students = relevantStudentEmails.map((email: string) => {
-              const user = usersMap.get(email);
-              return user || { email };
-            });
-
-            // Create a class object that matches the ClassSession interface in the frontend
-            const classInfo: any = {
-              id: classId, // Add ID for single schedule classes
-              dayOfWeek: classData.dayOfWeek,
-              daysOfWeek: classData.daysOfWeek,
-              startTime: classData.startTime,
-              endTime: classData.endTime,
-              courseType: classData.courseType,
-              notes: classData.notes,
-              studentEmails: relevantStudentEmails,
-              students,
-              startDate: classData.startDate ? classData.startDate.toDate() : null,
-              endDate: classData.endDate ? classData.endDate.toDate() : null,
-              recurrencePattern: classData.recurrencePattern || 'weekly',
-              recurrenceInterval: classData.recurrenceInterval || 1,
-              paymentConfig: classData.paymentConfig || {
-                type: 'monthly',
-                monthlyOption: 'first',
-                startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-              },
-              dates: classDates
-            };
-
-            // Add schedule type and schedules for multiple schedule classes
-            if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
-              // For multiple schedules, create a separate class object for each day
-              classData.schedules.forEach((schedule: any) => {
-                const dayClassInfo = {
-                  ...classInfo,
-                  id: `${classId}-${schedule.dayOfWeek}`, // Create a unique ID for each day
-                  dayOfWeek: schedule.dayOfWeek,
-                  startTime: schedule.startTime,
-                  endTime: schedule.endTime,
-                  scheduleType: 'multiple',
-                  schedules: classData.schedules,
-                  // Filter dates to only include those matching this day of week
-                  dates: classDates.filter(date => date.getDay() === schedule.dayOfWeek)
-                };
-                classSchedule.push(dayClassInfo);
-              });
-            } else {
-              // For single schedule classes, just add the original class info with scheduleType
-              classInfo.scheduleType = 'single';
-              classSchedule.push(classInfo);
-            }
-
-            // Add to daily class map
-            classDates.forEach(date => {
-              const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
-              if (!dailyClassMap[dateString]) {
-                dailyClassMap[dateString] = [];
-              }
-              
-              // Get the day of week for this date
-              const dayOfWeek = date.getDay();
-              
-              // Determine the correct start and end times based on schedule type
-              let startTime = classData.startTime;
-              let endTime = classData.endTime;
-              let classEntryId = classId; // Default to base ID
-              
-              // For multiple schedules, find the matching schedule for this day of week
-              if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
-                const matchingSchedule = classData.schedules.find((schedule: any) => 
-                  schedule.dayOfWeek === dayOfWeek
-                );
-                
-                if (matchingSchedule) {
-                  startTime = matchingSchedule.startTime;
-                  endTime = matchingSchedule.endTime;
-                  classEntryId = `${classId}-${dayOfWeek}`; // Use day-specific ID for multiple schedule
-                }
-              }
-              
-              dailyClassMap[dateString].push({
-                id: classEntryId, // Use consistent ID format
-                startTime: startTime,
-                endTime: endTime,
-                courseType: classData.courseType,
-                students: relevantStudentEmails.map((email: string) => {
-                  const user = usersMap.get(email);
-                  return user ? user.name : email;
-                })
-              });
-            });
-          }
-        }
-
-        // Sort classes in each day by start time
-        Object.keys(dailyClassMap).forEach(dateString => {
-          dailyClassMap[dateString].sort((a, b) => {
-            // Parse time strings to compare
-            const timeA = a.startTime ? a.startTime.replace(/[^0-9:]/g, '') : '00:00';
-            const timeB = b.startTime ? b.startTime.replace(/[^0-9:]/g, '') : '00:00';
-            
-            const [hoursA, minutesA] = timeA.split(':').map(Number);
-            const [hoursB, minutesB] = timeB.split(':').map(Number);
-            
-            // Convert to minutes for comparison
-            const totalMinutesA = hoursA * 60 + minutesA;
-            const totalMinutesB = hoursB * 60 + minutesB;
-            
-            return totalMinutesA - totalMinutesB;
-          });
-        });
-
-        // Extract user data for the frontend
-        const usersArray = Array.from(usersMap.values());
-
+      // Get users who have this admin as their teacher
+      const usersSnapshot = await admin.firestore().collection('users')
+        .where('teacher', '==', adminId as string)
+        .get();
+      
+      if (usersSnapshot.empty) {
         response.status(200).json({ 
-          classes: classSchedule,
-          dailyClassMap,
+          classes: [],
+          dailyClassMap: {},
           birthdays,
-          users: usersArray,
           month: monthInt,
           year: yearInt
         });
-      } catch (error) {
-        // Error logging
-        console.error("Error in getAllClassesForMonth:", error);
+        return;
+      }
+
+      const usersMap = new Map();
+      const userEmails: string[] = [];
+      
+      usersSnapshot.forEach(doc => {
+        const userData = doc.data();
+        usersMap.set(userData.email, {
+          name: userData.name,
+          email: userData.email,
+          birthdate: userData.birthdate,
+          paymentConfig: userData.paymentConfig
+        });
+        userEmails.push(userData.email);
         
-        if (error instanceof Error) {
-          console.error("Error details:", {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-          });
+        // Process birthdays
+        if (userData.birthdate) {
+          // Birthdate format is MM-DD
+          const [birthMonth, birthDay] = userData.birthdate.split('-').map(Number);
+          
+          // Check if the birthday is in the requested month
+          if (birthMonth === monthInt + 1) {
+            birthdays.push({
+              name: userData.name,
+              email: userData.email,
+              birthdate: userData.birthdate,
+              day: birthDay
+            });
+          }
+        }
+      });
+
+      // Query only classes that have students taught by this admin
+      // Firestore doesn't support direct array containsAny with more than 10 items
+      // So we need to handle this in batches if there are more than 10 emails
+      let classesSnapshot;
+      const batchSize = 10;
+      
+      if (userEmails.length <= batchSize) {
+        // If we have 10 or fewer emails, we can use a single query
+        classesSnapshot = await admin.firestore().collection('classes')
+          .where('studentEmails', 'array-contains-any', userEmails)
+          .get();
+      } else {
+        // If we have more than 10 emails, we need to use multiple queries
+        const batches: string[][] = [];
+        for (let i = 0; i < userEmails.length; i += batchSize) {
+          const batch = userEmails.slice(i, i + batchSize);
+          batches.push(batch);
         }
         
-        response.status(500).json({ error: 'Internal server error' });
+        // Execute all batch queries
+        const batchQueries = batches.map(batch => 
+          admin.firestore().collection('classes')
+            .where('studentEmails', 'array-contains-any', batch)
+            .get()
+        );
+        
+        const batchResults = await Promise.all(batchQueries);
+        
+        // Combine results, avoiding duplicates
+        const classesMap = new Map();
+        batchResults.forEach(querySnapshot => {
+          querySnapshot.forEach(doc => {
+            classesMap.set(doc.id, doc);
+          });
+        });
+        
+        // Convert map back to array format similar to QuerySnapshot
+        classesSnapshot = {
+          docs: Array.from(classesMap.values()),
+          empty: classesMap.size === 0
+        };
       }
-    });
-  } catch (corsError) {
-    console.error("CORS handling error:", corsError);
-    response.status(500).json({ error: 'CORS handling error' });
-  }
+      
+      if (classesSnapshot.empty) {
+        response.status(200).json({ 
+          classes: [],
+          dailyClassMap: {},
+          birthdays,
+          month: monthInt,
+          year: yearInt
+        });
+        return;
+      }
+
+      // Process classes and map them to dates
+      const classSchedule = [];
+      const dailyClassMap: Record<string, any[]> = {}; // Map of date strings to classes
+      
+      for (const doc of classesSnapshot.docs) {
+        const classData = doc.data();
+        const classId = doc.id;
+        
+        // Skip classes that have ended before the requested month
+        if (classData.endDate && classData.endDate.toDate() < startDate) {
+          continue;
+        }
+        
+        // Skip classes that start after the requested month
+        if (classData.startDate && classData.startDate.toDate() > endDate) {
+          continue;
+        }
+
+        // Get the actual start date to use (either class start date or month start)
+        const effectiveStartDate = classData.startDate && classData.startDate.toDate() > startDate 
+          ? classData.startDate.toDate() 
+          : new Date(startDate);
+        
+        // Get the actual end date to use (either class end date or month end)
+        const effectiveEndDate = classData.endDate && classData.endDate.toDate() < endDate 
+          ? classData.endDate.toDate() 
+          : new Date(endDate);
+
+        // Calculate class dates based on recurrence pattern
+        const classDates = calculateClassDates(
+          classData,
+          effectiveStartDate,
+          effectiveEndDate
+        );
+        
+        if (classDates.length > 0) {
+          // Get student details - only include students taught by this admin
+          const relevantStudentEmails = classData.studentEmails.filter((email: string) => userEmails.includes(email));
+          const students = relevantStudentEmails.map((email: string) => {
+            const user = usersMap.get(email);
+            return user || { email };
+          });
+
+          // Create a class object that matches the ClassSession interface in the frontend
+          const classInfo: any = {
+            id: classId, // Add ID for single schedule classes
+            dayOfWeek: classData.dayOfWeek,
+            daysOfWeek: classData.daysOfWeek,
+            startTime: classData.startTime,
+            endTime: classData.endTime,
+            courseType: classData.courseType,
+            notes: classData.notes,
+            studentEmails: relevantStudentEmails,
+            students,
+            startDate: classData.startDate ? classData.startDate.toDate() : null,
+            endDate: classData.endDate ? classData.endDate.toDate() : null,
+            recurrencePattern: classData.recurrencePattern || 'weekly',
+            recurrenceInterval: classData.recurrenceInterval || 1,
+            paymentConfig: classData.paymentConfig || {
+              type: 'monthly',
+              monthlyOption: 'first',
+              startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+            },
+            dates: classDates
+          };
+
+          // Add schedule type and schedules for multiple schedule classes
+          if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
+            // For multiple schedules, create a separate class object for each day
+            classData.schedules.forEach((schedule: any) => {
+              // Filter dates to only include those matching this day of week
+              const dayDates = classDates.filter(date => date.getDay() === schedule.dayOfWeek);
+              
+              if (dayDates.length > 0) {
+                // Calculate payment due dates for this day
+                const paymentDates = calculatePaymentDueDates(
+                  classData.paymentConfig,
+                  dayDates,
+                  effectiveStartDate,
+                  effectiveEndDate
+                );
+                
+                const dayClassInfo = {
+                  classDetails: {
+                    ...classInfo,
+                    id: `${classId}-${schedule.dayOfWeek}`, // Create a unique ID for each day
+                    dayOfWeek: schedule.dayOfWeek,
+                    startTime: schedule.startTime,
+                    endTime: schedule.endTime,
+                    timezone: schedule.timezone || classData.timezone, // Add timezone from schedule or class
+                    dates: dayDates
+                  },
+                  dates: dayDates,
+                  paymentDueDates: paymentDates
+                };
+                classSchedule.push(dayClassInfo);
+              }
+            });
+          } else {
+            // For single schedule classes, just add the original class info with scheduleType
+            // Add timezone and scheduleType directly in the classDetails structure
+            const singleClassInfo = {
+              classDetails: {
+                ...classInfo,
+                scheduleType: 'single',
+                timezone: classData.timezone
+              },
+              dates: classDates,
+              paymentDueDates: calculatePaymentDueDates(
+                classData.paymentConfig,
+                classDates,
+                effectiveStartDate,
+                effectiveEndDate
+              )
+            };
+            classSchedule.push(singleClassInfo);
+          }
+        }
+      }
+
+      // Process classes for the dailyClassMap
+      for (const classItem of classSchedule) {
+        // Process each date for the class
+        for (const date of classItem.dates) {
+          const dateStr = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+          
+          if (!dailyClassMap[dateStr]) {
+            dailyClassMap[dateStr] = [];
+          }
+          
+          // Extract class details from the structure
+          const classDetails = classItem.classDetails || classItem;
+          
+          dailyClassMap[dateStr].push({
+            id: classDetails.id,
+            startTime: classDetails.startTime,
+            endTime: classDetails.endTime,
+            timezone: classDetails.timezone || "",
+            courseType: classDetails.courseType,
+            students: classDetails.students || []
+          });
+        }
+      }
+      
+      // Sort classes in each day by start time
+      Object.keys(dailyClassMap).forEach(dateStr => {
+        dailyClassMap[dateStr].sort((a, b) => {
+          // Parse time strings to compare - handle edge cases cleanly
+          const timeA = a.startTime ? a.startTime.replace(/[^0-9:]/g, '') : '00:00';
+          const timeB = b.startTime ? b.startTime.replace(/[^0-9:]/g, '') : '00:00';
+          
+          const [hoursA, minutesA] = timeA.split(':').map(Number);
+          const [hoursB, minutesB] = timeB.split(':').map(Number);
+          
+          // Convert to minutes for comparison
+          const totalMinutesA = hoursA * 60 + (minutesA || 0);
+          const totalMinutesB = hoursB * 60 + (minutesB || 0);
+          
+          return totalMinutesA - totalMinutesB;
+        });
+      });
+
+      // Extract user data for the frontend
+      const usersArray = Array.from(usersMap.values());
+
+      response.status(200).json({ 
+        classes: classSchedule,
+        dailyClassMap,
+        birthdays,
+        users: usersArray,
+        month: monthInt,
+        year: yearInt
+      });
+    } catch (error) {
+      // Error logging to Firebase only (not to browser)
+      logger.error("Error in getAllClassesForMonth:", error);
+      
+      if (error instanceof Error) {
+        logger.error("Error details:", {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      }
+      
+      response.status(500).json({ error: 'Internal server error' });
+    }
+  });
 });

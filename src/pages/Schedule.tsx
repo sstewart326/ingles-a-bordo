@@ -24,6 +24,7 @@ interface CalendarClass extends ClassSession {
       dayOfWeek: number;
       startTime: string;
       endTime: string;
+      timezone?: string;
     }>;
     frequency: {
       type: string;
@@ -31,6 +32,7 @@ interface CalendarClass extends ClassSession {
     };
     startTime: string;
     endTime: string;
+    timezone?: string;
     courseType: string;
     notes: string;
     studentEmails: string[];
@@ -255,12 +257,30 @@ export const Schedule = () => {
     
     const dateStr = formatDateForComparison(date);
     
-    return calendarData.classes.filter(classItem => 
+    // Get all classes for this date
+    const allClassesForDate = calendarData.classes.filter(classItem => 
       classItem.dates.some(classDate => {
         const classDateStr = classDate?.split('T')[0] || '';
         return classDateStr === dateStr;
       })
     );
+    
+    // Use a map to deduplicate classes based on their base class ID
+    const uniqueClasses = new Map<string, CalendarClass>();
+    
+    allClassesForDate.forEach(classItem => {
+      const fullId = classItem.classDetails.id;
+      // Extract the base ID (without any day suffix like -1, -2)
+      const baseId = fullId.split('-')[0];
+      
+      // If we already have this base ID, keep the first instance
+      if (!uniqueClasses.has(baseId)) {
+        uniqueClasses.set(baseId, classItem);
+      }
+    });
+    
+    // Return the deduplicated classes as an array
+    return Array.from(uniqueClasses.values());
   };
 
   const isPaymentDueOnDate = (date: Date): boolean => {
@@ -313,6 +333,10 @@ export const Schedule = () => {
     const dateString = date.toISOString().split('T')[0];
     console.log(`Day clicked: ${dateString} with ${classes.length} classes`);
     
+    // Get deduplicated classes using the getClassesForDate function
+    const uniqueClasses = getClassesForDate(date);
+    console.log(`After deduplication: ${uniqueClasses.length} unique classes`);
+    
     // Update the selectedDate to match the clicked date
     setSelectedDate(date);
     
@@ -321,7 +345,7 @@ export const Schedule = () => {
     setSelectedHomeworkDate(date);
     
     // Check for homework on this date
-    classes.forEach(classItem => {
+    uniqueClasses.forEach(classItem => {
       // Safely handle potential undefined id
       const id = classItem.classDetails.id || '';
       const baseClassId = id ? id.split('-')[0] : '';
@@ -344,7 +368,7 @@ export const Schedule = () => {
     
     setSelectedDayDetails({
       date,
-      classes,
+      classes: uniqueClasses,
       isPaymentDay,
       isPaymentSoon
     });
@@ -622,11 +646,40 @@ export const Schedule = () => {
       Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
     const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
+    // For classes with multiple schedules, ensure we get the right schedule for this day of week
+    const currentDayOfWeek = date.getDay();
+    const classesWithCorrectSchedules = dayClasses.map(classItem => {
+      // Create a shallow copy of the class item
+      const updatedClass = { ...classItem };
+      
+      // If it's a multiple schedule class, find the right schedule for this day
+      if (updatedClass.classDetails.scheduleType === 'multiple' && 
+          Array.isArray(updatedClass.classDetails.schedules)) {
+        
+        const matchingSchedule = updatedClass.classDetails.schedules.find(
+          schedule => schedule.dayOfWeek === currentDayOfWeek
+        );
+        
+        if (matchingSchedule) {
+          // Update the class details with the current day's schedule
+          updatedClass.classDetails = {
+            ...updatedClass.classDetails,
+            dayOfWeek: currentDayOfWeek,
+            startTime: matchingSchedule.startTime,
+            endTime: matchingSchedule.endTime,
+            timezone: matchingSchedule.timezone || updatedClass.classDetails.timezone
+          };
+        }
+      }
+      
+      return updatedClass;
+    });
+
     // Create materials info map for the ScheduleCalendarDay component
     const materialsInfo = new Map<string, { hasSlides: boolean; hasLinks: boolean }>();
     
     if (calendarData?.materials) {
-      dayClasses.forEach(classItem => {
+      classesWithCorrectSchedules.forEach(classItem => {
         const dateStr = formatDateForComparison(date);
         const key = `${classItem.classDetails.id}_${dateStr}`;
         
@@ -650,13 +703,12 @@ export const Schedule = () => {
     const homeworkInfo = new Map<string, number>();
     
     // Check for homework for each class on this day
-    dayClasses.forEach(classItem => {
+    classesWithCorrectSchedules.forEach(classItem => {
       const dateStr = formatDateForComparison(date);
       // Safely handle potential undefined id
       const id = classItem.classDetails.id || '';
       
       // Important: This key must match the format used in ScheduleCalendarDay component
-      // In ScheduleCalendarDay, it uses: `${classItem.id}_${dateStr}`
       const key = `${id}_${dateStr}`;
       
       const baseClassId = id ? id.split('-')[0] : '';
@@ -678,7 +730,7 @@ export const Schedule = () => {
     const homeworkFeedbackInfo = new Map<string, boolean>();
     
     // Check for homework feedback for each class on this day
-    dayClasses.forEach(classItem => {
+    classesWithCorrectSchedules.forEach(classItem => {
       const dateStr = formatDateForComparison(date);
       // Safely handle potential undefined id
       const id = classItem.classDetails.id || '';
@@ -709,7 +761,7 @@ export const Schedule = () => {
     });
     
     // Map the calendar classes to include required ClassSession properties
-    const mappedClasses = dayClasses.map(classItem => ({
+    const mappedClasses = classesWithCorrectSchedules.map(classItem => ({
       ...classItem,
       id: classItem.classDetails.id,
       name: classItem.classDetails.courseType || 'Class',
@@ -717,6 +769,7 @@ export const Schedule = () => {
       dayOfWeek: classItem.classDetails.dayOfWeek,
       startTime: classItem.classDetails.startTime,
       endTime: classItem.classDetails.endTime,
+      timezone: classItem.classDetails.timezone,
       courseType: classItem.classDetails.courseType,
       notes: classItem.classDetails.notes,
       paymentConfig: classItem.classDetails.paymentConfig ? {
@@ -729,28 +782,6 @@ export const Schedule = () => {
         currency: classItem.classDetails.paymentConfig.currency
       } : undefined
     }));
-    
-    // Verify mappedClasses have the correct ID format
-    if (mappedClasses.length > 0 && homeworkInfo.size > 0) {
-      console.log(`Verifying mapped classes for date ${formatDateForComparison(date)}:`);
-      mappedClasses.forEach(cls => {
-        console.log(`  - Mapped class: id=${cls.id}, baseId=${cls.id ? cls.id.split('-')[0] : 'none'}`);
-      });
-      
-      // Debug log for homework pills
-      console.log(`Calendar day ${date.toISOString().split('T')[0]} has ${homeworkInfo.size} homework entries:`);
-      homeworkInfo.forEach((count, key) => {
-        console.log(`  - Key: ${key}, Count: ${count}`);
-      });
-      
-      // Debug log for feedback pills
-      if (homeworkFeedbackInfo.size > 0) {
-        console.log(`Calendar day ${date.toISOString().split('T')[0]} has feedback for homework:`);
-        homeworkFeedbackInfo.forEach((hasFeedback, key) => {
-          console.log(`  - Key: ${key}, Has Feedback: ${hasFeedback}`);
-        });
-      }
-    }
 
     return (
       <ScheduleCalendarDay<CalendarClass>
@@ -909,6 +940,231 @@ export const Schedule = () => {
     };
   }, [calendarData?.classes, getClassesForDate, homeworkByClass, isPaymentDueOnDate]);
 
+  // Class time formatter function - converts time from class timezone to user timezone
+  const formatClassTime = (classItem: any) => {
+    if (!classItem) return '';
+    
+    let startTime = classItem.startTime || classItem.classDetails?.startTime || '';
+    let endTime = classItem.endTime || classItem.classDetails?.endTime || '';
+    let timezone = classItem.timezone || classItem.classDetails?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Early validation of time strings
+    if (!startTime || !endTime) {
+      console.warn("Missing start or end time:", { startTime, endTime, classId: classItem.id });
+      
+      // Set default times if missing
+      startTime = startTime || "9:00 AM";
+      endTime = endTime || "10:00 AM";
+    }
+    
+    console.log("Schedule - Time formatting - Raw values:", { 
+      startTime, 
+      endTime, 
+      timezone, 
+      classId: classItem.id || classItem.classDetails?.id
+    });
+    
+    if (startTime && endTime) {
+      // Get the user's local timezone
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // Format the timezone name for display
+      const timezoneName = new Intl.DateTimeFormat('en', {
+        timeZoneName: 'short',
+        timeZone: userTimezone
+      }).formatToParts(new Date())
+        .find(part => part.type === 'timeZoneName')?.value || '';
+
+      // Function to convert time from class timezone to user timezone
+      const convertToUserTimezone = (timeStr: string, sourceTimezone: string) => {
+        console.log("Converting time:", { timeStr, sourceTimezone });
+        
+        if (!timeStr) {
+          console.error("Empty time string provided");
+          return "12:00 AM"; // Default fallback time
+        }
+        
+        try {
+          // Parse the time string
+          let isPM = false;
+          let isAM = false;
+          let hours = 0;
+          let minutes = 0;
+          
+          // Handle different time formats
+          if (timeStr.includes('AM') || timeStr.includes('PM')) {
+            // Format like "9:00 AM" or "9:00 PM"
+            isPM = timeStr.includes('PM');
+            isAM = timeStr.includes('AM');
+            
+            // Remove AM/PM and trim
+            const timeOnly = timeStr.replace(/\s*[AP]M\s*/, '').trim();
+            const timeParts = timeOnly.split(':');
+            
+            if (timeParts.length >= 2) {
+              hours = parseInt(timeParts[0]) || 0;
+              minutes = parseInt(timeParts[1]) || 0;
+            }
+          } else {
+            // Try to handle 24-hour format like "14:30"
+            const timeParts = timeStr.split(':');
+            if (timeParts.length >= 2) {
+              hours = parseInt(timeParts[0]) || 0;
+              minutes = parseInt(timeParts[1]) || 0;
+              
+              // Determine AM/PM for 24-hour format
+              isPM = hours >= 12;
+              isAM = hours < 12;
+            }
+          }
+          
+          console.log("Parsed time parts:", { hours, minutes, isPM, isAM });
+          
+          // Convert to 24-hour format if needed
+          if (isPM && hours < 12) hours += 12;
+          if (isAM && hours === 12) hours = 0;
+          
+          // Normalize hours and minutes
+          if (hours < 0 || hours > 23) hours = 0;
+          if (minutes < 0 || minutes > 59) minutes = 0;
+          
+          // Create a date with just the hour and minute information
+          const date = new Date();
+          date.setHours(hours, minutes, 0, 0);
+          
+          // Convert this time to a string representing source timezone time
+          let sourceTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          
+          console.log("Source time:", sourceTime);
+          
+          // Get standard offsets for timezones (approximate)
+          const getStandardOffset = (tz: string): number => {
+            // Return offset in hours from UTC
+            switch(tz) {
+              case 'America/New_York': return -5; // Eastern Time (UTC-5)
+              case 'America/Chicago': return -6; // Central Time (UTC-6)
+              case 'America/Denver': return -7; // Mountain Time (UTC-7)
+              case 'America/Los_Angeles': return -8; // Pacific Time (UTC-8)
+              case 'America/Sao_Paulo': return -3; // Brasilia Time (UTC-3)
+              case 'Europe/London': return 0; // GMT/UTC
+              case 'Europe/Paris': return 1; // Central European Time (UTC+1)
+              case 'Europe/Moscow': return 3; // Moscow Time (UTC+3)
+              case 'Asia/Tokyo': return 9; // Japan Standard Time (UTC+9)
+              case 'Asia/Shanghai': return 8; // China Standard Time (UTC+8)
+              case 'Australia/Sydney': return 10; // Australian Eastern Time (UTC+10)
+              default: 
+                // If timezone not recognized, try to get from browser
+                try {
+                  // Get current date in the timezone
+                  const date = new Date();
+                  const options = { timeZone: tz, timeZoneName: 'short' as const };
+                  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);
+                  const tzPart = parts.find(part => part.type === 'timeZoneName');
+                  
+                  if (tzPart && tzPart.value.includes('GMT')) {
+                    // Format like "GMT-5" or "GMT+8"
+                    const match = tzPart.value.match(/GMT([+-])(\d+)/);
+                    if (match) {
+                      const sign = match[1] === '+' ? 1 : -1;
+                      const hours = parseInt(match[2]);
+                      return sign * hours;
+                    }
+                  }
+                  
+                  console.log("Could not determine offset for timezone:", tz);
+                  return 0;
+                } catch (e) {
+                  console.error("Error determining timezone offset:", e);
+                  return 0;
+                }
+            }
+          };
+          
+          // Calculate the difference between source and user timezone
+          const sourceOffset = getStandardOffset(sourceTimezone);
+          const userOffset = getStandardOffset(userTimezone);
+          const hourDiff = userOffset - sourceOffset;
+          
+          console.log("Timezone offsets:", { 
+            sourceTimezone,
+            userTimezone,
+            sourceOffset,
+            userOffset,
+            hourDiff
+          });
+          
+          // Apply the hour difference
+          date.setHours(date.getHours() + hourDiff);
+          
+          // Format the time in 12-hour format
+          const result = date.toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: true 
+          });
+          
+          console.log("Converted time:", result);
+          return result;
+        } catch (error) {
+          console.error("Error converting time:", error);
+          return timeStr; // Return original time string on error
+        }
+      };
+
+      // Convert times from class timezone to user timezone
+      try {
+        const convertedStartTime = convertToUserTimezone(startTime, timezone);
+        const convertedEndTime = convertToUserTimezone(endTime, timezone);
+
+        // Determine if we need to show the original timezone
+        const showOriginalTimezone = timezone !== userTimezone;
+        
+        // Get a clean display name for the original timezone
+        let originalTimezoneDisplay = '';
+        if (showOriginalTimezone) {
+          try {
+            // Try to get a clean display name
+            if (timezone.includes('/')) {
+              originalTimezoneDisplay = timezone.split('/').pop() || timezone;
+            } else {
+              originalTimezoneDisplay = timezone;
+            }
+            
+            // Add abbreviation for common timezones
+            if (timezone === 'America/Denver') {
+              originalTimezoneDisplay += ' (MT)';
+            } else if (timezone === 'America/New_York') {
+              originalTimezoneDisplay += ' (ET)';
+            } else if (timezone === 'America/Chicago') {
+              originalTimezoneDisplay += ' (CT)';
+            } else if (timezone === 'America/Los_Angeles') {
+              originalTimezoneDisplay += ' (PT)';
+            } else if (timezone === 'America/Sao_Paulo') {
+              originalTimezoneDisplay += ' (BRT)';
+            }
+          } catch (e) {
+            originalTimezoneDisplay = timezone;
+          }
+        }
+
+        // If either time is invalid, use the original time string but format nicely
+        if (convertedStartTime === "Invalid Date" || convertedEndTime === "Invalid Date") {
+          console.warn("Conversion resulted in invalid date, using original time strings");
+          return `${startTime} - ${endTime} (${originalTimezoneDisplay})`;
+        }
+
+        return `${convertedStartTime} - ${convertedEndTime} ${timezoneName}${
+          showOriginalTimezone ? ` (${originalTimezoneDisplay})` : ''
+        }`;
+      } catch (error) {
+        console.error("Error formatting class time:", error);
+        // Fallback to original times
+        return `${startTime} - ${endTime}`;
+      }
+    }
+    return '';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1063,6 +1319,7 @@ export const Schedule = () => {
                       dayOfWeek: classItem.classDetails.dayOfWeek,
                       startTime: classItem.classDetails.startTime,
                       endTime: classItem.classDetails.endTime,
+                      timezone: classItem.classDetails.timezone,
                       courseType: classItem.classDetails.courseType,
                       notes: classItem.classDetails.notes,
                       paymentConfig: classItem.classDetails.paymentConfig ? {
@@ -1097,7 +1354,7 @@ export const Schedule = () => {
                           
                           <span className="text-sm font-medium text-[#4b5563]">{t.time}</span>
                           <span className="text-sm text-[#1a1a1a]">
-                            {mappedClass.startTime} - {mappedClass.endTime}
+                            {formatClassTime(classItem)}
                           </span>
 
                           <span className="text-sm font-medium text-[#4b5563]">{t.class}</span>
