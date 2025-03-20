@@ -313,11 +313,8 @@ export const AdminUsers = () => {
         teacher: undefined  // Reset teacher field
       }); // Reset form
       
-      // Hide the form
-      const form = document.getElementById('addUserForm');
-      if (form) {
-        form.classList.add('hidden');
-      }
+      // Close the modal
+      setShowAddForm(false);
       
       toast.success(t.signupLinkCopied);
     } catch (error) {
