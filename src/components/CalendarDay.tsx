@@ -163,7 +163,16 @@ export function CalendarDay<T extends ClassSession>({
               onClick={handlePillClick}
               title={createPaymentTooltip()}
             >
-              {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue : t.paymentsDue}
+              {allPaymentsCompleted ? t.allPaymentsCompleted : 
+                (() => {
+                  const pendingPayments = paymentsDue.filter(({ user, classSession }) => 
+                    !completedPayments.some(payment => 
+                      payment.userId === user.email && payment.classSessionId === classSession.id
+                    )
+                  ).length;
+                  return `${pendingPayments} ${pendingPayments === 1 ? t.paymentDue : t.paymentsDue}`;
+                })()
+              }
             </div>
           )}
 
