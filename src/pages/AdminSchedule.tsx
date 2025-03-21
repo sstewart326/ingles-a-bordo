@@ -23,7 +23,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import { invalidateCalendarCache } from '../services/calendarService';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { useNavigate } from 'react-router-dom';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
 
 interface User {
   id: string;
@@ -133,6 +133,20 @@ const getNextDayOccurrence = (dayOfWeek: number) => {
 
 const timeOptions = generateTimeOptions();
 
+const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }) => {
+  return (
+    <span className="relative inline-flex items-center group">
+      <span className="cursor-help">
+        {children}
+      </span>
+      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-3 py-2 w-56 max-w-xs bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+        {text}
+        <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></span>
+      </span>
+    </span>
+  );
+};
+
 export const AdminSchedule = () => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -174,6 +188,7 @@ export const AdminSchedule = () => {
     }
   });
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
+  const [currentStep, setCurrentStep] = useState<'schedule' | 'payment'>('schedule');
 
   const { setLoadedMonths } = useDashboardData();
 
@@ -439,6 +454,17 @@ export const AdminSchedule = () => {
       return;
     }
     
+    // Validate that we have at least one schedule
+    if (newClass.schedules.length === 0) {
+      toast.error("Please add at least one schedule day");
+      return;
+    }
+
+    if (currentStep === 'schedule') {
+      setCurrentStep('payment');
+      return;
+    }
+    
     // Validate payment start date for monthly payments
     if (newClass.paymentConfig.type === 'monthly') {
       const [year, month, day] = newClass.paymentConfig.startDate.split('-').map(Number);
@@ -450,12 +476,6 @@ export const AdminSchedule = () => {
         toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
         return;
       }
-    }
-    
-    // Validate that we have at least one schedule
-    if (newClass.schedules.length === 0) {
-      toast.error("Please add at least one schedule day");
-      return;
     }
     
     // Validate timezone is selected or use default
@@ -1004,6 +1024,11 @@ export const AdminSchedule = () => {
     }
   };
 
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setCurrentStep('schedule');
+  };
+
   if (loading) {
     return <div className="text-center p-4">Loading...</div>;
   }
@@ -1443,488 +1468,500 @@ export const AdminSchedule = () => {
         </div>
 
         {/* Add Class Form */}
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} paddingTop="20px">
+        <Modal isOpen={isModalOpen} onClose={handleCloseModal} paddingTop="20px">
           <div className="max-w-4xl w-full">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">{t.addNewClass}</h2>
+              <h2 className="text-xl font-semibold text-gray-800">
+                {currentStep === 'schedule' ? 'Add New Class - Schedule' : 'Add New Class - Payment'}
+              </h2>
             </div>
             <form onSubmit={handleCreateClass}>
-              {/* Class Configuration Section */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
-                  {"Class Configuration"}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={styles.form.label}>
-                      {t.students}
-                    </label>
-                    <Select
-                      isMulti
-                      value={studentOptions.filter(option => 
-                        newClass.studentEmails.includes(option.value)
-                      )}
-                      onChange={handleStudentChange}
-                      options={studentOptions}
-                      className="mt-1"
-                      classNamePrefix="select"
-                      styles={customSelectStyles}
-                    />
-                  </div>
-                  
-                  <div className="md:col-span-2 mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <label className={styles.form.label}>Class Schedules</label>
-                      <button
-                        type="button"
-                        onClick={handleAddSchedule}
-                        className="py-1 px-2 text-sm inline-flex items-center rounded border border-indigo-600 bg-white text-indigo-600 hover:bg-indigo-50"
-                      >
-                        <PlusIcon className="h-3.5 w-3.5 mr-1" /> Add Day
-                      </button>
+              {currentStep === 'schedule' ? (
+                /* Class Configuration Section */
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
+                    {"Class Configuration"}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={styles.form.label}>
+                        {t.students}
+                      </label>
+                      <Select
+                        isMulti
+                        value={studentOptions.filter(option => 
+                          newClass.studentEmails.includes(option.value)
+                        )}
+                        onChange={handleStudentChange}
+                        options={studentOptions}
+                        className="mt-1"
+                        classNamePrefix="select"
+                        styles={customSelectStyles}
+                      />
                     </div>
                     
-                    {newClass.schedules.length === 0 ? (
-                      <div className="p-4 border border-gray-200 rounded-md bg-gray-50 text-center">
-                        Please add at least one day to the class schedule
+                    <div className="md:col-span-2 mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className={styles.form.label}>Class Schedules</label>
+                        <button
+                          type="button"
+                          onClick={handleAddSchedule}
+                          className="py-1 px-2 text-sm inline-flex items-center rounded border border-indigo-600 bg-white text-indigo-600 hover:bg-indigo-50"
+                        >
+                          <PlusIcon className="h-3.5 w-3.5 mr-1" /> Add Day
+                        </button>
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {newClass.schedules.map((schedule: ClassSchedule, index: number) => (
-                          <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
-                            <div className="flex justify-between items-center mb-3">
-                              <h4 className="font-medium">Schedule #{index + 1}</h4>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSchedule(index)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
+                      
+                      {newClass.schedules.length === 0 ? (
+                        <div className="p-4 border border-gray-200 rounded-md bg-gray-50 text-center">
+                          Please add at least one day to the class schedule
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {newClass.schedules.map((schedule: ClassSchedule, index: number) => (
+                            <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="font-medium">Class #{index + 1}</h4>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSchedule(index)}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">Day</label>
+                                  <select
+                                    value={schedule.dayOfWeek}
+                                    onChange={(e) => handleScheduleChange(index, 'dayOfWeek', parseInt(e.target.value))}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                  >
+                                    {DAYS_OF_WEEK.map((day, dayIndex) => (
+                                      <option key={day} value={dayIndex}>{day}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                                  <select
+                                    value={schedule.startTime}
+                                    onChange={(e) => handleScheduleChange(index, 'startTime', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                  >
+                                    {timeOptions.map(time => (
+                                      <option key={time} value={time}>{time}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">End Time</label>
+                                  <select
+                                    value={schedule.endTime}
+                                    onChange={(e) => handleScheduleChange(index, 'endTime', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                  >
+                                    {timeOptions.map(time => (
+                                      <option key={time} value={time}>{time}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Day</label>
-                                <select
-                                  value={schedule.dayOfWeek}
-                                  onChange={(e) => handleScheduleChange(index, 'dayOfWeek', parseInt(e.target.value))}
-                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                >
-                                  {DAYS_OF_WEEK.map((day, dayIndex) => (
-                                    <option key={day} value={dayIndex}>{day}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Start Time</label>
-                                <select
-                                  value={schedule.startTime}
-                                  onChange={(e) => handleScheduleChange(index, 'startTime', e.target.value)}
-                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                >
-                                  {timeOptions.map(time => (
-                                    <option key={time} value={time}>{time}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">End Time</label>
-                                <select
-                                  value={schedule.endTime}
-                                  onChange={(e) => handleScheduleChange(index, 'endTime', e.target.value)}
-                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                >
-                                  {timeOptions.map(time => (
-                                    <option key={time} value={time}>{time}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Add frequency selection here */}
-                    <div>
-                      <label className={styles.form.label}>Class Frequency</label>
-                      <div className="flex items-center">
-                        <span className="text-gray-800 mr-2">Every</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={newClass.frequency.every}
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Add frequency selection here */}
+                      <div>
+                        <label className={styles.form.label}>
+                          Class Frequency
+                          <Tooltip text="How often the class repeats. For example, select 2 for classes that occur every 2 weeks.">
+                            <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
+                          </Tooltip>
+                        </label>
+                        <div className="flex items-center">
+                          <span className="text-gray-800 mr-2">Every</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={newClass.frequency.every}
+                            onChange={(e) => {
+                              const every = parseInt(e.target.value) || 1;
+                              setNewClass((prev: typeof newClass) => ({
+                                ...prev,
+                                frequency: {
+                                  type: 'custom',
+                                  every: Math.max(1, every)
+                                }
+                              }));
+                            }}
+                            className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          />
+                          <span className="text-gray-800 ml-2">weeks</span>
+                        </div>
+                      </div>
+                      
+                      {/* Add timezone selection */}
+                      <div>
+                        <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
+                        <select
+                          value={newClass.timezone}
                           onChange={(e) => {
-                            const every = parseInt(e.target.value) || 1;
                             setNewClass((prev: typeof newClass) => ({
                               ...prev,
-                              frequency: {
-                                type: 'custom',
-                                every: Math.max(1, every)
-                              }
+                              timezone: e.target.value,
+                              // Also update timezone in all schedules
+                              schedules: prev.schedules.map((s: ClassSchedule) => ({
+                                ...s,
+                                timezone: e.target.value
+                              }))
                             }));
                           }}
-                          className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        />
-                        <span className="text-gray-800 ml-2">weeks</span>
+                          required
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          {getTimezoneOptions().map(tz => (
+                            <option key={tz.value} value={tz.value}>{tz.label}</option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Class times will be displayed in this timezone. Students will see times converted to their local timezone.
+                        </p>
                       </div>
                     </div>
                     
-                    {/* Add timezone selection */}
-                    <div>
-                      <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
-                      <select
-                        value={newClass.timezone}
-                        onChange={(e) => {
-                          setNewClass((prev: typeof newClass) => ({
-                            ...prev,
-                            timezone: e.target.value,
-                            // Also update timezone in all schedules
-                            schedules: prev.schedules.map((s: ClassSchedule) => ({
-                              ...s,
-                              timezone: e.target.value
-                            }))
-                          }));
-                        }}
-                        required
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      >
-                        {getTimezoneOptions().map(tz => (
-                          <option key={tz.value} value={tz.value}>{tz.label}</option>
-                        ))}
-                      </select>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Class times will be displayed in this timezone. Students will see times converted to their local timezone.
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="md:col-span-2 flex space-x-4">
-                    <div className="flex-1">
-                      <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
-                      <DatePicker
-                        selected={newClass.startDate}
-                        onChange={(date: Date | null) => {
-                          if (date) {
+                    <div className="md:col-span-2 flex space-x-4">
+                      <div className="flex-1">
+                        <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
+                        <DatePicker
+                          selected={newClass.startDate}
+                          onChange={(date: Date | null) => {
+                            if (date) {
+                              setNewClass((prev: typeof newClass) => ({
+                                ...prev,
+                                startDate: date,
+                                // Reset end date if it's now before the start date
+                                ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
+                              }));
+                            }
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          showTimeSelect={false}
+                          dateFormat="MMMM d, yyyy"
+                          minDate={new Date()}
+                          filterDate={(date) => {
+                            // Only allow selecting dates that match any of the selected days
+                            if (newClass.schedules.length > 0) {
+                              const selectedDays = newClass.schedules.map((schedule: ClassSchedule) => schedule.dayOfWeek);
+                              return selectedDays.includes(date.getDay());
+                            }
+                            
+                            return true; // Allow all dates if no schedules defined yet
+                          }}
+                        />
+                        {newClass.schedules.length > 0 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Only {newClass.schedules.map((s: ClassSchedule) => DAYS_OF_WEEK[s.dayOfWeek]).join(', ')} dates can be selected
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
+                        <DatePicker
+                          selected={newClass.endDate}
+                          onChange={(date: Date | null) => {
                             setNewClass((prev: typeof newClass) => ({
                               ...prev,
-                              startDate: date,
-                              // Reset end date if it's now before the start date
-                              ...(prev.endDate && prev.endDate < date ? { endDate: null } : {})
+                              endDate: date
                             }));
-                          }
-                        }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        showTimeSelect={false}
-                        dateFormat="MMMM d, yyyy"
-                        minDate={new Date()}
-                        filterDate={(date) => {
-                          // Only allow selecting dates that match any of the selected days
-                          if (newClass.schedules.length > 0) {
-                            const selectedDays = newClass.schedules.map((schedule: ClassSchedule) => schedule.dayOfWeek);
-                            return selectedDays.includes(date.getDay());
-                          }
-                          
-                          return true; // Allow all dates if no schedules defined yet
-                        }}
+                          }}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          showTimeSelect={false}
+                          dateFormat="MMMM d, yyyy"
+                          minDate={newClass.startDate}
+                          isClearable={true}
+                          placeholderText={t.noEndDate || "No end date"}
+                        />
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={styles.form.label}>
+                        Contract (PDF, max 5MB)
+                        <span className="ml-1 text-gray-500 text-xs">(optional)</span>
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={handleContractFileChange}
+                        className="mt-1 block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-md file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-indigo-50 file:text-indigo-700
+                          hover:file:bg-indigo-100"
                       />
-                      {newClass.schedules.length > 0 && (
-                        <p className="mt-1 text-xs text-gray-500">
-                          Only {newClass.schedules.map((s: ClassSchedule) => DAYS_OF_WEEK[s.dayOfWeek]).join(', ')} dates can be selected
-                        </p>
+                      {contractFile && (
+                        <div className="mt-2 text-sm text-gray-700">
+                          Selected file: {contractFile.name}
+                        </div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
-                      <DatePicker
-                        selected={newClass.endDate}
-                        onChange={(date: Date | null) => {
-                          setNewClass((prev: typeof newClass) => ({
-                            ...prev,
-                            endDate: date
-                          }));
-                        }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        showTimeSelect={false}
-                        dateFormat="MMMM d, yyyy"
-                        minDate={newClass.startDate}
-                        isClearable={true}
-                        placeholderText={t.noEndDate || "No end date"}
-                      />
-                    </div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className={styles.form.label}>
-                      Contract (PDF, max 5MB)
-                    </label>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={handleContractFileChange}
-                      className="mt-1 block w-full text-sm text-gray-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-md file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-indigo-50 file:text-indigo-700
-                        hover:file:bg-indigo-100"
-                    />
-                    {contractFile && (
-                      <div className="mt-2 text-sm text-gray-700">
-                        Selected file: {contractFile.name}
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
-
-              {/* Payment Configuration Section */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
-                  {"Payment Configuration"}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={styles.form.label}>{"Payment Type"}</label>
-                    <select
-                      value={newClass.paymentConfig.type}
-                      onChange={(e) => {
-                        const type = e.target.value as 'weekly' | 'monthly';
-                        setNewClass((prev: typeof newClass) => {
-                          if (type === 'monthly') {
-                            // If switching to monthly, adjust the start date to a valid day (1, 15, or last day)
-                            const currentDate = (() => {
-                              const [year, month, day] = prev.paymentConfig.startDate.split('-').map(Number);
-                              const date = new Date();
-                              date.setFullYear(year);
-                              date.setMonth(month - 1); // Month is 0-indexed in JavaScript
-                              date.setDate(day);
-                              return date;
-                            })();
-                            
-                            const day = currentDate.getDate();
-                            const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-                            
-                            // Determine the closest valid day (1, 15, or last day)
-                            let newDay: number;
-                            if (day <= 8) {
-                              newDay = 1;
-                            } else if (day <= 23) {
-                              newDay = 15;
-                            } else {
-                              newDay = lastDayOfMonth;
+              ) : (
+                /* Payment Configuration Section */
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
+                    {"Payment Configuration"}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={styles.form.label}>{"Payment Type"}</label>
+                      <select
+                        value={newClass.paymentConfig.type}
+                        onChange={(e) => {
+                          const type = e.target.value as 'weekly' | 'monthly';
+                          setNewClass((prev: typeof newClass) => {
+                            if (type === 'monthly') {
+                              // If switching to monthly, adjust the start date to a valid day (1, 15, or last day)
+                              const currentDate = (() => {
+                                const [year, month, day] = prev.paymentConfig.startDate.split('-').map(Number);
+                                const date = new Date();
+                                date.setFullYear(year);
+                                date.setMonth(month - 1); // Month is 0-indexed in JavaScript
+                                date.setDate(day);
+                                return date;
+                              })();
+                              
+                              const day = currentDate.getDate();
+                              const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+                              
+                              // Determine the closest valid day (1, 15, or last day)
+                              let newDay: number;
+                              if (day <= 8) {
+                                newDay = 1;
+                              } else if (day <= 23) {
+                                newDay = 15;
+                              } else {
+                                newDay = lastDayOfMonth;
+                              }
+                              
+                              // Determine the corresponding monthlyOption
+                              let monthlyOption: 'first' | 'fifteen' | 'last';
+                              if (newDay === 1) {
+                                monthlyOption = 'first';
+                              } else if (newDay === 15) {
+                                monthlyOption = 'fifteen';
+                              } else {
+                                monthlyOption = 'last';
+                              }
+                              
+                              // Create new date string with adjusted day
+                              const year = currentDate.getFullYear();
+                              const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                              const adjustedDateStr = `${year}-${month}-${String(newDay).padStart(2, '0')}`;
+                              
+                              return {
+                                ...prev,
+                                paymentConfig: {
+                                  type,
+                                  startDate: adjustedDateStr,
+                                  monthlyOption: monthlyOption,
+                                  weeklyInterval: null
+                                }
+                              };
                             }
-                            
-                            // Determine the corresponding monthlyOption
-                            let monthlyOption: 'first' | 'fifteen' | 'last';
-                            if (newDay === 1) {
-                              monthlyOption = 'first';
-                            } else if (newDay === 15) {
-                              monthlyOption = 'fifteen';
-                            } else {
-                              monthlyOption = 'last';
-                            }
-                            
-                            // Create new date string with adjusted day
-                            const year = currentDate.getFullYear();
-                            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-                            const adjustedDateStr = `${year}-${month}-${String(newDay).padStart(2, '0')}`;
                             
                             return {
                               ...prev,
                               paymentConfig: {
                                 type,
-                                startDate: adjustedDateStr,
-                                monthlyOption: monthlyOption,
-                                weeklyInterval: null
+                                startDate: prev.paymentConfig.startDate,
+                                ...(type === 'weekly' 
+                                  ? { weeklyInterval: 1, monthlyOption: null } 
+                                  : { monthlyOption: 'first', weeklyInterval: null })
                               }
                             };
-                          }
-                          
-                          return {
-                            ...prev,
-                            paymentConfig: {
-                              type,
-                              startDate: prev.paymentConfig.startDate,
-                              ...(type === 'weekly' 
-                                ? { weeklyInterval: 1, monthlyOption: null } 
-                                : { monthlyOption: 'first', weeklyInterval: null })
-                            }
-                          };
-                        });
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={styles.form.label}>{t.paymentStartDate || "Payment Start Date"}</label>
-                    <DatePicker
-                      selected={(() => {
-                        // Fix: Parse the date string correctly to avoid timezone issues
-                        const [year, month, day] = newClass.paymentConfig.startDate.split('-').map(Number);
-                        const date = new Date();
-                        date.setFullYear(year);
-                        date.setMonth(month - 1); // Month is 0-indexed in JavaScript
-                        date.setDate(day);
-                        date.setHours(12, 0, 0, 0); // Set to noon to avoid any timezone issues
-                        return date;
-                      })()}
-                      onChange={(date: Date | null) => {
-                        if (date) {
-                          // Validate date for monthly payment type
-                          if (newClass.paymentConfig.type === 'monthly') {
-                            const day = date.getDate();
-                            const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-                            
-                            // Only allow 1st, 15th, or last day of month for monthly payments
-                            if (day !== 1 && day !== 15 && day !== lastDayOfMonth) {
-                              toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+                          });
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        <option value="weekly">Every X number of weeks</option>
+                        <option value="monthly">Once a month</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={styles.form.label}>{t.paymentStartDate || "Payment Start Date"}</label>
+                      <DatePicker
+                        selected={(() => {
+                          // Fix: Parse the date string correctly to avoid timezone issues
+                          const [year, month, day] = newClass.paymentConfig.startDate.split('-').map(Number);
+                          const date = new Date();
+                          date.setFullYear(year);
+                          date.setMonth(month - 1); // Month is 0-indexed in JavaScript
+                          date.setDate(day);
+                          date.setHours(12, 0, 0, 0); // Set to noon to avoid any timezone issues
+                          return date;
+                        })()}
+                        onChange={(date: Date | null) => {
+                          if (date) {
+                            // Validate date for monthly payment type
+                            if (newClass.paymentConfig.type === 'monthly') {
+                              const day = date.getDate();
+                              const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                              
+                              // Only allow 1st, 15th, or last day of month for monthly payments
+                              if (day !== 1 && day !== 15 && day !== lastDayOfMonth) {
+                                toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+                                return;
+                              }
+                              
+                              // Automatically set the monthlyOption based on the selected date
+                              let monthlyOption: 'first' | 'fifteen' | 'last';
+                              if (day === 1) {
+                                monthlyOption = 'first';
+                              } else if (day === 15) {
+                                monthlyOption = 'fifteen';
+                              } else {
+                                monthlyOption = 'last';
+                              }
+                              
+                              // Fix: Use local date string to prevent timezone issues
+                              const year = date.getFullYear();
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
+                              
+                              setNewClass((prev: typeof newClass) => ({
+                                ...prev,
+                                paymentConfig: {
+                                  ...prev.paymentConfig,
+                                  startDate: dateStr,
+                                  monthlyOption: monthlyOption
+                                }
+                              }));
                               return;
                             }
                             
-                            // Automatically set the monthlyOption based on the selected date
-                            let monthlyOption: 'first' | 'fifteen' | 'last';
-                            if (day === 1) {
-                              monthlyOption = 'first';
-                            } else if (day === 15) {
-                              monthlyOption = 'fifteen';
-                            } else {
-                              monthlyOption = 'last';
-                            }
-                            
+                            // For weekly payments, just update the date
                             // Fix: Use local date string to prevent timezone issues
                             const year = date.getFullYear();
                             const month = String(date.getMonth() + 1).padStart(2, '0');
-                            const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const dateStr = `${year}-${month}-${day}`;
                             
                             setNewClass((prev: typeof newClass) => ({
                               ...prev,
                               paymentConfig: {
                                 ...prev.paymentConfig,
-                                startDate: dateStr,
-                                monthlyOption: monthlyOption
+                                startDate: dateStr
                               }
                             }));
-                            return;
                           }
-                          
-                          // For weekly payments, just update the date
-                          // Fix: Use local date string to prevent timezone issues
-                          const year = date.getFullYear();
-                          const month = String(date.getMonth() + 1).padStart(2, '0');
-                          const day = String(date.getDate()).padStart(2, '0');
-                          const dateStr = `${year}-${month}-${day}`;
-                          
-                          setNewClass((prev: typeof newClass) => ({
-                            ...prev,
-                            paymentConfig: {
-                              ...prev.paymentConfig,
-                              startDate: dateStr
-                            }
-                          }));
-                        }
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      showTimeSelect={false}
-                      dateFormat="MMMM d, yyyy"
-                      filterDate={(date) => {
-                        // For monthly payments, only allow selecting 1st, 15th, or last day of month
-                        if (newClass.paymentConfig.type === 'monthly') {
-                          const day = date.getDate();
-                          const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-                          return day === 1 || day === 15 || day === lastDayOfMonth;
-                        }
-                        return true; // No filter for weekly payments
-                      }}
-                    />
-                  </div>
-                  {newClass.paymentConfig.type === 'weekly' ? (
-                    <div>
-                      <label htmlFor="weeklyInterval" className={styles.form.label}>
-                        {"Payment Frequency"}
-                      </label>
-                      <div className="flex items-center">
-                        <span className="mr-2">Every</span>
-                        <input
-                          type="number"
-                          id="weeklyInterval"
-                          min="1"
-                          value={newClass.paymentConfig.weeklyInterval === undefined ? '' : newClass.paymentConfig.weeklyInterval}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setNewClass((prev: typeof newClass) => ({
-                              ...prev,
-                              paymentConfig: {
-                                ...prev.paymentConfig,
-                                weeklyInterval: value === '' ? undefined : Math.max(1, parseInt(value))
-                              }
-                            }));
-                          }}
-                          className="mt-1 w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        />
-                        <span className="ml-2">{newClass.paymentConfig.weeklyInterval === 1 ? 'week' : 'weeks'}</span>
-                      </div>
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        showTimeSelect={false}
+                        dateFormat="MMMM d, yyyy"
+                        filterDate={(date) => {
+                          // For monthly payments, only allow selecting 1st, 15th, or last day of month
+                          if (newClass.paymentConfig.type === 'monthly') {
+                            const day = date.getDate();
+                            const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                            return day === 1 || day === 15 || day === lastDayOfMonth;
+                          }
+                          return true; // No filter for weekly payments
+                        }}
+                      />
                     </div>
-                  ) : (
-                    <div>
-                      <label htmlFor="monthlyOption" className={styles.form.label}>
-                        {t.selectPaymentDay || "Payment Day"}
-                        <span className="ml-1 text-gray-500 text-xs">
-                          (auto-set)
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-500 px-3 py-2 sm:text-sm flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                          {newClass.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
-                          {newClass.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
-                          {newClass.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                    {newClass.paymentConfig.type === 'weekly' ? (
+                      <div>
+                        <label htmlFor="weeklyInterval" className={styles.form.label}>
+                          {"Payment Frequency"}
+                          <Tooltip text="How often payments should be collected. This is only applicable for weekly classes.">
+                            <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
+                          </Tooltip>
+                        </label>
+                        <div className="flex items-center">
+                          <span className="mr-2">Every</span>
+                          <input
+                            type="number"
+                            id="weeklyInterval"
+                            min="1"
+                            value={newClass.paymentConfig.weeklyInterval === undefined ? '' : newClass.paymentConfig.weeklyInterval}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setNewClass((prev: typeof newClass) => ({
+                                ...prev,
+                                paymentConfig: {
+                                  ...prev.paymentConfig,
+                                  weeklyInterval: value === '' ? undefined : Math.max(1, parseInt(value))
+                                }
+                              }));
+                            }}
+                            className="mt-1 w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          />
+                          <span className="ml-2">{newClass.paymentConfig.weeklyInterval === 1 ? 'week' : 'weeks'}</span>
                         </div>
                       </div>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Payment day is automatically set based on the selected payment start date.
+                    ) : (
+                      <div>
+                        <label htmlFor="monthlyOption" className={styles.form.label}>
+                          {t.selectPaymentDay || "Payment Day"}
+                          <span className="ml-1 text-gray-500 text-xs">
+                            (auto-set)
+                          </span>
+                        </label>
+                        <div className="relative">
+                          <div className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-100 text-gray-500 px-3 py-2 sm:text-sm flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            {newClass.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
+                            {newClass.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
+                            {newClass.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                          </div>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Payment day is automatically set based on the selected payment start date.
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <label htmlFor="paymentLink" className={styles.form.label}>
+                        Payment Link
+                      </label>
+                      <input
+                        type="url"
+                        id="paymentLink"
+                        value={newClass.paymentConfig.paymentLink || ''}
+                        onChange={(e) => setNewClass((prev: typeof newClass) => ({
+                          ...prev,
+                          paymentConfig: {
+                            ...prev.paymentConfig,
+                            paymentLink: e.target.value
+                          }
+                        }))}
+                        placeholder="https://payment-provider.com/your-payment-link"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Enter a URL where students can make payments
                       </p>
                     </div>
-                  )}
-                  
-                  <div>
-                    <label htmlFor="paymentLink" className={styles.form.label}>
-                      Payment Link
-                    </label>
-                    <input
-                      type="url"
-                      id="paymentLink"
-                      value={newClass.paymentConfig.paymentLink || ''}
-                      onChange={(e) => setNewClass((prev: typeof newClass) => ({
-                        ...prev,
-                        paymentConfig: {
-                          ...prev.paymentConfig,
-                          paymentLink: e.target.value
-                        }
-                      }))}
-                      placeholder="https://payment-provider.com/your-payment-link"
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Enter a URL where students can make payments
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="paymentAmount" className={styles.form.label}>
-                      Payment Amount
-                    </label>
-                    <input
-                      type="number"
-                      id="paymentAmount"
-                      min="0"
-                    step="0.01"
+                    
+                    <div>
+                      <label htmlFor="paymentAmount" className={styles.form.label}>
+                        Payment Amount
+                      </label>
+                      <input
+                        type="number"
+                        id="paymentAmount"
+                        min="0"
+                      step="0.01"
                       value={newClass.paymentConfig.amount === undefined ? '' : newClass.paymentConfig.amount}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -1938,57 +1975,48 @@ export const AdminSchedule = () => {
                       }}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="paymentCurrency" className={styles.form.label}>
-                      Currency
-                    </label>
-                    <select
-                      id="paymentCurrency"
-                      value={newClass.paymentConfig.currency || 'USD'}
-                      onChange={(e) => setNewClass((prev: typeof newClass) => ({
-                        ...prev,
-                        paymentConfig: {
-                          ...prev.paymentConfig,
-                          currency: e.target.value
-                        }
-                      }))}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      <option value="BRL">BRL (R$)</option>
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                    </select>
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="paymentCurrency" className={styles.form.label}>
+                        Currency
+                      </label>
+                      <select
+                        id="paymentCurrency"
+                        value={newClass.paymentConfig.currency || 'USD'}
+                        onChange={(e) => setNewClass((prev: typeof newClass) => ({
+                          ...prev,
+                          paymentConfig: {
+                            ...prev.paymentConfig,
+                            currency: e.target.value
+                          }
+                        }))}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        <option value="BRL">BRL (R$)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="EUR">EUR (€)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  disabled={isCreating}
-                  className={`mr-3 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isCreating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {t.cancel || "Cancel"}
-                </button>
+              <div className="flex justify-end space-x-3 mt-6">
+                {currentStep === 'payment' && (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('schedule')}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Back
+                  </button>
+                )}
                 <button
                   type="submit"
-                  disabled={isCreating}
-                  className={`${styles.buttons.primary} ${isCreating ? 'opacity-80' : ''} flex items-center justify-center`}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  {isCreating ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      {"Creating..."}
-                    </>
-                  ) : (
-                    t.createNewClass
-                  )}
+                  {currentStep === 'schedule' ? 'Next' : 'Create Class'}
                 </button>
               </div>
             </form>
@@ -2221,7 +2249,12 @@ export const AdminSchedule = () => {
                   
                   {/* Add frequency selection here */}
                   <div className="md:col-span-2">
-                    <label className={styles.form.label}>Class Frequency</label>
+                    <label className={styles.form.label}>
+                      Class Frequency
+                      <Tooltip text="How often the class repeats. For example, every 1 week for weekly classes, every 2 weeks for biweekly classes, or a custom number of weeks.">
+                        <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
+                      </Tooltip>
+                    </label>
                     <div className="flex items-center space-x-4">
                       <select
                         value={editingClass?.frequency?.type || 'weekly'}
@@ -2550,6 +2583,12 @@ export const AdminSchedule = () => {
                 <div>
                   <label className={styles.form.label}>
                     Contract (PDF, max 5MB)
+                    <span className="text-sm text-gray-500 ml-1">(Optional)</span>
+                    <span className="ml-1 inline-block" title="Upload a PDF contract document for this class. This is optional but recommended for keeping track of agreements with students.">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
                   </label>
                   <div className="flex flex-col space-y-2">
                     {editingClass?.contractUrl && (
@@ -2756,6 +2795,11 @@ export const AdminSchedule = () => {
                   <div>
                     <label htmlFor="editWeeklyInterval" className={styles.form.label}>
                       {"Payment Frequency"}
+                      <span className="ml-1 inline-block" title="How often payments should be processed. For weekly payments, specify the interval in weeks. For monthly payments, choose between 1st, 15th, or last day of the month.">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </span>
                     </label>
                     <div className="flex items-center">
                       <span className="mr-2">Every</span>
