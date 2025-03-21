@@ -762,7 +762,7 @@ export const AdminClassPlans = () => {
   // Convert students to select options
   const studentOptions = students.map(student => ({
     value: student.email,
-    label: student.name ? `${student.name} (${student.email})` : student.email
+    label: student.name || student.email
   }));
   
   // Custom styles for the Select component
