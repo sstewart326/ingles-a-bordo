@@ -185,42 +185,225 @@ export const Schedule = () => {
     }
   }, [currentUser, t]);
 
-  // Handle initial data loading
-  useEffect(() => {
-    if (isInitialLoadRef.current && currentUser) {
-      const month = selectedDate.getMonth();
-      const year = selectedDate.getFullYear();
-      
-      fetchCalendarDataSafely(month, year);
-      isInitialLoadRef.current = false;
+  // Function to fetch homework for all classes
+  const fetchHomeworkForAllClasses = useCallback(async () => {
+    if (!calendarData?.classes || calendarData.classes.length === 0) {
+      console.log('No classes found, returning empty homework');
+      setHomeworkByClass({});
+      return Promise.resolve(); // Make sure we return a Promise
     }
-  }, [currentUser, selectedDate, fetchCalendarDataSafely]);
+    
+    console.log('Fetching homework for all classes...');
+    const newHomeworkByClass: Record<string, Homework[]> = {};
+    const newHomeworkFeedbackByClass: Record<string, Map<string, boolean>> = {};
+    
+    // Get unique class IDs (base IDs)
+    const uniqueClassIds = Array.from(new Set(
+      calendarData.classes
+        .map(classItem => classItem)
+        .filter(classItem => classItem.id) // Filter out entries without an id
+        .map(classItem => classItem.id ? classItem.id.split('-')[0] : '')
+    ));
+    
+    console.log(`Found ${uniqueClassIds.length} unique class IDs`);
+    
+    // If there are no unique class IDs, just update the state and return early
+    if (uniqueClassIds.length === 0) {
+      console.log('No classes with IDs found, skipping homework fetch');
+      setHomeworkByClass({});
+      return Promise.resolve(); // Make sure we return a Promise
+    }
+    
+    // Fetch homework for each class
+    const fetchPromises = uniqueClassIds.map(async (classId) => {
+      try {
+        console.log(`Fetching homework for class ${classId}...`);
+        const homework = await getHomeworkForClass(classId);
+        console.log(`Found ${homework.length} homework assignments for class ${classId}`);
 
-  // Handle date changes after initial load
-  useEffect(() => {
-    if (!isInitialLoadRef.current && currentUser) {
-      const month = selectedDate.getMonth();
-      const year = selectedDate.getFullYear();
+        // For each homework, check for submissions with feedback
+        const feedbackMap = new Map<string, boolean>();
+        for (const hw of homework) {
+          if (hw.id) {
+            try {
+              const submissions = await getHomeworkSubmissions(hw.id);
+              const hasFeedback = submissions.some((sub: HomeworkSubmission) => 
+                sub.status === 'graded' && sub.feedback && sub.feedback.trim() !== ''
+              );
+              
+              if (hasFeedback) {
+                // Key is homeworkId_dateStr
+                const dateStr = hw.classDate ? hw.classDate.toISOString().split('T')[0] : '';
+                feedbackMap.set(`${hw.id}_${dateStr}`, true);
+                console.log(`Homework ${hw.id} for date ${dateStr} has feedback`);
+              }
+            } catch (error) {
+              console.error(`Error fetching submissions for homework ${hw.id}:`, error);
+            }
+          }
+        }
+        
+        if (feedbackMap.size > 0) {
+          newHomeworkFeedbackByClass[classId] = feedbackMap;
+        }
+        
+        return { classId, homework };
+      } catch (error) {
+        console.error(`Error fetching homework for class ${classId}:`, error);
+        return { classId, homework: [] };
+      }
+    });
+    
+    try {
+      const results = await Promise.all(fetchPromises);
       
-      fetchCalendarDataSafely(month, year);
+      // Process results
+      results.forEach(({ classId, homework }) => {
+        newHomeworkByClass[classId] = homework;
+      });
+      
+      console.log('Setting homework by class state');
+      setHomeworkByClass(newHomeworkByClass);
+      setHomeworkFeedbackByClass(newHomeworkFeedbackByClass);
+      return Promise.resolve(); // Make sure we return a Promise
+    } catch (error) {
+      console.error('Error fetching homework:', error);
+      return Promise.reject(error); // Return rejected promise on error
     }
-  }, [selectedDate, currentUser, fetchCalendarDataSafely]);
+  }, [calendarData?.classes, setHomeworkByClass, setHomeworkFeedbackByClass]);
+
+  // Add a ref to track if we've initialized the current day details
+  const hasInitializedDayDetailsRef = useRef<boolean>(false);
+  
+  // Use useState to track which calendar data we've already fetched homework for
+  const [fetchedDataKeys, setFetchedDataKeys] = useState<Set<string>>(new Set());
+  
+  // Memoize the current data key
+  const currentDataKey = useMemo(() => {
+    if (!calendarData) return '';
+    return `${calendarData.month}_${calendarData.year}`;
+  }, [calendarData]);
+
+  // Modify the homework fetching effect to work better with initialization
+  useEffect(() => {
+    // Skip if we have no data or are loading
+    if (!calendarData || loading) return;
+    
+    // Skip if we've already fetched for this month/year
+    const key = `${calendarData.month}_${calendarData.year}`;
+    if (fetchedDataKeys.has(key)) {
+      console.log(`Already fetched homework for ${key}`);
+      return;
+    }
+    
+    // Don't skip homework fetch on page reload when masquerading
+    // Only skip if we're actively changing masquerade state
+    if (isMasquerading && !hasInitializedDayDetailsRef.current && isInitialLoadRef.current) {
+      console.log('Skipping homework fetch during masquerade transition');
+      return;
+    }
+    
+    console.log(`Fetching homework for ${key} (month=${calendarData.month}, year=${calendarData.year})`);
+    console.log('Current state:', { isMasquerading, masqueradingAs: masqueradingAs?.id, isInitialLoad: isInitialLoadRef.current });
+    
+    fetchHomeworkForAllClasses()
+      .then(() => {
+        // Mark this data key as fetched using a callback to avoid dependency
+        setFetchedDataKeys(prev => {
+          const newSet = new Set(prev);
+          newSet.add(key);
+          return newSet;
+        });
+        console.log(`Marked ${key} as fetched for homework`);
+      });
+      
+  }, [calendarData?.month, calendarData?.year, loading, isMasquerading, fetchHomeworkForAllClasses]);
 
   // Clear calendar cache when masquerading status changes
   useEffect(() => {
+    // Skip if not masquerading and no masquerade user
+    if (!isMasquerading && !masqueradingAs) return;
+    
+    console.log('Masquerade status changed, clearing caches');
     // Clear the calendar cache when masquerading status changes
     invalidateCalendarCache();
     
     // Reset the initial load flag to force a new data fetch
     isInitialLoadRef.current = true;
+    hasInitializedDayDetailsRef.current = false;
+    
+    // Clear homework cache and state
+    setHomeworkByClass({});
+    setHomeworkFeedbackByClass({});
+    setFetchedDataKeys(new Set()); // Clear the fetched keys to allow re-fetching
     
     // If we have a current user, fetch the data again
     if (currentUser) {
       const month = selectedDate.getMonth();
       const year = selectedDate.getFullYear();
-      fetchCalendarDataSafely(month, year);
+      fetchCalendarDataSafely(month, year).then(() => {
+        // After calendar data is loaded, set initial load to false
+        isInitialLoadRef.current = false;
+      });
     }
-  }, [isMasquerading, masqueradingAs?.id, currentUser, selectedDate, fetchCalendarDataSafely]);
+  }, [isMasquerading, masqueradingAs]);
+
+  // Handle initial data loading
+  useEffect(() => {
+    if (isInitialLoadRef.current && currentUser) {
+      console.log('Initial load with user:', { 
+        isMasquerading, 
+        masqueradingAs: masqueradingAs?.id,
+        currentUser: currentUser.email 
+      });
+      
+      const month = selectedDate.getMonth();
+      const year = selectedDate.getFullYear();
+      
+      fetchCalendarDataSafely(month, year).then(() => {
+        // After initial calendar data is loaded, set initial load to false
+        isInitialLoadRef.current = false;
+      });
+    }
+  }, [currentUser, selectedDate, fetchCalendarDataSafely, isMasquerading, masqueradingAs]);
+
+  // Add a new useEffect to set the initial day details for the current day
+  useEffect(() => {
+    // Only proceed if calendar data is loaded, not loading anymore, and we haven't initialized yet
+    if (!calendarData || loading || hasInitializedDayDetailsRef.current) return;
+
+    const today = new Date();
+    
+    // Check if the loaded calendar data contains the current month/year
+    if (calendarData.month === today.getMonth() && calendarData.year === today.getFullYear()) {
+      console.log('Initializing day details for the current day');
+      
+      // Set up the day details
+      const todayClasses = getClassesForDate(today);
+      console.log(`Found ${todayClasses.length} classes for today`);
+      
+      const isPaymentDay = isPaymentDueOnDate(today);
+      
+      // Calculate if payment is soon (within 3 days)
+      const daysUntilPayment = isPaymentDay ? 
+        Math.ceil((today.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+      
+      // Update the day details
+      setSelectedDate(today);
+      setSelectedHomeworkDate(today);
+      
+      setSelectedDayDetails({
+        date: today,
+        classes: todayClasses,
+        isPaymentDay,
+        isPaymentSoon
+      });
+      
+      // Mark as initialized
+      hasInitializedDayDetailsRef.current = true;
+    }
+  }, [calendarData, loading]);
 
   const getClassesForDate = (date: Date): CalendarClass[] => {
     if (!calendarData?.classes) return [];
@@ -351,261 +534,6 @@ export const Schedule = () => {
       }, 100);
     }
   };
-
-  // Function to fetch homework for all classes
-  const fetchHomeworkForAllClasses = useCallback(async () => {
-    if (!calendarData?.classes || calendarData.classes.length === 0) {
-      console.log('No classes found, returning empty homework');
-      setHomeworkByClass({});
-      return Promise.resolve(); // Make sure we return a Promise
-    }
-    
-    console.log('Fetching homework for all classes...');
-    const newHomeworkByClass: Record<string, Homework[]> = {};
-    const newHomeworkFeedbackByClass: Record<string, Map<string, boolean>> = {};
-    
-    // Get unique class IDs (base IDs)
-    const uniqueClassIds = Array.from(new Set(
-      calendarData.classes
-        .map(classItem => classItem)
-        .filter(classItem => classItem.id) // Filter out entries without an id
-        .map(classItem => classItem.id ? classItem.id.split('-')[0] : '')
-    ));
-    
-    console.log(`Found ${uniqueClassIds.length} unique class IDs`);
-    
-    // If there are no unique class IDs, just update the state and return early
-    if (uniqueClassIds.length === 0) {
-      console.log('No classes with IDs found, skipping homework fetch');
-      setHomeworkByClass({});
-      return Promise.resolve(); // Make sure we return a Promise
-    }
-    
-    // Fetch homework for each class
-    const fetchPromises = uniqueClassIds.map(async (classId) => {
-      try {
-        console.log(`Fetching homework for class ${classId}...`);
-        const homework = await getHomeworkForClass(classId);
-        console.log(`Found ${homework.length} homework assignments for class ${classId}`);
-
-        // For each homework, check for submissions with feedback
-        const feedbackMap = new Map<string, boolean>();
-        for (const hw of homework) {
-          if (hw.id) {
-            try {
-              const submissions = await getHomeworkSubmissions(hw.id);
-              const hasFeedback = submissions.some((sub: HomeworkSubmission) => 
-                sub.status === 'graded' && sub.feedback && sub.feedback.trim() !== ''
-              );
-              
-              if (hasFeedback) {
-                // Key is homeworkId_dateStr
-                const dateStr = hw.classDate ? hw.classDate.toISOString().split('T')[0] : '';
-                feedbackMap.set(`${hw.id}_${dateStr}`, true);
-                console.log(`Homework ${hw.id} for date ${dateStr} has feedback`);
-              }
-            } catch (error) {
-              console.error(`Error fetching submissions for homework ${hw.id}:`, error);
-            }
-          }
-        }
-        
-        if (feedbackMap.size > 0) {
-          newHomeworkFeedbackByClass[classId] = feedbackMap;
-        }
-        
-        return { classId, homework };
-      } catch (error) {
-        console.error(`Error fetching homework for class ${classId}:`, error);
-        return { classId, homework: [] };
-      }
-    });
-    
-    try {
-      const results = await Promise.all(fetchPromises);
-      
-      // Process results
-      results.forEach(({ classId, homework }) => {
-        newHomeworkByClass[classId] = homework;
-      });
-      
-      console.log('Setting homework by class state');
-      setHomeworkByClass(newHomeworkByClass);
-      setHomeworkFeedbackByClass(newHomeworkFeedbackByClass);
-      return Promise.resolve(); // Make sure we return a Promise
-    } catch (error) {
-      console.error('Error fetching homework:', error);
-      return Promise.reject(error); // Return rejected promise on error
-    }
-  }, [calendarData?.classes, setHomeworkByClass, setHomeworkFeedbackByClass]);
-
-  // Add a ref to track if we've initialized the current day details
-  const hasInitializedDayDetailsRef = useRef<string | false>(false);
-  
-  // Use useState to track which calendar data we've already fetched homework for
-  const [fetchedDataKeys, setFetchedDataKeys] = useState<Set<string>>(new Set());
-  
-  // Memoize the current data key
-  const currentDataKey = useMemo(() => {
-    if (!calendarData) return '';
-    return `${calendarData.month}_${calendarData.year}`;
-  }, [calendarData]);
-
-  // Add an effect to reset initialization flag when month/year changes
-  useEffect(() => {
-    if (calendarData) {
-      // Store the current month/year
-      const currentCalendarKey = `${calendarData.month}_${calendarData.year}`;
-      
-      // Store this on the ref object
-      if (!hasInitializedDayDetailsRef.current || 
-          hasInitializedDayDetailsRef.current !== currentCalendarKey) {
-        // Reset the initialization flag but use the key to remember which month we initialized
-        hasInitializedDayDetailsRef.current = false;
-      }
-    }
-  }, [calendarData?.month, calendarData?.year]);
-  
-  // Modify the homework fetching effect to work better with initialization
-  useEffect(() => {
-    // Skip if we have no data or are loading
-    if (!calendarData || loading) return;
-    
-    // Skip if we've already fetched for this month/year
-    if (fetchedDataKeys.has(currentDataKey)) {
-      console.log(`Already fetched homework for ${currentDataKey}`);
-      return;
-    }
-    
-    console.log(`Fetching homework for ${currentDataKey} (month=${calendarData.month}, year=${calendarData.year})`);
-    fetchHomeworkForAllClasses()
-      .then(() => {
-        // Mark this data key as fetched
-        setFetchedDataKeys(prev => {
-          const newSet = new Set(prev);
-          newSet.add(currentDataKey);
-          return newSet;
-        });
-        console.log(`Marked ${currentDataKey} as fetched for homework`);
-      });
-      
-  }, [calendarData, loading, currentDataKey, fetchedDataKeys, fetchHomeworkForAllClasses]);
-  
-  // Add a new useEffect to set the initial day details for the current day
-  useEffect(() => {
-    // Only proceed if calendar data is loaded, not loading anymore, and we haven't initialized yet
-    if (calendarData && !loading && !hasInitializedDayDetailsRef.current) {
-      const today = new Date();
-      
-      // Check if the loaded calendar data contains the current month/year
-      if (calendarData.month === today.getMonth() && calendarData.year === today.getFullYear()) {
-        console.log('Initializing day details for the current day');
-        
-        // Make sure homework is fetched first if needed
-        if (!fetchedDataKeys.has(currentDataKey)) {
-          console.log('Fetching homework data before initializing day details');
-          fetchHomeworkForAllClasses()
-            .then(() => {
-              console.log('Homework fetch completed, now setting day details');
-              
-              // After homework is fetched, now set up the day details
-              const todayClasses = getClassesForDate(today);
-              console.log(`Found ${todayClasses.length} classes for today`);
-              
-              // Debug: Check if any of these classes have homework
-              todayClasses.forEach(classItem => {
-                const id = classItem.id || '';
-                const baseClassId = id ? id.split('-')[0] : '';
-                const homeworkCount = homeworkByClass[baseClassId]?.length || 0;
-                console.log(`Class ${baseClassId} has ${homeworkCount} homework assignments`);
-              });
-              
-              const isPaymentDay = isPaymentDueOnDate(today);
-              
-              // Calculate if payment is soon (within 3 days)
-              const daysUntilPayment = isPaymentDay ? 
-                Math.ceil((today.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-              const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
-              
-              // Update the day details
-              setSelectedDate(today);
-              setSelectedHomeworkDate(today);
-              
-              setSelectedDayDetails({
-                date: today,
-                classes: todayClasses,
-                isPaymentDay,
-                isPaymentSoon
-              });
-              
-              // Mark as initialized
-              hasInitializedDayDetailsRef.current = `${calendarData.month}_${calendarData.year}`;
-              
-              // Mark this data key as fetched
-              setFetchedDataKeys(prev => {
-                const newSet = new Set(prev);
-                newSet.add(currentDataKey);
-                return newSet;
-              });
-              
-              console.log(`Auto-selected today's date with homework: ${today.toISOString().split('T')[0]} with ${todayClasses.length} classes`);
-            })
-            .catch(error => {
-              console.error('Error initializing day details after homework fetch:', error);
-              // Still try to initialize even if homework fetch failed
-              if (calendarData) {
-                initializeDayDetails(today);
-              }
-            });
-        } else {
-          // Homework is already fetched, just set up the day details
-          initializeDayDetails(today);
-        }
-      }
-    }
-    
-    // Helper function to initialize day details
-    function initializeDayDetails(today: Date) {
-      // Safety check to make sure calendarData is still available
-      if (!calendarData) {
-        console.error('Calendar data not available when initializing day details');
-        return;
-      }
-      
-      console.log('Initializing day details with existing homework data');
-      const todayClasses = getClassesForDate(today);
-      const isPaymentDay = isPaymentDueOnDate(today);
-      
-      // Debug: Check if any of these classes have homework
-      todayClasses.forEach(classItem => {
-        const id = classItem.id || '';
-        const baseClassId = id ? id.split('-')[0] : '';
-        const homeworkCount = homeworkByClass[baseClassId]?.length || 0;
-        console.log(`Class ${baseClassId} has ${homeworkCount} homework assignments`);
-      });
-      
-      // Calculate if payment is soon (within 3 days)
-      const daysUntilPayment = isPaymentDay ? 
-        Math.ceil((today.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-      const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
-      
-      // Update the day details
-      setSelectedDate(today);
-      setSelectedHomeworkDate(today);
-      
-      setSelectedDayDetails({
-        date: today,
-        classes: todayClasses,
-        isPaymentDay,
-        isPaymentSoon
-      });
-      
-      // Mark as initialized
-      hasInitializedDayDetailsRef.current = `${calendarData.month}_${calendarData.year}`;
-      
-      console.log(`Auto-selected today's date: ${today.toISOString().split('T')[0]} with ${todayClasses.length} classes`);
-    }
-  }, [calendarData, loading, currentDataKey, fetchedDataKeys, fetchHomeworkForAllClasses, getClassesForDate, isPaymentDueOnDate, homeworkByClass]);
 
   const renderCalendarDay = (date: Date, isToday: boolean) => {
     const dayClasses = getClassesForDate(date);

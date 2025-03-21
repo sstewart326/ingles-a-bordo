@@ -223,16 +223,39 @@ export const addHomework = async (
   }
 };
 
+// Add new function to invalidate homework cache
+export const invalidateHomeworkCache = () => {
+  // Clear all homework-related caches
+  invalidateCache(HOMEWORK_COLLECTION);
+  invalidateCache(SUBMISSION_COLLECTION);
+  
+  // Also clear any student-specific caches
+  const cacheKeys = Object.keys(localStorage);
+  cacheKeys.forEach(key => {
+    if (key.startsWith(`${HOMEWORK_COLLECTION}_student_`) || 
+        key.startsWith(`${SUBMISSION_COLLECTION}_`)) {
+      localStorage.removeItem(key);
+    }
+  });
+};
+
 // Get homework assignments for a specific class
 export const getHomeworkForClass = async (classId: string): Promise<Homework[]> => {
   try {
+    // Check if we're masquerading
+    const masqueradeUserStr = sessionStorage.getItem('masqueradeUser');
+    if (masqueradeUserStr) {
+      // If masquerading, don't use cache
+      invalidateHomeworkCache();
+    }
+    
     // Extract the base class ID to ensure consistency
     const baseClassId = extractBaseClassId(classId);
     
     const cacheKey = `${HOMEWORK_COLLECTION}_${baseClassId}`;
     const cached = getCached<Homework[]>(cacheKey);
     
-    if (cached) {
+    if (cached && !masqueradeUserStr) {
       return cached;
     }
     
@@ -267,10 +290,17 @@ export const getHomeworkForClass = async (classId: string): Promise<Homework[]> 
 // Get homework assignments for a specific student
 export const getHomeworkForStudent = async (studentEmail: string): Promise<Homework[]> => {
   try {
+    // Check if we're masquerading
+    const masqueradeUserStr = sessionStorage.getItem('masqueradeUser');
+    if (masqueradeUserStr) {
+      // If masquerading, don't use cache
+      invalidateHomeworkCache();
+    }
+    
     const cacheKey = `${HOMEWORK_COLLECTION}_student_${studentEmail}`;
     const cached = getCached<Homework[]>(cacheKey);
     
-    if (cached) {
+    if (cached && !masqueradeUserStr) {
       return cached;
     }
     
@@ -329,6 +359,13 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
 // Get homework assignments for a specific date
 export const getHomeworkForDate = async (classId: string, date: Date): Promise<Homework[]> => {
   try {
+    // Check if we're masquerading
+    const masqueradeUserStr = sessionStorage.getItem('masqueradeUser');
+    if (masqueradeUserStr) {
+      // If masquerading, don't use cache
+      invalidateHomeworkCache();
+    }
+    
     // Extract the base class ID to ensure consistency between views
     const baseClassId = extractBaseClassId(classId);
     
