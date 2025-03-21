@@ -250,57 +250,35 @@ export function ScheduleCalendarDay<T extends ClassSession>({
           // Convert to 24-hour format if needed
           if (isPM && hours < 12) hours += 12;
           if (isAM && hours === 12) hours = 0;
-          
-          // Create a date object for today with the specified time in the source timezone
-          const today = new Date();
-          
-          // First create the date in UTC
-          const utcDate = new Date(Date.UTC(
-            today.getUTCFullYear(),
-            today.getUTCMonth(),
-            today.getUTCDate(),
-            hours,
-            minutes,
-            0,
-            0
-          ));
 
-          // Format the time in the source timezone
-          const sourceTimeStr = utcDate.toLocaleTimeString('en-US', {
-            timeZone: timezone,
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZoneName: 'short'
-          });
+          try {
+            // Create a date object for the target date (not just today)
+            const targetDate = new Date(date);  // Use the calendar date instead of today
+            
+            // Set the time components
+            targetDate.setHours(hours);
+            targetDate.setMinutes(minutes);
+            targetDate.setSeconds(0);
+            targetDate.setMilliseconds(0);
 
-          console.log("Source timezone time:", sourceTimeStr);
-
-          // Parse the source time
-          const [sourceHours, sourceMinutes] = sourceTimeStr.split(':').map(Number);
-
-          // Create a new UTC date with the source time
-          const sourceDateTime = new Date(Date.UTC(
-            today.getUTCFullYear(),
-            today.getUTCMonth(),
-            today.getUTCDate(),
-            sourceHours,
-            sourceMinutes,
-            0,
-            0
-          ));
-
-          // Convert to user's timezone
-          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          const userTimeStr = sourceDateTime.toLocaleTimeString('en-US', {
-            timeZone: userTimezone,
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          });
-
-          console.log("Converted time:", userTimeStr);
-          return userTimeStr;
+            // Convert directly using the timezone information
+            return targetDate.toLocaleTimeString('en-US', {
+              timeZone: userTimezone,
+              hour: 'numeric',
+              minute: 'numeric',
+              hour12: true
+            });
+          } catch (error) {
+            console.error("Error converting time:", error, {
+              timeStr,
+              hours,
+              minutes,
+              timezone,
+              userTimezone,
+              date: date.toISOString()
+            });
+            return timeStr;
+          }
         } catch (error) {
           console.error("Error converting time:", error);
           return timeStr; // Return original time string on error
@@ -411,7 +389,83 @@ export function ScheduleCalendarDay<T extends ClassSession>({
               onClick={handleClassCountClick}
             >
               {classes.length === 1 
-                ? formatSingleClassTime(classes[0])
+                ? (() => {
+                    // Get the start and end times, considering multiple schedules
+                    let classItem = classes[0];
+                    let startTime = classItem.startTime;
+                    let endTime = classItem.endTime;
+                    let timezone = classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    
+                    // If it's a multiple schedule class, find the right schedule for this day
+                    if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules)) {
+                      const dayOfWeek = date.getDay();
+                      const matchingSchedule = classItem.schedules.find(s => s.dayOfWeek === dayOfWeek);
+                      
+                      if (matchingSchedule) {
+                        startTime = matchingSchedule.startTime;
+                        endTime = matchingSchedule.endTime;
+                        timezone = matchingSchedule.timezone || timezone;
+                      }
+                    }
+
+                    // Get the user's local timezone
+                    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    
+                    // Convert times if timezones are different
+                    if (timezone !== userTimezone) {
+                      const convertTime = (timeStr: string): string => {
+                        try {
+                          // Parse the time string
+                          let isPM = timeStr.includes('PM');
+                          let isAM = timeStr.includes('AM');
+                          let hours = 0;
+                          let minutes = 0;
+                          
+                          const timeOnly = timeStr.replace(/\s*[AP]M\s*/, '').trim();
+                          const [h, m] = timeOnly.split(':').map(Number);
+                          hours = h || 0;
+                          minutes = m || 0;
+                          
+                          if (isPM && hours < 12) hours += 12;
+                          if (isAM && hours === 12) hours = 0;
+                          
+                          // Create a date object for today with the specified time
+                          const today = new Date();
+                          const dateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+                          
+                          // First, create a date in the source timezone
+                          const sourceDate = new Date(dateString);
+                          
+                          // Get the timezone offsets
+                          const sourceOffset = new Date(sourceDate.toLocaleString('en-US', { timeZone: timezone })).getTime() - sourceDate.getTime();
+                          const userOffset = new Date(sourceDate.toLocaleString('en-US', { timeZone: userTimezone })).getTime() - sourceDate.getTime();
+                          
+                          // Calculate the time difference
+                          const timeDiff = sourceOffset - userOffset;
+                          
+                          // Apply the offset to get the correct time in user's timezone
+                          const convertedDate = new Date(sourceDate.getTime() - timeDiff);
+                          
+                          // Format the time in 12-hour format
+                          return convertedDate.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: 'numeric',
+                            hour12: true
+                          });
+                        } catch (error) {
+                          console.error("Error converting time:", error);
+                          return timeStr;
+                        }
+                      };
+                      
+                      const convertedStartTime = convertTime(startTime);
+                      const convertedEndTime = convertTime(endTime);
+                      return `${convertedStartTime} - ${convertedEndTime}`;
+                    }
+                    
+                    // If same timezone, just format nicely
+                    return `${startTime} - ${endTime}`;
+                  })()
                 : `${classes.length} ${t.class || 'class'}`
               }
               {hasMaterials && (

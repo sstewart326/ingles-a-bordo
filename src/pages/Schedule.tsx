@@ -616,34 +616,45 @@ export const Schedule = () => {
       Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
     const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
-    // For classes with multiple schedules, ensure we get the right schedule for this day of week
-    const currentDayOfWeek = date.getDay();
-    let updatedClass = { ...dayClasses[0] };
-    
-    // If it's a multiple schedule class, find the right schedule for this day
-    if (updatedClass.scheduleType === 'multiple' && 
-        Array.isArray(updatedClass.schedules)) {
-      
-      const matchingSchedule = updatedClass.schedules.find(
-        (s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === currentDayOfWeek
-      );
-      
-      if (matchingSchedule) {
-        // Update the class details with the current day's schedule
+    // For each class, ensure we get the correct schedule for this specific date
+    const processedClasses = dayClasses.map(classItem => {
+      let updatedClass = { ...classItem };
+      const currentDayOfWeek = date.getDay();
+
+      // If it's a multiple schedule class, find the right schedule for this day
+      if (updatedClass.scheduleType === 'multiple' && Array.isArray(updatedClass.schedules)) {
+        const matchingSchedule = updatedClass.schedules.find(
+          (s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === currentDayOfWeek
+        );
+
+        if (matchingSchedule) {
+          // Update the class details with the current day's schedule
+          updatedClass = {
+            ...updatedClass,
+            startTime: matchingSchedule.startTime,
+            endTime: matchingSchedule.endTime,
+            timezone: matchingSchedule.timezone || updatedClass.timezone
+          };
+        }
+      } else if (updatedClass.scheduleType === 'single' && Array.isArray(updatedClass.schedules) && updatedClass.schedules[0]) {
+        // For single schedule type, use the first schedule
+        const schedule = updatedClass.schedules[0];
         updatedClass = {
           ...updatedClass,
-          startTime: matchingSchedule.startTime,
-          endTime: matchingSchedule.endTime,
-          timezone: matchingSchedule.timezone || updatedClass.timezone
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          timezone: schedule.timezone || updatedClass.timezone
         };
       }
-    }
+
+      return updatedClass;
+    });
 
     // Create materials info map for the ScheduleCalendarDay component
     const materialsInfo = new Map<string, { hasSlides: boolean; hasLinks: boolean }>();
     
     if (calendarData?.materials) {
-      dayClasses.forEach(classItem => {
+      processedClasses.forEach(classItem => {
         const dateStr = formatDateForComparison(date);
         const key = `${classItem.id}_${dateStr}`;
         
@@ -667,7 +678,7 @@ export const Schedule = () => {
     const homeworkInfo = new Map<string, number>();
     
     // Check for homework for each class on this day
-    dayClasses.forEach(classItem => {
+    processedClasses.forEach(classItem => {
       const dateStr = formatDateForComparison(date);
       // Safely handle potential undefined id
       const id = classItem.id || '';
@@ -694,7 +705,7 @@ export const Schedule = () => {
     const homeworkFeedbackInfo = new Map<string, boolean>();
     
     // Check for homework feedback for each class on this day
-    dayClasses.forEach(classItem => {
+    processedClasses.forEach(classItem => {
       const dateStr = formatDateForComparison(date);
       // Safely handle potential undefined id
       const id = classItem.id || '';
@@ -725,7 +736,7 @@ export const Schedule = () => {
     });
     
     // Map the calendar classes to include required ClassSession properties
-    const mappedClasses = dayClasses.map(classItem => ({
+    const mappedClasses = processedClasses.map(classItem => ({
       ...classItem,
       id: classItem.id,
       name: classItem.courseType || 'Class',

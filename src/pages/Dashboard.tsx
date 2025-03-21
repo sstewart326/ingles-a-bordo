@@ -45,6 +45,7 @@ export const Dashboard = () => {
   const isFetchingRef = useRef<boolean>(false);
   
   const [homeworkByClassId, setHomeworkByClassId] = useState<Record<string, Homework[]>>({});
+  const lastHomeworkFetchRef = useRef<number>(0);
   
   const { currentUser, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -1121,6 +1122,14 @@ export const Dashboard = () => {
   
   // Function to refresh all homework data
   const refreshAllHomework = async () => {
+    // Prevent duplicate fetches within 2 seconds
+    const now = Date.now();
+    if (now - lastHomeworkFetchRef.current < 2000) {
+      console.log('Skipping homework fetch - too soon since last fetch');
+      return;
+    }
+    lastHomeworkFetchRef.current = now;
+    
     console.log('Dashboard: Refreshing all homework data');
     
     try {
