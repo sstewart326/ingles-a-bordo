@@ -579,7 +579,7 @@ export const AdminSchedule = () => {
           startDate: paymentStartDate,
           paymentLink: '',
           amount: 0,
-          currency: 'BRL'
+          currency: 'USD'
         },
         frequency: {
           type: 'custom',
@@ -885,7 +885,7 @@ export const AdminSchedule = () => {
         }),
         paymentLink: editingClass.paymentConfig.paymentLink || '',
         amount: editingClass.paymentConfig.amount || 0,
-        currency: editingClass.paymentConfig.currency || 'BRL'
+        currency: editingClass.paymentConfig.currency || 'USD'
       };
 
       // Ensure frequency has proper structure
@@ -1103,7 +1103,7 @@ export const AdminSchedule = () => {
             <div className="mt-2">
               <div className={styles.card.label}>Payment Amount</div>
               <div className="text-gray-800">
-                {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
+                {classItem.paymentConfig?.currency || 'USD'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
               </div>
             </div>
             <div className="mt-2">
@@ -1946,7 +1946,7 @@ export const AdminSchedule = () => {
                     </label>
                     <select
                       id="paymentCurrency"
-                      value={newClass.paymentConfig.currency || 'BRL'}
+                      value={newClass.paymentConfig.currency || 'USD'}
                       onChange={(e) => setNewClass((prev: typeof newClass) => ({
                         ...prev,
                         paymentConfig: {
@@ -2115,7 +2115,7 @@ export const AdminSchedule = () => {
                           )}
                         </td>
                         <td className={styles.table.cell}>
-                          {classItem.paymentConfig?.currency || 'BRL'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
+                          {classItem.paymentConfig?.currency || 'USD'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
                         </td>
                         <td className={styles.table.cell}>
                           {classItem.paymentConfig?.type === 'weekly'
@@ -2861,7 +2861,7 @@ export const AdminSchedule = () => {
                   </label>
                   <select
                     id="editPaymentCurrency"
-                    value={editingClass?.paymentConfig.currency || 'BRL'}
+                    value={editingClass?.paymentConfig.currency || 'USD'}
                     onChange={(e) => {
                       if (!editingClass) return;
                       setEditingClass((prev: any) => ({
