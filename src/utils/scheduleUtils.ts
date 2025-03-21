@@ -1,45 +1,60 @@
 import { Timestamp } from 'firebase/firestore';
 
 export interface ClassSession {
+  // Required fields
   id: string;
-  name: string;
-  date?: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  courseType: string;
+  studentEmails: string[];
+
+  // Optional fields
+  name?: string;
   title?: string;
   description?: string;
-  students?: any[];  // Allow both string[] and object[] types
-  studentEmails: string[];
+  students?: Array<{
+    id?: string;
+    name?: string;
+    email: string;
+    birthdate?: string;
+    paymentConfig?: {
+      type: 'weekly' | 'monthly';
+      weeklyInterval?: number;
+      monthlyOption?: 'first' | 'fifteen' | 'last';
+      startDate: string;
+      paymentLink?: string;
+      amount?: number;
+      currency?: string;
+    };
+  }>;
   studentIds?: string[]; // Keep for backward compatibility
-  dayOfWeek?: number;
-  startTime?: string;
-  endTime?: string;
-  timezone?: string; // Add timezone field
-  courseType?: string;
   notes?: string;
   privateNotes?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-  endDate?: Timestamp;
   startDate?: Timestamp;
-  scheduleType?: 'single' | 'multiple';  // Type of schedule (single day or multiple days per week)
+  endDate?: Timestamp | null;
+  recurrencePattern?: string;
+  recurrenceInterval?: number;
+  paymentConfig?: {
+    amount: number;
+    weeklyInterval?: number;
+    monthlyOption?: 'first' | 'fifteen' | 'last';
+    currency: string;
+    paymentLink: string;
+    type: 'weekly' | 'monthly';
+    startDate: string;
+  };
+  dates?: string[];
+  scheduleType?: 'single' | 'multiple';
   schedules?: Array<{
     dayOfWeek: number;
     startTime: string;
     endTime: string;
-    timezone?: string; // Add timezone field to schedule
-  }>;  // For multiple days per week
-  frequency?: {
-    type: 'weekly' | 'biweekly' | 'custom';
-    every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks
-  };
-  paymentConfig?: {
-    type: 'weekly' | 'monthly';
-    weeklyInterval?: number;  // for weekly payments, number of weeks
-    monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
-    startDate: string;  // YYYY-MM-DD date string
-    paymentLink?: string;  // URL for payment
-    amount?: number;  // Payment amount
-    currency?: string;  // Payment currency (e.g., USD, BRL)
-  };
+    timezone?: string;
+  }>;
   materials?: any[];
 }
 
@@ -57,31 +72,15 @@ export interface User {
   };
 }
 
-export interface ClassWithStudents extends ClassSession {
-  students: {
-    id: string;
-    name?: string;
-    email: string;
-    paymentConfig?: {
-      type: 'weekly' | 'monthly';
-      weeklyInterval?: number;
-      monthlyOption?: 'first' | 'fifteen' | 'last';
-      startDate: string;
-      paymentLink?: string;
-      amount?: number;  // Payment amount
-      currency?: string;  // Payment currency (e.g., USD, BRL)
-    };
-  }[];
-  paymentConfig: {
-    type: 'weekly' | 'monthly';
-    weeklyInterval?: number;  // for weekly payments, number of weeks
-    monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
-    startDate: string;  // YYYY-MM-DD date string
-    paymentLink?: string;  // URL for payment
-    amount?: number;  // Payment amount
-    currency?: string;  // Payment currency (e.g., USD, BRL)
-  };
-}
+// ClassWithStudents is now just an alias since we've updated the base interface
+export type ClassWithStudents = ClassSession;
+
+// Helper function to convert string or Timestamp to Date
+const toDate = (date: string | Timestamp | undefined | null): Date | undefined => {
+  if (!date) return undefined;
+  if (date instanceof Timestamp) return date.toDate();
+  return new Date(date);
+};
 
 export const formatClassTime = (classSession: ClassSession): string => {
   // For classes with multiple schedules, find the matching schedule for the day of week
@@ -134,7 +133,7 @@ export const getClassesForDay = (
   
   return classes.filter(classItem => {
     // Check if this date is on or after the class start date
-    const classStartDate = startOfDay(classItem.startDate?.toDate() || new Date());
+    const classStartDate = startOfDay(toDate(classItem.startDate) || new Date());
     const hasStarted = calendarDate >= classStartDate;      
     if (!hasStarted) {
       return false;
@@ -146,9 +145,10 @@ export const getClassesForDay = (
     }
     
     // Otherwise check if it's not expired and within end date
+    const endDate = toDate(classItem.endDate);
     const isValid = classItem.dayOfWeek === dayOfWeek && 
-      classItem.endDate.toDate() >= today && // Must not be expired
-      calendarDate <= classItem.endDate.toDate(); // Must not be past the end date      
+      (endDate ? endDate >= today : true) && // Must not be expired
+      (endDate ? calendarDate <= endDate : true); // Must not be past the end date      
     return isValid;
   });
 };
@@ -158,15 +158,28 @@ export const getNextPaymentDates = (
   classItem: ClassSession | ClassWithStudents,
   selectedDate: Date
 ): Date[] => {
+  // Debug logging
+  console.log('getNextPaymentDates called with:', {
+    paymentConfig,
+    classId: classItem.id,
+    selectedDate: selectedDate.toISOString(),
+    hasStartDate: !!classItem.startDate
+  });
+
   if (!paymentConfig || !classItem.startDate) {
+    console.log('Missing required data:', {
+      hasPaymentConfig: !!paymentConfig,
+      hasStartDate: !!classItem.startDate
+    });
     return [];
   }
   
   const dates: Date[] = [];
-  const startDate = classItem.startDate.toDate();
+  const startDate = toDate(classItem.startDate);
+  if (!startDate) return [];
   startDate.setHours(0, 0, 0, 0);
   
-  // Parse the payment start date in local timezone without time component
+  // Parse the payment start date in local timezone
   const paymentStartDate = new Date(paymentConfig.startDate);
   paymentStartDate.setHours(0, 0, 0, 0);
   
@@ -175,18 +188,30 @@ export const getNextPaymentDates = (
   monthStart.setHours(0, 0, 0, 0);
   const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
   monthEnd.setHours(23, 59, 59, 999);
+
+  // Debug log date ranges
+  console.log('Date ranges:', {
+    startDate: startDate.toISOString(),
+    paymentStartDate: paymentStartDate.toISOString(),
+    monthStart: monthStart.toISOString(),
+    monthEnd: monthEnd.toISOString()
+  });
   
   // If class has ended, no payments
   if (classItem.endDate) {
-    const endDate = classItem.endDate.toDate();
-    endDate.setHours(23, 59, 59, 999);
-    if (endDate < monthStart) {
-      return [];
+    const endDate = toDate(classItem.endDate);
+    if (endDate) {
+      endDate.setHours(23, 59, 59, 999);
+      if (endDate < monthStart) {
+        console.log('Class has ended before month start:', endDate.toISOString());
+        return [];
+      }
     }
   }
 
   // If we're viewing a month before the payment start date, return no dates
   if (monthEnd < paymentStartDate) {
+    console.log('Month ends before payment start date');
     return [];
   }
 
@@ -199,11 +224,16 @@ export const getNextPaymentDates = (
       d.getDate() === newPaymentDate.getDate()
     );
     if (!dateExists) {
+      console.log('Adding payment start date:', newPaymentDate.toISOString());
       dates.push(newPaymentDate);
     }
   }
   
   if (paymentConfig.type === 'weekly') {
+    console.log('Processing weekly payment config:', {
+      interval: paymentConfig.weeklyInterval || 1
+    });
+
     const interval = paymentConfig.weeklyInterval || 1;
     let currentPaymentDate = new Date(paymentStartDate);
     
@@ -211,6 +241,10 @@ export const getNextPaymentDates = (
     if (currentPaymentDate < monthStart) {
       const weeksToAdd = Math.ceil((monthStart.getTime() - currentPaymentDate.getTime()) / (7 * 24 * 60 * 60 * 1000) / interval) * interval;
       currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * weeksToAdd));
+      console.log('Adjusted weekly payment date:', {
+        weeksToAdd,
+        newDate: currentPaymentDate.toISOString()
+      });
     }
     
     // Add all payment dates in this month
@@ -218,11 +252,16 @@ export const getNextPaymentDates = (
       if (currentPaymentDate >= monthStart && currentPaymentDate >= paymentStartDate) {
         // Create new date object to avoid modifying the current one
         const paymentDate = new Date(currentPaymentDate);
+        console.log('Adding weekly payment date:', paymentDate.toISOString());
         dates.push(paymentDate);
       }
       currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * interval));
     }
   } else if (paymentConfig.type === 'monthly') {
+    console.log('Processing monthly payment config:', {
+      option: paymentConfig.monthlyOption
+    });
+
     const year = selectedDate.getFullYear();
     const month = selectedDate.getMonth();
     
@@ -239,20 +278,35 @@ export const getNextPaymentDates = (
         paymentDate = new Date(year, month + 1, 0);
         break;
       default:
+        console.log('Invalid monthly option:', paymentConfig.monthlyOption);
         return dates;
     }
     paymentDate.setHours(0, 0, 0, 0);
     
     // Only add the monthly payment date if it's after the payment start date
+    const endDate = toDate(classItem.endDate);
     if (paymentDate >= paymentStartDate && 
-        (!classItem.endDate || paymentDate <= classItem.endDate.toDate())) {
+        (!endDate || paymentDate <= endDate)) {
       // Check if this date is not already in the dates array
       const dateExists = dates.some(d => d.getTime() === paymentDate.getTime());
       if (!dateExists) {
+        console.log('Adding monthly payment date:', paymentDate.toISOString());
         dates.push(paymentDate);
       }
+    } else {
+      console.log('Monthly payment date not added:', {
+        paymentDate: paymentDate.toISOString(),
+        reason: paymentDate < paymentStartDate ? 'Before payment start date' : 'After class end date'
+      });
     }
   }
+
+  // Debug log final result
+  console.log('getNextPaymentDates returning:', {
+    classId: classItem.id,
+    datesCount: dates.length,
+    dates: dates.map(d => d.toISOString())
+  });
   
   return dates;
 };

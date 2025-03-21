@@ -16,42 +16,12 @@ import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
-  classDetails: {
-    id: string;
-    dayOfWeek: number;
-    scheduleType: string;
-    schedules: Array<{
-      dayOfWeek: number;
-      startTime: string;
-      endTime: string;
-      timezone?: string;
-    }>;
-    frequency: {
-      type: string;
-      every: number;
-    };
-    startTime: string;
-    endTime: string;
-    timezone?: string;
-    courseType: string;
-    notes: string;
-    studentEmails: string[];
-    startDate: string | null;
-    endDate: string | null;
-    recurrencePattern: string;
-    recurrenceInterval: number;
-    paymentConfig: {
-      amount: number;
-      weeklyInterval: number | null;
-      monthlyOption: string | null;
-      currency: string;
-      paymentLink: string;
-      type: string;
-      startDate: string;
-    };
-  };
   dates: string[];
   paymentDueDates: string[];
+  frequency?: {
+    type: string;
+    every: number;
+  };
 }
 
 interface CalendarMaterial {
@@ -269,7 +239,7 @@ export const Schedule = () => {
     const uniqueClasses = new Map<string, CalendarClass>();
     
     allClassesForDate.forEach(classItem => {
-      const fullId = classItem.classDetails.id;
+      const fullId = classItem.id;
       // Extract the base ID (without any day suffix like -1, -2)
       const baseId = fullId.split('-')[0];
       
@@ -297,7 +267,7 @@ export const Schedule = () => {
   const handleClassClick = async (classItem: CalendarClass, date: Date) => {
     if (!calendarData?.materials) return;
     
-    const classId = classItem.classDetails.id;
+    const classId = classItem.id;
     if (!calendarData.materials[classId]) return;
     
     setSelectedClass(classItem);
@@ -347,7 +317,7 @@ export const Schedule = () => {
     // Check for homework on this date
     uniqueClasses.forEach(classItem => {
       // Safely handle potential undefined id
-      const id = classItem.classDetails.id || '';
+      const id = classItem.id || '';
       const baseClassId = id ? id.split('-')[0] : '';
       console.log(`Checking for homework on class ${baseClassId} (original: ${id})`);
       
@@ -397,7 +367,7 @@ export const Schedule = () => {
     // Get unique class IDs (base IDs)
     const uniqueClassIds = Array.from(new Set(
       calendarData.classes
-        .map(classItem => classItem.classDetails)
+        .map(classItem => classItem)
         .filter(classItem => classItem.id) // Filter out entries without an id
         .map(classItem => classItem.id ? classItem.id.split('-')[0] : '')
     ));
@@ -544,7 +514,7 @@ export const Schedule = () => {
               
               // Debug: Check if any of these classes have homework
               todayClasses.forEach(classItem => {
-                const id = classItem.classDetails.id || '';
+                const id = classItem.id || '';
                 const baseClassId = id ? id.split('-')[0] : '';
                 const homeworkCount = homeworkByClass[baseClassId]?.length || 0;
                 console.log(`Class ${baseClassId} has ${homeworkCount} homework assignments`);
@@ -608,7 +578,7 @@ export const Schedule = () => {
       
       // Debug: Check if any of these classes have homework
       todayClasses.forEach(classItem => {
-        const id = classItem.classDetails.id || '';
+        const id = classItem.id || '';
         const baseClassId = id ? id.split('-')[0] : '';
         const homeworkCount = homeworkByClass[baseClassId]?.length || 0;
         console.log(`Class ${baseClassId} has ${homeworkCount} homework assignments`);
@@ -648,43 +618,37 @@ export const Schedule = () => {
 
     // For classes with multiple schedules, ensure we get the right schedule for this day of week
     const currentDayOfWeek = date.getDay();
-    const classesWithCorrectSchedules = dayClasses.map(classItem => {
-      // Create a shallow copy of the class item
-      const updatedClass = { ...classItem };
+    let updatedClass = { ...dayClasses[0] };
+    
+    // If it's a multiple schedule class, find the right schedule for this day
+    if (updatedClass.scheduleType === 'multiple' && 
+        Array.isArray(updatedClass.schedules)) {
       
-      // If it's a multiple schedule class, find the right schedule for this day
-      if (updatedClass.classDetails.scheduleType === 'multiple' && 
-          Array.isArray(updatedClass.classDetails.schedules)) {
-        
-        const matchingSchedule = updatedClass.classDetails.schedules.find(
-          schedule => schedule.dayOfWeek === currentDayOfWeek
-        );
-        
-        if (matchingSchedule) {
-          // Update the class details with the current day's schedule
-          updatedClass.classDetails = {
-            ...updatedClass.classDetails,
-            dayOfWeek: currentDayOfWeek,
-            startTime: matchingSchedule.startTime,
-            endTime: matchingSchedule.endTime,
-            timezone: matchingSchedule.timezone || updatedClass.classDetails.timezone
-          };
-        }
+      const matchingSchedule = updatedClass.schedules.find(
+        schedule => schedule.dayOfWeek === currentDayOfWeek
+      );
+      
+      if (matchingSchedule) {
+        // Update the class details with the current day's schedule
+        updatedClass = {
+          ...updatedClass,
+          startTime: matchingSchedule.startTime,
+          endTime: matchingSchedule.endTime,
+          timezone: matchingSchedule.timezone || updatedClass.timezone
+        };
       }
-      
-      return updatedClass;
-    });
+    }
 
     // Create materials info map for the ScheduleCalendarDay component
     const materialsInfo = new Map<string, { hasSlides: boolean; hasLinks: boolean }>();
     
     if (calendarData?.materials) {
-      classesWithCorrectSchedules.forEach(classItem => {
+      dayClasses.forEach(classItem => {
         const dateStr = formatDateForComparison(date);
-        const key = `${classItem.classDetails.id}_${dateStr}`;
+        const key = `${classItem.id}_${dateStr}`;
         
-        if (calendarData.materials[classItem.classDetails.id]) {
-          const material = calendarData.materials[classItem.classDetails.id].find(m => {
+        if (calendarData.materials[classItem.id]) {
+          const material = calendarData.materials[classItem.id].find(m => {
             const materialDateStr = m.classDate?.split('T')[0] || '';
             return materialDateStr === dateStr;
           });
@@ -703,10 +667,10 @@ export const Schedule = () => {
     const homeworkInfo = new Map<string, number>();
     
     // Check for homework for each class on this day
-    classesWithCorrectSchedules.forEach(classItem => {
+    dayClasses.forEach(classItem => {
       const dateStr = formatDateForComparison(date);
       // Safely handle potential undefined id
-      const id = classItem.classDetails.id || '';
+      const id = classItem.id || '';
       
       // Important: This key must match the format used in ScheduleCalendarDay component
       const key = `${id}_${dateStr}`;
@@ -730,10 +694,10 @@ export const Schedule = () => {
     const homeworkFeedbackInfo = new Map<string, boolean>();
     
     // Check for homework feedback for each class on this day
-    classesWithCorrectSchedules.forEach(classItem => {
+    dayClasses.forEach(classItem => {
       const dateStr = formatDateForComparison(date);
       // Safely handle potential undefined id
-      const id = classItem.classDetails.id || '';
+      const id = classItem.id || '';
       const key = `${id}_${dateStr}`;
       const baseClassId = id ? id.split('-')[0] : '';
       
@@ -761,25 +725,25 @@ export const Schedule = () => {
     });
     
     // Map the calendar classes to include required ClassSession properties
-    const mappedClasses = classesWithCorrectSchedules.map(classItem => ({
+    const mappedClasses = dayClasses.map(classItem => ({
       ...classItem,
-      id: classItem.classDetails.id,
-      name: classItem.classDetails.courseType || 'Class',
-      studentEmails: classItem.classDetails.studentEmails,
-      dayOfWeek: classItem.classDetails.dayOfWeek,
-      startTime: classItem.classDetails.startTime,
-      endTime: classItem.classDetails.endTime,
-      timezone: classItem.classDetails.timezone,
-      courseType: classItem.classDetails.courseType,
-      notes: classItem.classDetails.notes,
-      paymentConfig: classItem.classDetails.paymentConfig ? {
-        type: classItem.classDetails.paymentConfig.type as 'weekly' | 'monthly',
-        weeklyInterval: classItem.classDetails.paymentConfig.weeklyInterval || undefined,
-        monthlyOption: classItem.classDetails.paymentConfig.monthlyOption as 'first' | 'fifteen' | 'last' | undefined,
-        startDate: classItem.classDetails.paymentConfig.startDate,
-        paymentLink: classItem.classDetails.paymentConfig.paymentLink,
-        amount: classItem.classDetails.paymentConfig.amount,
-        currency: classItem.classDetails.paymentConfig.currency
+      id: classItem.id,
+      name: classItem.courseType || 'Class',
+      studentEmails: classItem.studentEmails,
+      dayOfWeek: classItem.dayOfWeek,
+      startTime: classItem.startTime,
+      endTime: classItem.endTime,
+      timezone: classItem.timezone,
+      courseType: classItem.courseType,
+      notes: classItem.notes,
+      paymentConfig: classItem.paymentConfig ? {
+        type: classItem.paymentConfig.type as 'weekly' | 'monthly',
+        weeklyInterval: classItem.paymentConfig.weeklyInterval || undefined,
+        monthlyOption: classItem.paymentConfig.monthlyOption as 'first' | 'fifteen' | 'last' | undefined,
+        startDate: classItem.paymentConfig.startDate,
+        paymentLink: classItem.paymentConfig.paymentLink,
+        amount: classItem.paymentConfig.amount,
+        currency: classItem.paymentConfig.currency
       } : undefined
     }));
 
@@ -817,7 +781,7 @@ export const Schedule = () => {
     // Check for homework on this date
     classes.forEach(classItem => {
       // Safely handle potential undefined id
-      const id = classItem.classDetails.id || '';
+      const id = classItem.id || '';
       const baseClassId = id ? id.split('-')[0] : '';
       console.log(`Class in pill: ${baseClassId} (original: ${id})`);
       
@@ -944,9 +908,9 @@ export const Schedule = () => {
   const formatClassTime = (classItem: any) => {
     if (!classItem) return '';
     
-    let startTime = classItem.startTime || classItem.classDetails?.startTime || '';
-    let endTime = classItem.endTime || classItem.classDetails?.endTime || '';
-    let timezone = classItem.timezone || classItem.classDetails?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let startTime = classItem.startTime || '';
+    let endTime = classItem.endTime || '';
+    let timezone = classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
     // Early validation of time strings
     if (!startTime || !endTime) {
@@ -961,7 +925,7 @@ export const Schedule = () => {
       startTime, 
       endTime, 
       timezone, 
-      classId: classItem.id || classItem.classDetails?.id
+      classId: classItem.id || classItem.id
     });
     
     if (startTime && endTime) {
@@ -1276,7 +1240,7 @@ export const Schedule = () => {
                 {selectedDayDetails.classes.length > 0 ? (
                   selectedDayDetails.classes.map(classItem => {
                     const dateStr = formatDateForComparison(selectedDayDetails.date);
-                    const id = classItem.classDetails.id || '';
+                    const id = classItem.id || '';
                     const classBaseId = id ? id.split('-')[0] : '';
                     
                     // Check if this class has materials
@@ -1311,31 +1275,31 @@ export const Schedule = () => {
                     });
 
                     // Map the class to include required ClassSession properties
-                    const mappedClass = {
-                      ...classItem,
-                      id: classItem.classDetails.id,
-                      name: classItem.classDetails.courseType || 'Class',
-                      studentEmails: classItem.classDetails.studentEmails,
-                      dayOfWeek: classItem.classDetails.dayOfWeek,
-                      startTime: classItem.classDetails.startTime,
-                      endTime: classItem.classDetails.endTime,
-                      timezone: classItem.classDetails.timezone,
-                      courseType: classItem.classDetails.courseType,
-                      notes: classItem.classDetails.notes,
-                      paymentConfig: classItem.classDetails.paymentConfig ? {
-                        type: classItem.classDetails.paymentConfig.type as 'weekly' | 'monthly',
-                        weeklyInterval: classItem.classDetails.paymentConfig.weeklyInterval || undefined,
-                        monthlyOption: classItem.classDetails.paymentConfig.monthlyOption as 'first' | 'fifteen' | 'last' | undefined,
-                        startDate: classItem.classDetails.paymentConfig.startDate,
-                        paymentLink: classItem.classDetails.paymentConfig.paymentLink,
-                        amount: classItem.classDetails.paymentConfig.amount,
-                        currency: classItem.classDetails.paymentConfig.currency
-                      } : undefined
-                    };
+                    let updatedClass = { ...classItem };
+                    const currentDayOfWeek = selectedDayDetails.date.getDay();
+                    
+                    // If it's a multiple schedule class, find the right schedule for this day
+                    if (updatedClass.scheduleType === 'multiple' && 
+                        Array.isArray(updatedClass.schedules)) {
+                      
+                      const matchingSchedule = updatedClass.schedules.find(
+                        schedule => schedule.dayOfWeek === currentDayOfWeek
+                      );
+                      
+                      if (matchingSchedule) {
+                        // Update the class details with the current day's schedule
+                        updatedClass = {
+                          ...updatedClass,
+                          startTime: matchingSchedule.startTime,
+                          endTime: matchingSchedule.endTime,
+                          timezone: matchingSchedule.timezone || updatedClass.timezone
+                        };
+                      }
+                    }
 
                     return (
                       <div
-                        key={classItem.classDetails.id}
+                        key={classItem.id}
                         onClick={() => hasMaterials && handleClassClick(classItem, selectedDayDetails.date)}
                         className={`p-4 rounded-xl mb-4 last:mb-0 border ${
                           hasMaterials 
@@ -1354,16 +1318,16 @@ export const Schedule = () => {
                           
                           <span className="text-sm font-medium text-[#4b5563]">{t.time}</span>
                           <span className="text-sm text-[#1a1a1a]">
-                            {formatClassTime(classItem)}
+                            {formatClassTime(updatedClass)}
                           </span>
 
                           <span className="text-sm font-medium text-[#4b5563]">{t.class}</span>
-                          <span className="text-sm text-[#1a1a1a]">{mappedClass.courseType || t.class}</span>
+                          <span className="text-sm text-[#1a1a1a]">{updatedClass.courseType || t.class}</span>
 
-                          {mappedClass.notes && (
+                          {updatedClass.notes && (
                             <>
                               <span className="text-sm font-medium text-[#4b5563]">{t.notes}</span>
-                              <span className="text-sm text-[#1a1a1a]">{mappedClass.notes}</span>
+                              <span className="text-sm text-[#1a1a1a]">{updatedClass.notes}</span>
                             </>
                           )}
                         </div>

@@ -767,13 +767,15 @@ export const Dashboard = () => {
   const formatClassTime = (classSession: ClassSession) => {
     if (!classSession) return '';
     
-    let startTime = classSession.startTime || '';
-    let endTime = classSession.endTime || '';
-    let timezone = classSession.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const details = classSession;
+    
+    let startTime = details.startTime || '';
+    let endTime = details.endTime || '';
+    let timezone = details.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
     // Early validation of time strings
     if (!startTime || !endTime) {
-      console.warn("Missing start or end time:", { startTime, endTime, classId: classSession.id });
+      console.warn("Missing start or end time:", { startTime, endTime, classId: details.id });
       
       // Set default times if missing
       startTime = startTime || "9:00 AM";
@@ -784,24 +786,24 @@ export const Dashboard = () => {
       startTime, 
       endTime, 
       timezone, 
-      classSessionId: classSession.id,
-      scheduleType: classSession.scheduleType,
-      dayOfWeek: classSession.dayOfWeek,
-      originalTimezone: classSession.timezone,
+      classSessionId: details.id,
+      scheduleType: details.scheduleType,
+      dayOfWeek: details.dayOfWeek,
+      originalTimezone: details.timezone,
       allTimezoneInfo: {
-        hasSchedules: !!classSession.schedules,
-        schedulesLength: classSession.schedules?.length,
-        firstScheduleTz: classSession.schedules?.[0]?.timezone,
-        dayOfWeekSearching: classSession.dayOfWeek
+        hasSchedules: !!details.schedules,
+        schedulesLength: details.schedules?.length,
+        firstScheduleTz: details.schedules?.[0]?.timezone,
+        dayOfWeekSearching: details.dayOfWeek
       }
     });
     
-    if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) && classSession.dayOfWeek !== undefined) {
+    if (details.scheduleType === 'multiple' && Array.isArray(details.schedules) && details.dayOfWeek !== undefined) {
       // Debug the schedules array to see timezone info
-      console.log('All schedules:', JSON.stringify(classSession.schedules, null, 2));
+      console.log('All schedules:', JSON.stringify(details.schedules, null, 2));
       
-      const matchingSchedule = classSession.schedules.find(schedule => 
-        schedule.dayOfWeek === classSession.dayOfWeek
+      const matchingSchedule = details.schedules.find(schedule => 
+        schedule.dayOfWeek === details.dayOfWeek
       );
       
       if (matchingSchedule) {
@@ -819,13 +821,13 @@ export const Dashboard = () => {
           endTime, 
           timezone,
           dayOfWeek: matchingSchedule.dayOfWeek,
-          originalTimezone: classSession.timezone,
+          originalTimezone: details.timezone,
           matchingSchedule
         });
       }
     }
     
-    if (classSession.dayOfWeek !== undefined && startTime && endTime) {
+    if (details.dayOfWeek !== undefined && startTime && endTime) {
       // Get the user's local timezone
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       
@@ -1002,9 +1004,9 @@ export const Dashboard = () => {
       // Convert times from class timezone to user timezone
       try {
         // Ensure we have the correct timezone - fallback check in case matchingSchedule processing failed above
-        if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) && classSession.dayOfWeek !== undefined) {
+        if (details.scheduleType === 'multiple' && Array.isArray(details.schedules) && details.dayOfWeek !== undefined) {
           // Find matching schedule for this day of week
-          const schedule = classSession.schedules.find(s => s.dayOfWeek === classSession.dayOfWeek);
+          const schedule = details.schedules.find(s => s.dayOfWeek === details.dayOfWeek);
           // Use schedule timezone if available (it should have higher priority)
           if (schedule && schedule.timezone) {
             timezone = schedule.timezone;
@@ -1075,23 +1077,25 @@ export const Dashboard = () => {
   };
 
   const getNextClassDate = (classSession: ClassSession): Date | null => {
-    if (!classSession.dayOfWeek && classSession.dayOfWeek !== 0) return null;
+    const details = classSession;
+    
+    if (!details.dayOfWeek && details.dayOfWeek !== 0) return null;
     
     const today = new Date();
     const currentDayOfWeek = today.getDay();
-    const targetDayOfWeek = classSession.dayOfWeek;
+    const targetDayOfWeek = details.dayOfWeek;
     
     let daysUntilNext = targetDayOfWeek - currentDayOfWeek;
     if (daysUntilNext <= 0) {
       daysUntilNext += 7;
     }
     
-    if (daysUntilNext === 0 && classSession.startTime) {
-      const [hours, minutes] = classSession.startTime.split(':');
+    if (daysUntilNext === 0 && details.startTime) {
+      const [hours, minutes] = details.startTime.split(':');
       let hour = parseInt(hours);
-      if (classSession.startTime.toLowerCase().includes('pm') && hour !== 12) {
+      if (details.startTime.toLowerCase().includes('pm') && hour !== 12) {
         hour += 12;
-      } else if (classSession.startTime.toLowerCase().includes('am') && hour === 12) {
+      } else if (details.startTime.toLowerCase().includes('am') && hour === 12) {
         hour = 0;
       }
       
@@ -1111,23 +1115,25 @@ export const Dashboard = () => {
   };
   
   const getPreviousClassDate = (classSession: ClassSession): Date | null => {
-    if (!classSession.dayOfWeek && classSession.dayOfWeek !== 0) return null;
+    const details = classSession;
+    
+    if (!details.dayOfWeek && details.dayOfWeek !== 0) return null;
     
     const today = new Date();
     const currentDayOfWeek = today.getDay();
-    const targetDayOfWeek = classSession.dayOfWeek;
+    const targetDayOfWeek = details.dayOfWeek;
     
     let daysSinceLast = currentDayOfWeek - targetDayOfWeek;
     if (daysSinceLast < 0) {
       daysSinceLast += 7;
     }
     
-    if (daysSinceLast === 0 && classSession.startTime) {
-      const [hours, minutes] = classSession.startTime.split(':');
+    if (daysSinceLast === 0 && details.startTime) {
+      const [hours, minutes] = details.startTime.split(':');
       let hour = parseInt(hours);
-      if (classSession.startTime.toLowerCase().includes('pm') && hour !== 12) {
+      if (details.startTime.toLowerCase().includes('pm') && hour !== 12) {
         hour += 12;
-      } else if (classSession.startTime.toLowerCase().includes('am') && hour === 12) {
+      } else if (details.startTime.toLowerCase().includes('am') && hour === 12) {
         hour = 0;
       }
       

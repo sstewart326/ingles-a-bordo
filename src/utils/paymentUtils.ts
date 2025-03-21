@@ -122,27 +122,44 @@ export const getPaymentsDueForDay = (
   users: User[],
   isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean
 ): PaymentDue[] => {
+  // Debug logging
+  console.log('getPaymentsDueForDay called with:', {
+    date: date.toISOString(),
+    upcomingClassesCount: upcomingClasses.length,
+    usersCount: users.length
+  });
+
   // Check if the date is within the current month or adjacent months
   if (!isDateInRelevantMonthRange(date, date)) {
+    console.log('Date not in relevant month range:', date.toISOString());
     return [];
-  }
-  
-  // Debug log for May 11, 2025
-  if (date.getFullYear() === 2025 && date.getMonth() === 4 && date.getDate() === 11) {
-    console.log(`getPaymentsDueForDay called for May 11, 2025 with ${upcomingClasses.length} classes`);
-    if (upcomingClasses.length > 0) {
-      console.log('First class ID:', upcomingClasses[0].id);
-      console.log('First class payment config:', upcomingClasses[0].paymentConfig);
-    }
   }
   
   const paymentsDue: PaymentDue[] = [];
   const processedStudentClassPairs = new Set<string>();
   
   upcomingClasses.forEach(classSession => {
-    if (classSession.paymentConfig) {
-      const paymentDates = getNextPaymentDates(classSession.paymentConfig, classSession, date);
+    // Get the payment config directly from the class session
+    const paymentConfig = classSession.paymentConfig;
+
+    // Debug log class session details
+    console.log('Processing class session:', {
+      id: classSession.id,
+      hasPaymentConfig: !!paymentConfig,
+      paymentConfig,
+      studentEmails: classSession.studentEmails
+    });
+
+    if (paymentConfig) {
+      // Use the class session as is for getNextPaymentDates since it already has the correct Timestamp types
+      const paymentDates = getNextPaymentDates(paymentConfig, classSession, date);
       
+      // Debug log payment dates
+      console.log('Payment dates calculated:', {
+        classId: classSession.id,
+        paymentDates: paymentDates.map(d => d.toISOString())
+      });
+
       const isPaymentDue = paymentDates.some(paymentDate => 
         paymentDate.getFullYear() === date.getFullYear() &&
         paymentDate.getMonth() === date.getMonth() &&
@@ -150,6 +167,9 @@ export const getPaymentsDueForDay = (
       );
       
       if (isPaymentDue) {
+        // Debug log payment due found
+        console.log('Payment due found for class:', classSession.id);
+
         // Add one entry per student, but only if we haven't processed this student-class pair yet
         classSession.studentEmails.forEach(email => {
           const baseClassId = getBaseClassId(classSession.id);
@@ -158,26 +178,45 @@ export const getPaymentsDueForDay = (
           if (!processedStudentClassPairs.has(studentClassKey)) {
             const user = users.find(u => u.email === email);
             if (user) {
-              // Create a copy of the class session
-              let classSessionWithSchedules = { ...classSession };
+              // Create a copy of the class session with the correct payment config
+              const classSessionWithConfig: ClassSession = {
+                ...classSession,
+                paymentConfig: paymentConfig
+              };
+              
+              let classSessionWithSchedules = classSessionWithConfig;
               
               // For multiple schedule classes, ensure all schedules are included
               if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules)) {
                 // Sort schedules by day of week for consistent display
                 const sortedSchedules = [...classSession.schedules].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
                 classSessionWithSchedules = {
-                  ...classSession,
+                  ...classSessionWithSchedules,
                   schedules: sortedSchedules
                 };
               }
               
               paymentsDue.push({ user, classSession: classSessionWithSchedules });
               processedStudentClassPairs.add(studentClassKey);
+
+              // Debug log payment due added
+              console.log('Added payment due for:', {
+                studentEmail: email,
+                classId: classSession.id
+              });
+            } else {
+              console.log('User not found for email:', email);
             }
           }
         });
       }
     }
+  });
+  
+  // Debug log final result
+  console.log('getPaymentsDueForDay returning:', {
+    paymentsDueCount: paymentsDue.length,
+    date: date.toISOString()
   });
   
   return paymentsDue;

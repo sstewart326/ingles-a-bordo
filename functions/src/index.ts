@@ -226,27 +226,28 @@ export const getClassScheduleHttp = onRequest({
           );
 
           classSchedule.push({
-            classDetails: {
-              dayOfWeek: classData.dayOfWeek,
-              daysOfWeek: classData.daysOfWeek,
-              startTime: classData.startTime,
-              endTime: classData.endTime,
-              courseType: classData.courseType,
-              notes: classData.notes,
-              studentEmails: classData.studentEmails,
-              startDate: classData.startDate ? classData.startDate.toDate() : null,
-              endDate: classData.endDate ? classData.endDate.toDate() : null,
-              recurrencePattern: classData.recurrencePattern || 'weekly',
-              recurrenceInterval: classData.recurrenceInterval || 1,
-              paymentConfig: classData.paymentConfig || {
-                type: 'monthly',
-                monthlyOption: 'first',
-                startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-              },
-              dates: classDates
+            id: doc.id,
+            dayOfWeek: classData.dayOfWeek,
+            daysOfWeek: classData.daysOfWeek,
+            startTime: classData.startTime,
+            endTime: classData.endTime,
+            courseType: classData.courseType,
+            notes: classData.notes,
+            studentEmails: classData.studentEmails,
+            startDate: classData.startDate ? classData.startDate.toDate() : null,
+            endDate: classData.endDate ? classData.endDate.toDate() : null,
+            recurrencePattern: classData.recurrencePattern || 'weekly',
+            recurrenceInterval: classData.recurrenceInterval || 1,
+            paymentConfig: classData.paymentConfig || {
+              type: 'monthly',
+              monthlyOption: 'first',
+              startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
             },
             dates: classDates,
-            paymentDueDates: paymentDates
+            paymentDueDates: paymentDates,
+            timezone: classData.timezone || 'UTC',
+            scheduleType: classData.scheduleType || 'single',
+            schedules: classData.schedules || []
           });
 
           // Add payment dates to the overall list
@@ -749,31 +750,27 @@ export const getCalendarDataHttp = onRequest({
 
           // Create a base class object
           const baseClassInfo = {
-            classDetails: {
-              id: classId, // Add ID for tracking
-              dayOfWeek: classData.dayOfWeek,
-              daysOfWeek: classData.daysOfWeek,
-              scheduleType: classData.scheduleType,
-              schedules: classData.schedules,
-              frequency: classData.frequency,
-              startTime: classData.startTime,
-              endTime: classData.endTime,
-              courseType: classData.courseType,
-              notes: classData.notes,
-              studentEmails: classData.studentEmails,
-              startDate: classData.startDate ? classData.startDate.toDate() : null,
-              endDate: classData.endDate ? classData.endDate.toDate() : null,
-              recurrencePattern: classData.recurrencePattern || 'weekly',
-              recurrenceInterval: classData.recurrenceInterval || 1,
-              paymentConfig: classData.paymentConfig || {
-                type: 'monthly',
-                monthlyOption: 'first',
-                startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-              },
-              dates: classDates
+            id: classId, // Add ID for tracking
+            dayOfWeek: classData.dayOfWeek,
+            daysOfWeek: classData.daysOfWeek,
+            scheduleType: classData.scheduleType,
+            schedules: classData.schedules,
+            frequency: classData.frequency,
+            startTime: classData.startTime,
+            endTime: classData.endTime,
+            courseType: classData.courseType,
+            notes: classData.notes,
+            studentEmails: classData.studentEmails,
+            startDate: classData.startDate ? classData.startDate.toDate() : null,
+            endDate: classData.endDate ? classData.endDate.toDate() : null,
+            recurrencePattern: classData.recurrencePattern || 'weekly',
+            recurrenceInterval: classData.recurrenceInterval || 1,
+            paymentConfig: classData.paymentConfig || {
+              type: 'monthly',
+              monthlyOption: 'first',
+              startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
             },
-            dates: classDates,
-            paymentDueDates: paymentDates
+            dates: classDates
           };
 
           // Handle multiple schedule types
@@ -785,18 +782,14 @@ export const getCalendarDataHttp = onRequest({
               
               if (dayDates.length > 0) {
                 const dayClassInfo = {
-                  classDetails: {
-                    ...baseClassInfo.classDetails,
-                    id: `${classId}-${schedule.dayOfWeek}`, // Create a unique ID for each day
-                    dayOfWeek: schedule.dayOfWeek,
-                    startTime: schedule.startTime,
-                    endTime: schedule.endTime,
-                    timezone: schedule.timezone || classData.timezone, // Add timezone from schedule or class
-                    dates: dayDates
-                  },
+                  ...baseClassInfo, // Spread base fields first
+                  id: `${classId}-${schedule.dayOfWeek}`, // Then override specific fields
+                  dayOfWeek: schedule.dayOfWeek,
+                  startTime: schedule.startTime,
+                  endTime: schedule.endTime,
+                  timezone: schedule.timezone || classData.timezone,
                   dates: dayDates,
                   paymentDueDates: paymentDates.filter(date => {
-                    // Include payment dates that match this day's dates
                     return dayDates.some(classDate => 
                       classDate.toISOString().split('T')[0] === date.toISOString().split('T')[0]
                     );
@@ -809,10 +802,8 @@ export const getCalendarDataHttp = onRequest({
             // For single schedule classes, just add the original class info
             // Add timezone directly in the classDetails structure
             const singleClassInfo = {
-              classDetails: {
-                ...baseClassInfo.classDetails,
-                timezone: classData.timezone
-              },
+              ...baseClassInfo,
+              timezone: classData.timezone,
               dates: classDates,
               paymentDueDates: paymentDates
             };
@@ -989,10 +980,6 @@ export const getCalendarDataHttp = onRequest({
         // Skip classes without dates
         if (!classItem.dates || !Array.isArray(classItem.dates)) continue;
         
-        // Determine if this is a class with classDetails structure or flat structure
-        const isNestedStructure = !!(classItem as any).classDetails;
-        const classDetails = isNestedStructure ? (classItem as any).classDetails : classItem;
-        
         // Add each class date to the daily map
         classItem.dates.forEach((date: Date) => {
           const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -1002,12 +989,12 @@ export const getCalendarDataHttp = onRequest({
           
           // Add class information to the daily map
           dailyClassMap[dateString].push({
-            id: classDetails.id || '',
-            startTime: classDetails.startTime || '',
-            endTime: classDetails.endTime || '',
-            timezone: classDetails.timezone || 'UTC',
-            courseType: classDetails.courseType || '',
-            students: classDetails.studentEmails || []
+            id: classItem.id || '',
+            startTime: classItem.startTime || '',
+            endTime: classItem.endTime || '',
+            timezone: classItem.timezone || 'UTC',
+            courseType: classItem.courseType || '',
+            students: classItem.studentEmails || []
           });
         });
       }
@@ -1297,17 +1284,14 @@ export const getAllClassesForMonthHttp = onRequest({
                 );
                 
                 const dayClassInfo = {
-                  classDetails: {
-                    ...classInfo,
-                    id: `${classId}-${schedule.dayOfWeek}`, // Create a unique ID for each day
-                    dayOfWeek: schedule.dayOfWeek,
-                    startTime: schedule.startTime,
-                    endTime: schedule.endTime,
-                    timezone: schedule.timezone || classData.timezone, // Add timezone from schedule or class
-                    dates: dayDates
-                  },
+                  id: `${classId}-${schedule.dayOfWeek}`, // Create a unique ID for each day
+                  dayOfWeek: schedule.dayOfWeek,
+                  startTime: schedule.startTime,
+                  endTime: schedule.endTime,
+                  timezone: schedule.timezone || classData.timezone, // Add timezone from schedule or class
                   dates: dayDates,
-                  paymentDueDates: paymentDates
+                  paymentDueDates: paymentDates,
+                  ...classInfo // Spread all other fields from classInfo
                 };
                 classSchedule.push(dayClassInfo);
               }
@@ -1316,18 +1300,16 @@ export const getAllClassesForMonthHttp = onRequest({
             // For single schedule classes, just add the original class info with scheduleType
             // Add timezone and scheduleType directly in the classDetails structure
             const singleClassInfo = {
-              classDetails: {
-                ...classInfo,
-                scheduleType: 'single',
-                timezone: classData.timezone
-              },
+              ...classInfo,
+              timezone: classData.timezone,
               dates: classDates,
               paymentDueDates: calculatePaymentDueDates(
                 classData.paymentConfig,
                 classDates,
                 effectiveStartDate,
                 effectiveEndDate
-              )
+              ),
+              scheduleType: 'single'
             };
             classSchedule.push(singleClassInfo);
           }
