@@ -10,7 +10,7 @@ import { debugMaterials, debugClassSession } from '../utils/debugUtils';
 import { HomeworkManager } from './HomeworkManager';
 
 // Extended interface to include dates property
-interface ExtendedClassSession extends ClassSession {
+interface ExtendedClassSession extends Omit<ClassSession, 'dates'> {
   dates?: Date[];
   _displayDate?: Date; // For displaying individual dates
 }
@@ -168,10 +168,16 @@ export const ClassSection = ({
     // Add each date as a separate class entry
     if (relevantDates.length > 0) {
       relevantDates.forEach(date => {
-        expandedClasses.push({
+        // Create a new class object with the correct dayOfWeek for the date
+        const updatedClass = {
           ...classSession,
-          _displayDate: date // Add a temporary property to store the date
-        } as ExtendedClassSession);
+          _displayDate: date, // Add the display date
+          dayOfWeek: date.getDay(), // Set the correct dayOfWeek based on the date
+          // Convert dates back to strings for compatibility
+          dates: classSession.dates?.map(d => d.toString())
+        } as unknown as ClassSession;
+        
+        expandedClasses.push(updatedClass);
       });
     }
   });

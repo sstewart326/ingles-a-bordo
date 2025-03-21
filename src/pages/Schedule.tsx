@@ -625,7 +625,7 @@ export const Schedule = () => {
         Array.isArray(updatedClass.schedules)) {
       
       const matchingSchedule = updatedClass.schedules.find(
-        schedule => schedule.dayOfWeek === currentDayOfWeek
+        (s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === currentDayOfWeek
       );
       
       if (matchingSchedule) {
@@ -982,93 +982,56 @@ export const Schedule = () => {
             }
           }
           
-          console.log("Parsed time parts:", { hours, minutes, isPM, isAM });
-          
           // Convert to 24-hour format if needed
           if (isPM && hours < 12) hours += 12;
           if (isAM && hours === 12) hours = 0;
           
-          // Normalize hours and minutes
-          if (hours < 0 || hours > 23) hours = 0;
-          if (minutes < 0 || minutes > 59) minutes = 0;
+          // Create a date object for today with the specified time
+          const today = new Date();
           
-          // Create a date with just the hour and minute information
-          const date = new Date();
-          date.setHours(hours, minutes, 0, 0);
-          
-          // Convert this time to a string representing source timezone time
-          let sourceTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          
-          console.log("Source time:", sourceTime);
-          
-          // Get standard offsets for timezones (approximate)
-          const getStandardOffset = (tz: string): number => {
-            // Return offset in hours from UTC
-            switch(tz) {
-              case 'America/New_York': return -5; // Eastern Time (UTC-5)
-              case 'America/Chicago': return -6; // Central Time (UTC-6)
-              case 'America/Denver': return -7; // Mountain Time (UTC-7)
-              case 'America/Los_Angeles': return -8; // Pacific Time (UTC-8)
-              case 'America/Sao_Paulo': return -3; // Brasilia Time (UTC-3)
-              case 'Europe/London': return 0; // GMT/UTC
-              case 'Europe/Paris': return 1; // Central European Time (UTC+1)
-              case 'Europe/Moscow': return 3; // Moscow Time (UTC+3)
-              case 'Asia/Tokyo': return 9; // Japan Standard Time (UTC+9)
-              case 'Asia/Shanghai': return 8; // China Standard Time (UTC+8)
-              case 'Australia/Sydney': return 10; // Australian Eastern Time (UTC+10)
-              default: 
-                // If timezone not recognized, try to get from browser
-                try {
-                  // Get current date in the timezone
-                  const date = new Date();
-                  const options = { timeZone: tz, timeZoneName: 'short' as const };
-                  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);
-                  const tzPart = parts.find(part => part.type === 'timeZoneName');
-                  
-                  if (tzPart && tzPart.value.includes('GMT')) {
-                    // Format like "GMT-5" or "GMT+8"
-                    const match = tzPart.value.match(/GMT([+-])(\d+)/);
-                    if (match) {
-                      const sign = match[1] === '+' ? 1 : -1;
-                      const hours = parseInt(match[2]);
-                      return sign * hours;
-                    }
-                  }
-                  
-                  console.log("Could not determine offset for timezone:", tz);
-                  return 0;
-                } catch (e) {
-                  console.error("Error determining timezone offset:", e);
-                  return 0;
-                }
-            }
-          };
-          
-          // Calculate the difference between source and user timezone
-          const sourceOffset = getStandardOffset(sourceTimezone);
-          const userOffset = getStandardOffset(userTimezone);
-          const hourDiff = userOffset - sourceOffset;
-          
-          console.log("Timezone offsets:", { 
+          // Create a date in the source timezone
+          const sourceDate = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate(),
+            hours,
+            minutes,
+            0,
+            0
+          );
+
+          // Get the source timezone offset
+          const sourceTzDate = new Date(sourceDate.toLocaleString('en-US', { timeZone: sourceTimezone }));
+          const sourceOffset = sourceTzDate.getTime() - sourceDate.getTime();
+
+          // Get the user timezone offset
+          const userTzDate = new Date(sourceDate.toLocaleString('en-US', { timeZone: userTimezone }));
+          const userOffset = userTzDate.getTime() - sourceDate.getTime();
+
+          // Calculate the time difference
+          const timeDiff = sourceOffset - userOffset;
+
+          // Apply the offset to get the correct time in user's timezone
+          const convertedDate = new Date(sourceDate.getTime() - timeDiff);
+
+          // Format the time in 12-hour format
+          const userTimeStr = convertedDate.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          });
+
+          console.log("Time conversion details:", {
+            sourceTime: timeStr,
             sourceTimezone,
             userTimezone,
             sourceOffset,
             userOffset,
-            hourDiff
+            timeDiff,
+            convertedTime: userTimeStr
           });
-          
-          // Apply the hour difference
-          date.setHours(date.getHours() + hourDiff);
-          
-          // Format the time in 12-hour format
-          const result = date.toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            hour12: true 
-          });
-          
-          console.log("Converted time:", result);
-          return result;
+
+          return userTimeStr;
         } catch (error) {
           console.error("Error converting time:", error);
           return timeStr; // Return original time string on error
@@ -1077,49 +1040,37 @@ export const Schedule = () => {
 
       // Convert times from class timezone to user timezone
       try {
+        // Ensure we have the correct timezone - fallback check in case matchingSchedule processing failed above
+        if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules) && classItem.dayOfWeek !== undefined) {
+          // Find matching schedule for this day of week
+          const schedule = classItem.schedules.find((s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === classItem.dayOfWeek);
+          // Use schedule timezone if available (it should have higher priority)
+          if (schedule && schedule.timezone) {
+            timezone = schedule.timezone;
+            console.log("Directly using schedule timezone for conversion:", timezone);
+          }
+        }
+        
         const convertedStartTime = convertToUserTimezone(startTime, timezone);
         const convertedEndTime = convertToUserTimezone(endTime, timezone);
 
-        // Determine if we need to show the original timezone
-        const showOriginalTimezone = timezone !== userTimezone;
-        
-        // Get a clean display name for the original timezone
-        let originalTimezoneDisplay = '';
-        if (showOriginalTimezone) {
-          try {
-            // Try to get a clean display name
-            if (timezone.includes('/')) {
-              originalTimezoneDisplay = timezone.split('/').pop() || timezone;
-            } else {
-              originalTimezoneDisplay = timezone;
-            }
-            
-            // Add abbreviation for common timezones
-            if (timezone === 'America/Denver') {
-              originalTimezoneDisplay += ' (MT)';
-            } else if (timezone === 'America/New_York') {
-              originalTimezoneDisplay += ' (ET)';
-            } else if (timezone === 'America/Chicago') {
-              originalTimezoneDisplay += ' (CT)';
-            } else if (timezone === 'America/Los_Angeles') {
-              originalTimezoneDisplay += ' (PT)';
-            } else if (timezone === 'America/Sao_Paulo') {
-              originalTimezoneDisplay += ' (BRT)';
-            }
-          } catch (e) {
-            originalTimezoneDisplay = timezone;
-          }
-        }
+        // Get the user's timezone abbreviation
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const userTimezoneName = new Intl.DateTimeFormat('en', {
+          timeZoneName: 'short',
+          timeZone: userTimezone
+        }).formatToParts(new Date())
+          .find(part => part.type === 'timeZoneName')?.value || '';
 
-        // If either time is invalid, use the original time string but format nicely
-        if (convertedStartTime === "Invalid Date" || convertedEndTime === "Invalid Date") {
-          console.warn("Conversion resulted in invalid date, using original time strings");
-          return `${startTime} - ${endTime} (${originalTimezoneDisplay})`;
-        }
+        // Get the source timezone abbreviation
+        const sourceTimezoneName = new Intl.DateTimeFormat('en', {
+          timeZoneName: 'short',
+          timeZone: timezone
+        }).formatToParts(new Date())
+          .find(part => part.type === 'timeZoneName')?.value || timezone;
 
-        return `${convertedStartTime} - ${convertedEndTime} ${timezoneName}${
-          showOriginalTimezone ? ` (${originalTimezoneDisplay})` : ''
-        }`;
+        // Return the converted times with both timezones
+        return `${convertedStartTime} - ${convertedEndTime} ${userTimezoneName} (${startTime} - ${endTime} ${sourceTimezoneName})`;
       } catch (error) {
         console.error("Error formatting class time:", error);
         // Fallback to original times
@@ -1283,7 +1234,7 @@ export const Schedule = () => {
                         Array.isArray(updatedClass.schedules)) {
                       
                       const matchingSchedule = updatedClass.schedules.find(
-                        schedule => schedule.dayOfWeek === currentDayOfWeek
+                        (s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === currentDayOfWeek
                       );
                       
                       if (matchingSchedule) {
