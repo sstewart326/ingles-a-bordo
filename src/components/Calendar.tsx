@@ -16,7 +16,6 @@ interface CalendarProps {
 export const Calendar: React.FC<CalendarProps> = ({
   selectedDate,
   onMonthChange,
-  onDayClick,
   renderDay,
   showNavigation = true,
   isLoading = false,

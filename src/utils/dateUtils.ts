@@ -170,13 +170,6 @@ export const formatTimeWithTimezones = (
     return `${convertedStartTime} - ${convertedEndTime} ${targetTimezoneName}`;
   }
 
-  // Get the source timezone abbreviation
-  const sourceTimezoneName = new Intl.DateTimeFormat('en', {
-    timeZoneName: 'short',
-    timeZone: sourceTimezone
-  }).formatToParts(new Date())
-    .find(part => part.type === 'timeZoneName')?.value || sourceTimezone;
-
   // Return both source and target times
   return `${convertedStartTime} - ${convertedEndTime} ${targetTimezoneName}`;
 }; 

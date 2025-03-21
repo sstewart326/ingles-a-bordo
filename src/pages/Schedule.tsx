@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { Calendar } from '../components/Calendar';
 import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';

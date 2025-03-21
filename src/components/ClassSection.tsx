@@ -9,9 +9,6 @@ import { UploadMaterialsForm } from './UploadMaterialsForm';
 import { debugMaterials, debugClassSession } from '../utils/debugUtils';
 import { HomeworkManager } from './HomeworkManager';
 
-// We can now use ClassSession directly since it includes all the properties we need
-type ExtendedClassSession = ClassSession;
-
 interface ClassSectionProps {
   title: string;
   classes: ClassSession[];
