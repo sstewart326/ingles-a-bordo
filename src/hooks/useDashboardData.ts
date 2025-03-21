@@ -9,14 +9,15 @@ import { updateClassList, fetchMaterialsForClasses } from '../utils/classUtils';
 import { getAllClassesForMonth, invalidateCalendarCache } from '../services/calendarService';
 
 // Extend the ClassSession interface to include the additional properties we need
-interface ExtendedClassSession extends ClassSession {
-  dates?: Date[];
+interface ExtendedClassSession extends Omit<ClassSession, 'dates'> {
+  dates?: string[] | Date[];
   studentNames?: string[];
+  _displayDate?: Date; // For displaying individual dates
 }
 
 interface DashboardData {
-  upcomingClasses: ClassSession[];
-  pastClasses: ClassSession[];
+  upcomingClasses: ExtendedClassSession[];
+  pastClasses: ExtendedClassSession[];
   users: User[];
   userNames: { [email: string]: string };
   classMaterials: Record<string, ClassMaterial[]>;
@@ -24,8 +25,8 @@ interface DashboardData {
   loadedMaterialMonths: Set<string>;
   selectedDayDetails: {
     date: Date;
-    classes: ClassSession[];
-    paymentsDue: { user: User; classSession: ClassSession }[];
+    classes: ExtendedClassSession[];
+    paymentsDue: { user: User; classSession: ExtendedClassSession }[];
     materials: Record<string, ClassMaterial[]>;
     birthdays?: User[];
   } | null;
@@ -33,14 +34,14 @@ interface DashboardData {
 }
 
 interface UseDashboardDataReturn extends DashboardData {
-  setUpcomingClasses: (classes: ClassSession[]) => void;
-  setPastClasses: (classes: ClassSession[]) => void;
+  setUpcomingClasses: (classes: ExtendedClassSession[]) => void;
+  setPastClasses: (classes: ExtendedClassSession[]) => void;
   setLoadedMonths: (months: Set<string>) => void;
   setLoadedMaterialMonths: (months: Set<string>) => void;
   setSelectedDayDetails: (details: DashboardData['selectedDayDetails']) => void;
   setClassMaterials: (materials: Record<string, ClassMaterial[]>) => void;
   fetchClasses: (targetDate: Date, isInitialLoad?: boolean, shouldBypassCache?: boolean) => Promise<void>;
-  getClassesForDay: (dayOfWeek: number, date: Date) => ClassSession[];
+  getClassesForDay: (dayOfWeek: number, date: Date) => ExtendedClassSession[];
   isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
   getRelevantMonthKeys: (date: Date) => string[];
   getMonthKey: (date: Date, offset?: number) => string;
@@ -105,7 +106,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     );
   };
 
-  const getClassesForDay = useCallback((_: number, date: Date): ClassSession[] => {
+  const getClassesForDay = useCallback((_: number, date: Date): ExtendedClassSession[] => {
     if (isAdmin) {
       const dateString = date.toISOString().split('T')[0];
       const classesForDay = dailyClassMap[dateString] || [];
@@ -193,11 +194,14 @@ export const useDashboardData = (): UseDashboardDataReturn => {
           transformedClasses = allClasses.map(classDoc => ({
             ...classDoc,
             paymentConfig: classDoc.paymentConfig || {
-              type: 'monthly',
-              monthlyOption: 'first',
-              startDate: classDoc.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+              type: 'monthly' as const,
+              monthlyOption: 'first' as const,
+              startDate: classDoc.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+              amount: 0,
+              currency: 'USD',
+              paymentLink: ''
             }
-          }));
+          })) as ExtendedClassSession[];
           
           // Extract unique emails from classes
           const uniqueEmails = new Set<string>();
@@ -228,14 +232,17 @@ export const useDashboardData = (): UseDashboardDataReturn => {
             return {
               ...classSession,
               paymentConfig: {
-                type: 'monthly',
-                monthlyOption: 'first',
-                startDate: classSession.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+                type: 'monthly' as const,
+                monthlyOption: 'first' as const,
+                startDate: classSession.startDate?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+                amount: 0,
+                currency: 'USD',
+                paymentLink: ''
               }
             };
           }
           return classSession;
-        });
+        }) as ExtendedClassSession[];
 
         // Batch state updates to reduce re-renders
         const updates = () => {
@@ -251,11 +258,14 @@ export const useDashboardData = (): UseDashboardDataReturn => {
           if (isInitialLoad) {
             // Update class lists using the updateClassList function
             updateClassList({
-              classes: transformedClasses,
+              classes: transformedClasses.map(cls => ({
+                ...cls,
+                dates: cls.dates?.map(d => typeof d === 'string' ? d : d.toISOString())
+              })) as ClassSession[],
               upcomingClasses: [],  // Start with empty arrays on initial load
               pastClasses: [],
-              setUpcomingClasses,
-              setPastClasses
+              setUpcomingClasses: setUpcomingClasses as (classes: ClassSession[]) => void,
+              setPastClasses: setPastClasses as (classes: ClassSession[]) => void
             });
           }
           
@@ -272,10 +282,19 @@ export const useDashboardData = (): UseDashboardDataReturn => {
 
         // Fetch materials for classes
         await fetchMaterialsForClasses({
-          classes: transformedClasses,
+          classes: transformedClasses.map(cls => ({
+            ...cls,
+            dates: cls.dates?.map(d => typeof d === 'string' ? d : d.toISOString())
+          })) as ClassSession[],
           state: {
-            upcomingClasses,
-            pastClasses,
+            upcomingClasses: upcomingClasses.map(cls => ({
+              ...cls,
+              dates: cls.dates?.map(d => typeof d === 'string' ? d : d.toISOString())
+            })) as ClassSession[],
+            pastClasses: pastClasses.map(cls => ({
+              ...cls,
+              dates: cls.dates?.map(d => typeof d === 'string' ? d : d.toISOString())
+            })) as ClassSession[],
             classMaterials,
             loadedMaterialMonths
           },

@@ -62,10 +62,6 @@ export const Calendar: React.FC<CalendarProps> = ({
     onMonthChange(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1));
   };
 
-  const handleDayClick = (date: Date) => {
-    onDayClick(date);
-  };
-
   return (
     <div className="calendar-container">
       {/* Navigation */}

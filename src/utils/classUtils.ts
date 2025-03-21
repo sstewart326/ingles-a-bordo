@@ -5,7 +5,7 @@ import { ClassMaterial } from '../types/interfaces';
 
 // Extended interface to include dates property
 interface ExtendedClassSession extends ClassSession {
-  dates?: Date[];
+  dates?: string[];
   studentNames?: string[];
 }
 

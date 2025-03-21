@@ -278,12 +278,6 @@ export const Schedule = () => {
   // Use useState to track which calendar data we've already fetched homework for
   const [fetchedDataKeys, setFetchedDataKeys] = useState<Set<string>>(new Set());
   
-  // Memoize the current data key
-  const currentDataKey = useMemo(() => {
-    if (!calendarData) return '';
-    return `${calendarData.month}_${calendarData.year}`;
-  }, [calendarData]);
-
   // Modify the homework fetching effect to work better with initialization
   useEffect(() => {
     // Skip if we have no data or are loading
@@ -871,13 +865,6 @@ export const Schedule = () => {
       // Get the user's local timezone
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       
-      // Format the timezone name for display
-      const timezoneName = new Intl.DateTimeFormat('en', {
-        timeZoneName: 'short',
-        timeZone: userTimezone
-      }).formatToParts(new Date())
-        .find(part => part.type === 'timeZoneName')?.value || '';
-
       // Function to convert time from class timezone to user timezone
       const convertToUserTimezone = (timeStr: string, sourceTimezone: string) => {
         console.log("Converting time:", { timeStr, sourceTimezone });

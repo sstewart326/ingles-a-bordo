@@ -264,6 +264,7 @@ const AdminMaterials = () => {
                 onDateSelect={handleDateSelect}
                 classInfo={selectedClass ? {
                   ...selectedClass,
+                  timezone: 'UTC',
                   startDate: selectedClass.startDate || { toDate: () => new Date() }
                 } : { 
                   id: '', 
@@ -271,7 +272,7 @@ const AdminMaterials = () => {
                   startTime: '', 
                   endTime: '', 
                   studentEmails: [],
-                  courseType: '',
+                  timezone: 'UTC',
                   startDate: { toDate: () => new Date() }
                 }}
                 availableClasses={classes.map(cls => ({

@@ -832,13 +832,6 @@ export const Dashboard = () => {
       // Get the user's local timezone
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       
-      // Format the timezone name for display
-      const timezoneName = new Intl.DateTimeFormat('en', {
-        timeZoneName: 'short',
-        timeZone: userTimezone
-      }).formatToParts(new Date())
-        .find(part => part.type === 'timeZoneName')?.value || '';
-
       // Function to convert time from class timezone to user timezone
       const convertToUserTimezone = (timeStr: string, sourceTimezone: string) => {
         console.log("Converting time:", { timeStr, sourceTimezone });
@@ -905,7 +898,6 @@ export const Dashboard = () => {
           const sourceOffset = sourceTzDate.getTime() - sourceDate.getTime();
 
           // Get the user timezone offset
-          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
           const userTzDate = new Date(sourceDate.toLocaleString('en-US', { timeZone: userTimezone }));
           const userOffset = userTzDate.getTime() - sourceDate.getTime();
 

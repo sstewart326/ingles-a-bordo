@@ -155,7 +155,6 @@ export const AdminSchedule = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<any>(null);
   const [deletingClassId, setDeletingClassId] = useState<string | null>(null);
@@ -488,7 +487,6 @@ export const AdminSchedule = () => {
       timezone = newClass.timezone;
     }
     
-    setIsCreating(true);
     try {
       const now = Timestamp.now();
       
@@ -543,7 +541,6 @@ export const AdminSchedule = () => {
         } catch (uploadError) {
           console.error('Contract upload error:', uploadError);
           toast.error('Failed to upload contract file. Please try again.');
-          setIsCreating(false);
           return;
         }
       }
@@ -614,8 +611,6 @@ export const AdminSchedule = () => {
     } catch (error) {
       console.error('Error creating class:', error);
       toast.error('Failed to create class');
-    } finally {
-      setIsCreating(false);
     }
   };
 
@@ -744,75 +739,10 @@ export const AdminSchedule = () => {
   };
 
   const handleStudentChange = (selected: MultiValue<SelectOption>) => {
-    const selectedEmails = selected ? selected.map(option => option.value) : [];
     setNewClass((prev: typeof newClass) => ({
       ...prev,
-      studentEmails: selectedEmails,
-      courseType: selectedEmails.length === 1 ? 'Individual' : selectedEmails.length === 2 ? 'Pair' : 'Group'
+      studentEmails: selected.map(option => option.value)
     }));
-  };
-
-  const handleStartTimeChange = (startTime: string) => {
-    // Parse the selected start time
-    const [time, period] = startTime.split(' ');
-    const [hours, minutes] = time.split(':').map(Number);
-    
-    // Create Date objects for start and end times
-    const startDate = new Date();
-    startDate.setHours(period === 'PM' && hours !== 12 ? hours + 12 : (period === 'AM' && hours === 12 ? 0 : hours), minutes);
-    
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
-    
-    // Format end time in 12-hour format
-    const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-    
-    setNewClass((prev: typeof newClass) => ({
-      ...prev,
-      startTime,
-      endTime
-    }));
-  };
-
-  const handleEndTimeChange = (endTime: string) => {
-    // Parse both times
-    const [startTime, startPeriod] = newClass.startTime.split(' ');
-    const [endTime_, endPeriod] = endTime.split(' ');
-    const [startHours, startMinutes] = startTime.split(':').map(Number);
-    const [endHours, endMinutes] = endTime_.split(':').map(Number);
-
-    // Create Date objects for comparison
-    const startDate = new Date();
-    const endDate = new Date();
-    
-    startDate.setHours(
-      startPeriod === 'PM' && startHours !== 12 ? startHours + 12 : (startPeriod === 'AM' && startHours === 12 ? 0 : startHours),
-      startMinutes
-    );
-    endDate.setHours(
-      endPeriod === 'PM' && endHours !== 12 ? endHours + 12 : (endPeriod === 'AM' && endHours === 12 ? 0 : endHours),
-      endMinutes
-    );
-
-    // If end time is before start time, adjust start time to be 1 hour before end time
-    if (endDate <= startDate) {
-      const newStartDate = new Date(endDate.getTime() - 60 * 60 * 1000);
-      const newStartTime = newStartDate.toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
-      });
-      
-      setNewClass((prev: typeof newClass) => ({
-        ...prev,
-        startTime: newStartTime,
-        endTime: endTime
-      }));
-    } else {
-      setNewClass((prev: typeof newClass) => ({
-        ...prev,
-        endTime
-      }));
-    }
   };
 
   // Function to handle opening the edit modal
