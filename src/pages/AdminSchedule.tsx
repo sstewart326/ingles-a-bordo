@@ -169,7 +169,7 @@ export const AdminSchedule = () => {
       currency: 'USD'
     },
     frequency: {
-      type: 'weekly',
+      type: 'custom',
       every: 1
     }
   });
@@ -582,7 +582,7 @@ export const AdminSchedule = () => {
           currency: 'BRL'
         },
         frequency: {
-          type: 'weekly',
+          type: 'custom',
           every: 1
         }
       });
@@ -1040,9 +1040,7 @@ export const AdminSchedule = () => {
             <div className="mt-2">
               <div className={styles.card.label}>Frequency</div>
               <div className="text-gray-800">
-                {classItem.frequency?.type === 'weekly' ? 'Weekly' : 
-                 classItem.frequency?.type === 'biweekly' ? 'Every 2 weeks' : 
-                 `Every ${classItem.frequency?.every || 1} weeks`}
+                {`Every ${classItem.frequency?.every || 1} ${classItem.frequency?.every === 1 ? 'week' : 'weeks'}`}
               </div>
             </div>
             <div className="mt-2">
@@ -1420,7 +1418,7 @@ export const AdminSchedule = () => {
                       currency: 'USD'
                     },
                     frequency: {
-                      type: 'weekly',
+                      type: 'custom',
                       every: 1
                     }
                   });
@@ -1472,82 +1470,6 @@ export const AdminSchedule = () => {
                       classNamePrefix="select"
                       styles={customSelectStyles}
                     />
-                  </div>
-                  
-                  {/* Add frequency selection here */}
-                  <div>
-                    <label className={styles.form.label}>Class Frequency</label>
-                    <div className="space-y-2">
-                      <select
-                        value={newClass.frequency.type}
-                        onChange={(e) => {
-                          const type = e.target.value as 'weekly' | 'biweekly' | 'custom';
-                          setNewClass((prev: typeof newClass) => ({
-                            ...prev,
-                            frequency: {
-                              type,
-                              every: type === 'weekly' ? 1 : type === 'biweekly' ? 2 : prev.frequency.every
-                            }
-                          }));
-                        }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      >
-                        <option value="weekly">Weekly</option>
-                        <option value="biweekly">Every 2 weeks</option>
-                        <option value="custom">Custom</option>
-                      </select>
-                      
-                      {newClass.frequency.type === 'custom' && (
-                        <div className="flex items-center mt-1">
-                          <span className="text-gray-800 mr-2">Every</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={newClass.frequency.every}
-                            onChange={(e) => {
-                              const every = parseInt(e.target.value) || 1;
-                              setNewClass((prev: typeof newClass) => ({
-                                ...prev,
-                                frequency: {
-                                  ...prev.frequency,
-                                  every: Math.max(1, every)
-                                }
-                              }));
-                            }}
-                            className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                          />
-                          <span className="text-gray-800 ml-2">weeks</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Add timezone selection */}
-                  <div className="md:col-span-2">
-                    <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
-                    <select
-                      value={newClass.timezone}
-                      onChange={(e) => {
-                        setNewClass((prev: typeof newClass) => ({
-                          ...prev,
-                          timezone: e.target.value,
-                          // Also update timezone in all schedules
-                          schedules: prev.schedules.map((s: ClassSchedule) => ({
-                            ...s,
-                            timezone: e.target.value
-                          }))
-                        }));
-                      }}
-                      required
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      {getTimezoneOptions().map(tz => (
-                        <option key={tz.value} value={tz.value}>{tz.label}</option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Class times will be displayed in this timezone. Students will see times converted to their local timezone.
-                    </p>
                   </div>
                   
                   <div className="md:col-span-2 mb-4">
@@ -1623,6 +1545,62 @@ export const AdminSchedule = () => {
                       </div>
                     )}
                   </div>
+
+                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Add frequency selection here */}
+                    <div>
+                      <label className={styles.form.label}>Class Frequency</label>
+                      <div className="flex items-center">
+                        <span className="text-gray-800 mr-2">Every</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={newClass.frequency.every}
+                          onChange={(e) => {
+                            const every = parseInt(e.target.value) || 1;
+                            setNewClass((prev: typeof newClass) => ({
+                              ...prev,
+                              frequency: {
+                                type: 'custom',
+                                every: Math.max(1, every)
+                              }
+                            }));
+                          }}
+                          className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        />
+                        <span className="text-gray-800 ml-2">weeks</span>
+                      </div>
+                    </div>
+                    
+                    {/* Add timezone selection */}
+                    <div>
+                      <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
+                      <select
+                        value={newClass.timezone}
+                        onChange={(e) => {
+                          setNewClass((prev: typeof newClass) => ({
+                            ...prev,
+                            timezone: e.target.value,
+                            // Also update timezone in all schedules
+                            schedules: prev.schedules.map((s: ClassSchedule) => ({
+                              ...s,
+                              timezone: e.target.value
+                            }))
+                          }));
+                        }}
+                        required
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        {getTimezoneOptions().map(tz => (
+                          <option key={tz.value} value={tz.value}>{tz.label}</option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Class times will be displayed in this timezone. Students will see times converted to their local timezone.
+                      </p>
+                    </div>
+                  </div>
+                  
                   <div className="md:col-span-2 flex space-x-4">
                     <div className="flex-1">
                       <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
@@ -1867,9 +1845,10 @@ export const AdminSchedule = () => {
                   {newClass.paymentConfig.type === 'weekly' ? (
                     <div>
                       <label htmlFor="weeklyInterval" className={styles.form.label}>
-                        {t.weeklyInterval || "Payment Frequency"}
+                        {"Payment Frequency"}
                       </label>
                       <div className="flex items-center">
+                        <span className="mr-2">Every</span>
                         <input
                           type="number"
                           id="weeklyInterval"
@@ -1885,9 +1864,9 @@ export const AdminSchedule = () => {
                               }
                             }));
                           }}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          className="mt-1 w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                         />
-                        <span className="ml-2">weeks</span>
+                        <span className="ml-2">{newClass.paymentConfig.weeklyInterval === 1 ? 'week' : 'weeks'}</span>
                       </div>
                     </div>
                   ) : (
@@ -2092,9 +2071,7 @@ export const AdminSchedule = () => {
                           )}
                         </td>
                         <td className={styles.table.cell}>
-                          {classItem.frequency?.type === 'weekly' ? 'Weekly' : 
-                           classItem.frequency?.type === 'biweekly' ? 'Every 2 weeks' : 
-                           `Every ${classItem.frequency?.every || 1} weeks`}
+                          {`Every ${classItem.frequency?.every || 1} ${classItem.frequency?.every === 1 ? 'week' : 'weeks'}`}
                         </td>
                         <td className={styles.table.cell}>
                           {classItem.studentEmails.map((email: string) => {
@@ -2483,6 +2460,35 @@ export const AdminSchedule = () => {
                   </div>
                 )}
                 
+                {/* Timezone Selection */}
+                <div className="mb-4">
+                  <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
+                  <select
+                    value={editingClass?.timezone}
+                    onChange={(e) => {
+                      if (!editingClass) return;
+                      setEditingClass((prev: any) => ({
+                        ...prev,
+                        timezone: e.target.value,
+                        // Also update timezone in all schedules
+                        schedules: prev.schedules.map((s: ClassSchedule) => ({
+                          ...s,
+                          timezone: e.target.value
+                        }))
+                      }));
+                    }}
+                    required
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    {getTimezoneOptions().map(tz => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Class times will be displayed in this timezone. Students will see times converted to their local timezone.
+                  </p>
+                </div>
+
                 {/* Date Pickers */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -2749,9 +2755,10 @@ export const AdminSchedule = () => {
                 {editingClass?.paymentConfig.type === 'weekly' ? (
                   <div>
                     <label htmlFor="editWeeklyInterval" className={styles.form.label}>
-                      {t.weeklyInterval || "Payment Frequency"}
+                      {"Payment Frequency"}
                     </label>
                     <div className="flex items-center">
+                      <span className="mr-2">Every</span>
                       <input
                         type="number"
                         id="editWeeklyInterval"
@@ -2768,9 +2775,9 @@ export const AdminSchedule = () => {
                             }
                           }));
                         }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        className="mt-1 w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       />
-                      <span className="ml-2">weeks</span>
+                      <span className="ml-2">{editingClass?.paymentConfig.weeklyInterval === 1 ? 'week' : 'weeks'}</span>
                     </div>
                   </div>
                 ) : (
