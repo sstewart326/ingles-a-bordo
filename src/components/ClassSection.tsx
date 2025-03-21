@@ -9,11 +9,8 @@ import { UploadMaterialsForm } from './UploadMaterialsForm';
 import { debugMaterials, debugClassSession } from '../utils/debugUtils';
 import { HomeworkManager } from './HomeworkManager';
 
-// Extended interface to include dates property
-interface ExtendedClassSession extends Omit<ClassSession, 'dates'> {
-  dates?: Date[];
-  _displayDate?: Date; // For displaying individual dates
-}
+// We can now use ClassSession directly since it includes all the properties we need
+type ExtendedClassSession = ClassSession;
 
 interface ClassSectionProps {
   title: string;
@@ -122,13 +119,12 @@ export const ClassSection = ({
   const expandedClasses: ClassSession[] = [];
   classes.forEach(classSession => {
     // If the class already has _displayDate set (like in DayDetails), use it directly
-    if ((classSession as ExtendedClassSession)._displayDate) {
+    if (classSession._displayDate) {
       expandedClasses.push(classSession);
       return;
     }
     
-    const extendedClass = classSession as ExtendedClassSession;
-    const dates = extendedClass.dates || [];
+    const dates = classSession.dates || [];
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const nowTime = now.getTime();
@@ -146,22 +142,20 @@ export const ClassSection = ({
     if (title === t.upcomingClasses) {
       // Get all upcoming dates for upcoming classes within the next 7 days
       relevantDates = dates
-        .filter((d: Date) => {
-          const dateTime = new Date(d);
+        .map(d => d instanceof Date ? d : new Date(d))
+        .filter(dateTime => {
           dateTime.setHours(0, 0, 0, 0);
           return dateTime.getTime() >= nowTime && dateTime.getTime() <= sevenDaysFromNowTime;
         })
-        .map((d: Date) => new Date(d))
         .sort((a, b) => a.getTime() - b.getTime()); // Sort chronologically
     } else {
       // Get all past dates for past classes within the last 7 days
       relevantDates = dates
-        .filter((d: Date) => {
-          const dateTime = new Date(d);
+        .map(d => d instanceof Date ? d : new Date(d))
+        .filter(dateTime => {
           dateTime.setHours(0, 0, 0, 0);
           return dateTime.getTime() < nowTime && dateTime.getTime() >= sevenDaysAgoTime;
         })
-        .map((d: Date) => new Date(d))
         .sort((a, b) => b.getTime() - a.getTime()); // Sort reverse chronologically (most recent first)
     }
     
@@ -174,9 +168,8 @@ export const ClassSection = ({
           _displayDate: date, // Add the display date
           dayOfWeek: date.getDay(), // Set the correct dayOfWeek based on the date
           // Convert dates back to strings for compatibility
-          dates: classSession.dates?.map(d => d.toString())
-        } as unknown as ClassSession;
-        
+          dates: classSession.dates?.map(d => d instanceof Date ? d.toISOString() : d)
+        };
         expandedClasses.push(updatedClass);
       });
     }

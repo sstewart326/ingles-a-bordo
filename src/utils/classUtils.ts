@@ -3,11 +3,8 @@ import { getClassMaterials } from './classMaterialsUtils';
 import toast from 'react-hot-toast';
 import { ClassMaterial } from '../types/interfaces';
 
-// Extended interface to include dates property
-interface ExtendedClassSession extends ClassSession {
-  dates?: string[];
-  studentNames?: string[];
-}
+// We can now use ClassSession directly since it includes all the properties we need
+type ExtendedClassSession = ClassSession;
 
 interface ClassState {
   upcomingClasses: ClassSession[];

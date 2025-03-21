@@ -24,6 +24,7 @@ import { storage } from '../config/firebase';
 import { invalidateCalendarCache } from '../services/calendarService';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { formatTimeWithTimezones } from '../utils/dateUtils';
 
 interface User {
   id: string;
@@ -979,7 +980,7 @@ export const AdminSchedule = () => {
                 <div className="text-gray-800">
                   {classItem.schedules && classItem.schedules.length > 0 ? (
                     <div className="space-y-1">
-                      {classItem.schedules.map((schedule, index) => (
+                      {classItem.schedules.map((schedule: ClassSchedule, index) => (
                         <div key={index} className="flex items-center text-sm">
                           <span className="font-medium mr-2">{DAYS_OF_WEEK[schedule.dayOfWeek]}:</span>
                           <span>{schedule.startTime} - {schedule.endTime}</span>
@@ -2008,7 +2009,13 @@ export const AdminSchedule = () => {
                           {classItem.scheduleType === 'single' ? (
                             <>
                           {getDayName(classItem.dayOfWeek, t)}<br />
-                          {classItem.startTime} - {classItem.endTime}
+                          {formatTimeWithTimezones(
+                            classItem.startTime,
+                            classItem.endTime,
+                            classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            classItem.startDate?.toDate()
+                          )}
                             </>
                           ) : (
                             <div className="max-h-32 overflow-y-auto">
@@ -2018,7 +2025,13 @@ export const AdminSchedule = () => {
                                   {classItem.schedules.map((schedule: ClassSchedule, index: number) => (
                                     <div key={index} className="text-sm">
                                       <span className="font-medium">{DAYS_OF_WEEK[schedule.dayOfWeek]}:</span>{' '}
-                                      {schedule.startTime} - {schedule.endTime}
+                                      {formatTimeWithTimezones(
+                                        schedule.startTime,
+                                        schedule.endTime,
+                                        schedule.timezone || classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+                                        Intl.DateTimeFormat().resolvedOptions().timeZone,
+                                        classItem.startDate?.toDate()
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -2177,60 +2190,6 @@ export const AdminSchedule = () => {
                     />
                   </div>
                   
-                  {/* Add frequency selection here */}
-                  <div className="md:col-span-2">
-                    <label className={styles.form.label}>
-                      Class Frequency
-                      <Tooltip text="How often the class repeats. For example, every 1 week for weekly classes, every 2 weeks for biweekly classes, or a custom number of weeks.">
-                        <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
-                      </Tooltip>
-                    </label>
-                    <div className="flex items-center space-x-4">
-                      <select
-                        value={editingClass?.frequency?.type || 'weekly'}
-                        onChange={(e) => {
-                          if (!editingClass) return;
-                          const type = e.target.value as 'weekly' | 'biweekly' | 'custom';
-                          setEditingClass((prev: any) => ({
-                            ...prev,
-                            frequency: {
-                              type,
-                              every: type === 'weekly' ? 1 : type === 'biweekly' ? 2 : editingClass.frequency?.every || 3
-                            }
-                          }));
-                        }}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      >
-                        <option value="weekly">Weekly</option>
-                        <option value="biweekly">Every 2 weeks</option>
-                        <option value="custom">Custom</option>
-                      </select>
-                      
-                      {editingClass?.frequency?.type === 'custom' && (
-                        <div className="flex items-center mt-1">
-                          <span className="text-gray-800 mr-2">Every</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={editingClass?.frequency?.every || 3}
-                            onChange={(e) => {
-                              if (!editingClass) return;
-                              const every = parseInt(e.target.value) || 1;
-                              setEditingClass((prev: any) => ({
-                                ...prev,
-                                frequency: {
-                                  ...editingClass.frequency,
-                                  every: Math.max(1, every)
-                                }
-                              }));
-                            }}
-                            className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                          />
-                          <span className="text-gray-800 ml-2">weeks</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
                 
                 {/* Schedule Configuration based on type */}
@@ -2422,34 +2381,63 @@ export const AdminSchedule = () => {
                     )}
                   </div>
                 )}
-                
-                {/* Timezone Selection */}
-                <div className="mb-4">
-                  <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
-                  <select
-                    value={editingClass?.timezone}
-                    onChange={(e) => {
-                      if (!editingClass) return;
-                      setEditingClass((prev: any) => ({
-                        ...prev,
-                        timezone: e.target.value,
-                        // Also update timezone in all schedules
-                        schedules: prev.schedules.map((s: ClassSchedule) => ({
-                          ...s,
-                          timezone: e.target.value
-                        }))
-                      }));
-                    }}
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  >
-                    {getTimezoneOptions().map(tz => (
-                      <option key={tz.value} value={tz.value}>{tz.label}</option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Class times will be displayed in this timezone. Students will see times converted to their local timezone.
-                  </p>
+                {/* Add frequency selection here */}
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={styles.form.label}>
+                      Class Frequency
+                      <Tooltip text="How often the class repeats. For example, select 2 for classes that occur every 2 weeks.">
+                        <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
+                      </Tooltip>
+                    </label>
+                    <div className="flex items-center">
+                      <span className="text-gray-800 mr-2">Every</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={editingClass?.frequency?.every || 1}
+                        onChange={(e) => {
+                          if (!editingClass) return;
+                          const every = parseInt(e.target.value) || 1;
+                          setEditingClass((prev: any) => ({
+                            ...prev,
+                            frequency: {
+                              type: 'custom',
+                              every: Math.max(1, every)
+                            }
+                          }));
+                        }}
+                        className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <span className="text-gray-800 ml-2">weeks</span>
+                    </div>
+                  </div>
+                  
+                  {/* Timezone Selection */}
+                  <div>
+                    <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
+                    <select
+                      value={editingClass?.timezone}
+                      onChange={(e) => {
+                        if (!editingClass) return;
+                        setEditingClass((prev: any) => ({
+                          ...prev,
+                          timezone: e.target.value,
+                          // Also update timezone in all schedules
+                          schedules: prev.schedules.map((s: ClassSchedule) => ({
+                            ...s,
+                            timezone: e.target.value
+                          }))
+                        }));
+                      }}
+                      required
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      {getTimezoneOptions().map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Date Pickers */}

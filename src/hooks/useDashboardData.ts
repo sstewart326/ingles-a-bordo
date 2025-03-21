@@ -8,12 +8,8 @@ import { ClassMaterial } from '../types/interfaces';
 import { updateClassList, fetchMaterialsForClasses } from '../utils/classUtils';
 import { getAllClassesForMonth, invalidateCalendarCache } from '../services/calendarService';
 
-// Extend the ClassSession interface to include the additional properties we need
-interface ExtendedClassSession extends Omit<ClassSession, 'dates'> {
-  dates?: string[] | Date[];
-  studentNames?: string[];
-  _displayDate?: Date; // For displaying individual dates
-}
+// We can now use ClassSession directly since it includes all the properties we need
+type ExtendedClassSession = ClassSession;
 
 interface DashboardData {
   upcomingClasses: ExtendedClassSession[];

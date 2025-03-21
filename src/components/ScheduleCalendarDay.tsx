@@ -3,6 +3,7 @@ import { ClassSession, User } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { FaFileAlt, FaBook, FaCommentAlt } from 'react-icons/fa';
+import { formatTimeWithTimezones } from '../utils/dateUtils';
 
 export interface ScheduleCalendarDayProps<T extends ClassSession> {
   date: Date;
@@ -213,138 +214,8 @@ export function ScheduleCalendarDay<T extends ClassSession>({
     // Get the user's local timezone
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // If timezones are different, convert the times
-    if (timezone !== userTimezone) {
-      // Convert time function
-      const convertTime = (timeStr: string): string => {
-        try {
-          // Parse the time string
-          let isPM = false;
-          let isAM = false;
-          let hours = 0;
-          let minutes = 0;
-          
-          // Handle different time formats
-          if (timeStr.includes('AM') || timeStr.includes('PM')) {
-            isPM = timeStr.includes('PM');
-            isAM = timeStr.includes('AM');
-            
-            const timeOnly = timeStr.replace(/\s*[AP]M\s*/, '').trim();
-            const timeParts = timeOnly.split(':');
-            
-            if (timeParts.length >= 2) {
-              hours = parseInt(timeParts[0]) || 0;
-              minutes = parseInt(timeParts[1]) || 0;
-            }
-          } else {
-            const timeParts = timeStr.split(':');
-            if (timeParts.length >= 2) {
-              hours = parseInt(timeParts[0]) || 0;
-              minutes = parseInt(timeParts[1]) || 0;
-              
-              isPM = hours >= 12;
-              isAM = hours < 12;
-            }
-          }
-          
-          // Convert to 24-hour format if needed
-          if (isPM && hours < 12) hours += 12;
-          if (isAM && hours === 12) hours = 0;
-
-          try {
-            // Create a date object for the target date (not just today)
-            const targetDate = new Date(date);  // Use the calendar date instead of today
-            
-            // Set the time components
-            targetDate.setHours(hours);
-            targetDate.setMinutes(minutes);
-            targetDate.setSeconds(0);
-            targetDate.setMilliseconds(0);
-
-            // Convert directly using the timezone information
-            return targetDate.toLocaleTimeString('en-US', {
-              timeZone: userTimezone,
-              hour: 'numeric',
-              minute: 'numeric',
-              hour12: true
-            });
-          } catch (error) {
-            console.error("Error converting time:", error, {
-              timeStr,
-              hours,
-              minutes,
-              timezone,
-              userTimezone,
-              date: date.toISOString()
-            });
-            return timeStr;
-          }
-        } catch (error) {
-          console.error("Error converting time:", error);
-          return timeStr; // Return original time string on error
-        }
-      };
-
-      // Convert start and end times
-      const convertedStartTime = convertTime(startTime);
-      const convertedEndTime = convertTime(endTime);
-
-      return `${convertedStartTime} - ${convertedEndTime}`;
-    }
-    
-    // Format times to be simpler (without leading zeros and AM/PM when possible)
-    const formatTimeString = (timeStr: string): { display: string; period: string } => {
-      // Extract hours, minutes, and period
-      const match = timeStr.match(/(\d+):(\d+)(?:\s*(AM|PM))?/i);
-      if (!match) return { display: timeStr, period: '' };
-      
-      let [_, hours, minutes, period] = match;
-      let hour = parseInt(hours);
-      
-      // If period is specified
-      if (period) {
-        period = period.toUpperCase();
-        // For PM times, add 12 to hour for 24-hour calculation (except 12 PM)
-        if (period === 'PM' && hour !== 12) {
-          hour += 12;
-        }
-        // For 12 AM, set hour to 0 in 24-hour format
-        if (period === 'AM' && hour === 12) {
-          hour = 0;
-        }
-      }
-      // Convert to 12-hour format for display
-      const displayHour = hour % 12 || 12;
-      
-      // Determine period for display
-      const displayPeriod = hour >= 12 ? 'PM' : 'AM';
-      
-      // Format the time
-      if (minutes === '00') {
-        // If minutes are 00, just show the hour
-        return {
-          display: `${displayHour}`,
-          period: displayPeriod
-        };
-      } else {
-        // Otherwise show hour:minutes
-        return {
-          display: `${displayHour}:${minutes}`,
-          period: displayPeriod
-        };
-      }
-    };
-
-    const startTimeInfo = formatTimeString(startTime);
-    const endTimeInfo = formatTimeString(endTime);
-    
-    // If both periods are the same, only show it once at the end
-    if (startTimeInfo.period === endTimeInfo.period) {
-      return `${startTimeInfo.display}-${endTimeInfo.display} ${startTimeInfo.period}`;
-    }
-    
-    // Otherwise show both periods
-    return `${startTimeInfo.display} ${startTimeInfo.period}-${endTimeInfo.display} ${endTimeInfo.period}`;
+    // Use our utility function to format the time with both timezones
+    return formatTimeWithTimezones(startTime, endTime, timezone, userTimezone, date);
   };
 
   return (
@@ -411,60 +282,9 @@ export function ScheduleCalendarDay<T extends ClassSession>({
                     // Get the user's local timezone
                     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     
-                    // Convert times if timezones are different
-                    if (timezone !== userTimezone) {
-                      const convertTime = (timeStr: string): string => {
-                        try {
-                          // Parse the time string
-                          let isPM = timeStr.includes('PM');
-                          let isAM = timeStr.includes('AM');
-                          let hours = 0;
-                          let minutes = 0;
-                          
-                          const timeOnly = timeStr.replace(/\s*[AP]M\s*/, '').trim();
-                          const [h, m] = timeOnly.split(':').map(Number);
-                          hours = h || 0;
-                          minutes = m || 0;
-                          
-                          if (isPM && hours < 12) hours += 12;
-                          if (isAM && hours === 12) hours = 0;
-                          
-                          // Create a date object for today with the specified time
-                          const today = new Date();
-                          const dateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-                          
-                          // First, create a date in the source timezone
-                          const sourceDate = new Date(dateString);
-                          
-                          // Get the timezone offsets
-                          const sourceOffset = new Date(sourceDate.toLocaleString('en-US', { timeZone: timezone })).getTime() - sourceDate.getTime();
-                          const userOffset = new Date(sourceDate.toLocaleString('en-US', { timeZone: userTimezone })).getTime() - sourceDate.getTime();
-                          
-                          // Calculate the time difference
-                          const timeDiff = sourceOffset - userOffset;
-                          
-                          // Apply the offset to get the correct time in user's timezone
-                          const convertedDate = new Date(sourceDate.getTime() - timeDiff);
-                          
-                          // Format the time in 12-hour format
-                          return convertedDate.toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: 'numeric',
-                            hour12: true
-                          });
-                        } catch (error) {
-                          console.error("Error converting time:", error);
-                          return timeStr;
-                        }
-                      };
-                      
-                      const convertedStartTime = convertTime(startTime);
-                      const convertedEndTime = convertTime(endTime);
-                      return `${convertedStartTime} - ${convertedEndTime}`;
-                    }
-                    
-                    // If same timezone, just format nicely
-                    return `${startTime} - ${endTime}`;
+                    // Use our utility function to format the time with both timezones
+                    // Don't show source time in the pill to save space
+                    return formatTimeWithTimezones(startTime, endTime, timezone, userTimezone, date, false);
                   })()
                 : `${classes.length} ${t.class || 'class'}`
               }

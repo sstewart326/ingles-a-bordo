@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import { formatTimeWithTimezones, formatTimeToAMPM, convertTimeToTimezone } from './dateUtils';
 
 export interface ClassSession {
   // Required fields
@@ -47,7 +48,7 @@ export interface ClassSession {
     type: 'weekly' | 'monthly';
     startDate: string;
   };
-  dates?: string[];
+  dates?: string[] | Date[];  // Allow both string[] and Date[] for dates
   scheduleType?: 'single' | 'multiple';
   schedules?: Array<{
     dayOfWeek: number;
@@ -56,6 +57,13 @@ export interface ClassSession {
     timezone?: string;
   }>;
   materials?: any[];
+  contractUrl?: string;
+  frequency: {
+    type: 'weekly' | 'biweekly' | 'custom';
+    every: number;
+  };
+  studentNames?: string[];    // Add studentNames as an optional property
+  _displayDate?: Date;        // Add _displayDate for display purposes
 }
 
 export interface User {
@@ -86,6 +94,7 @@ export const formatClassTime = (classSession: ClassSession): string => {
   // For classes with multiple schedules, find the matching schedule for the day of week
   let startTime = classSession.startTime;
   let endTime = classSession.endTime;
+  let timezone = classSession.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   
   if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) && classSession.dayOfWeek !== undefined) {
     const matchingSchedule = classSession.schedules.find(schedule => 
@@ -95,32 +104,17 @@ export const formatClassTime = (classSession: ClassSession): string => {
     if (matchingSchedule) {
       startTime = matchingSchedule.startTime;
       endTime = matchingSchedule.endTime;
+      timezone = matchingSchedule.timezone || timezone;
     }
   }
   
-  if (classSession.dayOfWeek !== undefined && startTime && endTime) {
-    // Get timezone abbreviation
-    const timezone = new Intl.DateTimeFormat('en', {
-      timeZoneName: 'short',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-    }).formatToParts(new Date())
-      .find(part => part.type === 'timeZoneName')?.value || '';
-
-    // Format times to ensure they have AM/PM if not present
-    const formatTimeString = (timeStr: string) => {
-      if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      const period = hours >= 12 ? 'PM' : 'AM';
-      const hour12 = hours % 12 || 12;
-      return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
-    };
-
-    const formattedStartTime = formatTimeString(startTime);
-    const formattedEndTime = formatTimeString(endTime);
-
-    return `${formattedStartTime} - ${formattedEndTime} ${timezone}`;
-  }
-  return '';
+  if (!startTime || !endTime) return '';
+  
+  // Get the user's local timezone
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  // Use our utility function to format the time with both timezones
+  return formatTimeWithTimezones(startTime, endTime, timezone, userTimezone, classSession._displayDate);
 };
 
 export const getClassesForDay = (
@@ -318,6 +312,7 @@ const startOfDay = (date: Date): Date => {
 };
 
 export const isClassPastToday = (dayOfWeek: number, startTime?: string): boolean => {
+  if (!startTime) return false;
   const now = new Date();
   const currentDayOfWeek = now.getDay();
   
@@ -326,26 +321,24 @@ export const isClassPastToday = (dayOfWeek: number, startTime?: string): boolean
     return false;
   }
 
-  // If it's today, check if the time has passed
-  if (startTime) {
-    const [hours, minutes] = startTime.split(':');
-    let hour = parseInt(hours);
-    if (startTime.toLowerCase().includes('pm') && hour !== 12) {
-      hour += 12;
-    } else if (startTime.toLowerCase().includes('am') && hour === 12) {
-      hour = 0;
-    }
-    
-    const classTime = new Date();
-    classTime.setHours(hour, parseInt(minutes), 0, 0);
-    
-    return now > classTime;
-  }
+  // Convert the class time to the user's timezone and compare
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const convertedTime = convertTimeToTimezone(startTime, userTimezone, userTimezone, now);
+  const [hours, minutes] = convertedTime.split(/[:\s]/);
+  const isPM = convertedTime.toLowerCase().includes('pm');
   
-  return false;
+  let hour = parseInt(hours);
+  if (isPM && hour !== 12) hour += 12;
+  else if (!isPM && hour === 12) hour = 0;
+  
+  const classTime = new Date(now);
+  classTime.setHours(hour, parseInt(minutes), 0, 0);
+  
+  return now > classTime;
 };
 
 export const isClassUpcoming = (dayOfWeek: number, startTime?: string): boolean => {
+  if (!startTime) return true;
   const now = new Date();
   const currentDayOfWeek = now.getDay();
   
@@ -354,16 +347,18 @@ export const isClassUpcoming = (dayOfWeek: number, startTime?: string): boolean 
     return true;
   } 
   // If it's today and hasn't started yet
-  else if (dayOfWeek === currentDayOfWeek && startTime) {
-    const [hours, minutes] = startTime.split(':');
-    let hour = parseInt(hours);
-    if (startTime.toLowerCase().includes('pm') && hour !== 12) {
-      hour += 12;
-    } else if (startTime.toLowerCase().includes('am') && hour === 12) {
-      hour = 0;
-    }
+  else if (dayOfWeek === currentDayOfWeek) {
+    // Convert the class time to the user's timezone and compare
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const convertedTime = convertTimeToTimezone(startTime, userTimezone, userTimezone, now);
+    const [hours, minutes] = convertedTime.split(/[:\s]/);
+    const isPM = convertedTime.toLowerCase().includes('pm');
     
-    const classTime = new Date();
+    let hour = parseInt(hours);
+    if (isPM && hour !== 12) hour += 12;
+    else if (!isPM && hour === 12) hour = 0;
+    
+    const classTime = new Date(now);
     classTime.setHours(hour, parseInt(minutes), 0, 0);
     
     return now < classTime;
@@ -374,29 +369,30 @@ export const isClassUpcoming = (dayOfWeek: number, startTime?: string): boolean 
 };
 
 export const formatTimeString = (timeStr: string): string => {
-  if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const hour12 = hours % 12 || 12;
-  return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  return formatTimeToAMPM(timeStr);
 };
 
 export const sortClassesByTime = (classes: ClassSession[]): ClassSession[] => {
   return [...classes].sort((a, b) => {
-    const getTime = (timeStr: string | undefined) => {
+    const getTimeInMinutes = (timeStr: string | undefined) => {
       if (!timeStr) return 0;
-      const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-      if (!match) return 0;
-      let [_, hours, minutes, period] = match;
+      
+      // Convert time to user's timezone for consistent sorting
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const convertedTime = convertTimeToTimezone(timeStr, userTimezone, userTimezone);
+      
+      // Parse the converted time
+      const [hours, minutes] = convertedTime.split(/[:\s]/);
+      const isPM = convertedTime.toLowerCase().includes('pm');
+      
       let hour = parseInt(hours);
-      if (period) {
-        period = period.toUpperCase();
-        if (period === 'PM' && hour !== 12) hour += 12;
-        if (period === 'AM' && hour === 12) hour = 0;
-      }
+      if (isPM && hour !== 12) hour += 12;
+      else if (!isPM && hour === 12) hour = 0;
+      
       return hour * 60 + parseInt(minutes);
     };
-    return getTime(a.startTime) - getTime(b.startTime);
+    
+    return getTimeInMinutes(a.startTime) - getTimeInMinutes(b.startTime);
   });
 };
 

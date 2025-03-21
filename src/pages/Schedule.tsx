@@ -13,13 +13,14 @@ import { ClassSession } from '../utils/scheduleUtils';
 import { getHomeworkForClass, getHomeworkSubmissions } from '../utils/homeworkUtils';
 import { Homework, HomeworkSubmission } from '../types/interfaces';
 import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
+import { formatTimeWithTimezones } from '../utils/dateUtils';
 
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
   dates: string[];
   paymentDueDates: string[];
-  frequency?: {
-    type: string;
+  frequency: {
+    type: 'weekly' | 'biweekly' | 'custom';
     every: number;
   };
 }
@@ -837,173 +838,42 @@ export const Schedule = () => {
     };
   }, [calendarData?.classes, getClassesForDate, homeworkByClass, isPaymentDueOnDate]);
 
-  // Class time formatter function - converts time from class timezone to user timezone
-  const formatClassTime = (classItem: any) => {
-    if (!classItem) return '';
+  // Function to format class time, converting from class timezone to user timezone
+  const formatClassTime = (classSession: ClassSession): string => {
+    if (!classSession) return '';
     
-    let startTime = classItem.startTime || '';
-    let endTime = classItem.endTime || '';
-    let timezone = classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let startTime = classSession.startTime || '';
+    let endTime = classSession.endTime || '';
+    let timezone = classSession.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
     // Early validation of time strings
     if (!startTime || !endTime) {
-      console.warn("Missing start or end time:", { startTime, endTime, classId: classItem.id });
-      
-      // Set default times if missing
-      startTime = startTime || "9:00 AM";
-      endTime = endTime || "10:00 AM";
+      console.warn("Missing start or end time:", { startTime, endTime, classId: classSession.id });
+      return '';
     }
     
-    console.log("Schedule - Time formatting - Raw values:", { 
-      startTime, 
-      endTime, 
-      timezone, 
-      classId: classItem.id || classItem.id
-    });
-    
-    if (startTime && endTime) {
-      // Get the user's local timezone
-      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // For classes with multiple schedules, find the matching schedule for the day of week
+    if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) && classSession.dayOfWeek !== undefined) {
+      const matchingSchedule = classSession.schedules.find(schedule => 
+        schedule.dayOfWeek === classSession.dayOfWeek
+      );
       
-      // Function to convert time from class timezone to user timezone
-      const convertToUserTimezone = (timeStr: string, sourceTimezone: string) => {
-        console.log("Converting time:", { timeStr, sourceTimezone });
-        
-        if (!timeStr) {
-          console.error("Empty time string provided");
-          return "12:00 AM"; // Default fallback time
+      if (matchingSchedule) {
+        startTime = matchingSchedule.startTime;
+        endTime = matchingSchedule.endTime;
+        // Use schedule timezone if available
+        if (matchingSchedule.timezone) {
+          timezone = matchingSchedule.timezone;
         }
-        
-        try {
-          // Parse the time string
-          let isPM = false;
-          let isAM = false;
-          let hours = 0;
-          let minutes = 0;
-          
-          // Handle different time formats
-          if (timeStr.includes('AM') || timeStr.includes('PM')) {
-            // Format like "9:00 AM" or "9:00 PM"
-            isPM = timeStr.includes('PM');
-            isAM = timeStr.includes('AM');
-            
-            // Remove AM/PM and trim
-            const timeOnly = timeStr.replace(/\s*[AP]M\s*/, '').trim();
-            const timeParts = timeOnly.split(':');
-            
-            if (timeParts.length >= 2) {
-              hours = parseInt(timeParts[0]) || 0;
-              minutes = parseInt(timeParts[1]) || 0;
-            }
-          } else {
-            // Try to handle 24-hour format like "14:30"
-            const timeParts = timeStr.split(':');
-            if (timeParts.length >= 2) {
-              hours = parseInt(timeParts[0]) || 0;
-              minutes = parseInt(timeParts[1]) || 0;
-              
-              // Determine AM/PM for 24-hour format
-              isPM = hours >= 12;
-              isAM = hours < 12;
-            }
-          }
-          
-          // Convert to 24-hour format if needed
-          if (isPM && hours < 12) hours += 12;
-          if (isAM && hours === 12) hours = 0;
-          
-          // Create a date object for today with the specified time
-          const today = new Date();
-          
-          // Create a date in the source timezone
-          const sourceDate = new Date(
-            today.getFullYear(),
-            today.getMonth(),
-            today.getDate(),
-            hours,
-            minutes,
-            0,
-            0
-          );
-
-          // Get the source timezone offset
-          const sourceTzDate = new Date(sourceDate.toLocaleString('en-US', { timeZone: sourceTimezone }));
-          const sourceOffset = sourceTzDate.getTime() - sourceDate.getTime();
-
-          // Get the user timezone offset
-          const userTzDate = new Date(sourceDate.toLocaleString('en-US', { timeZone: userTimezone }));
-          const userOffset = userTzDate.getTime() - sourceDate.getTime();
-
-          // Calculate the time difference
-          const timeDiff = sourceOffset - userOffset;
-
-          // Apply the offset to get the correct time in user's timezone
-          const convertedDate = new Date(sourceDate.getTime() - timeDiff);
-
-          // Format the time in 12-hour format
-          const userTimeStr = convertedDate.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          });
-
-          console.log("Time conversion details:", {
-            sourceTime: timeStr,
-            sourceTimezone,
-            userTimezone,
-            sourceOffset,
-            userOffset,
-            timeDiff,
-            convertedTime: userTimeStr
-          });
-
-          return userTimeStr;
-        } catch (error) {
-          console.error("Error converting time:", error);
-          return timeStr; // Return original time string on error
-        }
-      };
-
-      // Convert times from class timezone to user timezone
-      try {
-        // Ensure we have the correct timezone - fallback check in case matchingSchedule processing failed above
-        if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules) && classItem.dayOfWeek !== undefined) {
-          // Find matching schedule for this day of week
-          const schedule = classItem.schedules.find((s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === classItem.dayOfWeek);
-          // Use schedule timezone if available (it should have higher priority)
-          if (schedule && schedule.timezone) {
-            timezone = schedule.timezone;
-            console.log("Directly using schedule timezone for conversion:", timezone);
-          }
-        }
-        
-        const convertedStartTime = convertToUserTimezone(startTime, timezone);
-        const convertedEndTime = convertToUserTimezone(endTime, timezone);
-
-        // Get the user's timezone abbreviation
-        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const userTimezoneName = new Intl.DateTimeFormat('en', {
-          timeZoneName: 'short',
-          timeZone: userTimezone
-        }).formatToParts(new Date())
-          .find(part => part.type === 'timeZoneName')?.value || '';
-
-        // Get the source timezone abbreviation
-        const sourceTimezoneName = new Intl.DateTimeFormat('en', {
-          timeZoneName: 'short',
-          timeZone: timezone
-        }).formatToParts(new Date())
-          .find(part => part.type === 'timeZoneName')?.value || timezone;
-
-        // Return the converted times with both timezones
-        return `${convertedStartTime} - ${convertedEndTime} ${userTimezoneName} (${startTime} - ${endTime} ${sourceTimezoneName})`;
-      } catch (error) {
-        console.error("Error formatting class time:", error);
-        // Fallback to original times
-        return `${startTime} - ${endTime}`;
       }
     }
-    return '';
+    
+    // Get the user's local timezone
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Use our utility function to format the time with both timezones
+    // Always show source time (true) to display both original and converted times
+    return formatTimeWithTimezones(startTime, endTime, timezone, userTimezone, classSession._displayDate, true);
   };
 
   if (loading) {

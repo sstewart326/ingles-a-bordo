@@ -738,11 +738,21 @@ export const DayDetails = ({
                               <div>
                                 {classSession.schedules
                                   .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
-                                  .map((schedule, index) => (
-                                    <div key={index}>
-                                      {getDayName(schedule.dayOfWeek)}: {schedule.startTime} - {schedule.endTime}
-                                    </div>
-                                  ))}
+                                  .map((schedule, index) => {
+                                    // Create a temporary class session with this schedule's times
+                                    const tempClassSession = {
+                                      ...classSession,
+                                      startTime: schedule.startTime,
+                                      endTime: schedule.endTime,
+                                      timezone: schedule.timezone || classSession.timezone,
+                                      dayOfWeek: schedule.dayOfWeek
+                                    };
+                                    return (
+                                      <div key={index}>
+                                        {getDayName(schedule.dayOfWeek)}: {formatClassTime(tempClassSession)}
+                                      </div>
+                                    );
+                                  })}
                               </div>
                             ) : (
                               <>{t.time}: {formatClassTime(classSession)}</>

@@ -61,4 +61,122 @@ export const startOfDay = (date: Date): Date => {
   const newDate = new Date(date);
   newDate.setHours(0, 0, 0, 0);
   return newDate;
+};
+
+export const convertTimeToTimezone = (
+  timeStr: string,
+  sourceTimezone: string,
+  targetTimezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
+  date?: Date
+): string => {
+  if (!timeStr) {
+    console.error("Empty time string provided");
+    return "12:00 AM"; // Default fallback time
+  }
+
+  try {
+    // Parse the time string
+    let isPM = false;
+    let isAM = false;
+    let hours = 0;
+    let minutes = 0;
+
+    // Handle different time formats
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+      // Format like "9:00 AM" or "9:00 PM"
+      isPM = timeStr.includes('PM');
+      isAM = timeStr.includes('AM');
+
+      // Remove AM/PM and trim
+      const timeOnly = timeStr.replace(/\s*[AP]M\s*/, '').trim();
+      const timeParts = timeOnly.split(':');
+
+      if (timeParts.length >= 2) {
+        hours = parseInt(timeParts[0]) || 0;
+        minutes = parseInt(timeParts[1]) || 0;
+      }
+    } else {
+      // Try to handle 24-hour format like "14:30"
+      const timeParts = timeStr.split(':');
+      if (timeParts.length >= 2) {
+        hours = parseInt(timeParts[0]) || 0;
+        minutes = parseInt(timeParts[1]) || 0;
+
+        // Determine AM/PM for 24-hour format
+        isPM = hours >= 12;
+        isAM = hours < 12;
+      }
+    }
+
+    // Convert to 24-hour format if needed
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+
+    // Create a date object for the specified date or today
+    const baseDate = date || new Date();
+    
+    // Create an ISO string with the correct time
+    const isoString = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+    
+    // First create a date in the source timezone
+    const sourceDate = new Date(isoString);
+    
+    // Get the timezone offsets
+    const sourceOffset = new Date(sourceDate.toLocaleString('en-US', { timeZone: sourceTimezone })).getTime() - sourceDate.getTime();
+    const targetOffset = new Date(sourceDate.toLocaleString('en-US', { timeZone: targetTimezone })).getTime() - sourceDate.getTime();
+    
+    // Calculate the time difference between source and target timezones
+    const timeDiff = sourceOffset - targetOffset;
+    
+    // Apply the offset to get the correct time in target timezone
+    const targetDate = new Date(sourceDate.getTime() - timeDiff);
+
+    // Format the time in 12-hour format
+    return targetDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    });
+  } catch (error) {
+    console.error("Error converting time:", error, {
+      timeStr,
+      sourceTimezone,
+      targetTimezone,
+      date: date?.toISOString()
+    });
+    return timeStr; // Return original time string on error
+  }
+};
+
+export const formatTimeWithTimezones = (
+  startTime: string,
+  endTime: string,
+  sourceTimezone: string,
+  targetTimezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
+  date?: Date,
+  showSourceTime: boolean = true
+): string => {
+  const convertedStartTime = convertTimeToTimezone(startTime, sourceTimezone, targetTimezone, date);
+  const convertedEndTime = convertTimeToTimezone(endTime, sourceTimezone, targetTimezone, date);
+
+  // Get the target timezone abbreviation
+  const targetTimezoneName = new Intl.DateTimeFormat('en', {
+    timeZoneName: 'short',
+    timeZone: targetTimezone
+  }).formatToParts(new Date())
+    .find(part => part.type === 'timeZoneName')?.value || targetTimezone;
+
+  if (!showSourceTime) {
+    return `${convertedStartTime} - ${convertedEndTime} ${targetTimezoneName}`;
+  }
+
+  // Get the source timezone abbreviation
+  const sourceTimezoneName = new Intl.DateTimeFormat('en', {
+    timeZoneName: 'short',
+    timeZone: sourceTimezone
+  }).formatToParts(new Date())
+    .find(part => part.type === 'timeZoneName')?.value || sourceTimezone;
+
+  // Return both source and target times
+  return `${convertedStartTime} - ${convertedEndTime} ${targetTimezoneName}`;
 }; 
