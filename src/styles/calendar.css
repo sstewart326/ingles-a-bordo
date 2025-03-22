@@ -131,6 +131,10 @@
   background-color: #8b5cf6; /* purple-500 */
 }
 
+.calendar-day-indicators .payment-completed-indicator {
+  background-color: #22c55e;
+}
+
 /* Payment Due Label */
 .payment-due-label {
   font-size: 0.6rem;
@@ -220,6 +224,14 @@
 
 .payment-pill.soon:hover {
   background-color: #dc2626;
+}
+
+.payment-pill.completed {
+  background-color: #22c55e;
+}
+
+.payment-pill.completed:hover {
+  background-color: #16a34a;
 }
 
 /* Homework Pill */

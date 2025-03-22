@@ -17,6 +17,7 @@ export interface ScheduleCalendarDayProps<T extends ClassSession> {
   homeworkInfo?: Map<string, number>; // Map of classId to homework count for this date
   onHomeworkPillClick?: (e: React.MouseEvent, date: Date, classes: T[]) => void;
   homeworkFeedbackInfo?: Map<string, boolean>; // Map of classId_date to boolean indicating if feedback exists
+  paymentStatus?: { isCompleted: boolean; completedAt?: string };
 }
 
 export function ScheduleCalendarDay<T extends ClassSession>({
@@ -31,6 +32,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
   homeworkInfo,
   onHomeworkPillClick,
   homeworkFeedbackInfo,
+  paymentStatus
 }: ScheduleCalendarDayProps<T>) {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -226,10 +228,16 @@ export function ScheduleCalendarDay<T extends ClassSession>({
           <div key="class-indicator" className="indicator class-indicator" title="Has classes" />
         )}
         {isPaymentDay && (
-          <div 
+          <div
             key="payment-indicator"
-            className={`indicator ${isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'}`}
-            title={isPaymentSoon ? 'Payment due soon' : 'Payment due'}
+            className={`indicator ${
+              paymentStatus?.isCompleted
+                ? 'payment-completed-indicator'
+                : isPaymentSoon
+                ? 'payment-soon-indicator'
+                : 'payment-indicator'
+            }`}
+            title={paymentStatus?.isCompleted ? 'Payment completed' : isPaymentSoon ? 'Payment due soon' : 'Payment due'}
           />
         )}
         {hasMaterials && (
@@ -245,7 +253,15 @@ export function ScheduleCalendarDay<T extends ClassSession>({
 
       {/* Date */}
       <div className="flex flex-col items-center">
-        <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${isPaymentDay ? (isPaymentSoon ? 'text-[#ef4444]' : 'text-[#f59e0b]') : ''}`}>
+        <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${
+          isPaymentDay 
+            ? paymentStatus?.isCompleted
+              ? 'text-[#22c55e]'  // Green text for completed payments
+              : isPaymentSoon
+              ? 'text-[#ef4444]'  // Red text for soon payments
+              : 'text-[#f59e0b]'  // Yellow text for normal payments
+            : ''
+        }`}>
           {date.getDate()}
         </div>
       </div>
@@ -254,7 +270,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
       <div className="class-details">
         <div className="flex flex-col items-center gap-2">
           {classes.length > 0 && (
-            <div 
+            <div
               key="class-count-pill"
               className="calendar-pill class-count-pill"
               onClick={handleClassCountClick}
@@ -286,7 +302,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
                     // Don't show source time in the pill to save space
                     return formatTimeWithTimezones(startTime, endTime, timezone, userTimezone, date, false);
                   })()
-                : `${classes.length} ${t.class || 'class'}`
+                : `${classes.length} ${t.class}`
               }
               {hasMaterials && (
                 <span className="material-icon text-white">
@@ -295,38 +311,21 @@ export function ScheduleCalendarDay<T extends ClassSession>({
               )}
             </div>
           )}
-          
+
           {isPaymentDay && (
             <div 
               key="payment-pill"
-              className={`calendar-pill payment-pill ${isPaymentSoon ? 'soon' : 'normal'}`}
+              className={`calendar-pill payment-pill ${
+                paymentStatus?.isCompleted
+                  ? 'completed'
+                  : isPaymentSoon
+                  ? 'soon'
+                  : 'normal'
+              }`}
               onClick={handlePaymentPillClick}
               title={createPaymentTooltip()}
             >
-              {Array.isArray(paymentsDue)
-                ? (() => {
-                    // Calculate total payment amount if available
-                    let totalAmount = 0;
-                    let currency = '';
-                    let hasPaymentAmount = false;
-                    
-                    paymentsDue.forEach(({ classSession }) => {
-                      if (classSession.paymentConfig?.amount && classSession.paymentConfig?.currency) {
-                        totalAmount += classSession.paymentConfig.amount;
-                        currency = classSession.paymentConfig.currency;
-                        hasPaymentAmount = true;
-                      }
-                    });
-                    
-                    return (
-                      <>
-                        {paymentsDue.length} {paymentsDue.length === 1 ? t.paymentDue || 'payment' : t.paymentsDue || 'payments'}
-                        {hasPaymentAmount && ` (${currency} ${totalAmount.toFixed(2)})`}
-                      </>
-                    );
-                  })()
-                : 'Payment Due'
-              }
+              {paymentStatus?.isCompleted ? t.paymentCompleted : t.paymentDue}
             </div>
           )}
 

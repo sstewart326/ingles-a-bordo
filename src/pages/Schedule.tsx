@@ -345,22 +345,20 @@ export const Schedule = () => {
 
   // Handle initial data loading
   useEffect(() => {
-    if (isInitialLoadRef.current && currentUser) {
-      console.log('Initial load with user:', { 
-        isMasquerading, 
-        masqueradingAs: masqueradingAs?.id,
-        currentUser: currentUser.email 
-      });
-      
+    if (currentUser) {
       const month = selectedDate.getMonth();
       const year = selectedDate.getFullYear();
       
-      fetchCalendarDataSafely(month, year).then(() => {
-        // After initial calendar data is loaded, set initial load to false
-        isInitialLoadRef.current = false;
-      });
+      // Always fetch if we're masquerading or it's the initial load
+      if (isInitialLoadRef.current || isMasquerading) {
+        console.log('Initial load or masquerading, fetching calendar data');
+        fetchCalendarDataSafely(month, year).then(() => {
+          // After initial calendar data is loaded, set initial load to false
+          isInitialLoadRef.current = false;
+        });
+      }
     }
-  }, [currentUser, selectedDate, fetchCalendarDataSafely, isMasquerading, masqueradingAs]);
+  }, [currentUser, selectedDate, fetchCalendarDataSafely, isMasquerading]);
 
   // Add a new useEffect to set the initial day details for the current day
   useEffect(() => {
@@ -440,6 +438,34 @@ export const Schedule = () => {
       const paymentDateStr = payment.date?.split('T')[0] || '';
       return paymentDateStr === dateStr;
     });
+  };
+
+  // Add function to check if payment is completed
+  const getPaymentStatus = (date: Date): { isCompleted: boolean; completedAt?: string } => {
+    if (!calendarData?.completedPayments || !calendarData?.paymentDueDates) {
+      return { isCompleted: false };
+    }
+
+    const dateStr = formatDateForComparison(date);
+    
+    // Find the payment due date entry
+    const paymentDue = calendarData.paymentDueDates.find(payment => {
+      const paymentDateStr = payment.date?.split('T')[0] || '';
+      return paymentDateStr === dateStr;
+    });
+
+    if (!paymentDue) return { isCompleted: false };
+
+    // Find if there's a completed payment for this due date
+    const completedPayment = calendarData.completedPayments.find(payment => {
+      const paymentDueDateStr = payment.dueDate?.split('T')[0] || '';
+      return paymentDueDateStr === dateStr;
+    });
+
+    return {
+      isCompleted: !!completedPayment,
+      completedAt: completedPayment?.completedAt
+    };
   };
 
   const handleClassClick = async (classItem: CalendarClass, date: Date) => {
@@ -533,9 +559,10 @@ export const Schedule = () => {
   const renderCalendarDay = (date: Date, isToday: boolean) => {
     const dayClasses = getClassesForDate(date);
     const isPaymentDay = isPaymentDueOnDate(date);
+    const paymentStatus = getPaymentStatus(date);
     
     // Calculate if payment is soon (within 3 days)
-    const daysUntilPayment = isPaymentDay ? 
+    const daysUntilPayment = isPaymentDay && !paymentStatus.isCompleted ? 
       Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
     const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
 
@@ -697,6 +724,7 @@ export const Schedule = () => {
         homeworkInfo={homeworkInfo}
         homeworkFeedbackInfo={homeworkFeedbackInfo}
         onHomeworkPillClick={handleHomeworkPillClick}
+        paymentStatus={paymentStatus}
       />
     );
   };
@@ -905,8 +933,12 @@ export const Schedule = () => {
             <Calendar
               selectedDate={selectedDate}
               onMonthChange={(date) => {
-                // Just update the selected date, the useEffect will handle the data fetching
+                // Update selected date
                 setSelectedDate(date);
+                // Fetch data for the new month
+                const newMonth = date.getMonth();
+                const newYear = date.getFullYear();
+                fetchCalendarDataSafely(newMonth, newYear);
               }}
               onDayClick={(date: Date) => {
                 // Update selectedDate
@@ -940,16 +972,41 @@ export const Schedule = () => {
                 </h3>
 
                 {selectedDayDetails.isPaymentDay && (
-                  <div className="flex flex-col bg-[#fffbeb] p-3 rounded-lg mb-4">
+                  <div className={`flex flex-col p-3 rounded-lg mb-4 ${
+                    getPaymentStatus(selectedDayDetails.date).isCompleted
+                      ? 'bg-[#f0fdf4]'  // Light green background for completed payments
+                      : 'bg-[#fffbeb]'  // Original yellow background for pending payments
+                  }`}>
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${selectedDayDetails.isPaymentSoon ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`} />
+                      <div className={`w-2 h-2 rounded-full ${
+                        getPaymentStatus(selectedDayDetails.date).isCompleted
+                          ? 'bg-[#22c55e]'
+                          : selectedDayDetails.isPaymentSoon
+                          ? 'bg-[#ef4444]'
+                          : 'bg-[#f59e0b]'
+                      }`} />
                       <div>
-                        <span className="text-sm font-medium text-[#f59e0b]">{t.paymentDue}</span>
-                        {selectedDayDetails.isPaymentSoon && (
+                        <span className={`text-sm font-medium ${
+                          getPaymentStatus(selectedDayDetails.date).isCompleted
+                            ? 'text-[#22c55e]'
+                            : 'text-[#f59e0b]'
+                        }`}>
+                          {getPaymentStatus(selectedDayDetails.date).isCompleted
+                            ? t.paymentCompleted
+                            : t.paymentDue}
+                        </span>
+                        {selectedDayDetails.isPaymentSoon && !getPaymentStatus(selectedDayDetails.date).isCompleted && (
                           <span className="text-xs ml-2 text-[#ef4444]">Due soon</span>
                         )}
                       </div>
                     </div>
+                    
+                    {/* Show completion date if payment is completed */}
+                    {getPaymentStatus(selectedDayDetails.date).isCompleted && getPaymentStatus(selectedDayDetails.date).completedAt && (
+                      <div className="mt-2 ml-4 text-sm text-[#22c55e]">
+                        {t.completedOn}: {new Date(getPaymentStatus(selectedDayDetails.date).completedAt!).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+                      </div>
+                    )}
                     
                     {/* Payment Link Section */}
                     {calendarData?.paymentDueDates && calendarData.paymentDueDates.some(payment => {
