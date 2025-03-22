@@ -204,6 +204,9 @@ interface Translation {
   allPaymentsCompleted: string;
   markAsIncomplete: string;
   processing: string;
+  selectCompletionDate: string;
+  confirm: string;
+  completedOn: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -411,6 +414,9 @@ const translations: Record<Language, Translation> = {
     allPaymentsCompleted: 'All payments completed',
     markAsIncomplete: 'Mark as Incomplete',
     processing: 'Processing...',
+    selectCompletionDate: 'Select Payment Completion Date',
+    confirm: 'Confirm',
+    completedOn: 'Completed on',
   },
   'pt-BR': {
     // Auth & Profile
@@ -616,6 +622,9 @@ const translations: Record<Language, Translation> = {
     allPaymentsCompleted: 'Todos os pagamentos concluídos',
     markAsIncomplete: 'Marcar como Não Concluído',
     processing: 'Processando...',
+    selectCompletionDate: 'Selecione a Data de Conclusão do Pagamento',
+    confirm: 'Confirmar',
+    completedOn: 'Concluído em',
   }
 };
 

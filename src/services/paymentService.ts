@@ -125,7 +125,8 @@ export const createPayment = async (
   classSessionId: string,
   amount: number,
   currency: string,
-  dueDate: Date
+  dueDate: Date,
+  completedAt?: Date
 ): Promise<string> => {
   // Check if payment already exists
   const existingPayment = await checkExistingPayment(userId, classSessionId, dueDate);
@@ -144,7 +145,7 @@ export const createPayment = async (
     amount,
     currency,
     status: 'completed',
-    completedAt: Timestamp.now(),
+    completedAt: completedAt ? Timestamp.fromDate(completedAt) : Timestamp.now(),
     dueDate: Timestamp.fromDate(dueDate),
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),

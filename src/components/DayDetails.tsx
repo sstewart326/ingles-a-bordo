@@ -85,6 +85,12 @@ export const DayDetails = ({
   const [loadingPaymentLinks, setLoadingPaymentLinks] = useState<{[classId: string]: boolean}>({});
   const [loadingPaymentComplete, setLoadingPaymentComplete] = useState<{[key: string]: boolean}>({});
   const [loadingPaymentIncomplete, setLoadingPaymentIncomplete] = useState<{[key: string]: boolean}>({});
+  const [showCompletionDateModal, setShowCompletionDateModal] = useState(false);
+  const [selectedCompletionDate, setSelectedCompletionDate] = useState<Date>(new Date());
+  const [pendingPaymentAction, setPendingPaymentAction] = useState<{
+    userId: string;
+    classSession: ClassSession;
+  } | null>(null);
   const CLASSES_PER_PAGE = 3;
   const detailsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -181,6 +187,15 @@ export const DayDetails = ({
   }, [selectedDayDetails]);
 
   const handleMarkPaymentCompleted = async (userId: string, classSession: ClassSession) => {
+    setPendingPaymentAction({ userId, classSession });
+    setSelectedCompletionDate(new Date());
+    setShowCompletionDateModal(true);
+  };
+
+  const handleConfirmPaymentCompletion = async () => {
+    if (!pendingPaymentAction) return;
+    const { userId, classSession } = pendingPaymentAction;
+
     try {
       const paymentKey = `${userId}-${classSession.id}`;
       setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: true }));
@@ -208,7 +223,14 @@ export const DayDetails = ({
       const baseClassId = getBaseClassId(classSession.id);
       
       // Use the user's email as the userId since that's what we have
-      const paymentId = await createPayment(userPaymentDue.user.email, baseClassId, amount, currency, selectedDayDetails!.date);
+      const paymentId = await createPayment(
+        userPaymentDue.user.email,
+        baseClassId,
+        amount,
+        currency,
+        selectedDayDetails!.date,
+        selectedCompletionDate
+      );
       console.log('Payment created with ID:', paymentId);
       
       // Fetch all completed payments to ensure state is fully up to date
@@ -234,10 +256,14 @@ export const DayDetails = ({
       }
       
       setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
+      setShowCompletionDateModal(false);
+      setPendingPaymentAction(null);
     } catch (error) {
       console.error('Error marking payment completed:', error);
       const paymentKey = `${userId}-${classSession.id}`;
       setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
+      setShowCompletionDateModal(false);
+      setPendingPaymentAction(null);
     }
   };
 
@@ -704,11 +730,20 @@ export const DayDetails = ({
                   }`}
                 >
                   {completed ? (
-                    <div className="flex items-center text-green-600 bg-green-100 px-4 py-2 rounded-t-lg border-b border-green-200">
+                    <div className="flex items-center justify-between text-green-600 bg-green-100 px-4 py-2 rounded-t-lg border-b border-green-200">
                       <div className="flex items-center">
                         <CheckCircleIcon className="h-5 w-5 mr-2" />
                         <span className="text-sm font-bold">{t.completed}</span>
                       </div>
+                      {payment && payment.completedAt && (
+                        <div className="text-sm">
+                          {t.completedOn}: {new Date(payment.completedAt.seconds * 1000).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center text-yellow-600 bg-yellow-100 px-4 py-2 rounded-t-lg border-b border-yellow-200">
@@ -921,6 +956,38 @@ export const DayDetails = ({
           />
           
           {totalPages > 1 && <ClassesPagination />}
+        </div>
+      )}
+
+      {/* Completion Date Modal */}
+      {showCompletionDateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium mb-4">{t.selectCompletionDate}</h3>
+            <input
+              type="date"
+              value={selectedCompletionDate.toISOString().split('T')[0]}
+              onChange={(e) => setSelectedCompletionDate(new Date(e.target.value))}
+              className="w-full p-2 border rounded mb-4"
+            />
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowCompletionDateModal(false);
+                  setPendingPaymentAction(null);
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                {t.cancel}
+              </button>
+              <button
+                onClick={handleConfirmPaymentCompletion}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                {t.confirm}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
