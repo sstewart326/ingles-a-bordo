@@ -3,8 +3,8 @@ import { where } from 'firebase/firestore';
 import { useAuth } from './useAuth';
 import { useAdmin } from './useAdmin';
 import { getCachedCollection } from '../utils/firebaseUtils';
-import { ClassSession, User } from '../utils/scheduleUtils';
-import { ClassMaterial } from '../types/interfaces';
+import { ClassSession } from '../utils/scheduleUtils';
+import { ClassMaterial, User } from '../types/interfaces';
 import { updateClassList, fetchMaterialsForClasses } from '../utils/classUtils';
 import { getAllClassesForMonth, invalidateCalendarCache } from '../services/calendarService';
 
@@ -141,38 +141,28 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         let combinedDailyClassMap: Record<string, any[]> = { ...dailyClassMap };
         
         if (isAdmin) {
-          // For admin users, fetch data for all relevant months
-          const fetchPromises = newMonthsToLoad.map(async (monthKey) => {
+          // For admin users, fetch data for all relevant months sequentially to prevent race conditions
+          for (const monthKey of newMonthsToLoad) {
             const [year, month] = monthKey.split('-').map(Number);
             try {
               const response = await getAllClassesForMonth(month, year, { bypassCache: shouldBypassCache });
-              return response;
+              if (response) {
+                // Merge the response data with existing data
+                transformedClasses = [...transformedClasses, ...response.classes];
+                if (response.users) {
+                  userDocs = [...userDocs, ...response.users];
+                }
+                if (response.dailyClassMap) {
+                  combinedDailyClassMap = {
+                    ...combinedDailyClassMap,
+                    ...response.dailyClassMap
+                  };
+                }
+              }
             } catch (error) {
               console.error(`Error fetching classes for ${monthKey}:`, error);
-              return null;
             }
-          });
-
-          const responses = await Promise.all(fetchPromises);
-          
-          // Combine all responses
-          responses.forEach(response => {
-            if (response) {
-              if (response.classes) {
-                transformedClasses = [...transformedClasses, ...response.classes];
-              }
-              
-              if (response.dailyClassMap) {
-                // Merge the dailyClassMap from this response
-                combinedDailyClassMap = { ...combinedDailyClassMap, ...response.dailyClassMap };
-              }
-              
-              // Get users from the response
-              if (response.users && Array.isArray(response.users)) {
-                userDocs = [...userDocs, ...response.users];
-              }
-            }
-          });
+          }
 
           // Update the dailyClassMap state
           setDailyClassMap(combinedDailyClassMap);

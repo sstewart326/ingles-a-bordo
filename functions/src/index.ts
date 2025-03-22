@@ -86,6 +86,7 @@ export const checkUserExistsHttp = onRequest({
       }
 
       try {
+        logger.info('auth user lookup', { userId });
         await admin.auth().getUser(userId);
         response.status(200).json({ exists: true });
       } catch (error: unknown) {
@@ -184,9 +185,11 @@ export const getClassScheduleHttp = onRequest({
       // Query classes based on user identifier
       let classesQuery: admin.firestore.Query;
       if (email) {
+        logger.info('users lookup by email', { email });
         classesQuery = admin.firestore().collection('classes')
           .where('studentEmails', 'array-contains', email);
       } else {
+        logger.info('user lookup by userId', { userId });
         classesQuery = admin.firestore().collection('classes')
           .where('studentIds', 'array-contains', userId);
       }
@@ -200,9 +203,12 @@ export const getClassScheduleHttp = onRequest({
 
       // Get user data for payment configuration
       let userData = null;
+      let userEmail = null;
+      
       if (email) {
+        userEmail = email as string;
         const usersSnapshot = await admin.firestore().collection('users')
-          .where('email', '==', email)
+          .where('email', '==', userEmail)
           .limit(1)
           .get();
         
@@ -581,12 +587,15 @@ export const getClassMaterialsHttp = onRequest({
       
       if (classId) {
         // Filter by class ID
+        logger.info('materials lookup by classId', { classId });
         materialsQuery = materialsQuery.where('classId', '==', classId);
       } else if (email) {
         // Filter by student email
+        logger.info('materials lookup by studentEmail', { email });
         materialsQuery = materialsQuery.where('studentEmails', 'array-contains', email);
       } else if (userId) {
         // Get user email first
+        logger.info('user lookup for materials by userId', { userId });
         const userDoc = await admin.firestore().collection('users').doc(userId as string).get();
         if (!userDoc.exists) {
           response.status(404).json({ error: 'User not found' });
@@ -597,6 +606,7 @@ export const getClassMaterialsHttp = onRequest({
           response.status(404).json({ error: 'User email not found' });
           return;
         }
+        logger.info('materials lookup by studentEmail', { userEmail });
         materialsQuery = materialsQuery.where('studentEmails', 'array-contains', userEmail);
       }
 
@@ -604,8 +614,11 @@ export const getClassMaterialsHttp = onRequest({
       const materialsSnapshot = await materialsQuery.get();
       
       if (materialsSnapshot.empty) {
+        logger.info('no materials found for the given parameters');
         response.status(200).json({ materials: [] });
         return;
+      } else {
+        logger.info('number of materials found for the given parameters', { numMaterials: materialsSnapshot.size });
       }
 
       // Filter materials by date and organize by class
@@ -695,6 +708,7 @@ export const getCalendarDataHttp = onRequest({
       
       if (email) {
         userEmail = email as string;
+        logger.info('users lookup by email', { email });
         const usersSnapshot = await admin.firestore().collection('users')
           .where('email', '==', userEmail)
           .limit(1)
@@ -708,6 +722,7 @@ export const getCalendarDataHttp = onRequest({
           };
         }
       } else if (userId) {
+        logger.info('user lookup by userId', { userId });
         const userDoc = await admin.firestore().collection('users').doc(userId as string).get();
         if (userDoc.exists) {
           userData = {
@@ -719,22 +734,33 @@ export const getCalendarDataHttp = onRequest({
       }
 
       if (!userData) {
+        logger.info('user not found for the given parameters');
         response.status(404).json({ error: 'User not found' });
         return;
+      } else {
+        logger.info('user found for the given parameters', {userId: userData.id, email: userData.email});
       }
 
       // Query classes based on user identifier - try both studentIds and studentEmails
       let classesQuery: admin.firestore.Query;
       
       if (userEmail) {
+        logger.info('classes lookup by studentEmail', { userEmail });
         classesQuery = admin.firestore().collection('classes')
           .where('studentEmails', 'array-contains', userEmail);
       } else {
+        logger.info('classes lookup by userId', { userId });
         classesQuery = admin.firestore().collection('classes')
           .where('studentIds', 'array-contains', userId);
       }
 
       const classesSnapshot = await classesQuery.get();
+
+      if(classesSnapshot.empty) {
+        logger.info('no classes found for the given parameters');
+      } else {
+        logger.info('number of classes found for the given parameters', { numClasses: classesSnapshot.size });
+      }
       
       // Process classes and map them to dates
       const classSchedule = [];
@@ -858,10 +884,17 @@ export const getCalendarDataHttp = onRequest({
         }
         
         for (const chunk of classIdChunks) {
+          logger.info('materials lookup by classIds chunk', { classIds: chunk });
           const materialsQuery: admin.firestore.Query = admin.firestore().collection('classMaterials')
             .where('classId', 'in', chunk);
           
           const materialsSnapshot = await materialsQuery.get();
+
+          if(materialsSnapshot.empty) {
+            logger.info('no materials found for the given classIds chunk');
+          } else {
+            logger.info('number of materials found for the given classIds chunk', { numMaterials: materialsSnapshot.size });
+          }
           
           for (const doc of materialsSnapshot.docs) {
             const materialData = doc.data();
@@ -895,12 +928,19 @@ export const getCalendarDataHttp = onRequest({
         try {
           // Check if we should query by ID or email
           if (userEmail) {
+            logger.info('payments lookup by userEmail', { userEmail });
             // Try both userId field formats
             const paymentsSnapshotByEmail = await admin.firestore().collection('payments')
               .where('userId', '==', userEmail)
               .where('dueDate', '>=', startDate)
               .where('dueDate', '<=', endDate)
               .get();
+
+            if(paymentsSnapshotByEmail.empty) {
+              logger.info('no payments found for the given userEmail');
+            } else {
+              logger.info('number of payments found for the given userEmail', { numPayments: paymentsSnapshotByEmail.size });
+            }
               
             // Process payments by email
             for (const doc of paymentsSnapshotByEmail.docs) {
@@ -926,11 +966,18 @@ export const getCalendarDataHttp = onRequest({
           
           // Also try with user ID if available
           if (userData.id) {
+            logger.info('payments lookup by userId', { userId: userData.id });
             const paymentsSnapshotById = await admin.firestore().collection('payments')
               .where('userId', '==', userData.id)
               .where('dueDate', '>=', startDate)
               .where('dueDate', '<=', endDate)
               .get();
+
+            if(paymentsSnapshotById.empty) {
+              logger.info('no payments found for the given userId');
+            } else {
+              logger.info('number of payments found for the given userId', { numPayments: paymentsSnapshotById.size });
+            }
               
             // Process payments by ID
             for (const doc of paymentsSnapshotById.docs) {
@@ -968,7 +1015,14 @@ export const getCalendarDataHttp = onRequest({
       }> = [];
       
       // Query all users to get birthdays
+      logger.info('querying all users for birthdays');
       const usersSnapshot = await admin.firestore().collection('users').get();
+
+      if(usersSnapshot.empty) {
+        logger.error('no users found for the given parameters');
+      } else {
+        logger.info('number of users found for the given parameters', { numUsers: usersSnapshot.size });
+      }
       
       for (const doc of usersSnapshot.docs) {
         const userData = doc.data();
@@ -1089,20 +1143,28 @@ export const getAllClassesForMonthHttp = onRequest({
 
       // Verify admin status
       if (adminId) {
+        logger.info('admin verification lookup', { adminId });
         const adminDoc = await admin.firestore().collection('users').doc(adminId as string).get();
         
         if (!adminDoc.exists) {
+          logger.error('admin not found for the given parameters');
           response.status(403).json({ error: 'Unauthorized. Admin not found.' });
           return;
+        } else {
+          logger.info('admin found for the given parameters', { adminId: adminDoc.id });
         }
         
         const userData = adminDoc.data();
         
         if (!userData?.isAdmin) {
+          logger.error('admin access required');
           response.status(403).json({ error: 'Unauthorized. Admin access required.' });
           return;
+        } else {
+          logger.info('admin access granted');
         }
       } else {
+        logger.error('admin ID required');
         response.status(403).json({ error: 'Unauthorized. Admin ID required.' });
         return;
       }
@@ -1113,11 +1175,13 @@ export const getAllClassesForMonthHttp = onRequest({
 
       // Validate month and year
       if (isNaN(monthInt) || monthInt < 0 || monthInt > 11) {
+        logger.error('invalid month for the given parameters');
         response.status(400).json({ error: 'Invalid month. Must be between 0 and 11.' });
         return;
       }
 
       if (isNaN(yearInt) || yearInt < 2000 || yearInt > 2100) {
+        logger.error('invalid year for the given parameters');
         response.status(400).json({ error: 'Invalid year. Must be between 2000 and 2100.' });
         return;
       }
@@ -1135,11 +1199,13 @@ export const getAllClassesForMonthHttp = onRequest({
       }> = [];
 
       // Get users who have this admin as their teacher
+      logger.info('users lookup by teacher', { teacherId: adminId });
       const usersSnapshot = await admin.firestore().collection('users')
         .where('teacher', '==', adminId as string)
         .get();
       
       if (usersSnapshot.empty) {
+        logger.info('no users found for the given parameters');
         response.status(200).json({ 
           classes: [],
           dailyClassMap: {},
@@ -1148,6 +1214,8 @@ export const getAllClassesForMonthHttp = onRequest({
           year: yearInt
         });
         return;
+      } else {
+        logger.info('number of users found for the given parameters', { numUsers: usersSnapshot.size });
       }
 
       const usersMap = new Map();
@@ -1188,6 +1256,7 @@ export const getAllClassesForMonthHttp = onRequest({
       
       if (userEmails.length <= batchSize) {
         // If we have 10 or fewer emails, we can use a single query
+        logger.info('classes lookup by studentEmails (single batch)', { userEmails });
         classesSnapshot = await admin.firestore().collection('classes')
           .where('studentEmails', 'array-contains-any', userEmails)
           .get();
@@ -1200,6 +1269,7 @@ export const getAllClassesForMonthHttp = onRequest({
         }
         
         // Execute all batch queries
+        logger.info('classes lookup by studentEmails (multiple batches)', { batches });
         const batchQueries = batches.map(batch => 
           admin.firestore().collection('classes')
             .where('studentEmails', 'array-contains-any', batch)
@@ -1207,6 +1277,13 @@ export const getAllClassesForMonthHttp = onRequest({
         );
         
         const batchResults = await Promise.all(batchQueries);
+
+        const totalDocs = batchResults.reduce((sum, snapshot) => sum + snapshot.size, 0);
+        if(totalDocs === 0) {
+          logger.info('no classes found for the given parameters');
+        } else {
+          logger.info('number of classes found for the given parameters', { numClasses: totalDocs });
+        }
         
         // Combine results, avoiding duplicates
         const classesMap = new Map();
