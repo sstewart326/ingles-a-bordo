@@ -4,25 +4,7 @@ import { db } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { styles } from '../styles/styleUtils';
 import Modal from '../components/Modal';
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-}
-
-interface Class {
-  id: string;
-  studentIds: string[];
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  courseType: string;
-  notes?: string;
-  endDate: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
+import { Class, User } from '../types/interfaces';
 
 const COURSE_TYPES = ['Individual', 'Pair', 'Group'];
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -40,7 +22,7 @@ export const StudentSchedule = () => {
   const [loading, setLoading] = useState(true);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newClass, setNewClass] = useState<Omit<Class, 'id' | 'studentIds' | 'createdAt' | 'updatedAt'>>({
+  const [newClass, setNewClass] = useState<Partial<Class>>({
     dayOfWeek: 1,
     startTime: '09:00',
     endTime: '10:00',
@@ -234,7 +216,7 @@ export const StudentSchedule = () => {
                       const student = students.find(s => s.id === studentId);
                       return (
                         <div key={studentId} className="text-sm text-black">
-                          {student?.name || student?.email || 'Unknown Student'}
+                          {student?.name || 'Unknown Student'}
                         </div>
                       );
                     })}
@@ -265,7 +247,7 @@ export const StudentSchedule = () => {
                 >
                   {students.map((student) => (
                     <option key={student.id} value={student.id} className="p-1 hover:bg-gray-100 text-black">
-                      {student.name || student.email}
+                      {student.name}
                     </option>
                   ))}
                 </select>
@@ -331,7 +313,7 @@ export const StudentSchedule = () => {
                 <label className="block text-sm font-medium text-black">End Date</label>
                 <input
                   type="date"
-                  value={newClass.endDate.toDate().toISOString().split('T')[0]}
+                  value={newClass.endDate!.toDate().toISOString().split('T')[0]}
                   onChange={(e) => setNewClass({
                     ...newClass,
                     endDate: Timestamp.fromDate(new Date(e.target.value))

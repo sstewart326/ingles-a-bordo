@@ -25,54 +25,7 @@ import { invalidateCalendarCache } from '../services/calendarService';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  isAdmin: boolean;
-  createdAt: string;
-  status?: 'active' | 'pending';
-}
-
-interface PaymentConfig {
-  type: 'weekly' | 'monthly';
-  weeklyInterval?: number;  // for weekly payments, number of weeks
-  monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
-  startDate: string;  // YYYY-MM-DD date string
-  paymentLink?: string;  // URL for payment
-  amount?: number;  // Payment amount
-  currency?: string;  // Payment currency (e.g., USD, BRL)
-}
-
-interface Class {
-  id: string;
-  studentEmails: string[];
-  studentIds?: string[];
-  scheduleType: 'single' | 'multiple';  // New field to indicate schedule type
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  timezone: string;  // Add timezone field
-  schedules?: ClassSchedule[];
-  courseType: string;
-  notes?: string;
-  startDate: Timestamp;
-  endDate?: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  contractUrl?: string;  // URL to the contract document
-  paymentConfig: PaymentConfig;
-  frequency: {
-    type: 'weekly' | 'biweekly' | 'custom';
-    every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks
-  };
-}
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
+import { Class, SelectOption, User } from '../types/interfaces';
 
 type SelectStyles = StylesConfig<SelectOption, true>;
 
@@ -757,10 +710,6 @@ export const AdminSchedule = () => {
     
     // For start date and end date, convert Timestamp to Date
     const startDate = classItem.startDate.toDate();
-    let endDate = null;
-    if (classItem.endDate) {
-      endDate = classItem.endDate.toDate();
-    }
     
     // Ensure the timezone is set
     const timezone = classItem.timezone || 'America/New_York'; // Set to Eastern Time as default
@@ -773,7 +722,7 @@ export const AdminSchedule = () => {
       ...classItem,
       schedules,
       startDate: startDate,
-      endDate: endDate,
+      endDate: classItem.endDate.toDate(),
       timezone: timezone, // Set timezone with fixed value
       paymentConfig: {
         ...classItem.paymentConfig,

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar } from './Calendar';
 import { CalendarDay } from './CalendarDay';
-import { ClassSession, User } from '../utils/scheduleUtils';
+import { ClassSession } from '../utils/scheduleUtils';
 import { getPaymentsDueForDay } from '../utils/paymentUtils';
 import { getPaymentsForDates } from '../services/paymentService';
 import { Payment } from '../types/payment';
+import { User } from '../types/interfaces';
 
 interface CalendarSectionProps {
   selectedDate: Date;
@@ -141,13 +142,15 @@ export const CalendarSection = ({
           <CalendarDay
             date={date}
             isToday={isToday}
-            classes={getClassesForDayWithCache(date)}
+            dayClasses={getClassesForDayWithCache(date)}
             paymentsDue={dayPaymentsDue}
             isDateInRelevantMonthRange={isDateInRelevantMonthRange}
             completedPayments={completedPayments}
             isLoading={isLoadingPayments}
             users={users}
             onDayClick={handleDayClick}
+            onClassCountClick={(_) => handleDayClick(date)}
+            onPaymentPillClick={(_) => handleDayClick(date)}
           />
         );
       }}

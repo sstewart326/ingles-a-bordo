@@ -1,10 +1,10 @@
 import React from 'react';
-import { ClassSession, User } from '../utils/scheduleUtils';
+import { ClassSession } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { FaFileAlt, FaBook, FaCommentAlt } from 'react-icons/fa';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
-
+import { User } from '../types/interfaces';
 export interface ScheduleCalendarDayProps<T extends ClassSession> {
   date: Date;
   isToday: boolean;

@@ -36,17 +36,7 @@ import {
 import { styles } from '../styles/styleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-}
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
+import { SelectOption, User } from '../types/interfaces';
 
 // Simple tooltip component
 const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }) => {
@@ -143,7 +133,9 @@ export const AdminClassPlans = () => {
           fetchedStudents.push({
             id: doc.id,
             email: userData.email,
-            name: userData.name
+            name: userData.name,
+            isAdmin: userData.isAdmin,
+            createdAt: userData.createdAt
           });
         }
       });
@@ -762,7 +754,7 @@ export const AdminClassPlans = () => {
   // Convert students to select options
   const studentOptions = students.map(student => ({
     value: student.email,
-    label: student.name || student.email
+    label: student.name
   }));
   
   // Custom styles for the Select component

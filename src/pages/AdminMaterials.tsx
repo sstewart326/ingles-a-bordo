@@ -265,7 +265,7 @@ const AdminMaterials = () => {
                 classInfo={selectedClass ? {
                   ...selectedClass,
                   timezone: 'UTC',
-                  startDate: selectedClass.startDate || { toDate: () => new Date() }
+                  startDate: selectedClass.startDate
                 } : { 
                   id: '', 
                   dayOfWeek: 0, 
@@ -277,7 +277,7 @@ const AdminMaterials = () => {
                 }}
                 availableClasses={classes.map(cls => ({
                   ...cls,
-                  startDate: cls.startDate || { toDate: () => new Date() }
+                  startDate: cls.startDate
                 }))}
                 allowPastDates={true}
               />
@@ -308,7 +308,7 @@ const AdminMaterials = () => {
                       .map(classItem => {
                         // Find the student for this class
                         const student = users.find(u => classItem.studentEmails.includes(u.email));
-                        const displayText = student?.name || student?.email || t.unknownEmail;
+                        const displayText = student?.name || t.unknownEmail;
                         return (
                           <option key={classItem.id} value={classItem.id}>
                             {displayText} ({classItem.startTime} - {classItem.endTime})

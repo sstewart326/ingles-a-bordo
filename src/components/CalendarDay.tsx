@@ -1,31 +1,17 @@
-import { ClassSession, User } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { Payment } from '../types/payment';
-
-export interface CalendarDayProps<T extends ClassSession> {
-  date: Date;
-  isToday: boolean;
-  classes: T[];
-  paymentsDue?: { user: User; classSession: ClassSession }[];
-  onDayClick?: (date: Date, classes: T[]) => void;
-  completedPayments?: Payment[];
-  isLoading?: boolean;
-  isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
-  users?: User[];
-}
-
-export function CalendarDay<T extends ClassSession>({
+import { CalendarDayProps } from '../types/interfaces';
+export function CalendarDay({
   date,
   isToday,
-  classes = [],
+  dayClasses = [],
   paymentsDue = [],
   onDayClick,
   completedPayments = [],
   isLoading = false,
   isDateInRelevantMonthRange,
   users = []
-}: CalendarDayProps<T>) {
+}: CalendarDayProps) {
   const { language } = useLanguage();
   const t = useTranslation(language);
   
@@ -51,7 +37,7 @@ export function CalendarDay<T extends ClassSession>({
   // Handle day click
   const handleDayClick = () => {
     if (onDayClick) {
-      onDayClick(date, classes);
+      onDayClick(date, dayClasses);
     }
   };
 
@@ -101,7 +87,7 @@ export function CalendarDay<T extends ClassSession>({
   };
 
   const isRelevant = isDateInRelevantMonthRange(date, date);
-  const hasClasses = classes.length > 0;
+  const hasClasses = dayClasses.length > 0;
 
   return (
     <div className={`h-full flex flex-col ${!isRelevant ? 'text-gray-400' : ''}`} onClick={handleDayClick}>
@@ -149,7 +135,7 @@ export function CalendarDay<T extends ClassSession>({
               className="calendar-pill class-count-pill"
               onClick={handlePillClick}
             >
-              {classes.length} {classes.length === 1 ? t.class : t.class}
+              {dayClasses.length} {dayClasses.length === 1 ? t.class : t.class}
             </div>
           )}
           

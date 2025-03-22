@@ -1,16 +1,8 @@
-import { ClassSession, User } from '../utils/scheduleUtils';
+import { ClassSession } from '../utils/scheduleUtils';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
 import React, { useRef } from 'react';
-
-interface CalendarDayProps {
-  date: Date;
-  isToday: boolean;
-  dayClasses: ClassSession[];
-  paymentsDue: { user: User; classSession: ClassSession }[];
-  onClassCountClick: (e: React.MouseEvent, date: Date, dayClasses: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
-  onPaymentPillClick: (e: React.MouseEvent, date: Date, dayClasses: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
-}
+import { CalendarDayProps } from '../types/interfaces';
 
 export const CalendarDay = ({
   date,

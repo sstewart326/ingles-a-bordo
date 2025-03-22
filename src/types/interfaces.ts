@@ -1,6 +1,31 @@
+import { Timestamp } from 'firebase/firestore';
+import { ClassSession } from '../utils/scheduleUtils';
+import { Payment } from './payment';
+
 /**
  * Common interfaces used throughout the application
  */
+
+
+
+export interface CalendarDayProps {
+  date: Date;
+  isToday: boolean;
+  dayClasses: ClassSession[];
+  paymentsDue: { user: User; classSession: ClassSession }[];
+  onClassCountClick: (e: React.MouseEvent, date: Date, dayClasses: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
+  onPaymentPillClick: (e: React.MouseEvent, date: Date, dayClasses: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
+  onDayClick?: (date: Date, classes: ClassSession[]) => void;
+  completedPayments?: Payment[];
+  isLoading?: boolean;
+  isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
+  users?: User[];
+}
+
+export interface SelectOption {
+  value: string;
+  label: string;
+}
 
 export interface ClassMaterial {
   classId: string;
@@ -42,18 +67,38 @@ export interface HomeworkSubmission {
   grade?: string;
 }
 
+export interface PaymentConfig {
+  type: 'weekly' | 'monthly';
+  weeklyInterval?: number;  // for weekly payments, number of weeks
+  monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments: first day, 15th, or last day
+  startDate: string;  // YYYY-MM-DD date string
+  paymentLink?: string;  // URL for payment
+  amount?: number;  // Payment amount
+  currency?: string;  // Payment currency (e.g., USD, BRL)
+}
+
 export interface Class {
   id: string;
+  studentEmails: string[];
+  studentIds: string[];
+  scheduleType: 'single' | 'multiple';  // New field to indicate schedule type
   dayOfWeek: number;
   startTime: string;
   endTime: string;
-  timezone: string;
+  timezone: string;  // Add timezone field
+  schedules?: ClassSchedule[];
   courseType: string;
   notes?: string;
-  studentEmails: string[];
-  studentIds?: string[]; // Keep for backward compatibility
-  startDate?: { toDate: () => Date }; // Firebase Timestamp
-  endDate?: { toDate: () => Date }; // Optional Firebase Timestamp
+  startDate: Timestamp;
+  endDate: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  contractUrl?: string;  // URL to the contract document
+  paymentConfig: PaymentConfig;
+  frequency: {
+    type: 'weekly' | 'biweekly' | 'custom';
+    every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks
+  };
 }
 
 export interface ClassInfo {
@@ -70,8 +115,22 @@ export interface ClassInfo {
 
 export interface User {
   id: string;
+  uid?: string;  // Firebase Auth UID
   email: string;
-  name?: string;
+  name: string;
+  isAdmin: boolean;
+  isTeacher?: boolean;
+  status?: 'active' | 'pending';
+  createdAt: string | Date;
+  birthdate?: string;  // Add birthdate to User interface
+  teacher?: string;  // ID of the admin who created this user
+  paymentConfig?: {
+    type: 'weekly' | 'monthly';
+    weeklyInterval?: number;
+    monthlyOption?: 'first' | 'fifteen' | 'last';
+    startDate: string;
+    paymentLink?: string;
+  };
 }
 
 export interface MonthYear {

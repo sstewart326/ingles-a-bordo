@@ -14,26 +14,7 @@ import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 import Modal from '../components/Modal';
 import { MasqueradeButton } from '../components/MasqueradeButton';
-
-interface User {
-  id: string;
-  uid?: string;  // Firebase Auth UID
-  email: string;
-  name: string;
-  isAdmin: boolean;
-  isTeacher?: boolean;
-  status?: 'active' | 'pending';
-  createdAt: string | Date;
-  birthdate?: string;  // Add birthdate to User interface
-  teacher?: string;  // ID of the admin who created this user
-  paymentConfig?: {
-    type: 'weekly' | 'monthly';
-    weeklyInterval?: number;
-    monthlyOption?: 'first' | 'fifteen' | 'last';
-    startDate: string;
-    paymentLink?: string;
-  };
-}
+import { User } from '../types/interfaces';
 
 interface NewUser {
   email: string;

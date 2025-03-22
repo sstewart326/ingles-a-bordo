@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 import { formatTimeWithTimezones, formatTimeToAMPM, convertTimeToTimezone } from './dateUtils';
+import { User } from '../types/interfaces';
 
 export interface ClassSession {
   // Required fields
@@ -64,20 +65,6 @@ export interface ClassSession {
   };
   studentNames?: string[];    // Add studentNames as an optional property
   _displayDate?: Date;        // Add _displayDate for display purposes
-}
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  birthdate?: string; // Format: "MM-DD"
-  paymentConfig?: {
-    type: 'weekly' | 'monthly';
-    weeklyInterval?: number;  // for weekly payments, number of weeks
-    monthlyOption?: 'first' | 'fifteen' | 'last';  // for monthly payments
-    startDate: string;  // YYYY-MM-DD date string
-    paymentLink?: string;  // URL for payment
-  };
 }
 
 // ClassWithStudents is now just an alias since we've updated the base interface
