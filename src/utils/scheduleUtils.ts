@@ -1,6 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
 import { formatTimeWithTimezones, formatTimeToAMPM, convertTimeToTimezone } from './dateUtils';
-import { User } from '../types/interfaces';
 
 export interface ClassSession {
   // Required fields

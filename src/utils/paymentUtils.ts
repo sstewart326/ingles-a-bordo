@@ -1,5 +1,6 @@
-import { ClassSession, User } from './scheduleUtils';
+import { ClassSession } from './scheduleUtils';
 import { getBaseClassId } from './scheduleUtils';
+import { User } from '../types/interfaces';
 
 // Define the PaymentDue interface locally
 interface PaymentDue {

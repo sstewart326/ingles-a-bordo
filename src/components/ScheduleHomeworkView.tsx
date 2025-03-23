@@ -5,8 +5,6 @@ import { HomeworkSubmission } from './HomeworkSubmission';
 import { FaChevronDown, FaChevronUp, FaFilePdf, FaFileWord, FaFilePowerpoint, FaFileAudio, FaFileVideo, FaFile } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { styles } from '../styles/styleUtils';
-import { collection, query, getDocs } from 'firebase/firestore';
-import { getFirestore } from 'firebase/firestore';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 

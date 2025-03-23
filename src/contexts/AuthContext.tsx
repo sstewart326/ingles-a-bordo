@@ -181,7 +181,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           unsubscribe();
         };
       })
-      .catch((error) => {
+      .catch((_) => {
         if (mounted) {
           setLoading(false);
         }

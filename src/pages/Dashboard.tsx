@@ -512,14 +512,13 @@ export const Dashboard = () => {
     };
 
     const handleMaterialsUpdated = (event: CustomEvent) => {
-      const { classId, action } = event.detail;
+      const { classId } = event.detail;
 
       if (!classId) {
         return;
       }
 
       debounceRefresh(classId);
-
     };
 
     // Add the event listener

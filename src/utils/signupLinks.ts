@@ -21,12 +21,6 @@ const generateToken = () => {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
-const logSignup = (message: string, data?: any) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[SIGNUP] ${message}`, data ? data : '');
-  }
-};
-
 // Create a signup link for a student
 export const createSignupLink = async (studentEmail: string, studentName: string): Promise<{ signupLink: string, token: string }> => {
   // Check for existing valid tokens first

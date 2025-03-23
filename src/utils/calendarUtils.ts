@@ -1,5 +1,5 @@
-import { ClassSession, User } from './scheduleUtils';
-
+import { ClassSession } from './scheduleUtils';
+import { User } from '../types/interfaces';
 // Utility function to check if a date is within the relevant month range
 export const isDateInRelevantMonthRange = (date: Date, selectedDate: Date): boolean => {
   const dateMonth = date.getMonth();

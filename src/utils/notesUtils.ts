@@ -1,10 +1,10 @@
-import { ClassSession, User } from './scheduleUtils';
+import { ClassSession } from './scheduleUtils';
 import { updateCachedDocument } from './firebaseUtils';
 import { Timestamp } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { User as FirebaseUser } from 'firebase/auth';
 import { ClassMaterial } from '../types/interfaces';
-
+import { User } from '../types/interfaces';
 interface NotesState {
   editingNotes: { [classId: string]: string };
   savingNotes: { [classId: string]: boolean };

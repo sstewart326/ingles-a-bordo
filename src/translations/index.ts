@@ -206,6 +206,8 @@ interface Translation {
   processing: string;
   paymentCompleted: string;
   completedOn: string;
+  confirm: string;
+  selectCompletionDate: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -415,6 +417,8 @@ const translations: Record<Language, Translation> = {
     processing: 'Processing...',
     paymentCompleted: 'Payment Completed',
     completedOn: 'Completed on',
+    confirm: 'Confirm',
+    selectCompletionDate: 'Select Completion Date',
   },
   'pt-BR': {
     // Auth & Profile
@@ -622,6 +626,8 @@ const translations: Record<Language, Translation> = {
     processing: 'Processando...',
     paymentCompleted: 'Pagamento Concluído',
     completedOn: 'Concluído em',
+    confirm: 'Confirmar',
+    selectCompletionDate: 'Selecionar Data de Conclusão',
   }
 };
 

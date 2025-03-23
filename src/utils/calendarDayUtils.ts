@@ -1,5 +1,6 @@
-import { ClassSession, User } from './scheduleUtils';
+import { ClassSession } from './scheduleUtils';
 import { MouseEvent } from 'react';
+import { User } from '../types/interfaces';
 
 interface CalendarDayState {
   classTimeModal: {

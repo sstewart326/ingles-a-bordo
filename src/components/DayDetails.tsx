@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ClassSession, User, getBaseClassId } from '../utils/scheduleUtils';
+import { ClassSession, getBaseClassId } from '../utils/scheduleUtils';
 import { ClassMaterial, Homework } from '../types/interfaces';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
@@ -8,6 +8,7 @@ import { Payment } from '../types/payment';
 import { createPayment, getPaymentsByDueDate, deletePayment } from '../services/paymentService';
 import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
 import { ClassSection } from './ClassSection';
+import { User } from '../types/interfaces';
 
 interface DayDetailsProps {
   selectedDayDetails: {
