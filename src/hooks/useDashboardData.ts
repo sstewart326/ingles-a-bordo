@@ -52,7 +52,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const [upcomingClasses, setUpcomingClasses] = useState<ExtendedClassSession[]>([]);
   const [pastClasses, setPastClasses] = useState<ExtendedClassSession[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [userNames, setUserNames] = useState<{[email: string]: string}>({});
+  const [userNames, setUserNames] = useState<{ [email: string]: string }>({});
   const [classMaterials, setClassMaterials] = useState<Record<string, ClassMaterial[]>>({});
   const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
   const [loadedMaterialMonths, setLoadedMaterialMonths] = useState<Set<string>>(new Set());
@@ -63,13 +63,13 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const getMonthKey = (date: Date, offset: number = 0): string => {
     const year = date.getFullYear();
     const month = date.getMonth() + offset;
-    
+
     if (month < 0) {
       return `${year - 1}-${11}`;
     } else if (month > 11) {
       return `${year + 1}-${0}`;
     }
-    
+
     return `${year}-${month}`;
   };
 
@@ -84,16 +84,16 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const isDateInRelevantMonthRange = (date: Date, selectedDate: Date = new Date()): boolean => {
     const dateMonth = date.getMonth();
     const dateYear = date.getFullYear();
-    
+
     // Use the selected date from the calendar instead of the current date
     const selectedMonth = selectedDate.getMonth();
     const selectedYear = selectedDate.getFullYear();
-    
+
     // Allow any future date relative to the selected date
     if (dateYear > selectedYear || (dateYear === selectedYear && dateMonth > selectedMonth)) {
       return true;
     }
-    
+
     // For past dates, only show one month back from the selected date
     return (
       (dateMonth === selectedMonth && dateYear === selectedYear) ||
@@ -106,14 +106,14 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     if (isAdmin) {
       const dateString = date.toISOString().split('T')[0];
       const classesForDay = dailyClassMap[dateString] || [];
-      
+
       // Process the classes to ensure student information is complete
       return classesForDay.map(classObj => {
         // If studentEmails is missing or empty but we have students, populate from students
         if ((!classObj.studentEmails || classObj.studentEmails.length === 0) && classObj.students && classObj.students.length > 0) {
           return {
             ...classObj,
-            studentEmails: classObj.students.map((student: any) => 
+            studentEmails: classObj.students.map((student: any) =>
               typeof student === 'string' ? student : student.email || '')
               .filter((email: string) => email !== '')
           };
@@ -127,40 +127,33 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const fetchClasses = useCallback(async (targetDate: Date = new Date(), isInitialLoad: boolean = false, shouldBypassCache: boolean = false) => {
     if (!currentUser || adminLoading) return;
 
-    try {
       const monthsToLoad = getRelevantMonthKeys(targetDate);
-      console.log('Months to load:', monthsToLoad);
-      
+
       // Filter out months that have already been loaded
       const newMonthsToLoad = monthsToLoad.filter(month => !loadedMonths.has(month));
-      console.log('New months to load:', newMonthsToLoad);
-      
+
       if (newMonthsToLoad.length > 0) {
         let transformedClasses: ExtendedClassSession[] = [];
         let userDocs: User[] = [];
         let combinedDailyClassMap: Record<string, any[]> = { ...dailyClassMap };
-        
+
         if (isAdmin) {
           // For admin users, fetch data for all relevant months sequentially to prevent race conditions
           for (const monthKey of newMonthsToLoad) {
             const [year, month] = monthKey.split('-').map(Number);
-            try {
-              const response = await getAllClassesForMonth(month, year, { bypassCache: shouldBypassCache });
-              if (response) {
-                // Merge the response data with existing data
-                transformedClasses = [...transformedClasses, ...response.classes];
-                if (response.users) {
-                  userDocs = [...userDocs, ...response.users];
-                }
-                if (response.dailyClassMap) {
-                  combinedDailyClassMap = {
-                    ...combinedDailyClassMap,
-                    ...response.dailyClassMap
-                  };
-                }
+            const response = await getAllClassesForMonth(month, year, { bypassCache: shouldBypassCache });
+            if (response) {
+              // Merge the response data with existing data
+              transformedClasses = [...transformedClasses, ...response.classes];
+              if (response.users) {
+                userDocs = [...userDocs, ...response.users];
               }
-            } catch (error) {
-              console.error(`Error fetching classes for ${monthKey}:`, error);
+              if (response.dailyClassMap) {
+                combinedDailyClassMap = {
+                  ...combinedDailyClassMap,
+                  ...response.dailyClassMap
+                };
+              }
             }
           }
 
@@ -176,7 +169,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
             [where('studentEmails', 'array-contains', currentUser.email)],
             { userId: currentUser.uid, bypassCache: true }
           );
-          
+
           transformedClasses = allClasses.map(classDoc => ({
             ...classDoc,
             paymentConfig: classDoc.paymentConfig || {
@@ -188,7 +181,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
               paymentLink: ''
             }
           })) as ExtendedClassSession[];
-          
+
           // Extract unique emails from classes
           const uniqueEmails = new Set<string>();
           transformedClasses.forEach(classSession => {
@@ -196,22 +189,19 @@ export const useDashboardData = (): UseDashboardDataReturn => {
               classSession.studentEmails.forEach(email => uniqueEmails.add(email));
             }
           });
-          
+
           // Fetch users
           userDocs = await getCachedCollection<User>('users', [
             where('email', 'in', Array.from(uniqueEmails))
           ], { userId: currentUser.uid });
         }
-        
+
         // Process user data
-        const newUserNames: {[email: string]: string} = {};
+        const newUserNames: { [email: string]: string } = {};
         userDocs.forEach(user => {
           newUserNames[user.email] = user.name;
         });
 
-        // Log the number of classes fetched
-        console.log(`Fetched ${transformedClasses.length} classes for months: ${newMonthsToLoad.join(', ')}`);
-        
         // Ensure classes have payment config
         transformedClasses = transformedClasses.map(classSession => {
           if (!classSession.paymentConfig) {
@@ -239,7 +229,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
             userDocs.forEach(user => emailMap.set(user.email, user));
             return Array.from(emailMap.values());
           });
-          
+
           // Only update upcoming/past classes on initial load
           if (isInitialLoad) {
             // Update class lists using the updateClassList function
@@ -254,7 +244,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
               setPastClasses: setPastClasses as (classes: ClassSession[]) => void
             });
           }
-          
+
           // Update loaded months - add new months to the existing set
           setLoadedMonths(prev => {
             const updatedSet = new Set(prev);
@@ -292,9 +282,6 @@ export const useDashboardData = (): UseDashboardDataReturn => {
           setSelectedDayDetails
         });
       }
-    } catch (error) {
-      console.error('Error fetching classes:', error);
-    }
   }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails, loadedMonths, upcomingClasses, pastClasses, dailyClassMap]);
 
   const invalidateCache = useCallback(() => {

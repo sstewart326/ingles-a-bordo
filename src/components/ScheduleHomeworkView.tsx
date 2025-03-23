@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Homework } from '../types/interfaces';
-import { getHomeworkForDate } from '../utils/homeworkUtils';
+import { getHomeworkForMonth } from '../utils/homeworkUtils';
 import { HomeworkSubmission } from './HomeworkSubmission';
 import { FaChevronDown, FaChevronUp, FaFilePdf, FaFileWord, FaFilePowerpoint, FaFileAudio, FaFileVideo, FaFile } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -35,35 +35,17 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
       setIsLoading(true);
       setError(null);
       try {
-        // Normalize the date to avoid timezone issues
-        const normalizedDate = new Date(classDate);
+        // Get all homework for the month
+        const monthHomework = await getHomeworkForMonth(classId, classDate);
         
-        // First attempt: Try with the original class ID
-        let homeworkList = await getHomeworkForDate(classId, normalizedDate);
-        
-        // Special direct check for any homework on this date from any class
-        const allHomeworkQuery = query(collection(getFirestore(), 'homework'));
-        const allHomeworkSnapshot = await getDocs(allHomeworkQuery);
-        let foundAnyMatch = false;
-        
-        allHomeworkSnapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.classDate) {
-            const hwDate = data.classDate.toDate();
-            const hwDateStr = hwDate.toISOString().split('T')[0];
-            const targetDateStr = normalizedDate.toISOString().split('T')[0];
-            
-            if (hwDateStr === targetDateStr) {
-              foundAnyMatch = true;
-            }
-          }
+        // Filter for the specific date
+        const dateString = classDate.toISOString().split('T')[0];
+        const homeworkForDate = monthHomework.filter(hw => {
+          const hwDateStr = hw.classDate.toISOString().split('T')[0];
+          return hwDateStr === dateString;
         });
         
-        if (!foundAnyMatch) {
-        }
-        
-        // Set the homework list in state
-        setHomeworkList(homeworkList);
+        setHomeworkList(homeworkForDate);
       } catch (error) {
         console.error('Error fetching homework:', error);
         setError(t.failedToLoad);
@@ -76,7 +58,7 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
     if (classId && classDate && isOpen) {
       fetchHomework();
     }
-  }, [classId, classDate, isOpen, studentEmail]);
+  }, [classId, classDate, isOpen, t]);
 
   const toggleExpandHomework = (homeworkId: string) => {
     setExpandedHomeworkId(expandedHomeworkId === homeworkId ? null : homeworkId);

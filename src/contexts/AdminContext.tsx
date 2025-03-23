@@ -2,51 +2,45 @@ import { createContext, useState, useEffect } from 'react';
 import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
+import { logQuery } from '../utils/firebaseUtils';
 
 interface AdminContextType {
   isAdmin: boolean;
   loading: boolean;
 }
 
-const AdminContext = createContext<AdminContextType | null>(null);
-
-// Add structured logging
-const logAdmin = (message: string, data?: any) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[ADMIN] ${message}`, data ? data : '');
-  }
-};
+export const AdminContext = createContext<AdminContextType>({
+  isAdmin: false,
+  loading: true,
+});
 
 export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isAdmin, setIsAdmin] = useState(() => {
-    // Try to get from sessionStorage first
-    const stored = sessionStorage.getItem('isAdmin');
-    logAdmin('Initial admin state from storage:', stored);
-    return stored === 'true';
-  });
-  const [loading, setLoading] = useState(true);
-  const { currentUser, loading: authLoading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     if (!currentUser) {
-      logAdmin('No current user, setting isAdmin to false');
       setIsAdmin(false);
       setLoading(false);
       return;
     }
 
-    logAdmin('Setting up admin status listener for user:', {
-      uid: currentUser.uid,
-      email: currentUser.email
-    });
+    // Check session storage first
+    const cachedIsAdmin = sessionStorage.getItem('isAdmin');
+    if (cachedIsAdmin !== null) {
+      setIsAdmin(cachedIsAdmin === 'true');
+      setLoading(false);
+      return;
+    }
 
-    // First try to find the user document by uid
-    const findUserDocument = async () => {
+    const checkAdminStatus = async () => {
       try {
         // Try by UID first
         const userDocRef = doc(db, 'users', currentUser.uid);
+        logQuery('Checking admin status by UID', { uid: currentUser.uid });
         const unsubscribe = onSnapshot(userDocRef, (doc) => {
-          logAdmin('User document snapshot by UID:', {
+          logQuery('User document snapshot by UID', {
             exists: doc.exists(),
             data: doc.data()
           });
@@ -54,7 +48,7 @@ export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
           if (doc.exists()) {
             const userData = doc.data();
             const isAdminUser = userData?.isAdmin === true;
-            logAdmin('Setting admin status from UID document:', isAdminUser);
+            logQuery('Setting admin status from UID document', { isAdmin: isAdminUser });
             setIsAdmin(isAdminUser);
             sessionStorage.setItem('isAdmin', isAdminUser.toString());
             setLoading(false);
@@ -65,8 +59,9 @@ export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
           const usersRef = collection(db, 'users');
           const q = query(usersRef, where('email', '==', currentUser.email));
           
+          logQuery('Checking admin status by email', { email: currentUser.email });
           getDocs(q).then((querySnapshot) => {
-            logAdmin('User document query by email:', {
+            logQuery('User document query by email result', {
               empty: querySnapshot.empty,
               size: querySnapshot.size
             });
@@ -75,15 +70,14 @@ export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
               const userDoc = querySnapshot.docs[0];
               const userData = userDoc.data();
               const isAdminUser = userData?.isAdmin === true;
-              logAdmin('Setting admin status from email document:', {
+              logQuery('Setting admin status from email document', {
                 docId: userDoc.id,
-                isAdmin: isAdminUser,
-                userData
+                isAdmin: isAdminUser
               });
               setIsAdmin(isAdminUser);
               sessionStorage.setItem('isAdmin', isAdminUser.toString());
             } else {
-              logAdmin('No user document found by email');
+              logQuery('No user document found by email');
               setIsAdmin(false);
               sessionStorage.setItem('isAdmin', 'false');
             }
@@ -93,25 +87,18 @@ export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
 
         return unsubscribe;
       } catch (error) {
-        logAdmin('Error in admin status listener:', error);
+        logQuery('Error checking admin status', error);
         setIsAdmin(false);
-        sessionStorage.setItem('isAdmin', 'false');
         setLoading(false);
-        return () => {};
       }
     };
 
-    const unsubscribePromise = findUserDocument();
-    return () => {
-      unsubscribePromise.then(unsubscribe => unsubscribe());
-    };
+    checkAdminStatus();
   }, [currentUser]);
 
   return (
-    <AdminContext.Provider value={{ isAdmin, loading: loading || authLoading }}>
+    <AdminContext.Provider value={{ isAdmin, loading }}>
       {children}
     </AdminContext.Provider>
   );
-};
-
-export default AdminContext; 
+}; 

@@ -18,6 +18,7 @@ import {
 } from 'firebase/storage';
 import { getCached, setCached, invalidateCache, clearCacheByPrefix } from './cacheUtils';
 import { ClassMaterial } from '../types/interfaces';
+import { logQuery } from './firebaseUtils';
 
 const COLLECTION_PATH = 'classMaterials';
 const MAX_FILE_SIZE_MB = 10; // Maximum file size in megabytes
@@ -213,9 +214,11 @@ export const getClassMaterials = async (
     
     const cachedData = getCached<ClassMaterial[]>(cacheKey);
     if (cachedData) {
+      logQuery('Cache hit for class materials', { classId, specificDate });
       return cachedData;
     }
 
+    logQuery('Querying class materials', { classId, specificDate });
     // Always query by classId only, without date filtering
     const q = query(
       collection(db, COLLECTION_PATH),
@@ -223,6 +226,7 @@ export const getClassMaterials = async (
     );
     
     const querySnapshot = await getDocs(q);
+    logQuery('Query result', { classId, size: querySnapshot.docs.length });
     const materials = querySnapshot.docs.map(doc => {
       const data = doc.data();
       // Handle potential missing date fields

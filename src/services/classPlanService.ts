@@ -14,21 +14,15 @@ import {
 import { db } from '../config/firebase';
 import { ClassPlan, ClassPlanItem, ClassPlanTemplate } from '../types/interfaces';
 import { v4 as uuidv4 } from 'uuid';
+import { logQuery } from '../utils/firebaseUtils';
 
 const COLLECTION_PLANS = 'classPlans';
 const COLLECTION_TEMPLATES = 'classPlanTemplates';
 
-// Helper function to log operations in development
-const logOperation = (operation: string, data?: any) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[ClassPlanService] ${operation}`, data ? data : '');
-  }
-};
-
 // Get all class plans for a specific student and month/year
 export const getStudentClassPlans = async (studentEmail: string, month: number, year: number): Promise<ClassPlan[]> => {
   try {
-    logOperation('Getting class plans', { studentEmail, month, year });
+    logQuery('Getting class plans', { studentEmail, month, year });
     const plansRef = collection(db, COLLECTION_PLANS);
     const q = query(
       plansRef, 
@@ -38,6 +32,7 @@ export const getStudentClassPlans = async (studentEmail: string, month: number, 
     );
     
     const querySnapshot = await getDocs(q);
+    logQuery('Query result', { studentEmail, size: querySnapshot.docs.length });
     const plans: ClassPlan[] = [];
     
     querySnapshot.forEach((doc) => {
@@ -46,7 +41,7 @@ export const getStudentClassPlans = async (studentEmail: string, month: number, 
     
     return plans;
   } catch (error) {
-    logOperation('Error getting class plans', error);
+    logQuery('Error getting class plans', error);
     throw error;
   }
 };
@@ -54,7 +49,7 @@ export const getStudentClassPlans = async (studentEmail: string, month: number, 
 // Get all class plans for a specific student (without month/year filtering)
 export const getAllStudentClassPlans = async (studentEmail: string): Promise<ClassPlan[]> => {
   try {
-    logOperation('Getting all class plans for student', { studentEmail });
+    logQuery('Getting all class plans for student', { studentEmail });
     const plansRef = collection(db, COLLECTION_PLANS);
     const q = query(
       plansRef, 
@@ -78,7 +73,7 @@ export const getAllStudentClassPlans = async (studentEmail: string): Promise<Cla
     
     return plans;
   } catch (error) {
-    logOperation('Error getting all class plans for student', error);
+    logQuery('Error getting all class plans for student', error);
     throw error;
   }
 };
@@ -91,7 +86,7 @@ export const createClassPlan = async (
   createdBy: string
 ): Promise<string> => {
   try {
-    logOperation('Creating class plan', { studentEmail, month, year });
+    logQuery('Creating class plan', { studentEmail, month, year });
     
     const newPlan = {
       studentEmail,
@@ -106,7 +101,7 @@ export const createClassPlan = async (
     const docRef = await addDoc(collection(db, COLLECTION_PLANS), newPlan);
     return docRef.id;
   } catch (error) {
-    logOperation('Error creating class plan', error);
+    logQuery('Error creating class plan', error);
     throw error;
   }
 };
@@ -118,7 +113,7 @@ export const addClassPlanItem = async (
   description?: string
 ): Promise<string> => {
   try {
-    logOperation('Adding class plan item', { planId, title });
+    logQuery('Adding class plan item', { planId, title });
     
     const planRef = doc(db, COLLECTION_PLANS, planId);
     const planDoc = await getDoc(planRef);
@@ -144,7 +139,7 @@ export const addClassPlanItem = async (
     
     return newItem.id;
   } catch (error) {
-    logOperation('Error adding class plan item', error);
+    logQuery('Error adding class plan item', error);
     throw error;
   }
 };
@@ -156,7 +151,7 @@ export const updateClassPlanItem = async (
   updates: Partial<Omit<ClassPlanItem, 'id'>>
 ): Promise<void> => {
   try {
-    logOperation('Updating class plan item', { planId, itemId, updates });
+    logQuery('Updating class plan item', { planId, itemId, updates });
     
     const planRef = doc(db, COLLECTION_PLANS, planId);
     const planDoc = await getDoc(planRef);
@@ -222,7 +217,7 @@ export const updateClassPlanItem = async (
       updatedAt: serverTimestamp()
     });
   } catch (error) {
-    logOperation('Error updating class plan item', error);
+    logQuery('Error updating class plan item', error);
     throw error;
   }
 };
@@ -230,7 +225,7 @@ export const updateClassPlanItem = async (
 // Delete a class plan item
 export const deleteClassPlanItem = async (planId: string, itemId: string): Promise<void> => {
   try {
-    logOperation('Deleting class plan item', { planId, itemId });
+    logQuery('Deleting class plan item', { planId, itemId });
     
     const planRef = doc(db, COLLECTION_PLANS, planId);
     const planDoc = await getDoc(planRef);
@@ -284,7 +279,7 @@ export const deleteClassPlanItem = async (planId: string, itemId: string): Promi
       updatedAt: serverTimestamp()
     });
   } catch (error) {
-    logOperation('Error deleting class plan item', error);
+    logQuery('Error deleting class plan item', error);
     throw error;
   }
 };
@@ -292,10 +287,10 @@ export const deleteClassPlanItem = async (planId: string, itemId: string): Promi
 // Delete an entire class plan
 export const deleteClassPlan = async (planId: string): Promise<void> => {
   try {
-    logOperation('Deleting class plan', { planId });
+    logQuery('Deleting class plan', { planId });
     await deleteDoc(doc(db, COLLECTION_PLANS, planId));
   } catch (error) {
-    logOperation('Error deleting class plan', error);
+    logQuery('Error deleting class plan', error);
     throw error;
   }
 };
@@ -303,9 +298,10 @@ export const deleteClassPlan = async (planId: string): Promise<void> => {
 // Get all templates
 export const getClassPlanTemplates = async (): Promise<ClassPlanTemplate[]> => {
   try {
-    logOperation('Getting class plan templates');
+    logQuery('Getting class plan templates');
     const templatesRef = collection(db, COLLECTION_TEMPLATES);
     const querySnapshot = await getDocs(templatesRef);
+    logQuery('Query result', { size: querySnapshot.docs.length });
     const templates: ClassPlanTemplate[] = [];
     
     querySnapshot.forEach((doc) => {
@@ -314,7 +310,7 @@ export const getClassPlanTemplates = async (): Promise<ClassPlanTemplate[]> => {
     
     return templates;
   } catch (error) {
-    logOperation('Error getting class plan templates', error);
+    logQuery('Error getting class plan templates', error);
     throw error;
   }
 };
@@ -326,7 +322,7 @@ export const createClassPlanTemplate = async (
   createdBy: string
 ): Promise<string> => {
   try {
-    logOperation('Creating class plan template', { name });
+    logQuery('Creating class plan template', { name });
     
     // Helper function to recursively process items and their children
     const processItems = (items: ClassPlanItem[]): any[] => {
@@ -359,7 +355,7 @@ export const createClassPlanTemplate = async (
     const docRef = await addDoc(collection(db, COLLECTION_TEMPLATES), newTemplate);
     return docRef.id;
   } catch (error) {
-    logOperation('Error creating class plan template', error);
+    logQuery('Error creating class plan template', error);
     throw error;
   }
 };
@@ -370,7 +366,7 @@ export const applyTemplateToClassPlan = async (
   templateId: string
 ): Promise<void> => {
   try {
-    logOperation('Applying template to class plan', { planId, templateId });
+    logQuery('Applying template to class plan', { planId, templateId });
     
     const planRef = doc(db, COLLECTION_PLANS, planId);
     const templateRef = doc(db, COLLECTION_TEMPLATES, templateId);
@@ -418,7 +414,7 @@ export const applyTemplateToClassPlan = async (
       updatedAt: serverTimestamp()
     });
   } catch (error) {
-    logOperation('Error applying template to class plan', error);
+    logQuery('Error applying template to class plan', error);
     throw error;
   }
 };
@@ -426,10 +422,10 @@ export const applyTemplateToClassPlan = async (
 // Delete a template
 export const deleteClassPlanTemplate = async (templateId: string): Promise<void> => {
   try {
-    logOperation('Deleting class plan template', { templateId });
+    logQuery('Deleting class plan template', { templateId });
     await deleteDoc(doc(db, COLLECTION_TEMPLATES, templateId));
   } catch (error) {
-    logOperation('Error deleting class plan template', error);
+    logQuery('Error deleting class plan template', error);
     throw error;
   }
 };
@@ -437,7 +433,7 @@ export const deleteClassPlanTemplate = async (templateId: string): Promise<void>
 // Get a specific template by ID
 export const getClassPlanTemplate = async (templateId: string): Promise<ClassPlanTemplate> => {
   try {
-    logOperation('Getting class plan template', { templateId });
+    logQuery('Getting class plan template', { templateId });
     const templateRef = doc(db, COLLECTION_TEMPLATES, templateId);
     const templateDoc = await getDoc(templateRef);
     
@@ -447,7 +443,7 @@ export const getClassPlanTemplate = async (templateId: string): Promise<ClassPla
     
     return { id: templateDoc.id, ...templateDoc.data() } as ClassPlanTemplate;
   } catch (error) {
-    logOperation('Error getting class plan template', error);
+    logQuery('Error getting class plan template', error);
     throw error;
   }
 };
@@ -458,7 +454,7 @@ export const updateClassPlanTemplate = async (
   updates: { name?: string; items?: any[] }
 ): Promise<void> => {
   try {
-    logOperation('Updating class plan template', { templateId, updates });
+    logQuery('Updating class plan template', { templateId, updates });
     const templateRef = doc(db, COLLECTION_TEMPLATES, templateId);
     
     const updateData: any = {};
@@ -471,7 +467,7 @@ export const updateClassPlanTemplate = async (
     
     await updateDoc(templateRef, updateData);
   } catch (error) {
-    logOperation('Error updating class plan template', error);
+    logQuery('Error updating class plan template', error);
     throw error;
   }
 };
@@ -647,7 +643,7 @@ export const insertItemBefore = async (
   description?: string
 ): Promise<void> => {
   try {
-    logOperation('Inserting item before', { classPlanId, beforeItemId, title });
+    logQuery('Inserting item before', { classPlanId, beforeItemId, title });
     
     const planRef = doc(db, COLLECTION_PLANS, classPlanId);
     const planDoc = await getDoc(planRef);
@@ -687,7 +683,7 @@ export const insertItemBefore = async (
     
     return;
   } catch (error) {
-    logOperation('Error inserting item before', error);
+    logQuery('Error inserting item before', error);
     throw error;
   }
 }; 

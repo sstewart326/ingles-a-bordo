@@ -43,6 +43,8 @@ export interface ClassMaterial {
 export interface Homework {
   id: string;
   classId: string;
+  teacherId: string; // ID of the teacher who created the homework
+  month: string; // YYYY-MM format for querying by month
   title: string;
   description: string;
   documents?: { url: string; name: string; type: string; size: number }[]; // Files attached to homework

@@ -19,6 +19,8 @@ import {
 } from 'firebase/storage';
 import { getCached, setCached, invalidateCache, clearCacheByPrefix } from './cacheUtils';
 import { Homework, HomeworkSubmission } from '../types/interfaces';
+import { logQuery } from './firebaseUtils';
+import { getAuth } from 'firebase/auth';
 
 // Collection paths
 const HOMEWORK_COLLECTION = 'homework';
@@ -137,15 +139,27 @@ export const addHomework = async (
     // Extract the base class ID to ensure consistency between views
     const baseClassId = extractBaseClassId(classId);
     
+    // Get current user (teacher) ID
+    const auth = getAuth();
+    const teacherId = auth.currentUser?.uid;
+    if (!teacherId) {
+      throw new Error('User not authenticated');
+    }
+    
     // Normalize date to UTC to avoid timezone issues
     const year = classDate.getFullYear();
     const month = classDate.getMonth();
     const day = classDate.getDate();
     const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
     
+    // Create month string in YYYY-MM format
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    
     // Create homework document first
     const homeworkData: Omit<Homework, 'id'> = {
       classId: baseClassId,
+      teacherId,
+      month: monthStr,
       title,
       description,
       classDate: utcDate,
@@ -218,16 +232,100 @@ export const addHomework = async (
     
     return homeworkId;
   } catch (error) {
-    console.error('Error adding homework:', error);
+    logQuery('Error adding homework', error);
     throw error;
   }
 };
 
-// Add new function to invalidate homework cache
+// Request deduplication maps
+const pendingHomeworkRequests: Map<string, Promise<Homework[]>> = new Map();
+const pendingSubmissionRequests: Map<string, Promise<HomeworkSubmission[]>> = new Map();
+const pendingSubmissionDetailRequests: Map<string, Promise<HomeworkSubmission | null>> = new Map();
+
+// Get homework assignments for a specific month
+export const getHomeworkForMonth = async (classId: string, date: Date): Promise<Homework[]> => {
+  try {
+    // Extract the base class ID to ensure consistency between views
+    const baseClassId = extractBaseClassId(classId);
+    
+    // Create month string in YYYY-MM format
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    
+    const cacheKey = `${HOMEWORK_COLLECTION}_${baseClassId}_${monthStr}`;
+    
+    // Check memory cache first
+    const cached = getCached<Homework[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    
+    // Check if there's already a pending request for this data
+    const requestKey = `${baseClassId}_${monthStr}`;
+    const pendingRequest = pendingHomeworkRequests.get(requestKey);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+    
+    // Create new request
+    logQuery('Querying homework for month', { classId: baseClassId, month: monthStr });
+    const promise = (async () => {
+      // Query homework for the entire month
+      const q = query(
+        collection(db, HOMEWORK_COLLECTION),
+        where('classId', '==', baseClassId),
+        where('month', '==', monthStr)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const homework: Homework[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        homework.push({
+          ...data,
+          id: doc.id,
+          classDate: data.classDate.toDate(),
+          createdAt: data.createdAt.toDate(),
+          updatedAt: data.updatedAt.toDate()
+        } as Homework);
+      });
+      
+      // Cache the results
+      setCached(cacheKey, homework);
+      
+      // Remove from pending requests
+      pendingHomeworkRequests.delete(requestKey);
+      
+      return homework;
+    })();
+    
+    // Store the pending request
+    pendingHomeworkRequests.set(requestKey, promise);
+    
+    return promise;
+  } catch (error) {
+    logQuery('Error getting homework for month', error);
+    throw error;
+  }
+};
+
+// Add new function to clear all pending requests (useful for testing/debugging)
+export const clearAllPendingRequests = (): void => {
+  pendingHomeworkRequests.clear();
+  pendingSubmissionRequests.clear();
+  pendingSubmissionDetailRequests.clear();
+};
+
+// Modify the cache invalidation to also clear all pending requests
 export const invalidateHomeworkCache = () => {
   // Clear all homework-related caches
   invalidateCache(HOMEWORK_COLLECTION);
   invalidateCache(SUBMISSION_COLLECTION);
+  
+  // Clear all pending requests
+  clearAllPendingRequests();
   
   // Also clear any student-specific caches
   const cacheKeys = Object.keys(localStorage);
@@ -239,50 +337,34 @@ export const invalidateHomeworkCache = () => {
   });
 };
 
+// Get homework assignments for a specific date
+export const getHomeworkForDate = async (classId: string, date: Date): Promise<Homework[]> => {
+  try {
+    // Get all homework for the month
+    const monthHomework = await getHomeworkForMonth(classId, date);
+    
+    // Normalize date to YYYY-MM-DD format
+    const dateString = date.toISOString().split('T')[0];
+    
+    // Filter homework for the specific date
+    return monthHomework.filter(hw => {
+      const homeworkDateString = hw.classDate.toISOString().split('T')[0];
+      return homeworkDateString === dateString;
+    });
+  } catch (error) {
+    logQuery('Error getting homework for date', error);
+    throw error;
+  }
+};
+
 // Get homework assignments for a specific class
 export const getHomeworkForClass = async (classId: string): Promise<Homework[]> => {
   try {
-    // Check if we're masquerading
-    const masqueradeUserStr = sessionStorage.getItem('masqueradeUser');
-    if (masqueradeUserStr) {
-      // If masquerading, don't use cache
-      invalidateHomeworkCache();
-    }
-    
-    // Extract the base class ID to ensure consistency
-    const baseClassId = extractBaseClassId(classId);
-    
-    const cacheKey = `${HOMEWORK_COLLECTION}_${baseClassId}`;
-    const cached = getCached<Homework[]>(cacheKey);
-    
-    if (cached && !masqueradeUserStr) {
-      return cached;
-    }
-    
-    const q = query(
-      collection(db, HOMEWORK_COLLECTION),
-      where('classId', '==', baseClassId),
-      orderBy('classDate', 'desc')
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const homework: Homework[] = [];
-    
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      homework.push({
-        ...data,
-        id: doc.id,
-        classDate: data.classDate.toDate(),
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
-      } as Homework);
-    });
-    
-    setCached(cacheKey, homework);
-    return homework;
+    // Get current month's homework
+    const now = new Date();
+    return getHomeworkForMonth(classId, now);
   } catch (error) {
-    console.error('Error getting homework for class:', error);
+    logQuery('Error getting homework for class', error);
     throw error;
   }
 };
@@ -301,23 +383,27 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
     const cached = getCached<Homework[]>(cacheKey);
     
     if (cached && !masqueradeUserStr) {
+      logQuery('Cache hit for student homework', { studentEmail });
       return cached;
     }
     
     const homework: Homework[] = [];
     
     // Get the classes the student is enrolled in
+    logQuery('Querying student classes', { studentEmail });
     const classesQuery = query(
       collection(db, 'classes'),
       where('studentEmails', 'array-contains', studentEmail)
     );
     
     const classesSnapshot = await getDocs(classesQuery);
+    logQuery('Classes query result', { studentEmail, size: classesSnapshot.docs.length });
     const classIds = classesSnapshot.docs.map(doc => doc.id);
     
     // If the student is enrolled in any classes, get homework for those classes
     if (classIds.length > 0) {
       // We need to run multiple queries since Firestore doesn't support array-contains-any with other filters
+      logQuery('Querying homework for student classes', { classIds });
       const homeworkByClassPromises = classIds.map(async (classId) => {
         const classHomeworkQuery = query(
           collection(db, HOMEWORK_COLLECTION),
@@ -329,6 +415,8 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
       });
       
       const homeworkSnapshots = await Promise.all(homeworkByClassPromises);
+      const totalDocs = homeworkSnapshots.reduce((sum, snapshot) => sum + snapshot.size, 0);
+      logQuery('Homework query results', { studentEmail, totalHomework: totalDocs });
       
       // Process all the results
       homeworkSnapshots.forEach(snapshot => {
@@ -351,57 +439,7 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
     setCached(cacheKey, homework);
     return homework;
   } catch (error) {
-    console.error('Error getting homework for student:', error);
-    throw error;
-  }
-};
-
-// Get homework assignments for a specific date
-export const getHomeworkForDate = async (classId: string, date: Date): Promise<Homework[]> => {
-  try {
-    // Check if we're masquerading
-    const masqueradeUserStr = sessionStorage.getItem('masqueradeUser');
-    if (masqueradeUserStr) {
-      // If masquerading, don't use cache
-      invalidateHomeworkCache();
-    }
-    
-    // Extract the base class ID to ensure consistency between views
-    const baseClassId = extractBaseClassId(classId);
-    
-    // Normalize both incoming date and database dates to YYYY-MM-DD format
-    // to avoid timezone issues
-    const dateString = date.toISOString().split('T')[0]; // Get YYYY-MM-DD
-    
-    // Get all homework for this class and filter by date
-    const q = query(
-      collection(db, HOMEWORK_COLLECTION),
-      where('classId', '==', baseClassId)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const homework: Homework[] = [];
-    
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      const homeworkDate = data.classDate.toDate();
-      const homeworkDateString = homeworkDate.toISOString().split('T')[0];
-      
-      // Compare date strings (YYYY-MM-DD) rather than exact timestamps
-      if (homeworkDateString === dateString) {
-        homework.push({
-          ...data,
-          id: doc.id,
-          classDate: homeworkDate,
-          createdAt: data.createdAt.toDate(),
-          updatedAt: data.updatedAt.toDate()
-        } as Homework);
-      }
-    });
-    
-    return homework;
-  } catch (error) {
-    console.error('Error getting homework for date:', error);
+    logQuery('Error getting homework for student', error);
     throw error;
   }
 };
@@ -625,32 +663,53 @@ export const getHomeworkSubmission = async (
       return cached;
     }
     
-    const q = query(
-      collection(db, SUBMISSION_COLLECTION),
-      where('homeworkId', '==', homeworkId),
-      where('studentEmail', '==', studentEmail)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    
-    if (querySnapshot.empty) {
-      return null;
+    // Check if there's already a pending request for this data
+    const requestKey = `${homeworkId}_${studentEmail}`;
+    const pendingRequest = pendingSubmissionDetailRequests.get(requestKey);
+    if (pendingRequest) {
+      return pendingRequest;
     }
     
-    const doc = querySnapshot.docs[0];
-    const data = doc.data();
+    // Create new request
+    logQuery('Querying homework submission', { homeworkId, studentEmail });
+    const promise = (async () => {
+      const q = query(
+        collection(db, SUBMISSION_COLLECTION),
+        where('homeworkId', '==', homeworkId),
+        where('studentEmail', '==', studentEmail)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        return null;
+      }
+      
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
+      
+      const submission: HomeworkSubmission = {
+        ...data,
+        id: doc.id,
+        submittedAt: data.submittedAt.toDate(),
+        updatedAt: data.updatedAt.toDate()
+      } as HomeworkSubmission;
+      
+      // Cache the results
+      setCached(cacheKey, submission);
+      
+      // Remove from pending requests
+      pendingSubmissionDetailRequests.delete(requestKey);
+      
+      return submission;
+    })();
     
-    const submission: HomeworkSubmission = {
-      ...data,
-      id: doc.id,
-      submittedAt: data.submittedAt.toDate(),
-      updatedAt: data.updatedAt.toDate()
-    } as HomeworkSubmission;
+    // Store the pending request
+    pendingSubmissionDetailRequests.set(requestKey, promise);
     
-    setCached(cacheKey, submission);
-    return submission;
+    return promise;
   } catch (error) {
-    console.error('Error getting homework submission:', error);
+    logQuery('Error getting homework submission', error);
     throw error;
   }
 };
@@ -665,29 +724,49 @@ export const getHomeworkSubmissions = async (homeworkId: string): Promise<Homewo
       return cached;
     }
     
-    const q = query(
-      collection(db, SUBMISSION_COLLECTION),
-      where('homeworkId', '==', homeworkId),
-      orderBy('submittedAt', 'desc')
-    );
+    // Check if there's already a pending request for this data
+    const pendingRequest = pendingSubmissionRequests.get(homeworkId);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
     
-    const querySnapshot = await getDocs(q);
-    const submissions: HomeworkSubmission[] = [];
+    // Create new request
+    logQuery('Querying homework submissions', { homeworkId });
+    const promise = (async () => {
+      const q = query(
+        collection(db, SUBMISSION_COLLECTION),
+        where('homeworkId', '==', homeworkId),
+        orderBy('submittedAt', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const submissions: HomeworkSubmission[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        submissions.push({
+          ...data,
+          id: doc.id,
+          submittedAt: data.submittedAt.toDate(),
+          updatedAt: data.updatedAt.toDate()
+        } as HomeworkSubmission);
+      });
+      
+      // Cache the results
+      setCached(cacheKey, submissions);
+      
+      // Remove from pending requests
+      pendingSubmissionRequests.delete(homeworkId);
+      
+      return submissions;
+    })();
     
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      submissions.push({
-        ...data,
-        id: doc.id,
-        submittedAt: data.submittedAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
-      } as HomeworkSubmission);
-    });
+    // Store the pending request
+    pendingSubmissionRequests.set(homeworkId, promise);
     
-    setCached(cacheKey, submissions);
-    return submissions;
+    return promise;
   } catch (error) {
-    console.error('Error getting homework submissions:', error);
+    logQuery('Error getting homework submissions', error);
     throw error;
   }
 };

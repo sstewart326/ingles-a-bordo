@@ -73,6 +73,13 @@ const shouldCache = (collectionPath: string, options: CacheOptions = {}): boolea
   return true;
 };
 
+// Helper function to log Firebase queries in non-production environments
+export const logQuery = (operation: string, details?: any) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[Firebase Query] ${operation}`, details || '');
+  }
+};
+
 // Function to get collection data with caching
 export const getCachedCollection = async <T = DocumentData>(
   collectionPath: string,
@@ -80,9 +87,11 @@ export const getCachedCollection = async <T = DocumentData>(
   options: CacheOptions = {}
 ): Promise<T[]> => {
   if (!shouldCache(collectionPath, options)) {
+    logQuery('Querying collection', { collectionPath, queryConstraints });
     const querySnapshot = await getDocs(
       query(collection(db, collectionPath), ...queryConstraints)
     );
+    logQuery('Query result', { collectionPath, size: querySnapshot.docs.length });
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as T[];
   }
 

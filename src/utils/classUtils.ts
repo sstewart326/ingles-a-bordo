@@ -33,27 +33,6 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
   
   const sevenDaysFromNow = new Date(today);
   sevenDaysFromNow.setDate(today.getDate() + 7);
-  
-  console.log('\n=== Date Processing ===');
-  console.log('Today (midnight):', today.toISOString());
-  console.log('Seven days ago:', sevenDaysAgo.toISOString());
-  console.log('Seven days from now:', sevenDaysFromNow.toISOString());
-
-  // Log all classes with their dates for debugging
-  console.log('\nAll classes with dates:');
-  classes.forEach(c => {
-    const extendedClass = c as ExtendedClassSession;
-    if (extendedClass.dates && extendedClass.dates.length > 0) {
-      console.log(`Class ${c.id}:`, {
-        dates: extendedClass.dates.map(d => new Date(d).toISOString()),
-        dayOfWeek: c.dayOfWeek,
-        startTime: c.startTime,
-        endTime: c.endTime,
-        scheduleType: c.scheduleType,
-        schedules: c.schedules
-      });
-    }
-  });
 
   // Create a map of existing classes with their materials
   const existingUpcomingClassesMap = new Map();
@@ -79,14 +58,6 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
           // Ensure we're comparing dates at midnight in the local timezone
           dateToCheck.setHours(0, 0, 0, 0);
           const isFuture = dateToCheck.getTime() >= todayTime;
-          
-          if (isFuture) {
-            console.log(`\nFound future date for class ${c.id}:`);
-            console.log('Date:', dateToCheck.toISOString());
-            console.log('Today:', new Date(todayTime).toISOString());
-            console.log('Is in the future:', isFuture);
-          }
-          
           return isFuture;
         });
         
@@ -141,10 +112,6 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
           dateToCheck.setHours(0, 0, 0, 0);
           const isPastWithinSevenDays = dateToCheck.getTime() < todayTime && dateToCheck.getTime() >= sevenDaysAgoTime;
           
-          if (isPastWithinSevenDays) {
-            console.log(`Class ${c.id}: ${dateToCheck.toISOString()} is past within 7 days`);
-          }
-          
           return isPastWithinSevenDays;
         });
         
@@ -185,20 +152,6 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       
       return 0;
     });
-
-  console.log('\n=== Final Classification ===');
-  console.log('Upcoming classes (next 7 days):', newUpcomingClasses.map(c => ({
-    id: c.id,
-    dates: (c as ExtendedClassSession).dates?.map(d => new Date(d).toISOString()),
-    scheduleType: c.scheduleType,
-    schedules: c.schedules
-  })));
-  console.log('Past classes (last 7 days):', newPastClasses.map(c => ({
-    id: c.id,
-    dates: (c as ExtendedClassSession).dates?.map(d => new Date(d).toISOString()),
-    scheduleType: c.scheduleType,
-    schedules: c.schedules
-  })));
   
   setUpcomingClasses(newUpcomingClasses);
   setPastClasses(newPastClasses);
@@ -222,7 +175,6 @@ export const fetchMaterialsForClass = async ({
   setSelectedDayDetails
 }: FetchMaterialsParams) => {
   if (!classId) {
-    console.error('No class ID provided to fetchMaterialsForClass');
     return null;
   }
   
@@ -255,7 +207,6 @@ export const fetchMaterialsForClass = async ({
     
     return materials;
   } catch (error) {
-    console.error('Error fetching materials for class:', classId, error);
     toast.error('Error fetching materials');
     return [];
   }
@@ -293,10 +244,7 @@ export const fetchMaterialsForClasses = async ({
     if (!baseClassIdMap[baseClassId].includes(classSession.id)) {
       baseClassIdMap[baseClassId].push(classSession.id);
     }
-  });
-  
-  console.log('Base class ID map:', baseClassIdMap);
-  
+  });  
   // Create a map to store all materials by class ID
   const allMaterialsByClassId: Record<string, ClassMaterial[]> = {};
   

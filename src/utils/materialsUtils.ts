@@ -3,7 +3,6 @@ import { ClassMaterial } from '../types/interfaces';
 import { updateClassMaterialItem } from './classMaterialsUtils';
 import { getMonthKey } from './calendarUtils';
 import { toast } from 'react-hot-toast';
-import { debugLog } from './debugUtils';
 
 export interface MaterialsState {
   classMaterials: Record<string, ClassMaterial[]>;
@@ -136,7 +135,6 @@ export const handleDeleteMaterial = async ({
   // Validate required parameters
   if (!material || !classId || (type === 'slides' && typeof itemIndex !== 'number') || (type === 'link' && typeof itemIndex !== 'number')) {
     toast.error('Missing required parameters for deletion');
-    debugLog('Missing required parameters for deletion', { material, index, classId, type, itemIndex });
     return;
   }
 
@@ -172,9 +170,6 @@ export const handleDeleteMaterial = async ({
       console.warn('No valid date found for material, using current date as fallback');
       materialDate = new Date();
     }
-    
-    // Log for debugging
-    debugLog(`Deleting material item: type=${type}, itemIndex=${itemIndex}, classId=${documentClassId}, date=${materialDate.toISOString()}`);
     
     // Call the utility function to update the material
     if (type === 'slides' && typeof itemIndex === 'number') {
@@ -354,12 +349,6 @@ export const handleDeleteMaterial = async ({
           affectedClassIds: uniqueClassIdsToUpdate
         } 
       }));
-      debugLog('Dispatched materials-updated event after delete with details:', {
-        classId: documentClassId,
-        action: 'delete',
-        type,
-        affectedClassIds: uniqueClassIdsToUpdate
-      });
     }, 300); // Increased timeout to ensure state updates have completed
     
     // Show a single success message based on type

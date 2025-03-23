@@ -6,7 +6,6 @@ import { FaLink, FaTrash, FaFilePowerpoint } from 'react-icons/fa';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
 import { UploadMaterialsForm } from './UploadMaterialsForm';
-import { debugMaterials, debugClassSession } from '../utils/debugUtils';
 import { HomeworkManager } from './HomeworkManager';
 
 interface ClassSectionProps {
@@ -192,15 +191,6 @@ export const ClassSection = ({
   // Use the expanded classes for pagination
   const displayedClasses = expandedClasses.slice(startIndex, endIndex);
   const totalPages = Math.ceil(expandedClasses.length / pageSize);
-  
-  // Log only the first class's materials to avoid spam
-  if (displayedClasses.length > 0) {
-    const firstClass = displayedClasses[0];
-    debugClassSession(firstClass, 0);
-    if (classMaterials[firstClass.id]) {
-      debugMaterials(firstClass.id, classMaterials[firstClass.id], 'classMaterials prop');
-    }
-  }
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 0 && newPage < totalPages) {

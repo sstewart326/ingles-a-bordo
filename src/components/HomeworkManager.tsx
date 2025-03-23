@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Homework } from '../types/interfaces';
-import { getHomeworkForDate, deleteHomework, getHomeworkSubmissions, addHomeworkFeedback, getHomeworkForClass, subscribeToHomeworkChanges, updateHomework } from '../utils/homeworkUtils';
+import { getHomeworkForMonth, deleteHomework, getHomeworkSubmissions, addHomeworkFeedback, getHomeworkForClass, subscribeToHomeworkChanges, updateHomework } from '../utils/homeworkUtils';
 import { FaTrash, FaInbox, FaUserGraduate } from 'react-icons/fa';
 import { HomeworkForm } from './HomeworkForm';
 import toast from 'react-hot-toast';
@@ -96,15 +96,21 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
   const fetchHomework = async () => {
     setIsLoading(true);
     try {
-      // Normalize date to midnight to ensure consistent comparison
-      const normalizedDate = new Date(classDate);
-      normalizedDate.setHours(0, 0, 0, 0);
-
       let homework: Homework[];
       if (classDate) {
-        homework = await getHomeworkForDate(classId, normalizedDate);
+        // Get all homework for the month
+        const monthHomework = await getHomeworkForMonth(classId, classDate);
+        
+        // Filter for the specific date if provided
+        const dateString = classDate.toISOString().split('T')[0];
+        homework = monthHomework.filter(hw => {
+          const hwDateStr = hw.classDate.toISOString().split('T')[0];
+          return hwDateStr === dateString;
+        });
       } else {
-        homework = await getHomeworkForClass(classId);
+        // If no date provided, get current month's homework
+        const now = new Date();
+        homework = await getHomeworkForMonth(classId, now);
       }
       setHomeworkList(homework);
     } catch (err) {
