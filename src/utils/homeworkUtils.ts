@@ -256,10 +256,16 @@ export const getHomeworkForMonth = async (classId: string, date: Date): Promise<
     );
     
     const homeworkSnapshots = await getDocs(q);
-    const homework = homeworkSnapshots.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Homework[];
+    const homework = homeworkSnapshots.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        classDate: data.classDate.toDate(),
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate()
+      } as Homework;
+    });
     
     return homework;
   } catch (error) {
@@ -375,8 +381,8 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
             ...data,
             id: doc.id,
             classDate: data.classDate.toDate(),
-            createdAt: data.createdAt.toDate(),
-            updatedAt: data.updatedAt.toDate()
+            createdAt: data.createdAt?.toDate(),
+            updatedAt: data.updatedAt?.toDate()
           } as Homework);
         });
       });

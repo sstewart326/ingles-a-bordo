@@ -329,8 +329,6 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
     // Use the schedules array for multiple schedule type
     daysOfWeek.push(...classData.schedules.map((schedule: any) => schedule.dayOfWeek));
     
-    // Log for debugging
-    logger.info(`Multiple schedule type detected with days: ${daysOfWeek.join(', ')}`);
   } else if (Array.isArray(classData.daysOfWeek) && classData.daysOfWeek.length > 0) {
     // Use the daysOfWeek array if it exists
     daysOfWeek.push(...classData.daysOfWeek);
@@ -348,9 +346,6 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
   const isBiweekly = frequency.type === 'biweekly';
   const isCustom = frequency.type === 'custom';
   const interval = isBiweekly ? 2 : (isCustom ? frequency.every : recurrenceInterval);
-  
-  // Log frequency information for debugging
-  logger.info(`Class frequency: ${JSON.stringify(frequency)}, calculated interval: ${interval}`);
   
   // Get the class start date for reference
   const classStartDate = classData.startDate ? classData.startDate.toDate() : new Date(startDate);
@@ -420,9 +415,6 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
       }
     }
   }
-  
-  // Log the calculated dates for debugging
-  logger.info(`Calculated ${dates.length} class dates`);
   
   // Sort dates chronologically
   return dates.sort((a, b) => a.getTime() - b.getTime());
