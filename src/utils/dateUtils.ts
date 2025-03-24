@@ -172,4 +172,40 @@ export const formatTimeWithTimezones = (
 
   // Return both source and target times
   return `${convertedStartTime} - ${convertedEndTime} ${targetTimezoneName}`;
+};
+
+export const formatDateWithShortDay = (date: Date, language: string = 'en'): string => {
+  const options = { weekday: 'short' } as const;
+  return date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', options);
+};
+
+export const formatDateForComparison = (date: any): string => {
+  if (!date) return '';
+  
+  try {
+    // If it's a Date object
+    if (date instanceof Date) {
+      return date.toISOString().split('T')[0];
+    }
+    // If it's a string, try to create a Date
+    else if (typeof date === 'string') {
+      return new Date(date).toISOString().split('T')[0];
+    }
+    // If it's a Firestore Timestamp (has toDate method)
+    else if (typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+      return date.toDate().toISOString().split('T')[0];
+    }
+    // If it's a number, treat as milliseconds
+    else if (typeof date === 'number') {
+      return new Date(date).toISOString().split('T')[0];
+    }
+    // If we can't determine the type, try to stringify and log
+    else {
+      console.warn('Unknown date format:', date, typeof date);
+      return '';
+    }
+  } catch (error) {
+    console.error('Error formatting date:', error, date);
+    return '';
+  }
 }; 

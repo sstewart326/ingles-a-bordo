@@ -9,6 +9,7 @@ import { createPayment, getPaymentsByDueDate, deletePayment } from '../services/
 import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
 import { ClassSection } from './ClassSection';
 import { User } from '../types/interfaces';
+import { formatDateWithShortDay } from '../utils/dateUtils';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -100,13 +101,13 @@ export const DayDetails = ({
     if (dayOfWeek === undefined) return '';
     
     const days = [
-      t.sunday || 'Sunday',
-      t.monday || 'Monday', 
-      t.tuesday || 'Tuesday', 
-      t.wednesday || 'Wednesday', 
-      t.thursday || 'Thursday', 
-      t.friday || 'Friday', 
-      t.saturday || 'Saturday'
+      formatDateWithShortDay(new Date(2024, 0, 7), language), // Sunday
+      formatDateWithShortDay(new Date(2024, 0, 8), language), // Monday
+      formatDateWithShortDay(new Date(2024, 0, 9), language), // Tuesday
+      formatDateWithShortDay(new Date(2024, 0, 10), language), // Wednesday
+      formatDateWithShortDay(new Date(2024, 0, 11), language), // Thursday
+      formatDateWithShortDay(new Date(2024, 0, 12), language), // Friday
+      formatDateWithShortDay(new Date(2024, 0, 13), language)  // Saturday
     ];
     
     return days[dayOfWeek];
@@ -737,12 +738,13 @@ export const DayDetails = ({
                         <span className="text-sm font-bold">{t.completed}</span>
                       </div>
                       {payment && payment.completedAt && (
-                        <div className="text-sm">
-                          {t.completedOn}: {new Date(payment.completedAt.seconds * 1000).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', {
+                        <div className="mt-2 ml-4 text-sm text-[#22c55e]">
+                          <div>{t.completedOn}:</div>
+                          <div>{new Date(payment.completedAt.seconds * 1000).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', {
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric'
-                          })}
+                          })}</div>
                         </div>
                       )}
                     </div>
@@ -757,18 +759,8 @@ export const DayDetails = ({
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="text-xl font-semibold mb-2">{user.name}</h4>
-                        {/* Add class day and time details */}
+                        {/* Add time details */}
                         <div className="text-sm text-gray-600">
-                          {classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) ? (
-                            <div className="font-medium">
-                              {t.days || 'Days'}: {classSession.schedules
-                                .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
-                                .map(schedule => getDayName(schedule.dayOfWeek))
-                                .join(', ')}
-                            </div>
-                          ) : (
-                            <div className="font-medium">{t.dayOfWeek}: {getDayName(classSession.dayOfWeek)}</div>
-                          )}
                           <div className="mt-1">
                             {classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) ? (
                               <div>
@@ -791,12 +783,14 @@ export const DayDetails = ({
                                   })}
                               </div>
                             ) : (
-                              <>{t.time}: {formatClassTime(classSession)}</>
+                              <div>
+                                {getDayName(classSession.dayOfWeek)}: {formatClassTime(classSession)}
+                              </div>
                             )}
                           </div>
-                          {classSession.paymentConfig?.amount && classSession.paymentConfig?.currency && (
+                          {classSession.paymentConfig?.amount !== undefined && classSession.paymentConfig.amount > 0 && classSession.paymentConfig?.currency && (
                             <div className="mt-1">
-                              {t.amount || "Amount"}: {classSession.paymentConfig.currency} {classSession.paymentConfig.amount.toFixed(2)}
+                              {completedPayments[classSession.id]?.find(p => p.userId === user.email) ? t.amountPaid : t.amountDue}: {classSession.paymentConfig.currency} {classSession.paymentConfig.amount.toFixed(2)}
                             </div>
                           )}
                           

@@ -77,6 +77,7 @@ export interface PaymentConfig {
   paymentLink?: string;  // URL for payment
   amount?: number;  // Payment amount
   currency?: string;  // Payment currency (e.g., USD, BRL)
+  completed?: boolean;  // Whether the payment has been completed
 }
 
 export interface Class {

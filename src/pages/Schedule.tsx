@@ -14,6 +14,8 @@ import { getHomeworkForClass, getHomeworkSubmissions } from '../utils/homeworkUt
 import { Homework, HomeworkSubmission } from '../types/interfaces';
 import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
+import { formatDateForComparison } from '../utils/dateUtils';
+import { formatDateWithShortDay } from '../utils/dateUtils';
 
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
@@ -120,39 +122,16 @@ export const Schedule = () => {
   const [selectedHomeworkDate, setSelectedHomeworkDate] = useState<Date | null>(null);
   const [homeworkFeedbackByClass, setHomeworkFeedbackByClass] = useState<Record<string, Map<string, boolean>>>({});
 
-  const DAYS_OF_WEEK_FULL = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
-
-  // Function to format dates to YYYY-MM-DD for comparison
-  const formatDateForComparison = (date: any): string => {
-    if (!date) return '';
-    
-    try {
-      // If it's a Date object
-      if (date instanceof Date) {
-        return date.toISOString().split('T')[0];
-      }
-      // If it's a string, try to create a Date
-      else if (typeof date === 'string') {
-        return new Date(date).toISOString().split('T')[0];
-      }
-      // If it's a Firestore Timestamp (has toDate method)
-      else if (typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
-        return date.toDate().toISOString().split('T')[0];
-      }
-      // If it's a number, treat as milliseconds
-      else if (typeof date === 'number') {
-        return new Date(date).toISOString().split('T')[0];
-      }
-      // If we can't determine the type, try to stringify and log
-      else {
-        console.warn('Unknown date format:', date, typeof date);
-        return '';
-      }
-    } catch (error) {
-      console.error('Error formatting date:', error, date);
-      return '';
-    }
-  };
+  // Create an array of short day names using formatDateWithShortDay
+  const DAYS_OF_WEEK_FULL = [
+    formatDateWithShortDay(new Date(2024, 0, 7), language), // Sunday
+    formatDateWithShortDay(new Date(2024, 0, 8), language), // Monday
+    formatDateWithShortDay(new Date(2024, 0, 9), language), // Tuesday
+    formatDateWithShortDay(new Date(2024, 0, 10), language), // Wednesday
+    formatDateWithShortDay(new Date(2024, 0, 11), language), // Thursday
+    formatDateWithShortDay(new Date(2024, 0, 12), language), // Friday
+    formatDateWithShortDay(new Date(2024, 0, 13), language)  // Saturday
+  ];
 
   // Create a memoized fetch function to avoid duplicate requests
   const fetchCalendarDataSafely = useCallback(async (month: number, year: number) => {
@@ -963,13 +942,13 @@ export const Schedule = () => {
           <div ref={detailsRef}>
             {selectedDayDetails ? (
               <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h3 className={styles.headings.h3}>
-                  {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', { 
-                    weekday: 'long', 
-                    month: 'long', 
-                    day: 'numeric' 
+                <h2 className="text-xl font-semibold mb-6">
+                  {formatDateWithShortDay(selectedDayDetails.date, language)}, {selectedDayDetails.date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                   })}
-                </h3>
+                </h2>
 
                 {selectedDayDetails.isPaymentDay && (
                   <div className={`flex flex-col p-3 rounded-lg mb-4 ${
@@ -993,7 +972,7 @@ export const Schedule = () => {
                         }`}>
                           {getPaymentStatus(selectedDayDetails.date).isCompleted
                             ? t.paymentCompleted
-                            : t.paymentDue}
+                            : t.paymentDue} ({formatDateWithShortDay(selectedDayDetails.date, language)})
                         </span>
                         {selectedDayDetails.isPaymentSoon && !getPaymentStatus(selectedDayDetails.date).isCompleted && (
                           <span className="text-xs ml-2 text-[#ef4444]">Due soon</span>
@@ -1004,7 +983,7 @@ export const Schedule = () => {
                     {/* Show completion date if payment is completed */}
                     {getPaymentStatus(selectedDayDetails.date).isCompleted && getPaymentStatus(selectedDayDetails.date).completedAt && (
                       <div className="mt-2 ml-4 text-sm text-[#22c55e]">
-                        {t.completedOn}: {new Date(getPaymentStatus(selectedDayDetails.date).completedAt!).toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en')}
+                        {t.completedOn}: {formatDateWithShortDay(new Date(getPaymentStatus(selectedDayDetails.date).completedAt!), language)}
                       </div>
                     )}
                     
@@ -1118,7 +1097,7 @@ export const Schedule = () => {
 
                         <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2">
                           <span className="text-sm font-medium text-[#4b5563]">{t.dayOfWeek}</span>
-                          <span className="text-sm text-[#1a1a1a]">{DAYS_OF_WEEK_FULL[selectedDayDetails.date.getDay()]}</span>
+                          <span className="text-sm text-[#1a1a1a]">{formatDateWithShortDay(selectedDayDetails.date, language)}</span>
                           
                           <span className="text-sm font-medium text-[#4b5563]">{t.time}</span>
                           <span className="text-sm text-[#1a1a1a]">

@@ -26,6 +26,7 @@ import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { Class, SelectOption, User } from '../types/interfaces';
+import { formatDateWithShortDay } from '../utils/dateUtils';
 
 type SelectStyles = StylesConfig<SelectOption, true>;
 
@@ -996,13 +997,13 @@ export const AdminSchedule = () => {
                   ? (() => {
                       const [year, month, day] = classItem.paymentConfig.startDate.split('-').map(Number);
                       const date = new Date(year, month - 1, day);
-                      return getDayName(date.getDay(), translations);
+                      return formatDateWithShortDay(date, language);
                     })()
                   : classItem.paymentConfig?.monthlyOption === 'first'
-                    ? '1st day of month'
+                    ? '1st'
                     : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                      ? '15th day of month'
-                      : 'Last day of month'
+                      ? '15th'
+                      : 'Last'
                   }
               </div>
             </div>
@@ -2046,7 +2047,7 @@ export const AdminSchedule = () => {
                             ? (() => {
                                 const [year, month, day] = classItem.paymentConfig.startDate.split('-').map(Number);
                                 const date = new Date(year, month - 1, day);
-                                return getDayName(date.getDay(), translations);
+                                return formatDateWithShortDay(date, language);
                               })()
                             : classItem.paymentConfig?.monthlyOption === 'first'
                               ? translations.firstDayOfMonth

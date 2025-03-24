@@ -19,6 +19,8 @@ interface Translation {
   birthday: string;
   birthdays: string;
   emailNotEditable: string;
+  amountPaid: string;
+  amountDue: string;
   
   // Admin Schedule Navigation
   back: string;
@@ -410,6 +412,8 @@ const translations: Record<Language, Translation> = {
     birthday: 'Birthday',
     birthdays: 'Birthdays',
     emailNotEditable: 'Email cannot be edited. To change the email, the user must be deleted and recreated with the correct email.',
+    amountPaid: 'Amount paid',
+    amountDue: 'Amount due',
     
     // Admin Schedule Navigation
     back: 'Back',
@@ -799,6 +803,8 @@ const translations: Record<Language, Translation> = {
     birthday: 'Aniversário',
     birthdays: 'Aniversários',
     emailNotEditable: 'O email não pode ser editado. Para alterar o email, o usuário deve ser excluído e recriado com o email correto.',
+    amountPaid: 'Valor pago',
+    amountDue: 'Valor a pagar',
     
     // Admin Schedule Navigation
     back: 'Voltar',
