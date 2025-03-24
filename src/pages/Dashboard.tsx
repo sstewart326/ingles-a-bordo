@@ -8,7 +8,7 @@ import '../styles/calendar.css';
 import { ClassSession } from '../utils/scheduleUtils';
 import { styles } from '../styles/styleUtils';
 import { getClassMaterials } from '../utils/classMaterialsUtils';
-import { ClassMaterial, Homework } from '../types/interfaces';
+import { ClassMaterial, Homework, User } from '../types/interfaces';
 import {
   handleDeleteMaterial as deleteMaterial,
   MaterialsState
@@ -199,12 +199,23 @@ export const Dashboard = () => {
   const handleDayClick = useCallback((
     date: Date,
     classes: ClassSession[],
-    paymentsDue: any[] // Use any[] to avoid type errors
+    paymentsDue: { user: User; classSession: ClassSession; }[]
   ) => {
+    setSelectedDate(date);
+    setSelectedDayDetails({
+      date,
+      classes,
+      paymentsDue,
+      materials: {},
+      birthdays: []
+    });
 
-    // Call the internal implementation with shouldScroll=true for user clicks
-    handleDayClickInternal(date, classes, paymentsDue, true);
-  }, [handleDayClickInternal]);
+    // Check if screen is in mobile layout (details below calendar)
+    if (window.innerWidth < 1280) { // xl breakpoint
+      // Scroll the details section into view with smooth behavior
+      detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
 
   // Add a specific effect to handle initial data loading after auth and admin status are determined
   useEffect(() => {
@@ -1017,17 +1028,17 @@ export const Dashboard = () => {
   }
 
   const DashboardContent = () => (
-    <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="py-6 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h1 className={styles.headings.h1}>{t.home}</h1>
         </div>
       </div>
 
-      {/* Calendar and Day details section - side by side on desktop */}
-      <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">
+      {/* Calendar and Day details section */}
+      <div className="mt-8 grid gap-4 grid-cols-1 xl:grid-cols-[850px,1fr]">
         {/* Calendar section */}
-        <div>
+        <div className="w-full min-w-0 overflow-visible">
           <CalendarSection
             selectedDate={selectedDate}
             upcomingClasses={upcomingClasses}
@@ -1040,7 +1051,7 @@ export const Dashboard = () => {
         </div>
 
         {/* Day details section */}
-        <div ref={detailsRef} className="mt-8 lg:mt-0">
+        <div ref={detailsRef} className="w-full min-w-0">
           {selectedDayDetails ? (
             <DayDetails
               selectedDayDetails={selectedDayDetails}

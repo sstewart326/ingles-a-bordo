@@ -91,32 +91,31 @@ export function CalendarDay({
 
   return (
     <div className={`h-full flex flex-col ${!isRelevant ? 'text-gray-400' : ''}`} onClick={handleDayClick}>
-      {/* Indicators */}
-      <div className="calendar-day-indicators">
-        {hasClasses && (
-          <div className="indicator class-indicator" title="Has classes" />
-        )}
-        {shouldShowPaymentIndicators && (
-          <div 
-            className={`indicator ${
-              allPaymentsCompleted ? 'bg-green-500' :
-              isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'
-            }`}
-            title={
-              allPaymentsCompleted ? t.allPaymentsCompleted :
-              isPaymentSoon ? 'Payment due soon' : 'Payment due'
-            }
-          />
-        )}
-        {hasBirthdays && (
-          <div className="indicator birthday-indicator" title={`${birthdays.length} ${birthdays.length === 1 ? t.birthday : t.birthdays}`}>
-            🎂
-          </div>
-        )}
-      </div>
+      {/* Header section with indicators and date */}
+      <div className="calendar-day-header">
+        <div className="calendar-day-indicators">
+          {hasClasses && (
+            <div className="indicator class-indicator" title="Has classes" />
+          )}
+          {shouldShowPaymentIndicators && (
+            <div 
+              className={`indicator ${
+                allPaymentsCompleted ? 'payment-completed-indicator' :
+                isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'
+              }`}
+              title={
+                allPaymentsCompleted ? t.allPaymentsCompleted :
+                isPaymentSoon ? 'Payment due soon' : 'Payment due'
+              }
+            />
+          )}
+          {hasBirthdays && (
+            <div className="indicator birthday-indicator" title={`${birthdays.length} ${birthdays.length === 1 ? t.birthday : t.birthdays}`}>
+              🎂
+            </div>
+          )}
+        </div>
 
-      {/* Date */}
-      <div className="flex flex-col items-center">
         <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${
           shouldShowPaymentIndicators ? (
             allPaymentsCompleted ? 'text-green-500' :

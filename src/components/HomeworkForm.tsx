@@ -3,6 +3,8 @@ import { validateHomeworkFile, addHomework } from '../utils/homeworkUtils';
 import { FaTrash, FaCheck, FaUpload, FaFile } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { styles, classNames } from '../styles/styleUtils';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../translations';
 
 interface HomeworkFormProps {
   classId: string;
@@ -17,6 +19,8 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
   onSuccess,
   onCancel
 }) => {
+  const { language } = useLanguage();
+  const t = useTranslation(language);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -59,7 +63,7 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
     e.preventDefault();
     
     if (!title.trim()) {
-      toast.error('Title is required');
+      toast.error(t.homeworkTitle + ' ' + t.error);
       return;
     }
     
@@ -84,7 +88,7 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
       );
       
       console.log(`Successfully created homework for class "${classId}" on ${formattedDate}`);
-      toast.success('Homework assignment created successfully');
+      toast.success(t.success);
       
       // Reset form
       setTitle('');
@@ -99,9 +103,9 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
     } catch (error) {
       console.error('Error creating homework:', error);
       if (error instanceof Error) {
-        toast.error(error.message || 'Failed to create homework');
+        toast.error(error.message || t.error);
       } else {
-        toast.error('Failed to create homework');
+        toast.error(t.error);
       }
     } finally {
       setUploading(false);
@@ -110,12 +114,12 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-5 mb-6">
-      <h2 className="text-xl font-semibold mb-4">Create Homework Assignment</h2>
+      <h2 className="text-xl font-semibold mb-4">{t.addHomework}</h2>
       
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label className="block text-gray-700 mb-2" htmlFor="title">
-            Title*
+            {t.homeworkTitle}*
           </label>
           <input
             id="title"
@@ -123,21 +127,21 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className={classNames("w-full px-3 py-2 border rounded-md", styles.form.input)}
-            placeholder="Homework Title"
+            placeholder={t.homeworkTitle}
             required
           />
         </div>
         
         <div className="mb-4">
           <label className="block text-gray-700 mb-2" htmlFor="description">
-            Description
+            {t.homeworkDescription}
           </label>
           <textarea
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className={classNames("w-full px-3 py-2 border rounded-md", styles.form.textarea)}
-            placeholder="Homework description or instructions..."
+            placeholder={t.homeworkDescription}
             rows={5}
           />
         </div>
@@ -145,11 +149,11 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
             <label className="block text-gray-700">
-              Attachments
+              {t.materials}
             </label>
             <label className="inline-flex items-center cursor-pointer px-4 py-2 border border-blue-500 rounded text-blue-500 hover:bg-blue-100">
               <FaUpload className="mr-2" />
-              Upload Files
+              {t.uploadMaterials}
               <input
                 type="file"
                 onChange={handleFileChange}
@@ -184,7 +188,7 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
         </div>
         
         <div className="mb-6 p-4 bg-gray-50 rounded-md">
-          <h3 className="font-medium mb-3">Submission Options</h3>
+          <h3 className="font-medium mb-3">{t.submissionType}</h3>
           
           <div className="flex items-center mb-2">
             <input
@@ -195,7 +199,7 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
               className="mr-2"
             />
             <label htmlFor="allowTextSubmission">
-              Allow students to submit text responses
+              {t.allowTextSubmission}
             </label>
           </div>
           
@@ -208,12 +212,8 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
               className="mr-2"
             />
             <label htmlFor="allowFileSubmission">
-              Allow students to upload files
+              {t.allowFileSubmission}
             </label>
-          </div>
-          
-          <div className="text-sm text-gray-500 mt-2">
-            If neither option is selected, students will not be able to submit responses.
           </div>
         </div>
         
@@ -225,7 +225,7 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
               disabled={uploading}
             >
-              Cancel
+              {t.cancel}
             </button>
           )}
           
@@ -240,12 +240,12 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Creating...
+                {t.saving}
               </span>
             ) : (
               <span className="flex items-center">
                 <FaCheck className="mr-2" />
-                Create Homework
+                {t.addHomework}
               </span>
             )}
           </button>

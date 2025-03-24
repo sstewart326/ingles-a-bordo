@@ -363,6 +363,31 @@ interface Translation {
   editTemplate: string;
   viewTemplate: string;
   templateStructureNote: string;
+
+  // Homework
+  homework: string;
+  addHomework: string;
+  noHomework: string;
+  homeworkTitle: string;
+  homeworkDescription: string;
+  allowTextSubmission: string;
+  allowFileSubmission: string;
+  submissionType: string;
+  dueDate: string;
+  noHomeworkAssignments: string;
+  homeworkSubmissions: string;
+  noSubmissionsYet: string;
+  submittedOn: string;
+  grade: string;
+  feedback: string;
+  submitFeedback: string;
+  upcoming: string;
+  past: string;
+  upcomingHomework: string;
+  pastHomework: string;
+  noUpcomingHomework: string;
+  noPastHomework: string;
+  yourHomework: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -729,6 +754,31 @@ const translations: Record<Language, Translation> = {
     editTemplate: 'Edit Template',
     viewTemplate: 'View Template',
     templateStructureNote: 'For more complex changes to template structure, apply the template to a class plan, make your changes there, and save it as a new template.',
+
+    // Homework
+    homework: 'Homework',
+    addHomework: 'Add Homework',
+    noHomework: 'No homework',
+    homeworkTitle: 'Title',
+    homeworkDescription: 'Description',
+    allowTextSubmission: 'Allow text submission',
+    allowFileSubmission: 'Allow file submission',
+    submissionType: 'Submission Type',
+    dueDate: 'Due Date',
+    noHomeworkAssignments: 'No homework assignments found.',
+    homeworkSubmissions: 'Student Submissions',
+    noSubmissionsYet: 'No submissions yet.',
+    submittedOn: 'Submitted on',
+    grade: 'Grade',
+    feedback: 'Feedback',
+    submitFeedback: 'Submit Feedback',
+    upcoming: 'Upcoming',
+    past: 'Past',
+    upcomingHomework: 'Upcoming Homework',
+    pastHomework: 'Past Homework',
+    noUpcomingHomework: 'No upcoming homework assignments.',
+    noPastHomework: 'No past homework assignments.',
+    yourHomework: 'Your Homework',
   },
   'pt-BR': {
     // Auth & Profile
@@ -1093,6 +1143,31 @@ const translations: Record<Language, Translation> = {
     editTemplate: 'Editar Modelo',
     viewTemplate: 'Visualizar Modelo',
     templateStructureNote: 'Para alterações mais complexas na estrutura do modelo, aplique o modelo a um plano de aula, faça suas alterações lá e salve como um novo modelo.',
+
+    // Homework
+    homework: 'Tarefa',
+    addHomework: 'Adicionar Tarefa',
+    noHomework: 'Sem tarefa',
+    homeworkTitle: 'Título',
+    homeworkDescription: 'Descrição',
+    allowTextSubmission: 'Permitir envio de texto',
+    allowFileSubmission: 'Permitir envio de arquivo',
+    submissionType: 'Tipo de Envio',
+    dueDate: 'Data de Entrega',
+    noHomeworkAssignments: 'Nenhuma tarefa encontrada.',
+    homeworkSubmissions: 'Envios dos Alunos',
+    noSubmissionsYet: 'Nenhum envio ainda.',
+    submittedOn: 'Enviado em',
+    grade: 'Nota',
+    feedback: 'Feedback',
+    submitFeedback: 'Enviar Feedback',
+    upcoming: 'Próximas',
+    past: 'Passadas',
+    upcomingHomework: 'Próximas Tarefas',
+    pastHomework: 'Tarefas Passadas',
+    noUpcomingHomework: 'Nenhuma tarefa futura.',
+    noPastHomework: 'Nenhuma tarefa passada.',
+    yourHomework: 'Suas Tarefas',
   }
 };
 
