@@ -4,7 +4,7 @@ import {
   submitHomework, 
   validateHomeworkFile 
 } from '../utils/homeworkUtils';
-import { FaUpload, FaFile, FaTrash, FaFilePdf, FaFileWord, FaFilePowerpoint, FaFileAudio, FaFileVideo } from 'react-icons/fa';
+import { FaUpload, FaFile, FaTrash } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { Homework, HomeworkSubmission as HomeworkSubmissionType } from '../types/interfaces';
 import { useLanguage } from '../hooks/useLanguage';
@@ -121,15 +121,6 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const getFileIcon = (type: string) => {
-    if (type.includes('pdf')) return <FaFilePdf className="text-red-500" />;
-    if (type.includes('word')) return <FaFileWord className="text-blue-500" />;
-    if (type.includes('powerpoint')) return <FaFilePowerpoint className="text-orange-500" />;
-    if (type.includes('audio')) return <FaFileAudio className="text-purple-500" />;
-    if (type.includes('video')) return <FaFileVideo className="text-green-500" />;
-    return <FaFile className="text-gray-500" />;
   };
 
   // Show loading state

@@ -73,7 +73,6 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
   classId,
   classDate,
   isAdmin,
-  emptyStateMessage = 'No homework assignments found.',
   onAddSuccess,
 }) => {
   const { language } = useLanguage();
@@ -220,16 +219,6 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setEditedHomeworkDescription(e.target.value);
-    setIsFieldsModified(true);
-  };
-
-  const handleTextSubmissionChange = (checked: boolean) => {
-    setEditedAllowTextSubmission(checked);
-    setIsFieldsModified(true);
-  };
-
-  const handleFileSubmissionChange = (checked: boolean) => {
-    setEditedAllowFileSubmission(checked);
     setIsFieldsModified(true);
   };
 
@@ -615,8 +604,6 @@ const HomeworkSubmissionsManager: React.FC<HomeworkSubmissionsManagerProps> = ({
   const t = useTranslation(language);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
-  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -646,22 +633,6 @@ const HomeworkSubmissionsManager: React.FC<HomeworkSubmissionsManagerProps> = ({
       </div>
     );
   }
-  
-  // Calculate submission statistics
-  const submittedCount = submissions.length;
-  const reviewedCount = submissions.filter(s => s.status === 'reviewed' || s.status === 'graded').length;
-  
-  // Toggle the modal
-  const viewSubmissionDetails = (submission: any) => {
-    setSelectedSubmission(submission);
-    setShowSubmissionModal(true);
-  };
-  
-  // Format file size
-  const formatFileSize = (sizeInBytes: number) => {
-    const sizeInMB = sizeInBytes / (1024 * 1024);
-    return sizeInMB.toFixed(2) + ' MB';
-  };
   
   // Format date
   const formatDate = (dateString: string) => {
