@@ -21,26 +21,7 @@ interface Translation {
   emailNotEditable: string;
   amountPaid: string;
   amountDue: string;
-  
-  // Admin Schedule Navigation
-  back: string;
-  createClass: string;
-  scrollHorizontallyToSeeAllColumns: string;
-  multipleDays: string;
-  weekly: string;
-  monthly: string;
-  monthly1stDay: string;
-  monthly15thDay: string;
-  monthlyLastDay: string;
-  firstDayOfMonth: string;
-  fifteenthDayOfMonth: string;
-  lastDayOfMonth: string;
-  uploadPDFContractDocumentForThisClassThisIsOptionalButRecommendedForKeepingTrackOfAgreementsWithStudents: string;
-  viewCurrentContract: string;
-  uploadNewFileToReplace: string;
-  howOftenPaymentsShouldBeProcessedForWeeklyPaymentsThisIsOnlyApplicableForWeeklyClasses: string;
-  saving: string;
-  
+
   // Navigation
   dashboard: string;
   home: string;
@@ -131,9 +112,6 @@ interface Translation {
   loading: string;
   error: string;
   success: string;
-  month: string;
-  year: string;
-  for: string;
   of: string;
   page: string;
   total: string;
@@ -188,27 +166,6 @@ interface Translation {
   updateFailed: string;
   noNotes: string;
   noEndDate: string;
-  
-  // Class Configuration
-  classConfiguration: string;
-  classSchedule: string;
-  startTime: string;
-  endTime: string;
-  classFrequency: string;
-  addDay: string;
-  day: string;
-  noScheduleDetails: string;
-  noSchedulesAdded: string;
-  
-  // Table Headers
-  frequency: string;
-  paymentType: string;
-  paymentAmount: string;
-  paymentDay: string;
-  contract: string;
-  viewContract: string;
-  noContract: string;
-  deleting: string;
 
   // Admin Users
   teacherAccount: string;
@@ -245,6 +202,7 @@ interface Translation {
   // Payment Completion
   completed: string;
   markAsCompleted: string;
+  classSchedule: string;
   allPaymentsCompleted: string;
   markAsIncomplete: string;
   processing: string;
@@ -414,26 +372,7 @@ const translations: Record<Language, Translation> = {
     emailNotEditable: 'Email cannot be edited. To change the email, the user must be deleted and recreated with the correct email.',
     amountPaid: 'Amount paid',
     amountDue: 'Amount due',
-    
-    // Admin Schedule Navigation
-    back: 'Back',
-    createClass: 'Create Class',
-    scrollHorizontallyToSeeAllColumns: 'Scroll horizontally to see all columns',
-    multipleDays: 'Multiple Days',
-    weekly: 'Weekly',
-    monthly: 'Monthly',
-    monthly1stDay: '1st of Month',
-    monthly15thDay: '15th of Month',
-    monthlyLastDay: 'Last Day of Month',
-    firstDayOfMonth: 'First Day of Month',
-    fifteenthDayOfMonth: '15th Day of Month',
-    lastDayOfMonth: 'Last Day of Month',
-    uploadPDFContractDocumentForThisClassThisIsOptionalButRecommendedForKeepingTrackOfAgreementsWithStudents: 'Upload PDF contract document for this class (optional but recommended for keeping track of agreements with students)',
-    viewCurrentContract: 'View Current Contract',
-    uploadNewFileToReplace: 'Upload new file to replace',
-    howOftenPaymentsShouldBeProcessedForWeeklyPaymentsThisIsOnlyApplicableForWeeklyClasses: 'How often payments should be processed for weekly payments (this is only applicable for weekly classes)',
-    saving: 'Saving...',
-    
+
     // Navigation
     dashboard: 'Dashboard',
     home: 'Home',
@@ -524,9 +463,6 @@ const translations: Record<Language, Translation> = {
     loading: 'Loading...',
     error: 'Error',
     success: 'Success',
-    month: 'Month',
-    year: 'Year',
-    for: 'for',
     of: 'of',
     page: 'Page',
     total: 'total',
@@ -569,7 +505,7 @@ const translations: Record<Language, Translation> = {
     startDate: 'Start Date',
     endDate: 'End Date',
     classStartDate: 'Class Start Date',
-    actions: 'Ações',
+    actions: 'Actions',
     optional: 'Optional',
     selectStudents: 'Select students...',
     noStudentsAssigned: 'No students assigned',
@@ -581,27 +517,6 @@ const translations: Record<Language, Translation> = {
     updateFailed: 'Update failed',
     noNotes: 'No notes',
     noEndDate: 'No end date',
-    
-    // Class Configuration
-    classConfiguration: 'Class Configuration',
-    classSchedule: 'Class Schedule',
-    startTime: 'Start Time',
-    endTime: 'End Time',
-    classFrequency: 'Class Frequency',
-    addDay: 'Add Day',
-    day: 'Day',
-    noScheduleDetails: 'No schedule details',
-    noSchedulesAdded: 'No schedules added. Click "Add Day" to add a class day.',
-    
-    // Table Headers
-    frequency: 'Frequency',
-    paymentType: 'Payment Type',
-    paymentAmount: 'Payment Amount',
-    paymentDay: 'Payment Day',
-    contract: 'Contract',
-    viewContract: 'View Contract',
-    noContract: 'No contract',
-    deleting: 'Deleting...',
 
     // Admin Users
     teacherAccount: 'Teacher Account',
@@ -638,6 +553,7 @@ const translations: Record<Language, Translation> = {
     // Payment Completion
     completed: 'Completed',
     markAsCompleted: 'Mark as Completed',
+    classSchedule: 'Class Schedule',
     allPaymentsCompleted: 'All payments completed',
     markAsIncomplete: 'Mark as Incomplete',
     processing: 'Processing...',
@@ -805,26 +721,7 @@ const translations: Record<Language, Translation> = {
     emailNotEditable: 'O email não pode ser editado. Para alterar o email, o usuário deve ser excluído e recriado com o email correto.',
     amountPaid: 'Valor pago',
     amountDue: 'Valor a pagar',
-    
-    // Admin Schedule Navigation
-    back: 'Voltar',
-    createClass: 'Criar Aula',
-    scrollHorizontallyToSeeAllColumns: 'Role horizontalmente para ver todas as colunas',
-    multipleDays: 'Múltiplos Dias',
-    weekly: 'Semanal',
-    monthly: 'Mensal',
-    monthly1stDay: 'Dia 1 do Mês',
-    monthly15thDay: 'Dia 15 do Mês',
-    monthlyLastDay: 'Último Dia do Mês',
-    firstDayOfMonth: 'Primeiro Dia do Mês',
-    fifteenthDayOfMonth: 'Dia 15 do Mês',
-    lastDayOfMonth: 'Último Dia do Mês',
-    uploadPDFContractDocumentForThisClassThisIsOptionalButRecommendedForKeepingTrackOfAgreementsWithStudents: 'Fazer upload do documento de contrato em PDF para esta aula (opcional, mas recomendado para manter o registro de acordos com os alunos)',
-    viewCurrentContract: 'Ver Contrato Atual',
-    uploadNewFileToReplace: 'Fazer upload de novo arquivo para substituir',
-    howOftenPaymentsShouldBeProcessedForWeeklyPaymentsThisIsOnlyApplicableForWeeklyClasses: 'Com que frequência os pagamentos devem ser processados para pagamentos semanais (isso só se aplica a aulas semanais)',
-    saving: 'Salvando...',
-    
+
     // Navigation
     dashboard: 'Painel',
     home: 'Início',
@@ -915,9 +812,6 @@ const translations: Record<Language, Translation> = {
     loading: 'Carregando...',
     error: 'Erro',
     success: 'Sucesso',
-    month: 'Mês',
-    year: 'Ano',
-    for: 'para',
     of: 'de',
     page: 'Página',
     total: 'total',
@@ -972,27 +866,6 @@ const translations: Record<Language, Translation> = {
     updateFailed: 'Falha na atualização',
     noNotes: 'Sem notas',
     noEndDate: 'Sem data de término',
-    
-    // Class Configuration
-    classConfiguration: 'Configuração da Aula',
-    classSchedule: 'Agenda da Aula',
-    startTime: 'Horário de Início',
-    endTime: 'Horário de Término',
-    classFrequency: 'Frequência da Aula',
-    addDay: 'Adicionar Dia',
-    day: 'Dia',
-    noScheduleDetails: 'Sem detalhes de agenda',
-    noSchedulesAdded: 'Nenhuma agenda adicionada. Clique em "Adicionar Dia" para adicionar um dia de aula.',
-    
-    // Table Headers
-    frequency: 'Frequência',
-    paymentType: 'Tipo de Pagamento',
-    paymentAmount: 'Valor do Pagamento',
-    paymentDay: 'Dia do Pagamento',
-    contract: 'Contrato',
-    viewContract: 'Ver Contrato',
-    noContract: 'Sem contrato',
-    deleting: 'Excluindo...',
 
     // Admin Users
     teacherAccount: 'Conta de Professor',
@@ -1029,6 +902,7 @@ const translations: Record<Language, Translation> = {
     // Payment Completion
     completed: 'Concluído',
     markAsCompleted: 'Marcar como Concluído',
+    classSchedule: 'Horário das Aulas',
     allPaymentsCompleted: 'Todos os pagamentos concluídos',
     markAsIncomplete: 'Marcar como Não Concluído',
     processing: 'Processando...',

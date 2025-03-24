@@ -1,6 +1,7 @@
 import { collection, addDoc, query, where, getDocs, Timestamp, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Payment } from '../types/payment';
+import { logQuery } from '../utils/firebaseUtils';
 
 const PAYMENTS_COLLECTION = 'payments';
 
@@ -68,6 +69,7 @@ export const checkExistingPayment = async (userId: string, classSessionId: strin
   let querySnapshot;
   
   if (hasMultipleSchedules) {
+    logQuery('Checking existing payment with multiple schedules', { userId, classSessionId, baseClassId, dueDate });
     // For multiple schedules, check for payments with either the specific day ID or the base ID
     const q1 = query(
       collection(db, PAYMENTS_COLLECTION),
@@ -86,7 +88,12 @@ export const checkExistingPayment = async (userId: string, classSessionId: strin
     );
     
     // Execute both queries
+    logQuery('Executing multiple schedule payment queries', { userId, classSessionId, baseClassId });
     const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    logQuery('Multiple schedule query results', { 
+      snapshot1Size: snapshot1.size, 
+      snapshot2Size: snapshot2.size 
+    });
     
     // Return the first payment found
     if (!snapshot1.empty) {
@@ -102,6 +109,7 @@ export const checkExistingPayment = async (userId: string, classSessionId: strin
     return null;
   } else {
     // For single schedule classes, just check for the exact ID
+    logQuery('Checking existing payment with single schedule', { userId, classSessionId, dueDate });
     const q = query(
       collection(db, PAYMENTS_COLLECTION),
       where('userId', '==', userId),
@@ -111,6 +119,7 @@ export const checkExistingPayment = async (userId: string, classSessionId: strin
     );
     
     querySnapshot = await getDocs(q);
+    logQuery('Single schedule query result', { size: querySnapshot.size });
   }
 
   if (querySnapshot && !querySnapshot.empty) {
@@ -135,7 +144,6 @@ export const createPayment = async (
   }
 
   // Extract the base class ID for consistency with multiple schedule classes
-  // For classes with multiple schedules (e.g., "classId-1"), we use the base ID ("classId")
   const baseClassId = classSessionId.split('-')[0];
   
   // Use the base class ID for storing the payment to avoid duplicates across different days
@@ -151,9 +159,13 @@ export const createPayment = async (
     updatedAt: Timestamp.now(),
   };
 
+  logQuery('Creating new payment', paymentData);
   const docRef = await addDoc(collection(db, PAYMENTS_COLLECTION), paymentData);
+  
   // Invalidate cache when new payment is created
+  logQuery('Invalidating payments cache');
   paymentsCache.invalidate();
+  
   return docRef.id;
 };
 
@@ -161,9 +173,12 @@ export const getPaymentsForDates = async (dates: Date[], classSessionIds?: strin
   // Check cache first
   const cachedPayments = paymentsCache.get(dates, classSessionIds);
   if (cachedPayments) {
+    logQuery('Cache hit for payments', { dates, classSessionIds });
     return cachedPayments;
   }
 
+  logQuery('Fetching payments for dates', { dates, classSessionIds });
+  
   // If not in cache, fetch from Firestore
   const startTimestamps = dates.map(date => {
     const startOfDay = new Date(date);
@@ -181,6 +196,7 @@ export const getPaymentsForDates = async (dates: Date[], classSessionIds?: strin
     )
   );
 
+  logQuery('Executing payment queries', { queryCount: queries.length });
   const querySnapshots = await Promise.all(
     queries.map(q => getDocs(q))
   );
@@ -197,6 +213,8 @@ export const getPaymentsForDates = async (dates: Date[], classSessionIds?: strin
     });
   });
 
+  logQuery('Payment query results', { totalPayments: payments.length });
+  
   // Store in cache before returning
   paymentsCache.set(dates, payments, classSessionIds);
   return payments;
@@ -222,6 +240,7 @@ export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string
   let querySnapshot;
   
   if (hasMultipleSchedules) {
+    logQuery('Fetching payments for multiple schedules', { dueDate, classSessionId, baseClassId });
     // For multiple schedules, check for payments with either the specific day ID or the base ID
     const q1 = query(
       collection(db, PAYMENTS_COLLECTION),
@@ -239,6 +258,10 @@ export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string
     
     // Execute both queries
     const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    logQuery('Multiple schedule payment results', {
+      snapshot1Size: snapshot1.size,
+      snapshot2Size: snapshot2.size
+    });
     
     // Combine and deduplicate results
     const allDocs = [...snapshot1.docs, ...snapshot2.docs];
@@ -251,7 +274,7 @@ export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string
     
     return Array.from(uniquePayments.values());
   } else {
-    // For single schedule classes, just check for the exact ID
+    logQuery('Fetching payments for single schedule', { dueDate, classSessionId });
     const q = query(
       collection(db, PAYMENTS_COLLECTION),
       where('classSessionId', '==', classSessionId),
@@ -260,31 +283,30 @@ export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string
     );
     
     querySnapshot = await getDocs(q);
+    logQuery('Single schedule payment results', { size: querySnapshot.size });
+    
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Payment);
   }
-
-  const payments: Payment[] = [];
-  if (querySnapshot) {
-    querySnapshot.forEach(doc => {
-      payments.push({ id: doc.id, ...doc.data() } as Payment);
-    });
-  }
-
-  return payments;
 };
 
 export const getPaymentById = async (paymentId: string): Promise<Payment | null> => {
+  logQuery('Getting payment by ID', { paymentId });
   const docRef = doc(db, PAYMENTS_COLLECTION, paymentId);
   const docSnap = await getDoc(docRef);
   
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() } as Payment;
+  if (!docSnap.exists()) {
+    return null;
   }
-  return null;
+  
+  return { id: docSnap.id, ...docSnap.data() } as Payment;
 };
 
 export const deletePayment = async (paymentId: string): Promise<void> => {
+  logQuery('Deleting payment', { paymentId });
   const docRef = doc(db, PAYMENTS_COLLECTION, paymentId);
   await deleteDoc(docRef);
+  
   // Invalidate cache when payment is deleted
+  logQuery('Invalidating payments cache');
   paymentsCache.invalidate();
 }; 

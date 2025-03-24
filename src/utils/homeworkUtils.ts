@@ -19,6 +19,7 @@ import {
 } from 'firebase/storage';
 import { getCached, setCached, invalidateCache, clearCacheByPrefix } from './cacheUtils';
 import { Homework, HomeworkSubmission } from '../types/interfaces';
+import { logQuery } from './firebaseUtils';
 import { getAuth } from 'firebase/auth';
 
 // Collection paths
@@ -169,6 +170,7 @@ export const addHomework = async (
     };
     
     // Add homework document to get the ID
+    logQuery('Creating new homework document', homeworkData);
     const docRef = await addDoc(collection(db, HOMEWORK_COLLECTION), homeworkData);
     const homeworkId = docRef.id;
     
@@ -202,7 +204,9 @@ export const addHomework = async (
           }
         };
         
+        logQuery('Uploading homework file', { filename: finalFileName, metadata });
         await uploadBytes(storageRef, file, metadata);
+        logQuery('Getting download URL for file', { filename: finalFileName });
         const downloadUrl = await getDownloadURL(storageRef);
         
         documents.push({
@@ -214,6 +218,7 @@ export const addHomework = async (
       }
       
       // Update homework document with document URLs
+      logQuery('Updating homework with file URLs', { homeworkId, documentCount: documents.length });
       await updateDoc(doc(db, HOMEWORK_COLLECTION, homeworkId), {
         documents,
         updatedAt: new Date()
@@ -221,7 +226,8 @@ export const addHomework = async (
     }
     
     // Invalidate cache
-    invalidateCache(HOMEWORK_COLLECTION);
+    logQuery('Invalidating homework cache');
+    await invalidateCache(HOMEWORK_COLLECTION);
     
     // Clear all homework cache
     clearHomeworkCache();
@@ -231,6 +237,7 @@ export const addHomework = async (
     
     return homeworkId;
   } catch (error) {
+    logQuery('Error adding homework', error);
     throw error;
   }
 };
@@ -254,7 +261,7 @@ export const getHomeworkForMonth = async (classId: string, date: Date): Promise<
       where('classDate', '<=', endOfMonth),
       orderBy('classDate', 'asc')
     );
-    
+
     const homeworkSnapshots = await getDocs(q);
     const homework = homeworkSnapshots.docs.map(doc => {
       const data = doc.data();
@@ -266,10 +273,10 @@ export const getHomeworkForMonth = async (classId: string, date: Date): Promise<
         updatedAt: data.updatedAt?.toDate()
       } as Homework;
     });
-    
+
     return homework;
   } catch (error) {
-    console.error('Error fetching homework:', error);
+    logQuery('Error getting homework for month', error);
     throw error;
   }
 };
@@ -315,6 +322,7 @@ export const getHomeworkForDate = async (classId: string, date: Date): Promise<H
       return homeworkDateString === dateString;
     });
   } catch (error) {
+    logQuery('Error getting homework for date', error);
     throw error;
   }
 };
@@ -326,6 +334,7 @@ export const getHomeworkForClass = async (classId: string): Promise<Homework[]> 
     const now = new Date();
     return getHomeworkForMonth(classId, now);
   } catch (error) {
+    logQuery('Error getting homework for class', error);
     throw error;
   }
 };
@@ -344,23 +353,27 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
     const cached = getCached<Homework[]>(cacheKey);
     
     if (cached && !masqueradeUserStr) {
+      logQuery('Cache hit for student homework', { studentEmail });
       return cached;
     }
     
     const homework: Homework[] = [];
     
     // Get the classes the student is enrolled in
+    logQuery('Querying student classes', { studentEmail });
     const classesQuery = query(
       collection(db, 'classes'),
       where('studentEmails', 'array-contains', studentEmail)
     );
     
     const classesSnapshot = await getDocs(classesQuery);
+    logQuery('Classes query result', { studentEmail, size: classesSnapshot.docs.length });
     const classIds = classesSnapshot.docs.map(doc => doc.id);
     
     // If the student is enrolled in any classes, get homework for those classes
     if (classIds.length > 0) {
       // We need to run multiple queries since Firestore doesn't support array-contains-any with other filters
+      logQuery('Querying homework for student classes', { classIds });
       const homeworkByClassPromises = classIds.map(async (classId) => {
         const classHomeworkQuery = query(
           collection(db, HOMEWORK_COLLECTION),
@@ -372,6 +385,8 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
       });
       
       const homeworkSnapshots = await Promise.all(homeworkByClassPromises);
+      const totalDocs = homeworkSnapshots.reduce((sum, snapshot) => sum + snapshot.size, 0);
+      logQuery('Homework query results', { studentEmail, totalHomework: totalDocs });
       
       // Process all the results
       homeworkSnapshots.forEach(snapshot => {
@@ -394,6 +409,7 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
     setCached(cacheKey, homework);
     return homework;
   } catch (error) {
+    logQuery('Error getting homework for student', error);
     throw error;
   }
 };
@@ -402,6 +418,7 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
 export const deleteHomework = async (homeworkId: string): Promise<void> => {
   try {
     // Get the homework document to access file references
+    logQuery('Getting homework document for deletion', { homeworkId });
     const homeworkDoc = await getDoc(doc(db, HOMEWORK_COLLECTION, homeworkId));
     
     if (!homeworkDoc.exists()) {
@@ -420,15 +437,17 @@ export const deleteHomework = async (homeworkId: string): Promise<void> => {
         const storageRef = ref(storage, storagePath);
         
         try {
+          logQuery('Deleting homework file from storage', { storagePath });
           await deleteObject(storageRef);
         } catch (error) {
-          console.error('Error deleting file from storage:', error);
+          logQuery('Error deleting file from storage', { storagePath, error });
           // Continue with deletion even if file deletion fails
         }
       }
     }
     
     // Delete all submissions for this homework
+    logQuery('Querying submissions for deletion', { homeworkId });
     const submissionsQuery = query(
       collection(db, SUBMISSION_COLLECTION),
       where('homeworkId', '==', homeworkId)
@@ -448,30 +467,34 @@ export const deleteHomework = async (homeworkId: string): Promise<void> => {
           const storageRef = ref(storage, storagePath);
           
           try {
+            logQuery('Deleting submission file from storage', { storagePath });
             await deleteObject(storageRef);
           } catch (error) {
-            console.error('Error deleting submission file from storage:', error);
+            logQuery('Error deleting submission file from storage', { storagePath, error });
           }
         }
       }
       
       // Delete submission document
+      logQuery('Deleting submission document', { submissionId: submissionDoc.id });
       return deleteDoc(doc(db, SUBMISSION_COLLECTION, submissionDoc.id));
     });
     
     await Promise.all(submissionDeletePromises);
     
     // Finally, delete the homework document
+    logQuery('Deleting homework document', { homeworkId });
     await deleteDoc(doc(db, HOMEWORK_COLLECTION, homeworkId));
     
     // Invalidate caches
-    invalidateCache(HOMEWORK_COLLECTION);
-    invalidateCache(SUBMISSION_COLLECTION);
+    logQuery('Invalidating caches');
+    await invalidateCache(HOMEWORK_COLLECTION);
+    await invalidateCache(SUBMISSION_COLLECTION);
     
     // Notify all listeners about the change
     notifyHomeworkChange(classId);
   } catch (error) {
-    console.error('Error deleting homework:', error);
+    logQuery('Error deleting homework', error);
     throw error;
   }
 };
@@ -485,6 +508,7 @@ export const submitHomework = async (
 ): Promise<string> => {
   try {
     // Get the homework to retrieve class ID for cache invalidation
+    logQuery('Getting homework document', { homeworkId });
     const homeworkSnap = await getDoc(doc(db, HOMEWORK_COLLECTION, homeworkId));
     if (!homeworkSnap.exists()) {
       throw new Error('Homework not found');
@@ -494,6 +518,7 @@ export const submitHomework = async (
     const classId = homeworkData.classId;
     
     // Verify the homework exists and check if student is in the class
+    logQuery('Verifying class exists', { classId });
     const classDoc = await getDoc(doc(db, 'classes', homeworkData.classId));
       
     if (!classDoc.exists()) {
@@ -501,6 +526,7 @@ export const submitHomework = async (
     }
     
     // Check if a submission already exists
+    logQuery('Checking for existing submission', { homeworkId, studentEmail });
     const existingSubmissionQuery = query(
       collection(db, SUBMISSION_COLLECTION),
       where('homeworkId', '==', homeworkId),
@@ -561,7 +587,9 @@ export const submitHomework = async (
           }
         };
         
+        logQuery('Uploading submission file', { filename: finalFileName, metadata });
         await uploadBytes(storageRef, file, metadata);
+        logQuery('Getting download URL for submission file', { filename: finalFileName });
         const downloadUrl = await getDownloadURL(storageRef);
         
         uploadedFiles.push({
@@ -585,21 +613,24 @@ export const submitHomework = async (
     
     // Save submission
     if (isUpdate) {
+      logQuery('Updating existing submission', { submissionId, submissionData });
       await updateDoc(doc(db, SUBMISSION_COLLECTION, submissionId), submissionData);
     } else {
+      logQuery('Creating new submission', submissionData);
       const docRef = await addDoc(collection(db, SUBMISSION_COLLECTION), submissionData as HomeworkSubmission);
       submissionId = docRef.id;
     }
     
     // Invalidate the submissions cache
-    invalidateCache(SUBMISSION_COLLECTION);
+    logQuery('Invalidating submissions cache');
+    await invalidateCache(SUBMISSION_COLLECTION);
     
     // Notify about the change
     notifyHomeworkChange(classId);
     
     return submissionId;
   } catch (error) {
-    console.error('Error submitting homework:', error);
+    logQuery('Error submitting homework', error);
     throw error;
   }
 };
@@ -625,6 +656,7 @@ export const getHomeworkSubmission = async (
     }
     
     // Create new request
+    logQuery('Querying homework submission', { homeworkId, studentEmail });
     const promise = (async () => {
       const q = query(
         collection(db, SUBMISSION_COLLECTION),
@@ -662,6 +694,7 @@ export const getHomeworkSubmission = async (
     
     return promise;
   } catch (error) {
+    logQuery('Error getting homework submission', error);
     throw error;
   }
 };
@@ -683,6 +716,7 @@ export const getHomeworkSubmissions = async (homeworkId: string): Promise<Homewo
     }
     
     // Create new request
+    logQuery('Querying homework submissions', { homeworkId });
     const promise = (async () => {
       const q = query(
         collection(db, SUBMISSION_COLLECTION),
@@ -717,6 +751,7 @@ export const getHomeworkSubmissions = async (homeworkId: string): Promise<Homewo
     
     return promise;
   } catch (error) {
+    logQuery('Error getting homework submissions', error);
     throw error;
   }
 };
@@ -729,6 +764,7 @@ export const addHomeworkFeedback = async (
 ): Promise<void> => {
   try {
     // Get the submission to find the homework and class
+    logQuery('Getting submission document', { submissionId });
     const submissionSnap = await getDoc(doc(db, SUBMISSION_COLLECTION, submissionId));
     
     if (!submissionSnap.exists()) {
@@ -738,6 +774,7 @@ export const addHomeworkFeedback = async (
     const submissionData = submissionSnap.data() as HomeworkSubmission;
     
     // Get the homework to retrieve the class ID
+    logQuery('Getting homework document', { homeworkId: submissionData.homeworkId });
     const homeworkSnap = await getDoc(doc(db, HOMEWORK_COLLECTION, submissionData.homeworkId));
     
     if (!homeworkSnap.exists()) {
@@ -748,6 +785,7 @@ export const addHomeworkFeedback = async (
     const classId = homeworkData.classId;
     
     // Update the submission with feedback
+    logQuery('Adding feedback to submission', { submissionId, feedback, grade });
     await updateDoc(doc(db, SUBMISSION_COLLECTION, submissionId), {
       feedback,
       grade: grade || null,
@@ -755,14 +793,13 @@ export const addHomeworkFeedback = async (
     });
     
     // Invalidate cache
-    invalidateCache(SUBMISSION_COLLECTION);
+    logQuery('Invalidating submissions cache');
+    await invalidateCache(SUBMISSION_COLLECTION);
     
     // Notify about the change
     notifyHomeworkChange(classId);
-    
-    console.log(`Feedback added to submission ${submissionId}`);
   } catch (error) {
-    console.error('Error adding feedback:', error);
+    logQuery('Error adding feedback', error);
     throw error;
   }
 };
@@ -780,6 +817,7 @@ export const updateHomework = async (
 ): Promise<void> => {
   try {
     // Get the current homework data to retrieve class ID
+    logQuery('Getting homework document for update', { homeworkId });
     const homeworkSnap = await getDoc(doc(db, HOMEWORK_COLLECTION, homeworkId));
     
     if (!homeworkSnap.exists()) {
@@ -789,19 +827,23 @@ export const updateHomework = async (
     const homeworkData = homeworkSnap.data() as Homework;
     const classId = homeworkData.classId;
     
-    // Update the homework document
-    await updateDoc(doc(db, HOMEWORK_COLLECTION, homeworkId), {
+    const updatePayload = {
       ...updateData,
       updatedAt: new Date()
-    });
+    };
+    
+    // Update the homework document
+    logQuery('Updating homework document', { homeworkId, updatePayload });
+    await updateDoc(doc(db, HOMEWORK_COLLECTION, homeworkId), updatePayload);
     
     // Invalidate cache
-    invalidateCache(HOMEWORK_COLLECTION);
+    logQuery('Invalidating homework cache');
+    await invalidateCache(HOMEWORK_COLLECTION);
     
     // Notify about the change
     notifyHomeworkChange(classId);
   } catch (error) {
-    console.error('Error updating homework:', error);
+    logQuery('Error updating homework', error);
     throw error;
   }
 }; 

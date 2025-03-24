@@ -222,7 +222,7 @@ export const AdminClassPlans = () => {
       setNewItemTitle('');
       setNewItemDescription('');
       setShowAddItemModal(false);
-      toast.success(t.itemAdded);
+      toast.success('Item added to class plan');
     } catch (error) {
       console.error('Error adding first item:', error);
       toast.error('Failed to add item');
@@ -241,7 +241,7 @@ export const AdminClassPlans = () => {
       setNewItemTitle('');
       setNewItemDescription('');
       setShowAddItemModal(false);
-      toast.success(t.itemAdded);
+      toast.success('Item added');
     } catch (error) {
       console.error('Error adding item:', error);
       toast.error('Failed to add item');
@@ -263,7 +263,7 @@ export const AdminClassPlans = () => {
       setEditItemTitle('');
       setEditItemDescription('');
       setShowEditItemModal(false);
-      toast.success(t.itemUpdated);
+      toast.success('Item updated');
     } catch (error) {
       console.error('Error updating item:', error);
       toast.error('Failed to update item');
@@ -280,10 +280,10 @@ export const AdminClassPlans = () => {
       });
       
       await fetchClassPlan();
-      toast.success(item.completed ? t.itemMarkedIncomplete : t.itemMarkedCompleted);
+      toast.success(item.completed ? 'Item marked as incomplete' : 'Item marked as completed');
     } catch (error) {
       console.error('Error toggling item completion:', error);
-      toast.error(t.error);
+      toast.error('Failed to update item');
     }
   };
   
@@ -294,10 +294,10 @@ export const AdminClassPlans = () => {
     try {
       await deleteClassPlanItem(classPlan.id, itemId);
       await fetchClassPlan();
-      toast.success(t.itemDeleted);
+      toast.success('Item deleted');
     } catch (error) {
       console.error('Error deleting item:', error);
-      toast.error(t.error);
+      toast.error('Failed to delete item');
     }
   };
   
@@ -314,6 +314,7 @@ export const AdminClassPlans = () => {
     if (!templateName.trim() || !currentUser) return;
     
     try {
+      // Create a template with empty items array
       await createClassPlanTemplate(
         templateName,
         [], // Empty items array
@@ -323,10 +324,10 @@ export const AdminClassPlans = () => {
       await fetchTemplates();
       setTemplateName('');
       setShowTemplateModal(false);
-      toast.success(t.templateCreated);
+      toast.success('Template created successfully. You can now add items to it.');
     } catch (error) {
       console.error('Error creating empty template:', error);
-      toast.error(t.error);
+      toast.error('Failed to create template');
     }
   };
   
@@ -337,6 +338,7 @@ export const AdminClassPlans = () => {
     try {
       let planId;
       
+      // If no class plan exists, create one first
       if (!classPlan) {
         planId = await createClassPlan(
           selectedStudent.value,
@@ -348,15 +350,17 @@ export const AdminClassPlans = () => {
         planId = classPlan.id;
       }
       
+      // Apply the template to the plan
       await applyTemplateToClassPlan(planId, selectedTemplate);
       
+      // Fetch the updated plan
       await fetchClassPlan();
       setSelectedTemplate('');
       setShowApplyTemplateModal(false);
-      toast.success(t.templateApplied);
+      toast.success('Template applied');
     } catch (error) {
       console.error('Error applying template:', error);
-      toast.error(t.error);
+      toast.error('Failed to apply template');
     }
   };
   
@@ -365,10 +369,10 @@ export const AdminClassPlans = () => {
     try {
       await deleteClassPlanTemplate(templateId);
       setTemplates(templates.filter(t => t.id !== templateId));
-      toast.success(t.templateDeleted);
+      toast.success('Template deleted successfully');
     } catch (error) {
       console.error('Error deleting template:', error);
-      toast.error(t.error);
+      toast.error('Failed to delete template');
     }
   };
   
@@ -392,10 +396,10 @@ export const AdminClassPlans = () => {
       setCurrentTemplate(null);
       setEditTemplateName('');
       setTemplateItems([]);
-      toast.success(t.templateUpdated);
+      toast.success('Template updated successfully');
     } catch (error) {
       console.error('Error updating template:', error);
-      toast.error(t.error);
+      toast.error('Failed to update template');
     }
   };
   
@@ -427,10 +431,10 @@ export const AdminClassPlans = () => {
       setShowAddChildModal(false);
       setParentItemId(null);
       setInsertBeforeId(null);
-      toast.success(t.childItemAdded);
+      toast.success('Child item added');
     } catch (error) {
       console.error('Error adding child item:', error);
-      toast.error(t.error);
+      toast.error('Failed to add child item');
     }
   };
   
@@ -472,10 +476,10 @@ export const AdminClassPlans = () => {
       setNewItemDescription('');
       setShowInsertParentModal(false);
       setInsertBeforeParentId(null);
-      toast.success(t.itemInserted);
+      toast.success('Item inserted');
     } catch (error) {
       console.error('Error inserting parent item:', error);
-      toast.error(t.error);
+      toast.error('Failed to insert item');
     }
   };
   
@@ -493,26 +497,30 @@ export const AdminClassPlans = () => {
     
     return (
       <li key={item.id} className={`py-4 relative ${isChild ? 'ml-8 border-l border-gray-200 pl-4 group/child' : 'group/parent'}`}>
+        {/* Insert button for top-level items - make all controlled by hover */}
         {!isChild && (
           <div className="absolute -top-3 left-6 z-10 opacity-0 group-hover/parent:opacity-100 transition-opacity duration-200">
             <button
               onClick={() => openInsertParentModal(item.id)}
               className="p-1 rounded-full bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              title={t.insertItemAbove}
+              title="Insert item above"
             >
               <PlusIcon className="h-4 w-4" />
             </button>
           </div>
         )}
         
+        {/* Main content area with hover effect */}
         <div className="group">
+          {/* Insert button that appears on hover - removed to avoid confusion with other plus buttons */}
+          
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-3 flex-1">
+              {/* Expand/collapse button for items with children */}
               {hasChildren && (
                 <button
                   onClick={() => handleToggleExpanded(item.id)}
                   className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 bg-transparent"
-                  title={t.expandCollapse}
                 >
                   {item.isExpanded ? (
                     <span className="text-lg font-medium">-</span>
@@ -799,6 +807,7 @@ export const AdminClassPlans = () => {
                 </p>
               )}
               
+              {/* Render children recursively if they exist */}
               {item.children && item.children.length > 0 && (
                 <ul className="mt-2 space-y-1">
                   {item.children.map(child => renderPlanItem(child, true))}
@@ -868,13 +877,13 @@ export const AdminClassPlans = () => {
           {/* Student Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.selectStudent}
+              Student
             </label>
             <Select
               options={studentOptions}
               value={selectedStudent}
               onChange={(option: SelectOption | null) => setSelectedStudent(option)}
-              placeholder={t.selectStudent}
+              placeholder="Select a student"
               className="basic-single"
               classNamePrefix="select"
               styles={selectStyles}
@@ -892,7 +901,7 @@ export const AdminClassPlans = () => {
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
                     : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'}`}
               >
-                {t.monthlyView}
+                Monthly View
               </button>
               <button
                 type="button"
@@ -902,7 +911,7 @@ export const AdminClassPlans = () => {
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
                     : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'}`}
               >
-                {t.allPlans}
+                All Plans
               </button>
             </div>
           </div>
@@ -912,7 +921,7 @@ export const AdminClassPlans = () => {
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.month}
+                  Month
                 </label>
                 <select
                   value={selectedMonth}
@@ -931,7 +940,7 @@ export const AdminClassPlans = () => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.year}
+                  Year
                 </label>
                 <select
                   value={selectedYear}
@@ -959,7 +968,7 @@ export const AdminClassPlans = () => {
             className="bg-white rounded-lg shadow-md p-6"
             tabIndex={0}
             onKeyDown={handleKeyDown}
-            aria-label={`${t.classPlans} ${t.for} ${selectedStudent.label}, ${months[selectedMonth]} ${selectedYear}`}
+            aria-label={`Class plan for ${selectedStudent.label}, ${months[selectedMonth]} ${selectedYear}`}
           >
             <div className="mb-6">
               <div className="flex justify-between items-center">
@@ -967,8 +976,8 @@ export const AdminClassPlans = () => {
                   <button
                     onClick={handlePreviousMonth}
                     className="p-2 mr-2 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-                    title={t.previous}
-                    aria-label={t.previous}
+                    title="Previous month"
+                    aria-label="Go to previous month"
                   >
                     <ChevronLeftIcon className="h-5 w-5" />
                   </button>
@@ -980,10 +989,10 @@ export const AdminClassPlans = () => {
                   <button
                     onClick={handleNextMonth}
                     className="p-2 ml-2 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-                    title={t.createNewClass}
-                    aria-label={t.createNewClass}
+                    title="Next month"
+                    aria-label="Go to next month"
                   >
-                    {t.next}
+                    <ChevronRightIcon className="h-5 w-5" />
                   </button>
                 </div>
                 
@@ -995,8 +1004,8 @@ export const AdminClassPlans = () => {
                         className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
                         <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                        {t.createTemplate}
-                        <Tooltip text={t.templateReuse}>
+                        Save as Template
+                        <Tooltip text="Save the current class plan structure as a reusable template that can be applied to other students or months.">
                           <InformationCircleIcon className="h-4 w-4 ml-1 text-indigo-200" />
                         </Tooltip>
                       </button>
@@ -1006,7 +1015,7 @@ export const AdminClassPlans = () => {
                         className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                       >
                         <TrashIcon className="h-4 w-4 mr-1" />
-                        {t.deleteClassPlan}
+                        Delete Plan
                       </button>
                     </>
                   )}
@@ -1015,7 +1024,7 @@ export const AdminClassPlans = () => {
               
               <div className="flex items-center mt-2">
                 <p className="text-sm text-gray-500">
-                  {t.planFor} {selectedStudent.label}
+                  Plan for {selectedStudent.label}
                 </p>
                 <span className="mx-2 text-xs text-gray-400">•</span>
               </div>
@@ -1029,7 +1038,7 @@ export const AdminClassPlans = () => {
               <>
                 {classPlan.items.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <p>{t.noItemsInPlan}</p>
+                    <p>No items in this plan yet. Add your first item to get started.</p>
                     <div className="flex justify-center space-x-3 mt-4">
                       <button
                         onClick={() => {
@@ -1040,7 +1049,7 @@ export const AdminClassPlans = () => {
                         className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                       >
                         <PlusIcon className="h-4 w-4 mr-1" />
-                        {t.addFirstItem}
+                        Add First Item
                       </button>
                       
                       <button
@@ -1052,7 +1061,7 @@ export const AdminClassPlans = () => {
                         className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
                         <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                        {t.applyTemplate}
+                        Apply Template
                       </button>
                     </div>
                   </div>
@@ -1066,7 +1075,7 @@ export const AdminClassPlans = () => {
               </>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">{t.noClassPlan}</p>
+                <p className="text-gray-500 mb-4">No class plan exists for this student in {months[selectedMonth]} {selectedYear}.</p>
                 <div className="flex justify-center space-x-3">
                   <button
                     onClick={() => {
@@ -1077,7 +1086,7 @@ export const AdminClassPlans = () => {
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                   >
                     <PlusIcon className="h-4 w-4 mr-1" />
-                    {t.addFirstItem}
+                    Add First Item
                   </button>
                   
                   <button
@@ -1089,7 +1098,7 @@ export const AdminClassPlans = () => {
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
                     <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                    {t.applyTemplate}
+                    Apply Template
                   </button>
                 </div>
               </div>
@@ -1100,10 +1109,10 @@ export const AdminClassPlans = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="mb-6">
               <h2 className={styles.headings.h2}>
-                {t.allPlans} {t.for} {selectedStudent.label}
+                All Study Plans for {selectedStudent.label}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                {t.switchToMonthlyView}
+                Showing all study plans ordered by most recent. Click on a month to view in monthly mode.
               </p>
             </div>
             
@@ -1117,7 +1126,7 @@ export const AdminClassPlans = () => {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">{t.noClassPlansExist}</p>
+                <p className="text-gray-500 mb-4">No class plans exist for this student yet.</p>
                 <div className="flex justify-center space-x-3">
                   <button
                     onClick={() => {
@@ -1125,7 +1134,7 @@ export const AdminClassPlans = () => {
                     }}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    {t.switchToMonthlyView}
+                    Switch to Monthly View
                   </button>
                 </div>
               </div>
@@ -1134,7 +1143,7 @@ export const AdminClassPlans = () => {
         )
       ) : (
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
-          <p className="text-gray-500">{t.selectStudent}</p>
+          <p className="text-gray-500">Please select a student to view or create a class plan.</p>
         </div>
       )}
       
@@ -1144,11 +1153,11 @@ export const AdminClassPlans = () => {
         onClose={() => setShowAddItemModal(false)}
       >
         <div>
-          <h2 className="text-lg font-medium text-gray-900 mb-4">{t.addNewItem}</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Add New Item</h2>
           <div className="space-y-4">
             <div>
               <label htmlFor="itemTitle" className="block text-sm font-medium text-gray-700">
-                {t.itemTitle} *
+                Title *
               </label>
               <input
                 type="text"
@@ -1156,13 +1165,13 @@ export const AdminClassPlans = () => {
                 value={newItemTitle}
                 onChange={(e) => setNewItemTitle(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                placeholder={t.enterItemTitle}
+                placeholder="Enter item title"
               />
             </div>
             
             <div>
               <label htmlFor="itemDescription" className="block text-sm font-medium text-gray-700">
-                {t.itemDescription}
+                Description (optional)
               </label>
               <textarea
                 id="itemDescription"
@@ -1170,7 +1179,7 @@ export const AdminClassPlans = () => {
                 onChange={(e) => setNewItemDescription(e.target.value)}
                 rows={3}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                placeholder={t.enterItemDescription}
+                placeholder="Enter item description"
               />
             </div>
             
@@ -1503,13 +1512,13 @@ export const AdminClassPlans = () => {
       {/* Templates Section */}
       <div className="mt-8 bg-white rounded-lg shadow-md p-6">
         <div className="mb-6">
-          <h2 className={styles.headings.h2}>{t.templateLibrary}</h2>
+          <h2 className={styles.headings.h2}>Template Library</h2>
         </div>
         
         {templates.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            <p>{t.noTemplatesAvailable}</p>
-            <p className="mt-2 text-sm">{t.templateReuse}</p>
+            <p>No templates available yet.</p>
+            <p className="mt-2 text-sm">Templates allow you to reuse class plan structures across different students and months.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1518,14 +1527,14 @@ export const AdminClassPlans = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="text-md font-medium text-gray-900">{template.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{template.items.length} {t.templateItems}</p>
+                    <p className="text-sm text-gray-500 mt-1">{template.items.length} items</p>
                   </div>
                   
                   <div>
                     <button
                       onClick={() => handleDeleteTemplate(template.id)}
                       className="p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600"
-                      title={t.delete}
+                      title="Delete template"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -1533,14 +1542,14 @@ export const AdminClassPlans = () => {
                 </div>
                 
                 <div className="mt-3 text-sm">
-                  <p className="text-gray-600 font-medium">{t.topLevelItems}:</p>
+                  <p className="text-gray-600 font-medium">Top-level items:</p>
                   <ul className="mt-1 text-gray-500 list-disc list-inside">
                     {template.items.slice(0, 3).map((item, index) => (
                       <li key={index} className="truncate">{item.title}</li>
                     ))}
                     {template.items.length > 3 && (
                       <li className="text-indigo-500">
-                        +{template.items.length - 3} {t.moreItems}...
+                        +{template.items.length - 3} more items...
                       </li>
                     )}
                   </ul>
@@ -1548,7 +1557,7 @@ export const AdminClassPlans = () => {
                 
                 <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
                   <span className="text-xs text-gray-400">
-                    {t.createdBy}: {template.createdBy.split('@')[0]}
+                    Created by: {template.createdBy.split('@')[0]}
                   </span>
                   
                   {selectedStudent && (
@@ -1558,9 +1567,9 @@ export const AdminClassPlans = () => {
                         setShowApplyTemplateModal(true);
                       }}
                       className="px-2 py-1 text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      title={t.applyToClassPlan}
+                      title="Add all items from this template to the current class plan"
                     >
-                      {t.applyTemplate}
+                      Apply to plan
                     </button>
                   )}
                 </div>
@@ -1635,13 +1644,13 @@ export const AdminClassPlans = () => {
         onClose={() => setShowEditTemplateModal(false)}
       >
         <div>
-          <h2 className="text-lg font-medium text-gray-900 mb-4">{t.editTemplate}</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Edit Template</h2>
           
           {currentTemplate && (
             <div className="space-y-4">
               <div>
                 <label htmlFor="editTemplateName" className="block text-sm font-medium text-gray-700">
-                  {t.templateName} *
+                  Template Name *
                 </label>
                 <input
                   type="text"
@@ -1649,22 +1658,22 @@ export const AdminClassPlans = () => {
                   value={editTemplateName}
                   onChange={(e) => setEditTemplateName(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  placeholder={t.enterTemplateName}
+                  placeholder="Enter template name"
                 />
               </div>
               
               <div className="border rounded-md p-4 bg-gray-50">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">{t.templateItems}</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Template Items</h3>
                 
                 {templateItems.length === 0 ? (
-                  <p className="text-sm text-gray-500">{t.noItemsInTemplate}</p>
+                  <p className="text-sm text-gray-500">No items in this template.</p>
                 ) : (
                   <div className="space-y-4 max-h-96 overflow-y-auto">
                     {templateItems.map((item, index) => (
                       <div key={index} className="border border-gray-200 rounded p-3 bg-white">
                         <div className="mb-2">
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            {t.itemTitle}
+                            Title
                           </label>
                           <input
                             type="text"
@@ -1676,7 +1685,7 @@ export const AdminClassPlans = () => {
                         
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            {t.itemDescription}
+                            Description (optional)
                           </label>
                           <textarea
                             value={item.description || ''}
@@ -1685,13 +1694,26 @@ export const AdminClassPlans = () => {
                             className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           />
                         </div>
+                        
+                        {/* Child items are displayed but not editable directly */}
+                        {item.children && item.children.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-100">
+                            <p className="text-xs font-medium text-gray-700 mb-1">Child Items:</p>
+                            <ul className="pl-4 text-xs text-gray-500 list-disc">
+                              {item.children.map((child: any, childIndex: number) => (
+                                <li key={childIndex}>{child.title}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
                 
                 <p className="mt-4 text-xs text-gray-500">
-                  {t.templateStructureNote}
+                  Note: For more complex changes to template structure, apply the template to a class plan, 
+                  make your changes there, and save it as a new template.
                 </p>
               </div>
               
@@ -1701,7 +1723,7 @@ export const AdminClassPlans = () => {
                   onClick={() => setShowEditTemplateModal(false)}
                   className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  {t.cancel}
+                  Cancel
                 </button>
                 
                 <button
@@ -1710,7 +1732,7 @@ export const AdminClassPlans = () => {
                   disabled={!editTemplateName.trim()}
                   className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {t.saveChanges}
+                  Save Changes
                 </button>
               </div>
             </div>
@@ -1724,16 +1746,19 @@ export const AdminClassPlans = () => {
         onClose={() => setShowDeletePlanModal(false)}
       >
         <div>
-          <h2 className="text-lg font-medium text-gray-900 mb-4">{t.deleteClassPlan}</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Delete Class Plan</h2>
           <div className="bg-red-50 p-4 rounded-md mb-4">
             <div className="flex">
               <div className="flex-shrink-0">
                 <TrashIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">{t.error}</h3>
+                <h3 className="text-sm font-medium text-red-800">Warning</h3>
                 <div className="mt-2 text-sm text-red-700">
-                  <p>{t.deleteClassPlanWarning}</p>
+                  <p>
+                    Are you sure you want to delete this entire class plan? This action cannot be undone.
+                    All items and progress will be permanently removed.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1745,7 +1770,7 @@ export const AdminClassPlans = () => {
               onClick={() => setShowDeletePlanModal(false)}
               className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              {t.cancel}
+              Cancel
             </button>
             
             <button
@@ -1753,7 +1778,7 @@ export const AdminClassPlans = () => {
               onClick={handleDeleteClassPlan}
               className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             >
-              {t.delete}
+              Delete Plan
             </button>
           </div>
         </div>
