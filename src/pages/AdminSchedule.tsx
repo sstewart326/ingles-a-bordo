@@ -49,31 +49,7 @@ const generateTimeOptions = () => {
   return times;
 };
 
-// Common timezones for the dropdown
-const getTimezoneOptions = () => {
-  // Include most common timezones with Eastern Time first
-  return [
-    { value: 'America/New_York', label: 'Eastern Time (ET) - New York' },
-    { value: 'America/Chicago', label: 'Central Time (CT) - Chicago' },
-    { value: 'America/Denver', label: 'Mountain Time (MT) - Denver' },
-    { value: 'America/Los_Angeles', label: 'Pacific Time (PT) - Los Angeles' },
-    { value: 'America/Sao_Paulo', label: 'Brasília Time (BRT) - São Paulo' },
-    { value: 'Europe/London', label: 'Greenwich Mean Time (GMT) - London' },
-    { value: 'Europe/Paris', label: 'Central European Time (CET) - Paris' },
-    { value: 'Europe/Moscow', label: 'Moscow Time (MSK) - Moscow' },
-    { value: 'Asia/Tokyo', label: 'Japan Standard Time (JST) - Tokyo' },
-    { value: 'Asia/Shanghai', label: 'China Standard Time (CST) - Shanghai' },
-    { value: 'Australia/Sydney', label: 'Australian Eastern Time (AET) - Sydney' },
-    // Add user's local timezone if not already in the list
-    { 
-      value: Intl.DateTimeFormat().resolvedOptions().timeZone, 
-      label: `${Intl.DateTimeFormat().resolvedOptions().timeZone} (Your local time)` 
-    }
-  ].filter((tz, index, self) => 
-    // Remove duplicates
-    index === self.findIndex(t => t.value === tz.value)
-  );
-};
+const timeOptions = generateTimeOptions();
 
 const getNextDayOccurrence = (dayOfWeek: number) => {
   const today = new Date();
@@ -84,8 +60,6 @@ const getNextDayOccurrence = (dayOfWeek: number) => {
   resultDate.setHours(0, 0, 0, 0);
   return resultDate;
 };
-
-const timeOptions = generateTimeOptions();
 
 const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }) => {
   return (
@@ -103,8 +77,8 @@ const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }
 
 export const AdminSchedule = () => {
   const { language } = useLanguage();
-  const t = useTranslation(language);
-  const DAYS_OF_WEEK = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
+  const translations = useTranslation(language);
+  const DAYS_OF_WEEK = [translations.sunday, translations.monday, translations.tuesday, translations.wednesday, translations.thursday, translations.friday, translations.saturday];
   const [classes, setClasses] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -403,13 +377,13 @@ export const AdminSchedule = () => {
     
     // Validate that at least one student is selected
     if (newClass.studentEmails.length === 0) {
-      toast.error("Please select at least one student for the class");
+      toast.error(translations.admin.schedule.errors.selectStudent);
       return;
     }
     
     // Validate that we have at least one schedule
     if (newClass.schedules.length === 0) {
-      toast.error("Please add at least one schedule day");
+      toast.error(translations.admin.schedule.errors.addSchedule);
       return;
     }
 
@@ -426,7 +400,7 @@ export const AdminSchedule = () => {
       const lastDayOfMonth = new Date(year, month, 0).getDate();
       
       if (dayOfMonth !== 1 && dayOfMonth !== 15 && dayOfMonth !== lastDayOfMonth) {
-        toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+        toast.error(translations.admin.schedule.errors.monthlyPaymentDate);
         return;
       }
     }
@@ -494,7 +468,7 @@ export const AdminSchedule = () => {
           contractUrl = await getDownloadURL(storageRef);
         } catch (uploadError) {
           console.error('Contract upload error:', uploadError);
-          toast.error('Failed to upload contract file. Please try again.');
+          toast.error(translations.admin.schedule.errors.contractUpload);
           return;
         }
       }
@@ -558,13 +532,13 @@ export const AdminSchedule = () => {
         }
       });
       setContractFile(null);
-      toast.success('Class created successfully');
+      toast.success(translations.admin.schedule.success.classCreated);
       
       // Invalidate the calendar cache to refresh dashboard data
       invalidateCalendarCache('getAllClassesForMonthHttp');
     } catch (error) {
       console.error('Error creating class:', error);
-      toast.error('Failed to create class');
+      toast.error(translations.admin.schedule.errors.createClass);
     }
   };
 
@@ -573,7 +547,10 @@ export const AdminSchedule = () => {
     if (!classToDelete) return;
 
     const dayName = DAYS_OF_WEEK[classToDelete.dayOfWeek];
-    const confirmMessage = `Are you sure you want to delete the ${classToDelete.courseType} class on ${dayName} at ${classToDelete.startTime}?`;
+    const confirmMessage = translations.admin.schedule.confirmDelete
+      .replace('{courseType}', classToDelete.courseType)
+      .replace('{day}', dayName)
+      .replace('{time}', classToDelete.startTime);
     
     if (!window.confirm(confirmMessage)) {
       return;
@@ -585,13 +562,13 @@ export const AdminSchedule = () => {
       // Clear the loaded months cache to force a fresh fetch
       setLoadedMonths(new Set());
       await fetchClasses();
-      toast.success('Class deleted successfully');
+      toast.success(translations.admin.schedule.success.classDeleted);
       
       // Invalidate the calendar cache to refresh dashboard data
       invalidateCalendarCache('getAllClassesForMonthHttp');
     } catch (error) {
       console.error('Error deleting class:', error);
-      toast.error('Failed to delete class');
+      toast.error(translations.admin.schedule.errors.deleteClass);
     } finally {
       setDeletingClassId(null);
     }
@@ -708,8 +685,9 @@ export const AdminSchedule = () => {
       timezone: schedule.timezone || classItem.timezone || 'America/New_York' // Set to Eastern Time as default
     })) || [];
     
-    // For start date and end date, convert Timestamp to Date
-    const startDate = classItem.startDate.toDate();
+    // For start date and end date, convert Timestamp to Date with null checks
+    const startDate = classItem.startDate?.toDate() || new Date();
+    const endDate = classItem.endDate?.toDate() || new Date();
     
     // Ensure the timezone is set
     const timezone = classItem.timezone || 'America/New_York'; // Set to Eastern Time as default
@@ -722,7 +700,7 @@ export const AdminSchedule = () => {
       ...classItem,
       schedules,
       startDate: startDate,
-      endDate: classItem.endDate.toDate(),
+      endDate: endDate,
       timezone: timezone, // Set timezone with fixed value
       paymentConfig: {
         ...classItem.paymentConfig,
@@ -737,7 +715,7 @@ export const AdminSchedule = () => {
 
     // Validate that at least one student is selected
     if (editingClass.studentEmails.length === 0) {
-      toast.error("Please select at least one student for the class");
+      toast.error(translations.admin.schedule.errors.selectStudent);
       return;
     }
 
@@ -749,14 +727,14 @@ export const AdminSchedule = () => {
       const lastDayOfMonth = new Date(year, month, 0).getDate();
       
       if (dayOfMonth !== 1 && dayOfMonth !== 15 && dayOfMonth !== lastDayOfMonth) {
-        toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+        toast.error(translations.admin.schedule.errors.monthlyPaymentDate);
         return;
       }
     }
     
     // Validate that we have at least one schedule
     if (editingClass.schedules.length === 0) {
-      toast.error("Please add at least one schedule day");
+      toast.error(translations.admin.schedule.errors.addSchedule);
       return;
     }
 
@@ -819,7 +797,7 @@ export const AdminSchedule = () => {
           contractUrl = await getDownloadURL(storageRef);
         } catch (uploadError) {
           console.error('Contract upload error:', uploadError);
-          toast.error('Failed to upload contract file. Please try again.');
+          toast.error(translations.admin.schedule.errors.contractUpload);
           setIsSaving(false);
           return;
         }
@@ -949,21 +927,21 @@ export const AdminSchedule = () => {
               </div>
             </div>
             <div className="mt-2">
-              <div className={styles.card.label}>{t.courseType}</div>
+              <div className={styles.card.label}>{translations.courseType}</div>
               <div className="text-gray-800">{classItem.courseType}</div>
             </div>
             <div className="mt-2">
-              <div className={styles.card.label}>{t.students}</div>
+              <div className={styles.card.label}>{translations.students}</div>
               <div className="max-h-24 overflow-y-auto">
                 {classItem.studentEmails.map((email: string) => {
                   const student = users.find(u => u.email === email);
                   return student ? (
                     <div key={`${classItem.id}-${email}`} className="mb-1">
-                      {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
+                      {student.name}{student.status === 'pending' ? ` (${translations.pending})` : ''}
                     </div>
                   ) : (
                     <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
-                      {t.unknownEmail}: {email}
+                      {translations.unknownEmail}: {email}
                     </div>
                   );
                 })}
@@ -1018,7 +996,7 @@ export const AdminSchedule = () => {
                   ? (() => {
                       const [year, month, day] = classItem.paymentConfig.startDate.split('-').map(Number);
                       const date = new Date(year, month - 1, day);
-                      return getDayName(date.getDay(), t);
+                      return getDayName(date.getDay(), translations);
                     })()
                   : classItem.paymentConfig?.monthlyOption === 'first'
                     ? '1st day of month'
@@ -1034,7 +1012,7 @@ export const AdminSchedule = () => {
               onClick={() => openEditModal(classItem)}
               className={styles.buttons.primary}
             >
-              {t.edit}
+              {translations.edit}
             </button>
             <button
               onClick={() => handleDeleteClass(classItem.id)}
@@ -1050,7 +1028,7 @@ export const AdminSchedule = () => {
                   {"Deleting..."}
                 </>
               ) : (
-                t.delete
+                translations.delete
               )}
             </button>
           </div>
@@ -1278,11 +1256,37 @@ export const AdminSchedule = () => {
     });
   };
 
+  // Move getTimezoneOptions inside component to access translations
+  const getTimezoneOptions = () => {
+    // Include most common timezones with Eastern Time first
+    return [
+      { value: 'America/New_York', label: translations.timezones.eastern },
+      { value: 'America/Chicago', label: translations.timezones.central },
+      { value: 'America/Denver', label: translations.timezones.mountain },
+      { value: 'America/Los_Angeles', label: translations.timezones.pacific },
+      { value: 'America/Sao_Paulo', label: translations.timezones.brasilia },
+      { value: 'Europe/London', label: translations.timezones.gmt },
+      { value: 'Europe/Paris', label: translations.timezones.cet },
+      { value: 'Europe/Moscow', label: translations.timezones.msk },
+      { value: 'Asia/Tokyo', label: translations.timezones.jst },
+      { value: 'Asia/Shanghai', label: translations.timezones.cst },
+      { value: 'Australia/Sydney', label: translations.timezones.aet },
+      // Add user's local timezone if not already in the list
+      { 
+        value: Intl.DateTimeFormat().resolvedOptions().timeZone, 
+        label: `${Intl.DateTimeFormat().resolvedOptions().timeZone} (${translations.timezones.local})` 
+      }
+    ].filter((tz, index, self) => 
+      // Remove duplicates
+      index === self.findIndex(t => t.value === tz.value)
+    );
+  };
+
   return (
     <div className="flex-1">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className={styles.headings.h1}>{t.manageClasses}</h1>
+          <h1 className={styles.headings.h1}>{translations.manageClasses}</h1>
           <div className="relative">
             <button
               onClick={async () => {
@@ -1341,7 +1345,7 @@ export const AdminSchedule = () => {
               {isModalOpen ? (
                 <span className="text-xl">&times;</span>
               ) : (
-                t.addNewClass
+                translations.addNewClass
               )}
             </button>
           </div>
@@ -1360,12 +1364,12 @@ export const AdminSchedule = () => {
                 /* Class Configuration Section */
                 <div className="mb-6">
                   <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
-                    {"Class Configuration"}
+                    {translations.classConfiguration}
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className={styles.form.label}>
-                        {t.students}
+                        {translations.students}
                       </label>
                       <Select
                         isMulti
@@ -1382,26 +1386,26 @@ export const AdminSchedule = () => {
                     
                     <div className="md:col-span-2 mb-4">
                       <div className="flex justify-between items-center mb-2">
-                        <label className={styles.form.label}>Class Schedules</label>
+                        <label className={styles.form.label}>{translations.classSchedule}</label>
                         <button
                           type="button"
                           onClick={handleAddSchedule}
                           className="py-1 px-2 text-sm inline-flex items-center rounded border border-indigo-600 bg-white text-indigo-600 hover:bg-indigo-50"
                         >
-                          <PlusIcon className="h-3.5 w-3.5 mr-1" /> Add Day
+                          <PlusIcon className="h-3.5 w-3.5 mr-1" /> {translations.addDay}
                         </button>
                       </div>
                       
                       {newClass.schedules.length === 0 ? (
                         <div className="p-4 border border-gray-200 rounded-md bg-gray-50 text-center">
-                          Please add at least one day to the class schedule
+                          {translations.noSchedulesAdded}
                         </div>
                       ) : (
                         <div className="space-y-3">
                           {newClass.schedules.map((schedule: ClassSchedule, index: number) => (
                             <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
                               <div className="flex justify-between items-center mb-3">
-                                <h4 className="font-medium">Class #{index + 1}</h4>
+                                <h4 className="font-medium">{translations.day} {index + 1}</h4>
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveSchedule(index)}
@@ -1412,7 +1416,7 @@ export const AdminSchedule = () => {
                               </div>
                               <div className="grid grid-cols-3 gap-3">
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700">Day</label>
+                                  <label className="block text-sm font-medium text-gray-700">{translations.day}</label>
                                   <select
                                     value={schedule.dayOfWeek}
                                     onChange={(e) => handleScheduleChange(index, 'dayOfWeek', parseInt(e.target.value))}
@@ -1424,7 +1428,7 @@ export const AdminSchedule = () => {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                                  <label className="block text-sm font-medium text-gray-700">{translations.startTime}</label>
                                   <select
                                     value={schedule.startTime}
                                     onChange={(e) => handleScheduleChange(index, 'startTime', e.target.value)}
@@ -1436,7 +1440,7 @@ export const AdminSchedule = () => {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700">End Time</label>
+                                  <label className="block text-sm font-medium text-gray-700">{translations.endTime}</label>
                                   <select
                                     value={schedule.endTime}
                                     onChange={(e) => handleScheduleChange(index, 'endTime', e.target.value)}
@@ -1458,7 +1462,7 @@ export const AdminSchedule = () => {
                       {/* Add frequency selection here */}
                       <div>
                         <label className={styles.form.label}>
-                          Class Frequency
+                          {translations.classFrequency}
                           <Tooltip text="How often the class repeats. For example, select 2 for classes that occur every 2 weeks.">
                             <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
                           </Tooltip>
@@ -1487,7 +1491,7 @@ export const AdminSchedule = () => {
                       
                       {/* Add timezone selection */}
                       <div>
-                        <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
+                        <label className={styles.form.label}>{translations.timezone} <span className="text-red-500">*</span></label>
                         <select
                           value={newClass.timezone}
                           onChange={(e) => {
@@ -1509,14 +1513,14 @@ export const AdminSchedule = () => {
                           ))}
                         </select>
                         <p className="mt-1 text-xs text-gray-500">
-                          Class times will be displayed in this timezone. Students will see times converted to their local timezone.
+                          {translations.classTimesDisplayed} {translations.studentsSeeTimesConverted}.
                         </p>
                       </div>
                     </div>
                     
                     <div className="md:col-span-2 flex space-x-4">
                       <div className="flex-1">
-                        <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
+                        <label className={styles.form.label}>{translations.classStartDate || "Class Start Date"}</label>
                         <DatePicker
                           selected={newClass.startDate}
                           onChange={(date: Date | null) => {
@@ -1545,12 +1549,12 @@ export const AdminSchedule = () => {
                         />
                         {newClass.schedules.length > 0 && (
                           <p className="mt-1 text-xs text-gray-500">
-                            Only {newClass.schedules.map((s: ClassSchedule) => DAYS_OF_WEEK[s.dayOfWeek]).join(', ')} dates can be selected
+                            {translations.onlySelectedDates} {newClass.schedules.map((s: ClassSchedule) => DAYS_OF_WEEK[s.dayOfWeek]).join(', ')}
                           </p>
                         )}
                       </div>
                       <div className="flex-1">
-                        <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
+                        <label className={styles.form.label}>{translations.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({translations.optional})</span></label>
                         <DatePicker
                           selected={newClass.endDate}
                           onChange={(date: Date | null) => {
@@ -1564,13 +1568,13 @@ export const AdminSchedule = () => {
                           dateFormat="MMMM d, yyyy"
                           minDate={newClass.startDate}
                           isClearable={true}
-                          placeholderText={t.noEndDate || "No end date"}
+                          placeholderText={translations.noEndDate || "No end date"}
                         />
                       </div>
                     </div>
                     <div className="md:col-span-2">
                       <label className={styles.form.label}>
-                        Contract (PDF, max 5MB)
+                        {translations.contract} (PDF, max 5MB)
                         <span className="ml-1 text-gray-500 text-xs">(optional)</span>
                       </label>
                       <input
@@ -1586,7 +1590,7 @@ export const AdminSchedule = () => {
                       />
                       {contractFile && (
                         <div className="mt-2 text-sm text-gray-700">
-                          Selected file: {contractFile.name}
+                          {translations.selectedFile}: {contractFile.name}
                         </div>
                       )}
                     </div>
@@ -1596,11 +1600,11 @@ export const AdminSchedule = () => {
                 /* Payment Configuration Section */
                 <div className="mb-6">
                   <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
-                    {"Payment Configuration"}
+                    {translations.paymentConfiguration}
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className={styles.form.label}>{"Payment Type"}</label>
+                      <label className={styles.form.label}>{translations.paymentType}</label>
                       <select
                         value={newClass.paymentConfig.type}
                         onChange={(e) => {
@@ -1670,12 +1674,12 @@ export const AdminSchedule = () => {
                         }}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       >
-                        <option value="weekly">Every X number of weeks</option>
-                        <option value="monthly">Once a month</option>
+                        <option value="weekly">{translations.everyXNumberWeeks}</option>
+                        <option value="monthly">{translations.onceAMonth}</option>
                       </select>
                     </div>
                     <div>
-                      <label className={styles.form.label}>{t.paymentStartDate || "Payment Start Date"}</label>
+                      <label className={styles.form.label}>{translations.paymentStartDate || "Payment Start Date"}</label>
                       <DatePicker
                         selected={(() => {
                           // Fix: Parse the date string correctly to avoid timezone issues
@@ -1696,7 +1700,7 @@ export const AdminSchedule = () => {
                               
                               // Only allow 1st, 15th, or last day of month for monthly payments
                               if (day !== 1 && day !== 15 && day !== lastDayOfMonth) {
-                                toast.error("For monthly payments, start date must be the 1st, 15th, or last day of the month");
+                                toast.error(`${translations.forMonthlyPayments}: ${translations.startDateMustBe1st15thOrLastDayOfMonth}`);
                                 return;
                               }
                               
@@ -1759,13 +1763,13 @@ export const AdminSchedule = () => {
                     {newClass.paymentConfig.type === 'weekly' ? (
                       <div>
                         <label htmlFor="weeklyInterval" className={styles.form.label}>
-                          {"Payment Frequency"}
+                          {translations.paymentFrequency}
                           <Tooltip text="How often payments should be collected. This is only applicable for weekly classes.">
                             <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
                           </Tooltip>
                         </label>
                         <div className="flex items-center">
-                          <span className="mr-2">Every</span>
+                          <span className="mr-2">{translations.every}</span>
                           <input
                             type="number"
                             id="weeklyInterval"
@@ -1783,15 +1787,15 @@ export const AdminSchedule = () => {
                             }}
                             className="mt-1 w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                           />
-                          <span className="ml-2">{newClass.paymentConfig.weeklyInterval === 1 ? 'week' : 'weeks'}</span>
+                          <span className="ml-2">{newClass.paymentConfig.weeklyInterval === 1 ? translations.week : translations.weeks}</span>
                         </div>
                       </div>
                     ) : (
                       <div>
                         <label htmlFor="monthlyOption" className={styles.form.label}>
-                          {t.selectPaymentDay || "Payment Day"}
+                          {translations.selectPaymentDay || "Payment Day"}
                           <span className="ml-1 text-gray-500 text-xs">
-                            (auto-set)
+                            ({translations.autoSet})
                           </span>
                         </label>
                         <div className="relative">
@@ -1799,20 +1803,20 @@ export const AdminSchedule = () => {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                             </svg>
-                            {newClass.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
-                            {newClass.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
-                            {newClass.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                            {newClass.paymentConfig.monthlyOption === 'first' && translations.firstDayMonth}
+                            {newClass.paymentConfig.monthlyOption === 'fifteen' && translations.fifteenthDayMonth}
+                            {newClass.paymentConfig.monthlyOption === 'last' && translations.lastDayMonth}
                           </div>
                         </div>
                         <p className="mt-1 text-sm text-gray-500">
-                          Payment day is automatically set based on the selected payment start date.
+                          {translations.paymentDayAutoSet}
                         </p>
                       </div>
                     )}
                     
                     <div>
                       <label htmlFor="paymentLink" className={styles.form.label}>
-                        Payment Link
+                        {translations.paymentLink}
                       </label>
                       <input
                         type="url"
@@ -1829,13 +1833,13 @@ export const AdminSchedule = () => {
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                       />
                       <p className="mt-1 text-xs text-gray-500">
-                        Enter a URL where students can make payments
+                        {translations.enterURLWhereStudentsCanMakePayments}
                       </p>
                     </div>
                     
                     <div>
                       <label htmlFor="paymentAmount" className={styles.form.label}>
-                        Payment Amount
+                        {translations.paymentAmount}
                       </label>
                       <input
                         type="number"
@@ -1859,7 +1863,7 @@ export const AdminSchedule = () => {
                     
                     <div>
                       <label htmlFor="paymentCurrency" className={styles.form.label}>
-                        Currency
+                        {translations.currency}
                       </label>
                       <select
                         id="paymentCurrency"
@@ -1873,9 +1877,9 @@ export const AdminSchedule = () => {
                         }))}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       >
-                        <option value="BRL">BRL (R$)</option>
-                        <option value="USD">USD ($)</option>
-                        <option value="EUR">EUR (€)</option>
+                        <option value="BRL">{translations.currencyBRL} (R$)</option>
+                        <option value="USD">{translations.currencyUSD} ($)</option>
+                        <option value="EUR">{translations.currencyEUR} (€)</option>
                       </select>
                     </div>
                   </div>
@@ -1889,14 +1893,14 @@ export const AdminSchedule = () => {
                     onClick={() => setCurrentStep('schedule')}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    Back
+                    {translations.back}
                   </button>
                 )}
                 <button
                   type="submit"
                   className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  {currentStep === 'schedule' ? 'Next' : 'Create Class'}
+                  {currentStep === 'schedule' ? translations.next : translations.createClass}
                 </button>
               </div>
             </form>
@@ -1914,7 +1918,7 @@ export const AdminSchedule = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                 </svg>
-                Scroll horizontally to see all columns
+                {translations.scrollHorizontallyToSeeAllColumns}
               </div>
             </div>
             <div className="relative">
@@ -1926,28 +1930,28 @@ export const AdminSchedule = () => {
                   <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th scope="col" className={styles.table.header}>
-                        {t.dayAndTime}
+                        {translations.dayAndTime}
                       </th>
                       <th scope="col" className={styles.table.header}>
-                        Frequency
+                        {translations.frequency}
                       </th>
                       <th scope="col" className={styles.table.header}>
-                        {t.students}
+                        {translations.students}
                       </th>
                       <th scope="col" className={styles.table.header}>
-                        Payment Type
+                        {translations.paymentType}
                       </th>
                       <th scope="col" className={styles.table.header}>
-                        Payment Amount
+                        {translations.paymentAmount}
                       </th>
                       <th scope="col" className={styles.table.header}>
-                        Payment Day
+                        {translations.paymentDay}
                       </th>
                       <th scope="col" className={styles.table.header}>
-                        Contract
+                        {translations.contract}
                       </th>
                       <th scope="col" className={`${styles.table.header} text-center`}>
-                        {t.actions}
+                        {translations.actions}
                       </th>
                     </tr>
                   </thead>
@@ -1957,7 +1961,7 @@ export const AdminSchedule = () => {
                         <td className={styles.table.cell}>
                           {classItem.scheduleType === 'single' ? (
                             <>
-                          {getDayName(classItem.dayOfWeek, t)}<br />
+                          {getDayName(classItem.dayOfWeek, translations)}<br />
                           {formatTimeWithTimezones(
                             classItem.startTime,
                             classItem.endTime,
@@ -1968,7 +1972,7 @@ export const AdminSchedule = () => {
                             </>
                           ) : (
                             <div className="max-h-32 overflow-y-auto">
-                              <div className="font-medium mb-1">Multiple Days:</div>
+                              <div className="font-medium mb-1">{translations.multipleDays}:</div>
                               {classItem.schedules && classItem.schedules.length > 0 ? (
                                 <div className="space-y-1">
                                   {classItem.schedules.map((schedule: ClassSchedule, index: number) => (
@@ -1985,24 +1989,24 @@ export const AdminSchedule = () => {
                                   ))}
                                 </div>
                               ) : (
-                                <div className="text-gray-500 italic">No schedule details</div>
+                                <div className="text-gray-500 italic">{translations.noScheduleDetails}</div>
                               )}
                             </div>
                           )}
                         </td>
                         <td className={styles.table.cell}>
-                          {`Every ${classItem.frequency?.every || 1} ${classItem.frequency?.every === 1 ? 'week' : 'weeks'}`}
+                          {`Every ${classItem.frequency?.every || 1} ${classItem.frequency?.every === 1 ? translations.week : translations.weeks}`}
                         </td>
                         <td className={styles.table.cell}>
                           {classItem.studentEmails.map((email: string) => {
                             const student = users.find(u => u.email === email);
                             return student ? (
                               <div key={`${classItem.id}-${email}`} className="mb-1">
-                                {student.name}{student.status === 'pending' ? ` (${t.pending})` : ''}
+                                {student.name}{student.status === 'pending' ? ` (${translations.pending})` : ''}
                               </div>
                             ) : (
                               <div key={`${classItem.id}-${email}`} className="mb-1 text-red-500">
-                                {t.unknownEmail}: {email}
+                                {translations.unknownEmail}: {email}
                               </div>
                             );
                           })}
@@ -2010,13 +2014,13 @@ export const AdminSchedule = () => {
                         <td className={styles.table.cell}>
                           {classItem.paymentConfig?.type === 'weekly'
                             ? ((classItem.paymentConfig.weeklyInterval || 1) === 1
-                              ? 'Weekly'
-                              : `Every ${classItem.paymentConfig.weeklyInterval} weeks`)
+                              ? translations.weekly
+                              : `Every ${classItem.paymentConfig.weeklyInterval} ${translations.weeks}`)
                             : classItem.paymentConfig?.monthlyOption === 'first'
-                              ? 'Monthly (1st day)'
+                              ? translations.monthly1stDay
                               : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                                ? 'Monthly (15th day)'
-                                : 'Monthly (last day)'
+                                ? translations.monthly15thDay
+                                : translations.monthlyLastDay
                             }
                           {classItem.paymentConfig?.paymentLink && (
                             <div className="mt-1">
@@ -2029,26 +2033,26 @@ export const AdminSchedule = () => {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                 </svg>
-                                Payment Link
+                                {translations.paymentLink}
                               </a>
                             </div>
                           )}
                         </td>
                         <td className={styles.table.cell}>
-                          {classItem.paymentConfig?.currency || 'USD'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
+                          {classItem.paymentConfig?.currency || translations.currencyUSD} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
                         </td>
                         <td className={styles.table.cell}>
                           {classItem.paymentConfig?.type === 'weekly'
                             ? (() => {
                                 const [year, month, day] = classItem.paymentConfig.startDate.split('-').map(Number);
                                 const date = new Date(year, month - 1, day);
-                                return getDayName(date.getDay(), t);
+                                return getDayName(date.getDay(), translations);
                               })()
                             : classItem.paymentConfig?.monthlyOption === 'first'
-                              ? '1st day of month'
+                              ? translations.firstDayOfMonth
                               : classItem.paymentConfig?.monthlyOption === 'fifteen'
-                                ? '15th day of month'
-                                : 'Last day of month'
+                                ? translations.fifteenthDayOfMonth
+                                : translations.lastDayOfMonth
                             }
                         </td>
                         <td className={styles.table.cell}>
@@ -2059,10 +2063,10 @@ export const AdminSchedule = () => {
                               rel="noopener noreferrer"
                               className="text-indigo-600 hover:text-indigo-800"
                             >
-                              View Contract
+                              {translations.viewContract}
                             </a>
                           ) : (
-                            <span className="text-gray-500">No contract</span>
+                            <span className="text-gray-500">{translations.noContract}</span>
                           )}
                         </td>
                         <td className={`${styles.table.cell} text-center`}>
@@ -2071,7 +2075,7 @@ export const AdminSchedule = () => {
                               onClick={() => openEditModal(classItem)}
                               className={styles.buttons.primary}
                             >
-                              {t.edit}
+                              {translations.edit}
                             </button>
                             <button
                               onClick={() => handleDeleteClass(classItem.id)}
@@ -2084,10 +2088,10 @@ export const AdminSchedule = () => {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                   </svg>
-                                  {"Deleting..."}
+                                  {translations.deleting}
                                 </>
                               ) : (
-                                t.delete
+                                translations.delete
                               )}
                             </button>
                           </div>
@@ -2105,19 +2109,19 @@ export const AdminSchedule = () => {
         <Modal isOpen={!!editingClass} onClose={() => setEditingClass(null)}>
           <div className="max-w-2xl w-full mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className={styles.headings.h2}>{t.edit} {t.class}</h2>
+              <h2 className={styles.headings.h2}>{translations.edit} {translations.class}</h2>
             </div>
 
             {/* Class Configuration Section */}
             <div className="mb-6">
               <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
-                {"Class Configuration"}
+                {translations.classConfiguration}
               </h3>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className={styles.form.label}>
-                      {t.students}
+                      {translations.students}
                     </label>
                     <Select
                       isMulti
@@ -2145,7 +2149,7 @@ export const AdminSchedule = () => {
                 {editingClass?.scheduleType === 'single' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className={styles.form.label}>{t.dayOfWeek}</label>
+                      <label className={styles.form.label}>{translations.dayOfWeek}</label>
                       <select
                         value={editingClass?.dayOfWeek}
                         onChange={(e) => {
@@ -2164,7 +2168,7 @@ export const AdminSchedule = () => {
                     </div>
                     <div className="flex space-x-4 md:col-span-2">
                       <div className="flex-1">
-                        <label className={styles.form.label}>{"Start Time"}</label>
+                        <label className={styles.form.label}>{translations.startTime}</label>
                         <select
                           value={editingClass?.startTime}
                           onChange={(e) => {
@@ -2198,7 +2202,7 @@ export const AdminSchedule = () => {
                         </select>
                       </div>
                       <div className="flex-1">
-                        <label className={styles.form.label}>{"End Time"}</label>
+                        <label className={styles.form.label}>{translations.endTime}</label>
                         <select
                           value={editingClass?.endTime}
                           onChange={(e) => {
@@ -2256,26 +2260,26 @@ export const AdminSchedule = () => {
                 ) : (
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className={styles.form.label}>Class Schedule</label>
+                      <label className={styles.form.label}>{translations.classSchedule}</label>
                       <button
                         type="button"
                         onClick={handleAddScheduleToEdit}
                         className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
-                        Add Day
+                        {translations.addDay}
                       </button>
                     </div>
                     
                     {editingClass?.schedules.length === 0 ? (
                       <div className="text-center py-4 text-gray-500 border border-dashed border-gray-300 rounded-md">
-                        No schedules added. Click "Add Day" to add a class day.
+                        {translations.noSchedulesAdded}
                       </div>
                     ) : (
                       <div className="space-y-4 mt-2">
                         {editingClass?.schedules.map((schedule: ClassSchedule, index: number) => (
                           <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
                             <div className="flex justify-between items-center mb-3">
-                              <h4 className="text-sm font-medium text-gray-700">Day {index + 1}</h4>
+                              <h4 className="text-sm font-medium text-gray-700">{translations.day} {index + 1}</h4>
                               <button
                                 type="button"
                                 onClick={() => handleRemoveScheduleFromEdit(index)}
@@ -2288,7 +2292,7 @@ export const AdminSchedule = () => {
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">Day</label>
+                                <label className="block text-sm font-medium text-gray-700">{translations.day}</label>
                                 <select
                                   value={schedule.dayOfWeek}
                                   onChange={(e) => handleEditScheduleChange(index, 'dayOfWeek', parseInt(e.target.value))}
@@ -2300,7 +2304,7 @@ export const AdminSchedule = () => {
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                                <label className="block text-sm font-medium text-gray-700">{translations.startTime}</label>
                                 <select
                                   value={schedule.startTime}
                                   onChange={(e) => handleEditScheduleChange(index, 'startTime', e.target.value)}
@@ -2312,7 +2316,7 @@ export const AdminSchedule = () => {
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">End Time</label>
+                                <label className="block text-sm font-medium text-gray-700">{translations.endTime}</label>
                                 <select
                                   value={schedule.endTime}
                                   onChange={(e) => handleEditScheduleChange(index, 'endTime', e.target.value)}
@@ -2334,7 +2338,7 @@ export const AdminSchedule = () => {
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={styles.form.label}>
-                      Class Frequency
+                      {translations.classFrequency}
                       <Tooltip text="How often the class repeats. For example, select 2 for classes that occur every 2 weeks.">
                         <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
                       </Tooltip>
@@ -2364,7 +2368,7 @@ export const AdminSchedule = () => {
                   
                   {/* Timezone Selection */}
                   <div>
-                    <label className={styles.form.label}>Timezone <span className="text-red-500">*</span></label>
+                    <label className={styles.form.label}>{translations.timezone} <span className="text-red-500">*</span></label>
                     <select
                       value={editingClass?.timezone}
                       onChange={(e) => {
@@ -2392,7 +2396,7 @@ export const AdminSchedule = () => {
                 {/* Date Pickers */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
+                    <label className={styles.form.label}>{translations.classStartDate || "Class Start Date"}</label>
                     <DatePicker
                       selected={editingClass?.startDate}
                       onChange={(date: Date | null) => {
@@ -2422,12 +2426,12 @@ export const AdminSchedule = () => {
                     />
                     {editingClass?.schedules.length > 0 && (
                       <p className="mt-1 text-xs text-gray-500">
-                        Only {editingClass.schedules.map((s: ClassSchedule) => DAYS_OF_WEEK[s.dayOfWeek]).join(', ')} dates can be selected
+                        {translations.onlySelectedDates} {editingClass.schedules.map((s: ClassSchedule) => DAYS_OF_WEEK[s.dayOfWeek]).join(', ')}
                       </p>
                     )}
                   </div>
                   <div>
-                    <label className={styles.form.label}>{t.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({t.optional})</span></label>
+                    <label className={styles.form.label}>{translations.endDate || "Class End Date"} <span className="text-gray-500 text-xs">({translations.optional})</span></label>
                     <DatePicker
                       selected={editingClass?.endDate}
                       onChange={(date: Date | null) => {
@@ -2442,16 +2446,16 @@ export const AdminSchedule = () => {
                       dateFormat="MMMM d, yyyy"
                       minDate={editingClass?.startDate}
                       isClearable={true}
-                      placeholderText={t.noEndDate || "No end date"}
+                      placeholderText={translations.noEndDate || "No end date"}
                     />
                   </div>
                 </div>
                 
                 <div>
                   <label className={styles.form.label}>
-                    Contract (PDF, max 5MB)
-                    <span className="text-sm text-gray-500 ml-1">(Optional)</span>
-                    <span className="ml-1 inline-block" title="Upload a PDF contract document for this class. This is optional but recommended for keeping track of agreements with students.">
+                    {translations.contract} (PDF, max 5MB)
+                    <span className="text-sm text-gray-500 ml-1">({translations.optional})</span>
+                    <span className="ml-1 inline-block" title={translations.uploadPDFContractDocumentForThisClassThisIsOptionalButRecommendedForKeepingTrackOfAgreementsWithStudents}>
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -2466,10 +2470,10 @@ export const AdminSchedule = () => {
                           rel="noopener noreferrer"
                           className="text-indigo-600 hover:text-indigo-800 mr-2"
                         >
-                          View Current Contract
+                          {translations.viewCurrentContract}
                         </a>
                         <span className="text-sm text-gray-500">
-                          (Upload a new file to replace)
+                          ({translations.uploadNewFileToReplace})
                         </span>
                       </div>
                     )}
@@ -2486,7 +2490,7 @@ export const AdminSchedule = () => {
                     />
                     {editContractFile && (
                       <div className="mt-2 text-sm text-gray-700">
-                        Selected file: {editContractFile.name}
+                        {translations.selectedFile}: {editContractFile.name}
                       </div>
                     )}
                   </div>
@@ -2497,11 +2501,11 @@ export const AdminSchedule = () => {
             {/* Payment Configuration Section */}
             <div className="mb-6">
               <h3 className="text-lg font-medium text-gray-800 mb-3 pb-2 border-b border-gray-200">
-                {"Payment Configuration"}
+                {translations.paymentConfiguration}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={styles.form.label}>{"Payment Type"}</label>
+                  <label className={styles.form.label}>{translations.paymentType}</label>
                   <select
                     value={editingClass?.paymentConfig.type}
                     onChange={(e) => {
@@ -2564,13 +2568,13 @@ export const AdminSchedule = () => {
                     }}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   >
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
+                    <option value="weekly">{translations.weekly}</option>
+                    <option value="monthly">{translations.monthly}</option>
                   </select>
                 </div>
                 
                 <div>
-                  <label className={styles.form.label}>{"Payment Start Date"}</label>
+                  <label className={styles.form.label}>{translations.paymentStartDate || "Payment Start Date"}</label>
                   <DatePicker
                     selected={(() => {
                       if (!editingClass) return new Date();
@@ -2661,15 +2665,15 @@ export const AdminSchedule = () => {
                 {editingClass?.paymentConfig.type === 'weekly' ? (
                   <div>
                     <label htmlFor="editWeeklyInterval" className={styles.form.label}>
-                      {"Payment Frequency"}
-                      <span className="ml-1 inline-block" title="How often payments should be processed. For weekly payments, specify the interval in weeks. For monthly payments, choose between 1st, 15th, or last day of the month.">
+                      {translations.paymentFrequency}
+                      <span className="ml-1 inline-block" title={translations.howOftenPaymentsShouldBeProcessedForWeeklyPaymentsThisIsOnlyApplicableForWeeklyClasses}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </span>
                     </label>
                     <div className="flex items-center">
-                      <span className="mr-2">Every</span>
+                      <span className="mr-2">{translations.every}</span>
                       <input
                         type="number"
                         id="editWeeklyInterval"
@@ -2688,15 +2692,15 @@ export const AdminSchedule = () => {
                         }}
                         className="mt-1 w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       />
-                      <span className="ml-2">{editingClass?.paymentConfig.weeklyInterval === 1 ? 'week' : 'weeks'}</span>
+                      <span className="ml-2">{editingClass?.paymentConfig.weeklyInterval === 1 ? translations.week : translations.weeks}</span>
                     </div>
                   </div>
                 ) : (
                   <div>
                     <label htmlFor="editMonthlyOption" className={styles.form.label}>
-                      {t.selectPaymentDay || "Payment Day"}
+                      {translations.selectPaymentDay || "Payment Day"}
                       <span className="ml-1 text-gray-500 text-xs">
-                        (auto-set)
+                        ({translations.autoSet})
                       </span>
                     </label>
                     <div className="relative">
@@ -2704,20 +2708,20 @@ export const AdminSchedule = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        {editingClass?.paymentConfig.monthlyOption === 'first' && t.firstDayMonth}
-                        {editingClass?.paymentConfig.monthlyOption === 'fifteen' && t.fifteenthDayMonth}
-                        {editingClass?.paymentConfig.monthlyOption === 'last' && t.lastDayMonth}
+                        {editingClass?.paymentConfig.monthlyOption === 'first' && translations.firstDayMonth}
+                        {editingClass?.paymentConfig.monthlyOption === 'fifteen' && translations.fifteenthDayMonth}
+                        {editingClass?.paymentConfig.monthlyOption === 'last' && translations.lastDayMonth}
                       </div>
                     </div>
                     <p className="mt-1 text-sm text-gray-500">
-                      Payment day is automatically set based on the selected payment start date.
+                      {translations.paymentDayAutoSet}
                     </p>
                   </div>
                 )}
                 
                 <div>
                   <label htmlFor="editPaymentLink" className={styles.form.label}>
-                    Payment Link
+                    {translations.paymentLink}
                   </label>
                   <input
                     type="url"
@@ -2737,13 +2741,13 @@ export const AdminSchedule = () => {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Enter a URL where students can make payments
+                    {translations.enterURLWhereStudentsCanMakePayments}
                   </p>
                 </div>
                 
                 <div>
                   <label htmlFor="editPaymentAmount" className={styles.form.label}>
-                    Payment Amount
+                    {translations.paymentAmount}
                   </label>
                   <input
                     type="number"
@@ -2768,7 +2772,7 @@ export const AdminSchedule = () => {
                 
                 <div>
                   <label htmlFor="editPaymentCurrency" className={styles.form.label}>
-                    Currency
+                    {translations.currency}
                   </label>
                   <select
                     id="editPaymentCurrency"
@@ -2785,9 +2789,9 @@ export const AdminSchedule = () => {
                     }}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   >
-                    <option value="BRL">BRL (R$)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
+                    <option value="BRL">{translations.currencyBRL} (R$)</option>
+                    <option value="USD">{translations.currencyUSD} ($)</option>
+                    <option value="EUR">{translations.currencyEUR} (€)</option>
                   </select>
                 </div>
               </div>
@@ -2800,7 +2804,7 @@ export const AdminSchedule = () => {
                 disabled={isSaving}
                 className={`${styles.buttons.cancel} ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {t.cancel}
+                {translations.cancel}
               </button>
               <button
                 onClick={handleSaveChanges}
@@ -2813,10 +2817,10 @@ export const AdminSchedule = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    {"Saving..."}
+                    {translations.saving}
                   </>
                 ) : (
-                  t.save
+                  translations.save
                 )}
               </button>
             </div>

@@ -20,6 +20,25 @@ interface Translation {
   birthdays: string;
   emailNotEditable: string;
   
+  // Admin Schedule Navigation
+  back: string;
+  createClass: string;
+  scrollHorizontallyToSeeAllColumns: string;
+  multipleDays: string;
+  weekly: string;
+  monthly: string;
+  monthly1stDay: string;
+  monthly15thDay: string;
+  monthlyLastDay: string;
+  firstDayOfMonth: string;
+  fifteenthDayOfMonth: string;
+  lastDayOfMonth: string;
+  uploadPDFContractDocumentForThisClassThisIsOptionalButRecommendedForKeepingTrackOfAgreementsWithStudents: string;
+  viewCurrentContract: string;
+  uploadNewFileToReplace: string;
+  howOftenPaymentsShouldBeProcessedForWeeklyPaymentsThisIsOnlyApplicableForWeeklyClasses: string;
+  saving: string;
+  
   // Navigation
   dashboard: string;
   home: string;
@@ -110,6 +129,9 @@ interface Translation {
   loading: string;
   error: string;
   success: string;
+  month: string;
+  year: string;
+  for: string;
   of: string;
   page: string;
   total: string;
@@ -164,6 +186,27 @@ interface Translation {
   updateFailed: string;
   noNotes: string;
   noEndDate: string;
+  
+  // Class Configuration
+  classConfiguration: string;
+  classSchedule: string;
+  startTime: string;
+  endTime: string;
+  classFrequency: string;
+  addDay: string;
+  day: string;
+  noScheduleDetails: string;
+  noSchedulesAdded: string;
+  
+  // Table Headers
+  frequency: string;
+  paymentType: string;
+  paymentAmount: string;
+  paymentDay: string;
+  contract: string;
+  viewContract: string;
+  noContract: string;
+  deleting: string;
 
   // Admin Users
   teacherAccount: string;
@@ -200,7 +243,6 @@ interface Translation {
   // Payment Completion
   completed: string;
   markAsCompleted: string;
-  classSchedule: string;
   allPaymentsCompleted: string;
   markAsIncomplete: string;
   processing: string;
@@ -208,6 +250,119 @@ interface Translation {
   completedOn: string;
   confirm: string;
   selectCompletionDate: string;
+
+  // Admin Schedule Errors and Success Messages
+  admin: {
+    schedule: {
+      errors: {
+        selectStudent: string;
+        addSchedule: string;
+        monthlyPaymentDate: string;
+        contractUpload: string;
+        createClass: string;
+        deleteClass: string;
+      };
+      success: {
+        classCreated: string;
+        classDeleted: string;
+      };
+      confirmDelete: string;
+    };
+  };
+
+  // Timezones
+  timezones: {
+    eastern: string;
+    central: string;
+    mountain: string;
+    pacific: string;
+    brasilia: string;
+    gmt: string;
+    cet: string;
+    msk: string;
+    jst: string;
+    cst: string;
+    aet: string;
+    local: string;
+  };
+
+  timezone: string;
+  classTimesDisplayed: string;
+  studentsSeeTimesConverted: string;
+  onlySelectedDates: string;
+  selectedFile: string;
+  everyXNumberWeeks: string;
+  onceAMonth: string;
+  forMonthlyPayments: string;
+  startDateMustBe1st15thOrLastDayOfMonth: string;
+
+  paymentFrequency: string;
+  every: string;
+  week: string;
+  weeks: string;
+  autoSet: string;
+  paymentDayAutoSet: string;
+  enterURLWhereStudentsCanMakePayments: string;
+  currency: string;
+  currencyBRL: string;
+  currencyUSD: string;
+  currencyEUR: string;
+
+  // Class Plans
+  templateLibrary: string;
+  noTemplatesAvailable: string;
+  templateDescription: string;
+  createTemplate: string;
+  templateName: string;
+  enterTemplateName: string;
+  applyTemplate: string;
+  applyToClassPlan: string;
+  templateCreated: string;
+  templateDeleted: string;
+  templateUpdated: string;
+  templateItems: string;
+  noItemsInTemplate: string;
+  topLevelItems: string;
+  moreItems: string;
+  createdBy: string;
+  addFirstItem: string;
+  noClassPlan: string;
+  addNewItem: string;
+  editItem: string;
+  itemTitle: string;
+  itemDescription: string;
+  enterItemTitle: string;
+  enterItemDescription: string;
+  saveChanges: string;
+  addChildItem: string;
+  insertItemAbove: string;
+  deleteClassPlan: string;
+  deleteClassPlanWarning: string;
+  deleteClassPlanConfirm: string;
+  monthlyView: string;
+  allPlans: string;
+  selectStudent: string;
+  noClassPlansExist: string;
+  switchToMonthlyView: string;
+  itemsCompleted: string;
+  noItemsInPlan: string;
+  addItemToGetStarted: string;
+  planFor: string;
+  insertAbove: string;
+  expandCollapse: string;
+  itemMarkedCompleted: string;
+  itemMarkedIncomplete: string;
+  templateApplied: string;
+  itemAdded: string;
+  itemUpdated: string;
+  itemDeleted: string;
+  childItemAdded: string;
+  itemInserted: string;
+  noTemplatesYet: string;
+  templateReuse: string;
+  editTemplate: string;
+  viewTemplate: string;
+  templateStructureNote: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -230,6 +385,25 @@ const translations: Record<Language, Translation> = {
     birthday: 'Birthday',
     birthdays: 'Birthdays',
     emailNotEditable: 'Email cannot be edited. To change the email, the user must be deleted and recreated with the correct email.',
+    
+    // Admin Schedule Navigation
+    back: 'Back',
+    createClass: 'Create Class',
+    scrollHorizontallyToSeeAllColumns: 'Scroll horizontally to see all columns',
+    multipleDays: 'Multiple Days',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    monthly1stDay: '1st of Month',
+    monthly15thDay: '15th of Month',
+    monthlyLastDay: 'Last Day of Month',
+    firstDayOfMonth: 'First Day of Month',
+    fifteenthDayOfMonth: '15th Day of Month',
+    lastDayOfMonth: 'Last Day of Month',
+    uploadPDFContractDocumentForThisClassThisIsOptionalButRecommendedForKeepingTrackOfAgreementsWithStudents: 'Upload PDF contract document for this class (optional but recommended for keeping track of agreements with students)',
+    viewCurrentContract: 'View Current Contract',
+    uploadNewFileToReplace: 'Upload new file to replace',
+    howOftenPaymentsShouldBeProcessedForWeeklyPaymentsThisIsOnlyApplicableForWeeklyClasses: 'How often payments should be processed for weekly payments (this is only applicable for weekly classes)',
+    saving: 'Saving...',
     
     // Navigation
     dashboard: 'Dashboard',
@@ -321,6 +495,9 @@ const translations: Record<Language, Translation> = {
     loading: 'Loading...',
     error: 'Error',
     success: 'Success',
+    month: 'Month',
+    year: 'Year',
+    for: 'for',
     of: 'of',
     page: 'Page',
     total: 'total',
@@ -363,7 +540,7 @@ const translations: Record<Language, Translation> = {
     startDate: 'Start Date',
     endDate: 'End Date',
     classStartDate: 'Class Start Date',
-    actions: 'Actions',
+    actions: 'Ações',
     optional: 'Optional',
     selectStudents: 'Select students...',
     noStudentsAssigned: 'No students assigned',
@@ -375,6 +552,27 @@ const translations: Record<Language, Translation> = {
     updateFailed: 'Update failed',
     noNotes: 'No notes',
     noEndDate: 'No end date',
+    
+    // Class Configuration
+    classConfiguration: 'Class Configuration',
+    classSchedule: 'Class Schedule',
+    startTime: 'Start Time',
+    endTime: 'End Time',
+    classFrequency: 'Class Frequency',
+    addDay: 'Add Day',
+    day: 'Day',
+    noScheduleDetails: 'No schedule details',
+    noSchedulesAdded: 'No schedules added. Click "Add Day" to add a class day.',
+    
+    // Table Headers
+    frequency: 'Frequency',
+    paymentType: 'Payment Type',
+    paymentAmount: 'Payment Amount',
+    paymentDay: 'Payment Day',
+    contract: 'Contract',
+    viewContract: 'View Contract',
+    noContract: 'No contract',
+    deleting: 'Deleting...',
 
     // Admin Users
     teacherAccount: 'Teacher Account',
@@ -411,7 +609,6 @@ const translations: Record<Language, Translation> = {
     // Payment Completion
     completed: 'Completed',
     markAsCompleted: 'Mark as Completed',
-    classSchedule: 'Class Schedule',
     allPaymentsCompleted: 'All payments completed',
     markAsIncomplete: 'Mark as Incomplete',
     processing: 'Processing...',
@@ -419,6 +616,119 @@ const translations: Record<Language, Translation> = {
     completedOn: 'Completed on',
     confirm: 'Confirm',
     selectCompletionDate: 'Select Completion Date',
+
+    // Admin Schedule Errors and Success Messages
+    admin: {
+      schedule: {
+        errors: {
+          selectStudent: 'Please select at least one student for the class',
+          addSchedule: 'Please add at least one schedule',
+          monthlyPaymentDate: 'Monthly payments must start on the 1st, 15th, or last day of the month',
+          contractUpload: 'Failed to upload contract file',
+          createClass: 'Failed to create class',
+          deleteClass: 'Failed to delete class'
+        },
+        success: {
+          classCreated: 'Class created successfully',
+          classDeleted: 'Class deleted successfully'
+        },
+        confirmDelete: 'Are you sure you want to delete this {courseType} class on {day} at {time}?'
+      }
+    },
+
+    // Timezones
+    timezones: {
+      eastern: 'Eastern Time (ET)',
+      central: 'Central Time (CT)',
+      mountain: 'Mountain Time (MT)',
+      pacific: 'Pacific Time (PT)',
+      brasilia: 'Brasília Time (BRT)',
+      gmt: 'Greenwich Mean Time (GMT)',
+      cet: 'Central European Time (CET)',
+      msk: 'Moscow Standard Time (MSK)',
+      jst: 'Japan Standard Time (JST)',
+      cst: 'China Standard Time (CST)',
+      aet: 'Australian Eastern Time (AET)',
+      local: 'Local Time'
+    },
+
+    timezone: 'Timezone',
+    classTimesDisplayed: 'Class times will be displayed in this timezone',
+    studentsSeeTimesConverted: 'Students will see times converted to their local timezone',
+    onlySelectedDates: 'Only',
+    selectedFile: 'Selected file',
+    everyXNumberWeeks: 'Every X number of weeks',
+    onceAMonth: 'Once a month',
+    forMonthlyPayments: 'For monthly payments',
+    startDateMustBe1st15thOrLastDayOfMonth: 'Start date must be the 1st, 15th, or last day of the month',
+
+    paymentFrequency: 'Payment Frequency',
+    every: 'Every',
+    week: 'week',
+    weeks: 'weeks',
+    autoSet: 'auto-set',
+    paymentDayAutoSet: 'Payment day is automatically set based on the selected payment start date',
+    enterURLWhereStudentsCanMakePayments: 'Enter a URL where students can make payments',
+    currency: 'Currency',
+    currencyBRL: 'BRL',
+    currencyUSD: 'USD',
+    currencyEUR: 'EUR',
+
+    // Class Plans
+    templateLibrary: 'Template Library',
+    noTemplatesAvailable: 'No templates available',
+    templateDescription: 'Template Description',
+    createTemplate: 'Create Template',
+    templateName: 'Template Name',
+    enterTemplateName: 'Enter Template Name',
+    applyTemplate: 'Apply Template',
+    applyToClassPlan: 'Apply to Class Plan',
+    templateCreated: 'Template Created',
+    templateDeleted: 'Template Deleted',
+    templateUpdated: 'Template Updated',
+    templateItems: 'Template Items',
+    noItemsInTemplate: 'No items in template',
+    topLevelItems: 'Top Level Items',
+    moreItems: 'More Items',
+    createdBy: 'Created By',
+    addFirstItem: 'Add First Item',
+    noClassPlan: 'No Class Plan',
+    addNewItem: 'Add New Item',
+    editItem: 'Edit Item',
+    itemTitle: 'Item Title',
+    itemDescription: 'Item Description',
+    enterItemTitle: 'Enter Item Title',
+    enterItemDescription: 'Enter Item Description',
+    saveChanges: 'Save Changes',
+    addChildItem: 'Add Child Item',
+    insertItemAbove: 'Insert Item Above',
+    deleteClassPlan: 'Delete Class Plan',
+    deleteClassPlanWarning: 'Are you sure you want to delete this class plan?',
+    deleteClassPlanConfirm: 'Are you sure you want to delete this class plan?',
+    monthlyView: 'Monthly View',
+    allPlans: 'All Plans',
+    selectStudent: 'Select Student',
+    noClassPlansExist: 'No class plans exist',
+    switchToMonthlyView: 'Switch to Monthly View',
+    itemsCompleted: 'Items Completed',
+    noItemsInPlan: 'No items in plan',
+    addItemToGetStarted: 'Add item to get started',
+    planFor: 'Plan For',
+    insertAbove: 'Insert Above',
+    expandCollapse: 'Expand/Collapse',
+    itemMarkedCompleted: 'Item marked as completed',
+    itemMarkedIncomplete: 'Item marked as incomplete',
+    templateApplied: 'Template Applied',
+    itemAdded: 'Item Added',
+    itemUpdated: 'Item Updated',
+    itemDeleted: 'Item Deleted',
+    childItemAdded: 'Child Item Added',
+    itemInserted: 'Item Inserted',
+    noTemplatesYet: 'No templates yet',
+    templateReuse: 'Template Reuse',
+    editTemplate: 'Edit Template',
+    viewTemplate: 'View Template',
+    templateStructureNote: 'For more complex changes to template structure, apply the template to a class plan, make your changes there, and save it as a new template.',
   },
   'pt-BR': {
     // Auth & Profile
@@ -439,6 +749,25 @@ const translations: Record<Language, Translation> = {
     birthday: 'Aniversário',
     birthdays: 'Aniversários',
     emailNotEditable: 'O email não pode ser editado. Para alterar o email, o usuário deve ser excluído e recriado com o email correto.',
+    
+    // Admin Schedule Navigation
+    back: 'Voltar',
+    createClass: 'Criar Aula',
+    scrollHorizontallyToSeeAllColumns: 'Role horizontalmente para ver todas as colunas',
+    multipleDays: 'Múltiplos Dias',
+    weekly: 'Semanal',
+    monthly: 'Mensal',
+    monthly1stDay: 'Dia 1 do Mês',
+    monthly15thDay: 'Dia 15 do Mês',
+    monthlyLastDay: 'Último Dia do Mês',
+    firstDayOfMonth: 'Primeiro Dia do Mês',
+    fifteenthDayOfMonth: 'Dia 15 do Mês',
+    lastDayOfMonth: 'Último Dia do Mês',
+    uploadPDFContractDocumentForThisClassThisIsOptionalButRecommendedForKeepingTrackOfAgreementsWithStudents: 'Fazer upload do documento de contrato em PDF para esta aula (opcional, mas recomendado para manter o registro de acordos com os alunos)',
+    viewCurrentContract: 'Ver Contrato Atual',
+    uploadNewFileToReplace: 'Fazer upload de novo arquivo para substituir',
+    howOftenPaymentsShouldBeProcessedForWeeklyPaymentsThisIsOnlyApplicableForWeeklyClasses: 'Com que frequência os pagamentos devem ser processados para pagamentos semanais (isso só se aplica a aulas semanais)',
+    saving: 'Salvando...',
     
     // Navigation
     dashboard: 'Painel',
@@ -530,6 +859,9 @@ const translations: Record<Language, Translation> = {
     loading: 'Carregando...',
     error: 'Erro',
     success: 'Sucesso',
+    month: 'Mês',
+    year: 'Ano',
+    for: 'para',
     of: 'de',
     page: 'Página',
     total: 'total',
@@ -584,6 +916,27 @@ const translations: Record<Language, Translation> = {
     updateFailed: 'Falha na atualização',
     noNotes: 'Sem notas',
     noEndDate: 'Sem data de término',
+    
+    // Class Configuration
+    classConfiguration: 'Configuração da Aula',
+    classSchedule: 'Agenda da Aula',
+    startTime: 'Horário de Início',
+    endTime: 'Horário de Término',
+    classFrequency: 'Frequência da Aula',
+    addDay: 'Adicionar Dia',
+    day: 'Dia',
+    noScheduleDetails: 'Sem detalhes de agenda',
+    noSchedulesAdded: 'Nenhuma agenda adicionada. Clique em "Adicionar Dia" para adicionar um dia de aula.',
+    
+    // Table Headers
+    frequency: 'Frequência',
+    paymentType: 'Tipo de Pagamento',
+    paymentAmount: 'Valor do Pagamento',
+    paymentDay: 'Dia do Pagamento',
+    contract: 'Contrato',
+    viewContract: 'Ver Contrato',
+    noContract: 'Sem contrato',
+    deleting: 'Excluindo...',
 
     // Admin Users
     teacherAccount: 'Conta de Professor',
@@ -620,7 +973,6 @@ const translations: Record<Language, Translation> = {
     // Payment Completion
     completed: 'Concluído',
     markAsCompleted: 'Marcar como Concluído',
-    classSchedule: 'Horário das Aulas',
     allPaymentsCompleted: 'Todos os pagamentos concluídos',
     markAsIncomplete: 'Marcar como Não Concluído',
     processing: 'Processando...',
@@ -628,6 +980,119 @@ const translations: Record<Language, Translation> = {
     completedOn: 'Concluído em',
     confirm: 'Confirmar',
     selectCompletionDate: 'Selecionar Data de Conclusão',
+
+    // Admin Schedule Errors and Success Messages
+    admin: {
+      schedule: {
+        errors: {
+          selectStudent: 'Por favor, selecione pelo menos um aluno para a aula',
+          addSchedule: 'Por favor, adicione pelo menos um horário',
+          monthlyPaymentDate: 'Pagamentos mensais devem começar no dia 1, 15 ou último dia do mês',
+          contractUpload: 'Falha ao fazer upload do arquivo do contrato',
+          createClass: 'Falha ao criar aula',
+          deleteClass: 'Falha ao excluir aula'
+        },
+        success: {
+          classCreated: 'Aula criada com sucesso',
+          classDeleted: 'Aula excluída com sucesso'
+        },
+        confirmDelete: 'Tem certeza que deseja excluir esta aula {courseType} na {day} às {time}?'
+      }
+    },
+
+    // Timezones
+    timezones: {
+      eastern: 'Horário do Leste (ET)',
+      central: 'Horário Central (CT)',
+      mountain: 'Horário das Montanhas (MT)',
+      pacific: 'Horário do Pacífico (PT)',
+      brasilia: 'Horário de Brasília (BRT)',
+      gmt: 'Horário de Greenwich (GMT)',
+      cet: 'Horário da Europa Central (CET)',
+      msk: 'Horário de Moscou (MSK)',
+      jst: 'Horário do Japão (JST)',
+      cst: 'Horário da China (CST)',
+      aet: 'Horário da Austrália Oriental (AET)',
+      local: 'Horário Local'
+    },
+
+    timezone: 'Fuso horário',
+    classTimesDisplayed: 'Os horários das aulas serão exibidos neste fuso horário',
+    studentsSeeTimesConverted: 'Os alunos verão os horários convertidos para seu fuso horário local',
+    onlySelectedDates: 'Apenas',
+    selectedFile: 'Arquivo selecionado',
+    everyXNumberWeeks: 'A cada X semanas',
+    onceAMonth: 'Uma vez por mês',
+    forMonthlyPayments: 'Para pagamentos mensais',
+    startDateMustBe1st15thOrLastDayOfMonth: 'A data de início deve ser o 1º, 15º ou último dia do mês',
+
+    paymentFrequency: 'Frequência de Pagamento',
+    every: 'A cada',
+    week: 'semana',
+    weeks: 'semanas',
+    autoSet: 'automático',
+    paymentDayAutoSet: 'O dia do pagamento é definido automaticamente com base na data de início selecionada',
+    enterURLWhereStudentsCanMakePayments: 'Digite uma URL onde os alunos podem fazer pagamentos',
+    currency: 'Moeda',
+    currencyBRL: 'BRL',
+    currencyUSD: 'USD',
+    currencyEUR: 'EUR',
+
+    // Class Plans
+    templateLibrary: 'Biblioteca de Modelos',
+    noTemplatesAvailable: 'Nenhum modelo disponível',
+    templateDescription: 'Descrição do Modelo',
+    createTemplate: 'Criar Modelo',
+    templateName: 'Nome do Modelo',
+    enterTemplateName: 'Digite o Nome do Modelo',
+    applyTemplate: 'Aplicar Modelo',
+    applyToClassPlan: 'Aplicar ao Plano de Aula',
+    templateCreated: 'Modelo Criado',
+    templateDeleted: 'Modelo Excluído',
+    templateUpdated: 'Modelo Atualizado',
+    templateItems: 'Itens do Modelo',
+    noItemsInTemplate: 'Nenhum item no modelo',
+    topLevelItems: 'Itens de Nível Superior',
+    moreItems: 'Mais Itens',
+    createdBy: 'Criado Por',
+    addFirstItem: 'Adicionar Primeiro Item',
+    noClassPlan: 'Nenhum Plano de Aula',
+    addNewItem: 'Adicionar Novo Item',
+    editItem: 'Editar Item',
+    itemTitle: 'Título do Item',
+    itemDescription: 'Descrição do Item',
+    enterItemTitle: 'Digite o Título do Item',
+    enterItemDescription: 'Digite a Descrição do Item',
+    saveChanges: 'Salvar Alterações',
+    addChildItem: 'Adicionar Item Filho',
+    insertItemAbove: 'Inserir Item Acima',
+    deleteClassPlan: 'Excluir Plano de Aula',
+    deleteClassPlanWarning: 'Tem certeza que deseja excluir este plano de aula?',
+    deleteClassPlanConfirm: 'Tem certeza que deseja excluir este plano de aula?',
+    monthlyView: 'Visualização Mensal',
+    allPlans: 'Todos os Planos',
+    selectStudent: 'Selecionar Aluno',
+    noClassPlansExist: 'Nenhum plano de aula existente',
+    switchToMonthlyView: 'Alternar para Visualização Mensal',
+    itemsCompleted: 'Itens Concluídos',
+    noItemsInPlan: 'Nenhum item no plano',
+    addItemToGetStarted: 'Adicionar item para começar',
+    planFor: 'Plano Para',
+    insertAbove: 'Inserir Acima',
+    expandCollapse: 'Expandir/Recolher',
+    itemMarkedCompleted: 'Item marcado como concluído',
+    itemMarkedIncomplete: 'Item marcado como não concluído',
+    templateApplied: 'Modelo Aplicado',
+    itemAdded: 'Item Adicionado',
+    itemUpdated: 'Item Atualizado',
+    itemDeleted: 'Item Excluído',
+    childItemAdded: 'Item Filho Adicionado',
+    itemInserted: 'Item Inserido',
+    noTemplatesYet: 'Nenhum modelo disponível ainda',
+    templateReuse: 'Reutilizar Modelo',
+    editTemplate: 'Editar Modelo',
+    viewTemplate: 'Visualizar Modelo',
+    templateStructureNote: 'Para alterações mais complexas na estrutura do modelo, aplique o modelo a um plano de aula, faça suas alterações lá e salve como um novo modelo.',
   }
 };
 

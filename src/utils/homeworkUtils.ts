@@ -19,7 +19,6 @@ import {
 } from 'firebase/storage';
 import { getCached, setCached, invalidateCache, clearCacheByPrefix } from './cacheUtils';
 import { Homework, HomeworkSubmission } from '../types/interfaces';
-import { logQuery } from './firebaseUtils';
 import { getAuth } from 'firebase/auth';
 
 // Collection paths
@@ -232,7 +231,6 @@ export const addHomework = async (
     
     return homeworkId;
   } catch (error) {
-    logQuery('Error adding homework', error);
     throw error;
   }
 };
@@ -269,7 +267,6 @@ export const getHomeworkForMonth = async (classId: string, date: Date): Promise<
     }
     
     // Create new request
-    logQuery('Querying homework for month', { classId: baseClassId, month: monthStr });
     const promise = (async () => {
       // Query homework for the entire month
       const q = query(
@@ -306,7 +303,6 @@ export const getHomeworkForMonth = async (classId: string, date: Date): Promise<
     
     return promise;
   } catch (error) {
-    logQuery('Error getting homework for month', error);
     throw error;
   }
 };
@@ -352,7 +348,6 @@ export const getHomeworkForDate = async (classId: string, date: Date): Promise<H
       return homeworkDateString === dateString;
     });
   } catch (error) {
-    logQuery('Error getting homework for date', error);
     throw error;
   }
 };
@@ -364,7 +359,6 @@ export const getHomeworkForClass = async (classId: string): Promise<Homework[]> 
     const now = new Date();
     return getHomeworkForMonth(classId, now);
   } catch (error) {
-    logQuery('Error getting homework for class', error);
     throw error;
   }
 };
@@ -383,27 +377,23 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
     const cached = getCached<Homework[]>(cacheKey);
     
     if (cached && !masqueradeUserStr) {
-      logQuery('Cache hit for student homework', { studentEmail });
       return cached;
     }
     
     const homework: Homework[] = [];
     
     // Get the classes the student is enrolled in
-    logQuery('Querying student classes', { studentEmail });
     const classesQuery = query(
       collection(db, 'classes'),
       where('studentEmails', 'array-contains', studentEmail)
     );
     
     const classesSnapshot = await getDocs(classesQuery);
-    logQuery('Classes query result', { studentEmail, size: classesSnapshot.docs.length });
     const classIds = classesSnapshot.docs.map(doc => doc.id);
     
     // If the student is enrolled in any classes, get homework for those classes
     if (classIds.length > 0) {
       // We need to run multiple queries since Firestore doesn't support array-contains-any with other filters
-      logQuery('Querying homework for student classes', { classIds });
       const homeworkByClassPromises = classIds.map(async (classId) => {
         const classHomeworkQuery = query(
           collection(db, HOMEWORK_COLLECTION),
@@ -416,7 +406,6 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
       
       const homeworkSnapshots = await Promise.all(homeworkByClassPromises);
       const totalDocs = homeworkSnapshots.reduce((sum, snapshot) => sum + snapshot.size, 0);
-      logQuery('Homework query results', { studentEmail, totalHomework: totalDocs });
       
       // Process all the results
       homeworkSnapshots.forEach(snapshot => {
@@ -439,7 +428,6 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
     setCached(cacheKey, homework);
     return homework;
   } catch (error) {
-    logQuery('Error getting homework for student', error);
     throw error;
   }
 };
@@ -671,7 +659,6 @@ export const getHomeworkSubmission = async (
     }
     
     // Create new request
-    logQuery('Querying homework submission', { homeworkId, studentEmail });
     const promise = (async () => {
       const q = query(
         collection(db, SUBMISSION_COLLECTION),
@@ -709,7 +696,6 @@ export const getHomeworkSubmission = async (
     
     return promise;
   } catch (error) {
-    logQuery('Error getting homework submission', error);
     throw error;
   }
 };
@@ -731,7 +717,6 @@ export const getHomeworkSubmissions = async (homeworkId: string): Promise<Homewo
     }
     
     // Create new request
-    logQuery('Querying homework submissions', { homeworkId });
     const promise = (async () => {
       const q = query(
         collection(db, SUBMISSION_COLLECTION),
@@ -766,7 +751,6 @@ export const getHomeworkSubmissions = async (homeworkId: string): Promise<Homewo
     
     return promise;
   } catch (error) {
-    logQuery('Error getting homework submissions', error);
     throw error;
   }
 };
