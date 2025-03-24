@@ -117,12 +117,12 @@ export const AdminSchedule = () => {
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [editContractFile, setEditContractFile] = useState<File | null>(null);
   const [newClass, setNewClass] = useState<any>({
-    scheduleType: 'multiple', // Default to multiple now
+    scheduleType: 'multiple',
     dayOfWeek: 1,
-    startTime: timeOptions.find(time => time.includes('9:00') && time.includes('AM')) || '09:00 AM',
-    endTime: timeOptions.find(time => time.includes('10:00') && time.includes('AM')) || '10:00 AM',
-    timezone: 'America/New_York', // Set default timezone to Eastern Time
-    schedules: [], // Start with empty schedules
+    startTime: '09:00 AM',
+    endTime: '10:00 AM',
+    timezone: 'America/New_York',
+    schedules: [],
     courseType: 'Individual',
     studentEmails: [],
     startDate: getNextDayOccurrence(1),
@@ -236,7 +236,7 @@ export const AdminSchedule = () => {
         dayOfWeek: newDayOfWeek, 
         startTime: defaultStartTime, 
         endTime: defaultEndTime,
-        timezone: prev.timezone // Use the class timezone without fallback
+        timezone: prev.timezone || 'America/New_York' // Ensure timezone is set with fallback
       };
       
       const updatedSchedules = [...prev.schedules, newSchedule];
@@ -246,23 +246,10 @@ export const AdminSchedule = () => {
       const selectedDays = updatedSchedules.map(schedule => schedule.dayOfWeek);
       const isCurrentStartDateValid = selectedDays.includes(currentStartDateDay);
       
-      // If this is the first schedule or the current start date is not valid,
-      // update the start date to the next occurrence of the new day
-      if (prev.schedules.length === 0 || !isCurrentStartDateValid) {
-        const nextOccurrence = getNextDayOccurrence(newDayOfWeek);
-        
-        return {
-          ...prev,
-          schedules: updatedSchedules,
-          startDate: nextOccurrence,
-          // Reset end date if it's now before the start date
-          ...(prev.endDate && prev.endDate < nextOccurrence ? { endDate: null } : {})
-        };
-      }
-      
       return {
         ...prev,
-        schedules: updatedSchedules
+        schedules: updatedSchedules,
+        timezone: prev.timezone || 'America/New_York' // Ensure timezone is set in parent object too
       };
     });
   };
@@ -435,6 +422,11 @@ export const AdminSchedule = () => {
       const classData = {
         ...newClass,
         contractUrl,
+        timezone: newClass.timezone || 'America/New_York', // Ensure timezone is set
+        schedules: newClass.schedules.map((schedule: any) => ({
+          ...schedule,
+          timezone: schedule.timezone || newClass.timezone || 'America/New_York' // Ensure timezone is set in each schedule
+        })),
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       };
@@ -451,7 +443,7 @@ export const AdminSchedule = () => {
         dayOfWeek: 1,
         startTime: '09:00 AM',
         endTime: '10:00 AM',
-        timezone: 'America/New_York', // Reset with Eastern Time
+        timezone: 'America/New_York',
         schedules: [],
         courseType: 'Individual',
         studentEmails: [],
@@ -475,6 +467,10 @@ export const AdminSchedule = () => {
       setContractFile(null);
       await fetchClasses();
       toast.success(t.admin.schedule.success.classCreated);
+      
+      // Close modal and reset step
+      setIsModalOpen(false);
+      setCurrentStep('schedule');
     } catch (error) {
       logQuery('Error creating class', error);
       toast.error(t.admin.schedule.errors.createClass);
@@ -485,6 +481,7 @@ export const AdminSchedule = () => {
 
   const handleDeleteClass = async (classId: string) => {
     try {
+      setDeletingClassId(classId);
       logQuery('Deleting class', { classId });
       await deleteCachedDocument('classes', classId);
       logQuery('Invalidating calendar cache');
@@ -495,6 +492,8 @@ export const AdminSchedule = () => {
     } catch (error) {
       logQuery('Error deleting class', error);
       toast.error(t.admin.schedule.errors.deleteClass);
+    } finally {
+      setDeletingClassId(null);
     }
   };
 
@@ -1185,7 +1184,14 @@ export const AdminSchedule = () => {
                 {currentStep === 'schedule' ? 'Add New Class - Schedule' : 'Add New Class - Payment'}
               </h2>
             </div>
-            <form onSubmit={handleCreateClass}>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (currentStep === 'schedule') {
+                setCurrentStep('payment');
+              } else {
+                handleCreateClass(e);
+              }
+            }}>
               {currentStep === 'schedule' ? (
                 /* Class Configuration Section */
                 <div className="mb-6">
@@ -1798,7 +1804,9 @@ export const AdminSchedule = () => {
                             </>
                           ) : (
                             <div className="max-h-32 overflow-y-auto">
-                              <div className="font-medium mb-1">Multiple Days:</div>
+                              {classItem.schedules && classItem.schedules.length > 1 && (
+                                <div className="font-medium mb-1">Multiple Days:</div>
+                              )}
                               {classItem.schedules && classItem.schedules.length > 0 ? (
                                 <div className="space-y-1">
                                   {classItem.schedules.map((schedule: ClassSchedule, index: number) => (
