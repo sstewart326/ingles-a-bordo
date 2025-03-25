@@ -16,7 +16,7 @@ import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
-
+import { logQuery } from '../utils/firebaseUtils';
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
   dates: string[];
@@ -122,17 +122,6 @@ export const Schedule = () => {
   const [selectedHomeworkDate, setSelectedHomeworkDate] = useState<Date | null>(null);
   const [homeworkFeedbackByClass, setHomeworkFeedbackByClass] = useState<Record<string, Map<string, boolean>>>({});
 
-  // Create an array of short day names using formatDateWithShortDay
-  const DAYS_OF_WEEK_FULL = [
-    formatDateWithShortDay(new Date(2024, 0, 7), language), // Sunday
-    formatDateWithShortDay(new Date(2024, 0, 8), language), // Monday
-    formatDateWithShortDay(new Date(2024, 0, 9), language), // Tuesday
-    formatDateWithShortDay(new Date(2024, 0, 10), language), // Wednesday
-    formatDateWithShortDay(new Date(2024, 0, 11), language), // Thursday
-    formatDateWithShortDay(new Date(2024, 0, 12), language), // Friday
-    formatDateWithShortDay(new Date(2024, 0, 13), language)  // Saturday
-  ];
-
   // Create a memoized fetch function to avoid duplicate requests
   const fetchCalendarDataSafely = useCallback(async (month: number, year: number) => {
     // Check if we're already fetching this exact data
@@ -207,6 +196,7 @@ export const Schedule = () => {
           if (hw.id) {
             try {
               const submissions = await getHomeworkSubmissions(hw.id);
+              logQuery('Homework Submissions Query result', { submissions });
               const hasFeedback = submissions.some((sub: HomeworkSubmission) => 
                 sub.status === 'graded' && sub.feedback && sub.feedback.trim() !== ''
               );

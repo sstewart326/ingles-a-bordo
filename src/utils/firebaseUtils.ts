@@ -91,7 +91,7 @@ export const getCachedCollection = async <T = DocumentData>(
     const querySnapshot = await getDocs(
       query(collection(db, collectionPath), ...queryConstraints)
     );
-    logQuery('Query result', { collectionPath, size: querySnapshot.docs.length });
+    logQuery('Collection Query result', { collectionPath, size: querySnapshot.docs.length });
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as T[];
   }
 

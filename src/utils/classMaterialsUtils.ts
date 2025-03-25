@@ -28,6 +28,9 @@ const ALLOWED_FILE_TYPES = [
   'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 ];
 
+// Add a map to track in-flight requests
+const inFlightRequests: Record<string, Promise<ClassMaterial[]>> = {};
+
 /**
  * Deletes a file from Firebase Storage using its URL
  * @param url The Firebase Storage URL of the file to delete
@@ -86,51 +89,22 @@ export const validateFile = (file: File): string | null => {
 
 export const addClassMaterials = async (
   classId: string,
-  classDate: Date | string,
-  studentEmails: string[],
+  dateObj: Date,
   slideFiles?: File[],
-  links?: string[]
+  links?: string[],
+  studentEmails?: string[],
+  teacherId?: string
 ): Promise<void> => {
   try {
-    // Extract the date components directly to avoid timezone issues
-    let dateObj: Date;
-    
-    if (classDate instanceof Date) {
-      // Get the date components directly
-      const year = classDate.getFullYear();
-      const month = classDate.getMonth();
-      const day = classDate.getDate();
-      
-      // Create a new date using UTC to avoid timezone issues
-      dateObj = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
-      
-      console.log('Original date:', classDate.toString());
-      console.log('Original day of week:', classDate.getDay());
-    } else {
-      // Parse the string date
-      const parsedDate = new Date(classDate);
-      const year = parsedDate.getFullYear();
-      const month = parsedDate.getMonth();
-      const day = parsedDate.getDate();
-      
-      // Create a new date using UTC to avoid timezone issues
-      dateObj = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
-      
-      console.log('Original date string:', classDate);
-      console.log('Parsed date:', parsedDate.toString());
-      console.log('Original day of week:', parsedDate.getDay());
-    }
-    
-    if (isNaN(dateObj.getTime())) {
-      throw new Error('Invalid date provided');
+    if (!classId || !dateObj) {
+      throw new Error('Class ID and date are required');
     }
 
-    // Log the date for debugging
-    console.log('Class material date (UTC):', dateObj.toUTCString());
-    console.log('Class material date (ISO):', dateObj.toISOString());
-    console.log('Class material date day of week (UTC):', dateObj.getUTCDay(), '(0=Sunday, 1=Monday, etc.)');
+    if (!teacherId) {
+      throw new Error('Teacher ID is required');
+    }
 
-    let slidesUrls: string[] = [];
+    const slidesUrls: string[] = [];
     
     if (slideFiles && slideFiles.length > 0) {
       for (const slideFile of slideFiles) {
@@ -174,7 +148,9 @@ export const addClassMaterials = async (
       createdAt: new Date(),
       updatedAt: new Date(),
       classDate: dateObj,
-      studentEmails: studentEmails,
+      studentEmails: studentEmails || [],
+      teacherId,
+      month: `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`
     };
 
     await addDoc(collection(db, COLLECTION_PATH), materialData);
@@ -190,7 +166,7 @@ export const addClassMaterials = async (
     const allCacheKey = `${COLLECTION_PATH}_${classId}_all`;
     invalidateCache(allCacheKey);
     
-    logMaterialsUtil('Materials added successfully', { classId, classDate });
+    logMaterialsUtil('Materials added successfully', { classId, dateObj });
   } catch (error) {
     console.error('Error adding class materials:', error);
     throw error;
@@ -199,73 +175,133 @@ export const addClassMaterials = async (
 
 export const getClassMaterials = async (
   classId: string,
-  specificDate?: Date
+  specificDate?: Date,
+  teacherId?: string
 ): Promise<ClassMaterial[]> => {
   try {
-    if (!classId) {
-      console.error('No class ID provided to getClassMaterials');
-      return [];
+    // If we have a teacherId and specificDate, construct the month key
+    let monthKey = '';
+    if (teacherId && specificDate) {
+      monthKey = `${specificDate.getFullYear()}-${String(specificDate.getMonth() + 1).padStart(2, '0')}`;
     }
-
-    // Check cache first
-    const cacheKey = specificDate 
-      ? `${COLLECTION_PATH}_${classId}_${specificDate.toISOString().split('T')[0]}`
-      : `${COLLECTION_PATH}_${classId}_all`;
     
+    // Construct cache key based on the query parameters
+    let cacheKey: string;
+    if (teacherId && monthKey) {
+      cacheKey = `${COLLECTION_PATH}_teacher_${teacherId}_month_${monthKey}`;
+    } else if (classId) {
+      cacheKey = `${COLLECTION_PATH}_class_${classId}`;
+    } else {
+      cacheKey = `${COLLECTION_PATH}_all`;
+    }
+    
+    // Check cache first
     const cachedData = getCached<ClassMaterial[]>(cacheKey);
     if (cachedData) {
-      logQuery('Cache hit for class materials', { classId, specificDate });
+      logQuery('Using cached class materials', { 
+        teacherId: teacherId, 
+        month: monthKey,
+        classId: classId,
+        cacheHit: true
+      });
       return cachedData;
     }
-
-    logQuery('Querying class materials', { classId, specificDate });
-    // Always query by classId only, without date filtering
-    const q = query(
-      collection(db, COLLECTION_PATH),
-      where('classId', '==', classId)
-    );
     
-    const querySnapshot = await getDocs(q);
-    logQuery('Query result', { classId, size: querySnapshot.docs.length });
-    const materials = querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      // Handle potential missing date fields
-      const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt);
-      const updatedAt = data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt);
-      const classDate = data.classDate instanceof Timestamp ? data.classDate.toDate() : new Date(data.classDate);
-      
-      return {
-        ...data,
-        id: doc.id,
-        createdAt,
-        updatedAt,
-        classDate,
-      } as unknown as ClassMaterial;
-    });
-
-    // Filter by specific date if provided
-    let filteredMaterials = materials;
-    if (specificDate) {
-      const targetDate = new Date(specificDate);
-      targetDate.setHours(0, 0, 0, 0);
-      
-      filteredMaterials = materials.filter(material => {
-        const materialDate = new Date(material.classDate);
-        materialDate.setHours(0, 0, 0, 0);
-        
-        return materialDate.getFullYear() === targetDate.getFullYear() &&
-               materialDate.getMonth() === targetDate.getMonth() &&
-               materialDate.getDate() === targetDate.getDate();
+    // Check if there's already an in-flight request for this cache key
+    if (cacheKey in inFlightRequests) {
+      logQuery('Reusing in-flight request for class materials', { 
+        teacherId: teacherId, 
+        month: monthKey,
+        classId: classId,
+        deduped: true
       });
+      return inFlightRequests[cacheKey];
     }
-
-    // Sort by date descending
-    filteredMaterials.sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
-
-    // Cache the result
-    setCached(cacheKey, filteredMaterials, COLLECTION_PATH);
     
-    return filteredMaterials;
+    // Create a new promise for this request
+    const fetchPromise = (async () => {
+      // Define the query based on the parameters
+      let q;
+      if (teacherId && specificDate) {
+        // If we have a teacherId and specificDate, query by month
+        logQuery('Querying class materials', { teacherId: teacherId, month: monthKey });
+        q = query(
+          collection(db, COLLECTION_PATH),
+          where('teacherId', '==', teacherId),
+          where('month', '==', monthKey)
+        );
+      } else if (classId) {
+        // Fallback to querying by classId
+        logQuery('Querying class materials', { classId: classId });
+        q = query(
+          collection(db, COLLECTION_PATH),
+          where('classId', '==', classId)
+        );
+      } else {
+        // No valid query parameters
+        return [];
+      }
+
+      const querySnapshot = await getDocs(q);
+      const materials = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Only log the query result if we're using classId
+        if (classId) {
+          logQuery('Class Materials Query result', { classId: data.classId, size: querySnapshot.docs.length });
+        }
+
+        // Handle potential missing date fields
+        const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt);
+        const updatedAt = data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt);
+        const classDate = data.classDate instanceof Timestamp ? data.classDate.toDate() : new Date(data.classDate);
+        
+        return {
+          ...data,
+          id: doc.id,
+          createdAt,
+          updatedAt,
+          classDate,
+        } as unknown as ClassMaterial;
+      });
+
+      // Filter by specific date if provided and we're not using month-based query
+      let filteredMaterials = materials;
+      if (specificDate && !teacherId) {
+        const targetDate = new Date(specificDate);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        filteredMaterials = materials.filter(material => {
+          const materialDate = new Date(material.classDate);
+          materialDate.setHours(0, 0, 0, 0);
+          
+          return materialDate.getFullYear() === targetDate.getFullYear() &&
+                materialDate.getMonth() === targetDate.getMonth() &&
+                materialDate.getDate() === targetDate.getDate();
+        });
+      }
+
+      // Sort by date descending
+      filteredMaterials.sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
+
+      // Cache the result
+      setCached(cacheKey, filteredMaterials, COLLECTION_PATH);
+      
+      return filteredMaterials;
+    })();
+    
+    // Store the promise in the in-flight requests map
+    inFlightRequests[cacheKey] = fetchPromise;
+    
+    // Clean up the in-flight request map after the request completes
+    fetchPromise.finally(() => {
+      // Remove this request from the in-flight map after a short delay
+      // This delay ensures that very close concurrent requests still get deduped
+      setTimeout(() => {
+        delete inFlightRequests[cacheKey];
+      }, 500);
+    });
+    
+    return fetchPromise;
   } catch (error) {
     console.error('Error getting class materials:', error);
     return [];

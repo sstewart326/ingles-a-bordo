@@ -11,6 +11,7 @@ interface ClassState {
   pastClasses: ClassSession[];
   classMaterials: Record<string, ClassMaterial[]>;
   loadedMaterialMonths: Set<string>;
+  teacherId?: string;
 }
 
 interface UpdateClassListParams {
@@ -182,8 +183,20 @@ export const fetchMaterialsForClass = async ({
     // For classes with multiple schedules, use the base class ID to fetch materials
     const baseClassId = getBaseClassId(classId);
     
-    // Fetch materials for this class using the base class ID
-    const materials = await getClassMaterials(baseClassId, date);
+    // Ensure we have a date to query with
+    const queryDate = date || new Date();
+    
+    // Check if we already have materials for this month in state
+    const monthKey = `${queryDate.getFullYear()}-${String(queryDate.getMonth() + 1).padStart(2, '0')}`;
+    const existingMaterials = state.classMaterials[classId] || [];
+    const hasMonthMaterials = existingMaterials.some(m => m.month === monthKey);
+    
+    // If we don't have materials for this month, fetch them
+    let materials = existingMaterials;
+    if (!hasMonthMaterials) {
+      // Fetch materials for this class using the base class ID and teacherId
+      materials = await getClassMaterials(baseClassId, queryDate, state.teacherId);
+    }
     
     // Update the classMaterials state
     setState({
@@ -218,6 +231,7 @@ interface FetchMaterialsForClassesParams {
   setState: (updates: Partial<ClassState>) => void;
   selectedDayDetails: any;
   setSelectedDayDetails: (details: any) => void;
+  selectedDate: Date;
 }
 
 export const fetchMaterialsForClasses = async ({
@@ -225,7 +239,8 @@ export const fetchMaterialsForClasses = async ({
   state,
   setState,
   selectedDayDetails,
-  setSelectedDayDetails
+  setSelectedDayDetails,
+  selectedDate
 }: FetchMaterialsForClassesParams) => {
   // First build a map of baseClassId -> all class IDs that share that base
   const baseClassIdMap: Record<string, string[]> = {};
@@ -245,13 +260,32 @@ export const fetchMaterialsForClasses = async ({
       baseClassIdMap[baseClassId].push(classSession.id);
     }
   });  
+
   // Create a map to store all materials by class ID
   const allMaterialsByClassId: Record<string, ClassMaterial[]> = {};
   
-  // Fetch materials for each base class ID
-  const baseClassPromises = Object.keys(baseClassIdMap).map(async (baseClassId) => {
-    // Get materials for this base class ID
-    const materials = await getClassMaterials(baseClassId);
+  // Get dates for previous, current, and next month
+  const dates = [
+    new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1), // Previous month
+    selectedDate, // Current month
+    new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1), // Next month
+  ];
+
+  // Create a Set to track which months we've already queried
+  const queriedMonths = new Set<string>();
+  
+  // Fetch materials for each month only once
+  const monthPromises = dates.map(async (date) => {
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Skip if we've already queried this month
+    if (queriedMonths.has(monthKey)) {
+      return;
+    }
+    queriedMonths.add(monthKey);
+
+    // Get materials for this month using teacherId
+    const materials = await getClassMaterials('', date, state.teacherId);
     
     // Make sure all materials have an id for tracking
     const materialsWithIds = materials.map(material => 
@@ -259,17 +293,38 @@ export const fetchMaterialsForClasses = async ({
     );
     
     if (materialsWithIds.length > 0) {
-      console.log(`Found ${materialsWithIds.length} materials for base class ${baseClassId}`);
+      console.log(`Found ${materialsWithIds.length} materials for month ${date.getMonth() + 1}`);
       
-      // Store materials for all class IDs that share this base
-      baseClassIdMap[baseClassId].forEach(classId => {
-        allMaterialsByClassId[classId] = materialsWithIds;
+      // Group materials by their classId
+      materialsWithIds.forEach(material => {
+        const classId = material.classId;
+        if (!classId) return;
+        
+        // Get the base class ID and all related class IDs
+        const baseClassId = classId.split('-')[0];
+        const relatedClassIds = baseClassIdMap[baseClassId] || [classId];
+        
+        // Store materials for all related class IDs
+        relatedClassIds.forEach(relatedClassId => {
+          if (!allMaterialsByClassId[relatedClassId]) {
+            allMaterialsByClassId[relatedClassId] = [];
+          }
+          // Add new materials that aren't already in the array
+          if (!allMaterialsByClassId[relatedClassId].some(m => m.id === material.id)) {
+            allMaterialsByClassId[relatedClassId].push(material);
+          }
+        });
       });
     }
   });
   
   // Wait for all materials to be fetched
-  await Promise.all(baseClassPromises);
+  await Promise.all(monthPromises);
+  
+  // Sort materials by date for each class
+  Object.keys(allMaterialsByClassId).forEach(classId => {
+    allMaterialsByClassId[classId].sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
+  });
   
   // Update the classMaterials state with all materials
   if (Object.keys(allMaterialsByClassId).length > 0) {

@@ -128,7 +128,7 @@ export const Profile = () => {
     
     setLoadingContracts(true);
     try {
-      logProfile('Fetching contracts for user:', email);
+      logProfile('Querying contracts for user:', email);
       
       // Fetch classes without a limit since the CacheOptions doesn't support it
       const classes = await getCachedCollection<ClassContract>(

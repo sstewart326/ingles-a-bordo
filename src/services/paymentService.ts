@@ -88,7 +88,7 @@ export const checkExistingPayment = async (userId: string, classSessionId: strin
     );
     
     // Execute both queries
-    logQuery('Executing multiple schedule payment queries', { userId, classSessionId, baseClassId });
+    logQuery('Querying multiple schedule payment queries', { userId, classSessionId, baseClassId });
     const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
     logQuery('Multiple schedule query results', { 
       snapshot1Size: snapshot1.size, 
@@ -176,14 +176,16 @@ export const getPaymentsForDates = async (dates: Date[], classSessionIds?: strin
     logQuery('Cache hit for payments', { dates, classSessionIds });
     return cachedPayments;
   }
-
-  logQuery('Fetching payments for dates', { dates, classSessionIds });
   
   // If not in cache, fetch from Firestore
   const startTimestamps = dates.map(date => {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     return Timestamp.fromDate(startOfDay);
+  });
+
+  startTimestamps.map(timestamp => {
+    logQuery('Querying payment for date', { timestamp: timestamp.toDate(), classSessionIds: classSessionIds });
   });
 
   const queries = startTimestamps.map(timestamp => 
@@ -196,7 +198,6 @@ export const getPaymentsForDates = async (dates: Date[], classSessionIds?: strin
     )
   );
 
-  logQuery('Executing payment queries', { queryCount: queries.length });
   const querySnapshots = await Promise.all(
     queries.map(q => getDocs(q))
   );
@@ -240,7 +241,7 @@ export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string
   let querySnapshot;
   
   if (hasMultipleSchedules) {
-    logQuery('Fetching payments for multiple schedules', { dueDate, classSessionId, baseClassId });
+    logQuery('Querying payments for multiple schedules', { dueDate, classSessionId, baseClassId });
     // For multiple schedules, check for payments with either the specific day ID or the base ID
     const q1 = query(
       collection(db, PAYMENTS_COLLECTION),
@@ -274,7 +275,7 @@ export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string
     
     return Array.from(uniquePayments.values());
   } else {
-    logQuery('Fetching payments for single schedule', { dueDate, classSessionId });
+    logQuery('Querying payments for single schedule', { dueDate, classSessionId });
     const q = query(
       collection(db, PAYMENTS_COLLECTION),
       where('classSessionId', '==', classSessionId),

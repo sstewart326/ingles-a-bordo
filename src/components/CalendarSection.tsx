@@ -89,28 +89,36 @@ export const CalendarSection = ({
     const currentMonth = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}`;
     
     const fetchMonthPayments = async () => {
+      // Don't fetch if we're already loading or if there are no payment dates
+      if (isLoadingPayments || monthPaymentDueDates.datesWithPayments.length === 0) {
+        setCompletedPayments([]);
+        setIsLoadingPayments(false);
+        return;
+      }
+
+      // Check if we really need to fetch
+      if (previousPaymentMonthRef.current === currentMonth) {
+        return;
+      }
+      
       setIsLoadingPayments(true);
       
       try {
-        if (monthPaymentDueDates.datesWithPayments.length > 0) {
-          const payments = await getPaymentsForDates(
-            monthPaymentDueDates.datesWithPayments,
-            monthPaymentDueDates.classSessionIds
-          );
-          setCompletedPayments(payments);
-        } else {
-          setCompletedPayments([]);
-        }
+        const payments = await getPaymentsForDates(
+          monthPaymentDueDates.datesWithPayments,
+          monthPaymentDueDates.classSessionIds
+        );
+        setCompletedPayments(payments);
+        previousPaymentMonthRef.current = currentMonth;
+      } catch (error) {
+        console.error('Error fetching payments:', error);
+        setCompletedPayments([]);
       } finally {
         setIsLoadingPayments(false);
       }
     };
 
-    // Fetch payments when month changes or payment due dates update
-    if (previousPaymentMonthRef.current !== currentMonth || monthPaymentDueDates.datesWithPayments.length > 0) {
-      fetchMonthPayments();
-      previousPaymentMonthRef.current = currentMonth;
-    }
+    fetchMonthPayments();
   }, [selectedDate, monthPaymentDueDates]);
 
   const handleDayClick = useCallback((date: Date) => {

@@ -391,6 +391,7 @@ export const getHomeworkForStudent = async (studentEmail: string): Promise<Homew
       // Process all the results
       homeworkSnapshots.forEach(snapshot => {
         snapshot.forEach(doc => {
+          logQuery('Homework query result', { doc: doc.data() });
           const data = doc.data();
           homework.push({
             ...data,

@@ -32,7 +32,7 @@ export const getStudentClassPlans = async (studentEmail: string, month: number, 
     );
     
     const querySnapshot = await getDocs(q);
-    logQuery('Query result', { studentEmail, size: querySnapshot.docs.length });
+    logQuery('Class PlansQuery result', { studentEmail, size: querySnapshot.docs.length });
     const plans: ClassPlan[] = [];
     
     querySnapshot.forEach((doc) => {
@@ -301,7 +301,7 @@ export const getClassPlanTemplates = async (): Promise<ClassPlanTemplate[]> => {
     logQuery('Getting class plan templates');
     const templatesRef = collection(db, COLLECTION_TEMPLATES);
     const querySnapshot = await getDocs(templatesRef);
-    logQuery('Query result', { size: querySnapshot.docs.length });
+    logQuery('Class Plan Templates Query result', { size: querySnapshot.docs.length });
     const templates: ClassPlanTemplate[] = [];
     
     querySnapshot.forEach((doc) => {

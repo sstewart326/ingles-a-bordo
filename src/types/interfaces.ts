@@ -37,6 +37,8 @@ export interface ClassMaterial {
   classDate: Date; // The specific date this material is for
   studentEmails: string[]; // The specific students these materials are for
   studentIds?: string[]; // Keep for backward compatibility
+  teacherId: string; // The ID of the teacher who created the material
+  month: string; // The month in YYYY-MM format for efficient querying
 }
 
 // New interface for homework assignments

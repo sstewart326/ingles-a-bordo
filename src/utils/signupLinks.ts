@@ -25,10 +25,10 @@ const generateToken = () => {
 export const createSignupLink = async (studentEmail: string, studentName: string): Promise<{ signupLink: string, token: string }> => {
   // Check for existing valid tokens first
   const tokensRef = collection(db, 'signupTokens');
-  logQuery('Checking existing signup tokens', { studentEmail });
+  logQuery('Querying signup tokens', { studentEmail });
   const q = query(tokensRef, where('email', '==', studentEmail));
   const existingTokens = await getDocs(q);
-  logQuery('Query result', { studentEmail, size: existingTokens.docs.length });
+  logQuery('Signup Tokens Query result', { studentEmail, size: existingTokens.docs.length });
   
   // Try to find a valid existing token
   const now = new Date();

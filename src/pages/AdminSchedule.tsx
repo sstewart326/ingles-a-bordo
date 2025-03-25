@@ -185,7 +185,7 @@ export const AdminSchedule = () => {
 
   const fetchClasses = async () => {
     try {
-      logQuery('Fetching all classes');
+      logQuery('Querying all classes');
       const classesData = await getCachedCollection<Class>('classes', [], { includeIds: true });
       setClasses(classesData);
     } catch (error) {
@@ -196,7 +196,7 @@ export const AdminSchedule = () => {
 
   const fetchAllUsers = async () => {
     try {
-      logQuery('Fetching all users');
+      logQuery('Querying all users');
       // Fetch all users directly from Firestore to get fresh data
       const usersSnapshot = await getDocs(collection(db, 'users'));
       logQuery('Users query result', { size: usersSnapshot.docs.length });

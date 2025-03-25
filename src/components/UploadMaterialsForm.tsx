@@ -5,6 +5,7 @@ import { FaTrash } from 'react-icons/fa';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { invalidateCalendarCache } from '../services/calendarService';
+import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 
 interface UploadMaterialsFormProps {
   classId: string;
@@ -28,6 +29,7 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
   const [uploading, setUploading] = useState(false);
   const { language } = useLanguage();
   const t = useTranslation(language);
+  const { currentUser } = useAuthWithMasquerade();
 
   // Add URL validation function
   const isValidUrl = (url: string): boolean => {
@@ -69,6 +71,11 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!currentUser) {
+      toast.error('You must be logged in to upload materials');
+      return;
+    }
+    
     if (slideFiles.length === 0 && links.length === 0) {
       toast.error(t.noMaterialsFound || 'No materials to upload');
       return;
@@ -85,7 +92,14 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
       // Create a new date using UTC to avoid timezone issues
       const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
       
-      await addClassMaterials(actualClassId, utcDate, studentEmails, slideFiles, links);
+      await addClassMaterials(
+        actualClassId,
+        utcDate,
+        slideFiles,
+        links,
+        studentEmails,
+        currentUser.uid
+      );
       
       // Invalidate all related caches to ensure data is refreshed
       invalidateCalendarCache('getAllClassesForMonthHttp');

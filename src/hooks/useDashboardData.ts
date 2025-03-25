@@ -272,14 +272,16 @@ export const useDashboardData = (): UseDashboardDataReturn => {
               dates: cls.dates?.map(d => typeof d === 'string' ? d : d.toISOString())
             })) as ClassSession[],
             classMaterials,
-            loadedMaterialMonths
+            loadedMaterialMonths,
+            teacherId: currentUser?.uid
           },
           setState: (updates) => {
             if (updates.classMaterials) setClassMaterials(updates.classMaterials);
             if (updates.loadedMaterialMonths) setLoadedMaterialMonths(updates.loadedMaterialMonths);
           },
           selectedDayDetails,
-          setSelectedDayDetails
+          setSelectedDayDetails,
+          selectedDate: targetDate
         });
       }
   }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails, loadedMonths, upcomingClasses, pastClasses, dailyClassMap]);

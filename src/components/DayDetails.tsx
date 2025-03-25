@@ -5,7 +5,7 @@ import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
 import { PencilIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Payment } from '../types/payment';
-import { createPayment, getPaymentsByDueDate, deletePayment } from '../services/paymentService';
+import { createPayment, getPaymentsByDueDate, deletePayment, getPaymentsForDates } from '../services/paymentService';
 import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
 import { ClassSection } from './ClassSection';
 import { User } from '../types/interfaces';
@@ -48,6 +48,8 @@ interface DayDetailsProps {
   homeworkByClassId?: Record<string, Homework[]>;
   refreshHomework?: () => Promise<void>;
   formatStudentNames: (emails: string[]) => string;
+  completedPayments: Record<string, Payment[]>;
+  isLoadingPayments?: boolean;
 }
 
 export const DayDetails = ({
@@ -74,13 +76,14 @@ export const DayDetails = ({
   onPaymentStatusChange,
   homeworkByClassId,
   refreshHomework,
-  formatStudentNames
+  formatStudentNames,
+  completedPayments,
+  isLoadingPayments
 }: DayDetailsProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
   const [currentPage, setCurrentPage] = useState(0);
   const [paymentsPage, setPaymentsPage] = useState(0);
-  const [completedPayments, setCompletedPayments] = useState<Record<string, Payment[]>>({});
   const [editingPaymentLink, setEditingPaymentLink] = useState<{[classId: string]: string | null}>({});
   const [savingPaymentLink, setSavingPaymentLink] = useState<{[classId: string]: boolean}>({});
   const [paymentLinks, setPaymentLinks] = useState<{[classId: string]: string | null}>({});
@@ -117,26 +120,6 @@ export const DayDetails = ({
   useEffect(() => {
     setPaymentsPage(0);
   }, [selectedDayDetails?.date]);
-
-  // Only fetch completed payments when there are payments due
-  useEffect(() => {
-    const fetchCompletedPayments = async () => {
-      if (!selectedDayDetails?.date || !selectedDayDetails.paymentsDue.length) return;
-      
-      const payments: Record<string, Payment[]> = {};
-      
-      for (const { classSession } of selectedDayDetails.paymentsDue) {
-        const completedPaymentsForClass = await getPaymentsByDueDate(selectedDayDetails.date, classSession.id);
-        if (completedPaymentsForClass.length > 0) {
-          payments[classSession.id] = completedPaymentsForClass;
-        }
-      }
-      
-      setCompletedPayments(payments);
-    };
-
-    fetchCompletedPayments();
-  }, [selectedDayDetails?.date, selectedDayDetails?.paymentsDue]);
 
   // Add a useEffect to fetch payment links for all classes in selectedDayDetails
   useEffect(() => {
@@ -195,7 +178,7 @@ export const DayDetails = ({
   };
 
   const handleConfirmPaymentCompletion = async () => {
-    if (!pendingPaymentAction) return;
+    if (!pendingPaymentAction || !selectedDayDetails) return;
     const { userId, classSession } = pendingPaymentAction;
 
     try {
@@ -211,7 +194,7 @@ export const DayDetails = ({
       console.log('Payment details:', { amount, currency });
       
       // Find the user in the paymentsDue array to get their email
-      const userPaymentDue = selectedDayDetails?.paymentsDue.find(
+      const userPaymentDue = selectedDayDetails.paymentsDue.find(
         payment => payment.classSession.id === classSession.id && payment.user.email === userId
       );
       
@@ -225,36 +208,18 @@ export const DayDetails = ({
       const baseClassId = getBaseClassId(classSession.id);
       
       // Use the user's email as the userId since that's what we have
-      const paymentId = await createPayment(
+      await createPayment(
         userPaymentDue.user.email,
         baseClassId,
         amount,
         currency,
-        selectedDayDetails!.date,
+        selectedDayDetails.date,
         selectedCompletionDate
       );
-      console.log('Payment created with ID:', paymentId);
-      
-      // Fetch all completed payments to ensure state is fully up to date
-      if (selectedDayDetails?.paymentsDue) {
-        console.log('Fetching updated payments...');
-        const payments: Record<string, Payment[]> = {};
-        
-        for (const { classSession: cs } of selectedDayDetails.paymentsDue) {
-          const completedPaymentsForClass = await getPaymentsByDueDate(selectedDayDetails.date, cs.id);
-          console.log('Completed payments for class:', cs.id, completedPaymentsForClass);
-          if (completedPaymentsForClass.length > 0) {
-            payments[cs.id] = completedPaymentsForClass;
-          }
-        }
-        
-        console.log('Setting completed payments:', payments);
-        setCompletedPayments(payments);
-      }
       
       // Notify the parent component that a payment was completed
       if (onPaymentStatusChange) {
-        onPaymentStatusChange(selectedDayDetails!.date);
+        onPaymentStatusChange(selectedDayDetails.date);
       }
       
       setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
@@ -274,12 +239,6 @@ export const DayDetails = ({
       setLoadingPaymentIncomplete(prev => ({ ...prev, [payment.id]: true }));
       
       await deletePayment(payment.id);
-      
-      // Update the local state by removing the payment
-      setCompletedPayments(prev => ({
-        ...prev,
-        [payment.classSessionId]: prev[payment.classSessionId]?.filter(p => p.id !== payment.id) || []
-      }));
       
       // Notify parent component to refresh calendar
       if (onPaymentStatusChange && selectedDayDetails) {

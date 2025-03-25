@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import { Homework, HomeworkSubmission as HomeworkSubmissionType } from '../types/interfaces';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-
+import { logQuery } from '../utils/firebaseUtils';
 interface HomeworkSubmissionProps {
   homework: Homework;
   studentEmail: string;
@@ -33,6 +33,7 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
       try {
         setLoading(true);
         const existingSubmission = await getHomeworkSubmission(homework.id, studentEmail);
+        logQuery('Homework Submission Query result', { existingSubmission });
         
         if (existingSubmission) {
           setSubmission(existingSubmission);
@@ -110,6 +111,7 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
       
       // Refetch submission
       const updatedSubmission = await getHomeworkSubmission(homework.id, studentEmail);
+      logQuery('Homework Submission Query result', { updatedSubmission });
       setSubmission(updatedSubmission);
     } catch (error) {
       console.error('Error submitting homework:', error);

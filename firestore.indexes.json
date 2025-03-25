@@ -5,6 +5,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "teacherId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "month",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "classMaterials",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "classId",
           "order": "ASCENDING"
         },

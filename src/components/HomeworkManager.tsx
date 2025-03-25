@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { styles } from '../styles/styleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-
+import { logQuery } from '../utils/firebaseUtils';
 interface HomeworkManagerProps {
   classId: string;
   classDate: Date;
@@ -35,6 +35,7 @@ const HomeworkSubmissionBadge: React.FC<{
     const fetchSubmissionCount = async () => {
       try {
         const submissions = await getHomeworkSubmissions(homeworkId);
+        logQuery('Homework Submissions Query result', { submissions });
         setSubmissionCount(submissions.length);
       } catch (error) {
         console.error('Error fetching submission count:', error);
@@ -610,6 +611,7 @@ const HomeworkSubmissionsManager: React.FC<HomeworkSubmissionsManagerProps> = ({
       try {
         setLoading(true);
         const data = await getHomeworkSubmissions(homeworkId);
+        logQuery('Homework Submissions Query result', { data });
         setSubmissions(data);
       } catch (error) {
         console.error('Error fetching submissions:', error);

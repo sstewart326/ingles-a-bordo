@@ -9,6 +9,7 @@ import { ClassSession } from '../utils/scheduleUtils';
 import { styles } from '../styles/styleUtils';
 import { getClassMaterials } from '../utils/classMaterialsUtils';
 import { ClassMaterial, Homework, User } from '../types/interfaces';
+import { Payment } from '../types/payment';
 import {
   handleDeleteMaterial as deleteMaterial,
   MaterialsState
@@ -65,6 +66,7 @@ export const Dashboard = () => {
     selectedDayDetails,
     setUpcomingClasses,
     setPastClasses,
+    setLoadedMonths,
     setLoadedMaterialMonths,
     setSelectedDayDetails,
     setClassMaterials,
@@ -73,6 +75,9 @@ export const Dashboard = () => {
     isDateInRelevantMonthRange,
     getMonthKey,
   } = useDashboardData();
+
+  // Add state for completed payments
+  const [completedPayments, setCompletedPayments] = useState<Record<string, Payment[]>>({});
 
   // Define the internal handleDayClick implementation with the shouldScroll parameter
   const handleDayClickInternal = useCallback((
@@ -123,24 +128,52 @@ export const Dashboard = () => {
     const fetchMaterials = async () => {
       const materialsMap: Record<string, ClassMaterial[]> = {};
 
-      for (const classSession of updatedClasses) {
-        // For classes with multiple schedules, use the base class ID to fetch materials
-        const baseClassId = getBaseClassId(classSession.id);
+      // Generate month key for the selected date
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      // Check if we've already loaded materials for this month
+      const monthAlreadyLoaded = loadedMaterialMonths.has(monthKey);
 
-        // Fetch materials for this class using the base class ID
-        const materials = await getClassMaterials(baseClassId, date);
+      if (!monthAlreadyLoaded) {
+        // Fetch materials for all classes at once using teacherId
+        const materials = await getClassMaterials('', date, currentUser?.uid);
 
-        if (materials.length > 0) {
-          // Store materials by the original class ID for consistency in the UI
-          materialsMap[classSession.id] = materials;
-        }
+        // Group materials by classId
+        materials.forEach(material => {
+          const classId = material.classId;
+          if (!classId) return;
 
-      }
+          // For classes with multiple schedules, get all related class IDs
+          const baseClassId = getBaseClassId(classId);
+          const relatedClassIds = updatedClasses
+            .filter(c => getBaseClassId(c.id) === baseClassId)
+            .map(c => c.id);
 
-      if (!materialsAlreadyLoaded) {
+          // Store materials for all related class IDs
+          relatedClassIds.forEach(relatedClassId => {
+            if (!materialsMap[relatedClassId]) {
+              materialsMap[relatedClassId] = [];
+            }
+            // Add the material if it's not already in the array
+            if (!materialsMap[relatedClassId].some(m => m.id === material.id)) {
+              materialsMap[relatedClassId].push(material);
+            }
+          });
+        });
+
+        // Mark this month as loaded to prevent duplicate queries
         const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
         updatedLoadedMaterialMonths.add(monthKey);
         setLoadedMaterialMonths(updatedLoadedMaterialMonths);
+      } else {
+        // If we've already loaded this month, collect materials from existing state
+        // This prevents duplicate queries when clicking on different days within the same month
+        updatedClasses.forEach(classSession => {
+          const classId = classSession.id;
+          if (classMaterials[classId] && classMaterials[classId].length > 0) {
+            materialsMap[classId] = classMaterials[classId];
+          }
+        });
       }
 
       setSelectedDayDetails({
@@ -192,7 +225,8 @@ export const Dashboard = () => {
     upcomingClasses,
     isDateInRelevantMonthRange,
     setLoadedMaterialMonths,
-    setSelectedDayDetails
+    setSelectedDayDetails,
+    currentUser
   ]);
 
   // Create a wrapper function that matches the expected signature for CalendarSection
@@ -503,7 +537,6 @@ export const Dashboard = () => {
 
       // Set a new timeout to do the actual refresh after a delay
       refreshTimeoutId = setTimeout(() => {
-
         // If we have any pending classIds, refresh the first one
         // The refresh will capture all related class IDs anyway
         if (pendingClassIds.size > 0) {
@@ -512,14 +545,12 @@ export const Dashboard = () => {
           // Temporarily set the visibleUploadForm to trigger the refresh
           setVisibleUploadForm(firstClassId);
 
-          // Run the refresh after a small delay to ensure state has updated
-          setTimeout(() => {
-            refreshMaterialsForClass();
-            // Clear the pending set after refresh
-            pendingClassIds.clear();
-          }, 50);
+          // Run the refresh immediately
+          refreshMaterialsForClass();
+          // Clear the pending set after refresh
+          pendingClassIds.clear();
         }
-      }, 300); // 300ms debounce time
+      }, 100); // Reduce debounce time to 100ms for faster updates
     };
 
     const handleMaterialsUpdated = (event: CustomEvent) => {
@@ -527,6 +558,14 @@ export const Dashboard = () => {
 
       if (!classId) {
         return;
+      }
+
+      // Invalidate the cache for this month immediately
+      if (selectedDayDetails) {
+        const monthKey = `${selectedDayDetails.date.getFullYear()}-${String(selectedDayDetails.date.getMonth() + 1).padStart(2, '0')}`;
+        const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
+        updatedLoadedMaterialMonths.delete(monthKey);
+        setLoadedMaterialMonths(updatedLoadedMaterialMonths);
       }
 
       debounceRefresh(classId);
@@ -542,7 +581,7 @@ export const Dashboard = () => {
         clearTimeout(refreshTimeoutId);
       }
     };
-  }, []);
+  }, [selectedDayDetails, loadedMaterialMonths]);
 
   // Renamed function to be more accurate about what it does
   const refreshMaterialsForClass = async (retryCount = 0) => {
@@ -570,12 +609,101 @@ export const Dashboard = () => {
       // Use the base class ID to fetch materials, but we'll store by the original ID
       const actualClassId = classIdWithPossibleTimestamp;
 
-      // Fetch updated materials for this class without date filtering
-      let updatedMaterials;
+      // Always fetch fresh materials after an upload
       try {
-        updatedMaterials = await getClassMaterials(baseClassId);
-      } catch (fetchError) {
+        // Use the teacher-based query for efficiency
+        const materials = await getClassMaterials('', selectedDayDetails.date, currentUser?.uid);
+        
+        // Make sure all materials have an id for tracking
+        const materialsWithIds = materials.map(material =>
+          material.id ? material : { ...material, id: Math.random().toString(36).substring(2) }
+        );
 
+        // Use batched state updates to reduce the number of renders
+        const batchStateUpdates = () => {
+          // ============== STEP 1: Find all class IDs that need updates ==============
+          // Find all class IDs that should be updated (original and any variants)
+          const classIdsToUpdate = [
+            actualClassId,
+            baseClassId,
+            ...upcomingClasses.map(c => c.id).filter(id => id.startsWith(baseClassId)),
+            ...pastClasses.map(c => c.id).filter(id => id.startsWith(baseClassId))
+          ];
+
+          const uniqueClassIdsToUpdate = [...new Set(classIdsToUpdate)];
+
+          // ============== STEP 2: Update the materials map ==============
+          // Create updated materials map for selectedDayDetails
+          const updatedMaterialsMap = {
+            ...selectedDayDetails.materials
+          };
+
+          // Add materials for all relevant class IDs
+          uniqueClassIdsToUpdate.forEach(id => {
+            updatedMaterialsMap[id] = materialsWithIds;
+          });
+
+          // ============== STEP 3: Update class objects with materials ==============
+          // Update selectedDayDetails classes with materials
+          const updatedSelectedDayClasses = selectedDayDetails.classes.map(c => {
+            if (uniqueClassIdsToUpdate.includes(c.id)) {
+              return {
+                ...c,
+                materials: materialsWithIds
+              };
+            }
+            return c;
+          });
+
+          // Update upcoming classes with materials
+          const updatedUpcomingClasses = upcomingClasses.map(c => {
+            if (uniqueClassIdsToUpdate.includes(c.id)) {
+              const updatedClass = {
+                ...c,
+                materials: materialsWithIds
+              };
+              return updatedClass;
+            }
+            return c;
+          });
+
+          // Update past classes with materials
+          const updatedPastClasses = pastClasses.map(c => {
+            if (uniqueClassIdsToUpdate.includes(c.id)) {
+              const updatedClass = {
+                ...c,
+                materials: materialsWithIds
+              };
+              return updatedClass;
+            }
+            return c;
+          });
+
+          // ============== STEP 4: Update global class materials state ==============
+          // Update the global classMaterials state
+          const updatedClassMaterials = { ...classMaterials };
+
+          // Add materials for all relevant class IDs
+          uniqueClassIdsToUpdate.forEach(id => {
+            updatedClassMaterials[id] = materialsWithIds;
+          });
+
+          // ============== STEP 5: Batch all state updates together ==============
+          // Batch all state updates in a single React cycle to minimize renders
+          setSelectedDayDetails({
+            ...selectedDayDetails,
+            materials: updatedMaterialsMap,
+            classes: updatedSelectedDayClasses
+          });
+          setClassMaterials(updatedClassMaterials);
+          setUpcomingClasses(updatedUpcomingClasses);
+          setPastClasses(updatedPastClasses);
+        };
+
+        // Execute the batch update
+        batchStateUpdates();
+
+      } catch (fetchError) {
         // If we've had fewer than 2 retries, try again
         if (retryCount < 2) {
           setTimeout(() => refreshMaterialsForClass(retryCount + 1), 500);
@@ -585,114 +713,15 @@ export const Dashboard = () => {
         }
       }
 
-      // Make sure all materials have an id for tracking
-      const materialsWithIds = updatedMaterials.map(material =>
-        material.id ? material : { ...material, id: Math.random().toString(36).substring(2) }
-      );
-
-      // Use batched state updates to reduce the number of renders
-      const batchStateUpdates = () => {
-        // ============== STEP 1: Find all class IDs that need updates ==============
-        // Find all class IDs that should be updated (original and any variants)
-        const classIdsToUpdate = [
-          actualClassId,
-          baseClassId,
-          ...upcomingClasses.map(c => c.id).filter(id => id.startsWith(baseClassId)),
-          ...pastClasses.map(c => c.id).filter(id => id.startsWith(baseClassId))
-        ];
-
-        const uniqueClassIdsToUpdate = [...new Set(classIdsToUpdate)];
-
-        // ============== STEP 2: Update the materials map ==============
-        // Create updated materials map for selectedDayDetails
-        const updatedMaterialsMap = {
-          ...selectedDayDetails.materials
-        };
-
-        // Add materials for all relevant class IDs
-        uniqueClassIdsToUpdate.forEach(id => {
-          updatedMaterialsMap[id] = materialsWithIds;
-        });
-
-        // ============== STEP 3: Update class objects with materials ==============
-        // Update selectedDayDetails classes with materials
-        const updatedSelectedDayClasses = selectedDayDetails.classes.map(c => {
-          if (uniqueClassIdsToUpdate.includes(c.id)) {
-            return {
-              ...c,
-              materials: materialsWithIds
-            };
-          }
-          return c;
-        });
-
-        // Update upcoming classes with materials
-        const updatedUpcomingClasses = upcomingClasses.map(c => {
-          if (uniqueClassIdsToUpdate.includes(c.id)) {
-            const updatedClass = {
-              ...c,
-              materials: materialsWithIds
-            };
-            return updatedClass;
-          }
-          return c;
-        });
-
-        // Update past classes with materials
-        const updatedPastClasses = pastClasses.map(c => {
-          if (uniqueClassIdsToUpdate.includes(c.id)) {
-            const updatedClass = {
-              ...c,
-              materials: materialsWithIds
-            };
-            return updatedClass;
-          }
-          return c;
-        });
-
-        // ============== STEP 4: Update global class materials state ==============
-        // Update the global classMaterials state
-        const updatedClassMaterials = { ...classMaterials };
-
-        // Add materials for all relevant class IDs
-        uniqueClassIdsToUpdate.forEach(id => {
-          updatedClassMaterials[id] = materialsWithIds;
-        });
-
-        // ============== STEP 5: Batch all state updates together ==============
-        // Batch all state updates in a single React cycle to minimize renders
-        // React will batch these updates when they're called synchronously
-        setSelectedDayDetails({
-          ...selectedDayDetails,
-          materials: updatedMaterialsMap,
-          classes: updatedSelectedDayClasses
-        });
-        setClassMaterials(updatedClassMaterials);
-        setUpcomingClasses(updatedUpcomingClasses);
-        setPastClasses(updatedPastClasses);
-
-        // ============== STEP 6: Invalidate cache for future loads ==============
-        // Invalidate the loaded material months to force a refresh on next load
-        const monthKey = getMonthKey(selectedDayDetails.date);
-        const updatedLoadedMaterialMonths = new Set(loadedMaterialMonths);
-        updatedLoadedMaterialMonths.delete(monthKey); // Remove this month to force refresh on next load
-        setLoadedMaterialMonths(updatedLoadedMaterialMonths);
-      };
-
-      // Execute the batch update
-      batchStateUpdates();
-
     } catch (error) {
       // Show an error toast to the user
       toast.error('Failed to refresh materials. Please try again.');
-    } finally {
-      // Close the modal if it's open
-      setVisibleUploadForm(null);
     }
   };
 
   // Simple wrapper for backward compatibility
   const handleCloseUploadForm = () => {
+    setVisibleUploadForm(null);
     refreshMaterialsForClass();
   };
 
@@ -906,32 +935,36 @@ export const Dashboard = () => {
     return prevDate;
   };
 
-  const handlePaymentStatusChange = useCallback((date: Date) => {
+  const handlePaymentStatusChange = useCallback(async (date: Date) => {
     // Force refresh of the calendar by clearing the previous month reference
     // This will trigger a re-fetch of payments for the current month
     const monthKey = getMonthKey(date);
     const loadedMonthsCopy = new Set(loadedMonths);
     loadedMonthsCopy.delete(monthKey);
+    setLoadedMonths(loadedMonthsCopy);
 
     // Re-fetch classes and payments for the current month
-    fetchClasses(date, false);
-
-    // Force a refresh of the calendar by setting a new date object with the same value
-    // This will trigger the useEffect in CalendarSection to re-fetch payments
-    setSelectedDate(new Date(date));
+    await fetchClasses(date, false, true); // Pass true to bypass cache
 
     // If we have selected day details, refresh them too
     if (selectedDayDetails && selectedDayDetails.date.getTime() === date.getTime()) {
       // Get updated payment due information
       const updatedPaymentsDue = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
+      const updatedClasses = getClassesForDay(date.getDay(), date);
 
-      // Update the selected day details with the updated payments
+      // Update the selected day details with the updated payments and classes
       setSelectedDayDetails({
         ...selectedDayDetails,
-        paymentsDue: updatedPaymentsDue
+        classes: updatedClasses,
+        paymentsDue: updatedPaymentsDue,
+        materials: selectedDayDetails.materials || {},
+        birthdays: selectedDayDetails.birthdays || []
       });
     }
-  }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, upcomingClasses, users, isDateInRelevantMonthRange, setSelectedDate, setSelectedDayDetails]);
+
+    // Force a refresh of the calendar by setting a new date object with the same value
+    setSelectedDate(new Date(date));
+  }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, upcomingClasses, users, isDateInRelevantMonthRange, getClassesForDay, setLoadedMonths]);
 
   // Add a function to fetch homework for a class and update the state
   const fetchHomeworkForClass = async (classId: string) => {
@@ -1078,6 +1111,7 @@ export const Dashboard = () => {
               onPaymentStatusChange={handlePaymentStatusChange}
               homeworkByClassId={homeworkByClassId}
               refreshHomework={refreshAllHomework}
+              completedPayments={completedPayments}
             />
           ) : (
             <div className="bg-white rounded-lg shadow p-6 text-center">

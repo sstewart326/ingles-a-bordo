@@ -9,10 +9,12 @@ import { styles, classNames } from '../styles/styleUtils';
 import { ClassMaterial, Class, User } from '../types/interfaces';
 import { getDocs, collection } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 
 const AdminMaterials = () => {
   const { language } = useLanguage();
   const t = useTranslation(language);
+  const { currentUser } = useAuthWithMasquerade();
   const [classes, setClasses] = useState<Class[]>([]);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [links, setLinks] = useState<string[]>([]);
@@ -39,8 +41,8 @@ const AdminMaterials = () => {
     try {
       setLoading(true);
 
-      // Fetch materials for the selected date
-      const materials = await getClassMaterials(selectedClass.id);
+      // Fetch materials for the selected date using teacherId
+      const materials = await getClassMaterials(selectedClass.id, date, currentUser?.uid);
       // Convert materials to include studentEmails if they don't have it
       const updatedMaterials = materials.map(material => ({
         ...material,
@@ -58,7 +60,7 @@ const AdminMaterials = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedClass, selectedDate]);
+  }, [selectedClass, selectedDate, currentUser?.uid]);
 
   useEffect(() => {
     if (selectedClass && selectedDate) {
@@ -136,58 +138,40 @@ const AdminMaterials = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedClass) {
-      toast.error('Please select a class');
+    if (!selectedClass || !selectedDate) {
+      toast.error('Please select a class and date');
+      return;
+    }
+
+    if (!currentUser) {
+      toast.error('You must be logged in to upload materials');
       return;
     }
 
     if (!selectedFile && links.length === 0) {
-      toast.error('Please upload a file or add at least one link');
+      toast.error('Please add at least one file or link');
       return;
     }
 
-    try {
-      setUploading(true);
-      if (selectedFile) {
-        const validationError = await validateFile(selectedFile);
-        if (validationError) {
-          toast.error(validationError);
-          return;
-        }
-      }
+    setUploading(true);
 
-      // Extract the date components directly to avoid timezone issues
-      const year = selectedDate.getFullYear();
-      const month = selectedDate.getMonth();
-      const day = selectedDate.getDate();
-      
-      // Create a new date using UTC to avoid timezone issues
-      const classDateTime = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
-      
-      // Validate the date is valid before proceeding
-      if (isNaN(classDateTime.getTime())) {
-        toast.error('Invalid class date selected');
-        return;
-      }
-      
-      // Check if the selected date matches the class schedule
-      // Use type assertion since the Class interface doesn't include scheduleType and schedules
-      const classWithSchedules = selectedClass as unknown as {
-        scheduleType?: string;
-        schedules?: Array<{ dayOfWeek: number; startTime: string; endTime: string }>;
-        dayOfWeek: number;
-      };
-      
-      if (classWithSchedules.scheduleType === 'multiple' && Array.isArray(classWithSchedules.schedules)) {
+    try {
+      // Create a new date at noon UTC to avoid timezone issues
+      const classDateTime = new Date(Date.UTC(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        12, 0, 0, 0
+      ));
+
+      // Warn if the selected date doesn't match the class schedule
+      if (selectedClass.schedules) {
         // For classes with multiple schedules
-        const matchingSchedule = classWithSchedules.schedules.find(
-          schedule => schedule.dayOfWeek === selectedDate.getDay()
-        );
-        
+        const matchingSchedule = selectedClass.schedules.find(s => s.dayOfWeek === selectedDate.getDay());
         if (!matchingSchedule) {
           console.warn(
             `Warning: Selected date (${selectedDate.toDateString()}) has day of week ${selectedDate.getDay()}, ` +
-            `but class schedules are for days: ${classWithSchedules.schedules.map(s => s.dayOfWeek).join(', ')}`
+            `but class schedules are for days: ${selectedClass.schedules.map(s => s.dayOfWeek).join(', ')}`
           );
         }
       } else if (selectedClass.dayOfWeek !== selectedDate.getDay()) {
@@ -201,9 +185,10 @@ const AdminMaterials = () => {
       await addClassMaterials(
         selectedClass.id,
         classDateTime,
-        selectedClass.studentEmails,
         selectedFile ? [selectedFile] : undefined,
-        links
+        links,
+        selectedClass.studentEmails,
+        currentUser.uid
       );
       toast.success('Materials uploaded successfully');
       await fetchMaterialsAndStudents();
