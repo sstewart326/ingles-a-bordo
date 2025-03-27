@@ -4,6 +4,8 @@ export interface Payment {
   id: string;
   userId: string;
   classSessionId: string;
+  teacherId: string;
+  month: string;
   amount: number;
   currency: string;
   status: 'completed';

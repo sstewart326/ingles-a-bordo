@@ -22,9 +22,28 @@ class PaymentsCache {
     const classStr = classSessionIds ? classSessionIds.sort().join(',') : '';
     return `${dateStr}|${classStr}`;
   }
+  
+  private createTeacherMonthKey(teacherId: string, month: string): string {
+    return `teacher_${teacherId}_month_${month}`;
+  }
 
   get(dates: Date[], classSessionIds?: string[]): Payment[] | null {
     const key = this.createKey(dates, classSessionIds);
+    const entry = this.cache.get(key);
+    
+    if (!entry) return null;
+    
+    // Check if cache has expired
+    if (Date.now() - entry.timestamp > entry.expiresIn) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data;
+  }
+  
+  getByTeacherMonth(teacherId: string, month: string): Payment[] | null {
+    const key = this.createTeacherMonthKey(teacherId, month);
     const entry = this.cache.get(key);
     
     if (!entry) return null;
@@ -46,6 +65,15 @@ class PaymentsCache {
       expiresIn
     });
   }
+  
+  setByTeacherMonth(teacherId: string, month: string, payments: Payment[], expiresIn: number = this.DEFAULT_EXPIRY): void {
+    const key = this.createTeacherMonthKey(teacherId, month);
+    this.cache.set(key, {
+      data: payments,
+      timestamp: Date.now(),
+      expiresIn
+    });
+  }
 
   invalidate(): void {
     this.cache.clear();
@@ -53,6 +81,103 @@ class PaymentsCache {
 }
 
 const paymentsCache = new PaymentsCache();
+
+// Add in-flight promise tracking
+const inFlightQueries: Map<string, Promise<Payment[]>> = new Map();
+
+// Create a key for the in-flight query map
+const createInFlightKey = (teacherId: string, monthKey: string): string => {
+  return `${teacherId}_${monthKey}`;
+};
+
+// Add a new function to get payments by teacherId and month
+export const getPaymentsByTeacherAndMonth = async (
+  teacherId: string,
+  date: Date
+): Promise<Payment[]> => {
+  try {
+    // Create month key in format YYYY-MM
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Create cache key
+    const cacheKey = createInFlightKey(teacherId, monthKey);
+    
+    // Check if there's an in-flight query
+    const inFlightQuery = inFlightQueries.get(cacheKey);
+    if (inFlightQuery) {
+      logQuery('Reusing in-flight payment query', { teacherId, monthKey });
+      return inFlightQuery;
+    }
+    
+    // Check cache first
+    const cachedPayments = paymentsCache.getByTeacherMonth(teacherId, monthKey);
+    if (cachedPayments) {
+      logQuery('Cache hit for teacher payments', { teacherId, monthKey });
+      return cachedPayments;
+    }
+    
+    logQuery('Querying payments by teacher and month', { teacherId, monthKey });
+    
+    // Create the promise for the query
+    const queryPromise = (async () => {
+      try {
+        // Query payments by teacherId and month
+        const paymentsQuery = query(
+          collection(db, PAYMENTS_COLLECTION),
+          where('teacherId', '==', teacherId),
+          where('month', '==', monthKey)
+        );
+        
+        const querySnapshot = await getDocs(paymentsQuery);
+        
+        const payments: Payment[] = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          
+          // Convert Timestamp fields to Date objects
+          const dueDateObj = data.dueDate instanceof Timestamp ? 
+            data.dueDate.toDate() : new Date(data.dueDate);
+          const completedAtObj = data.completedAt instanceof Timestamp ? 
+            data.completedAt.toDate() : new Date(data.completedAt);
+          const createdAtObj = data.createdAt instanceof Timestamp ? 
+            data.createdAt.toDate() : new Date(data.createdAt);
+          const updatedAtObj = data.updatedAt instanceof Timestamp ? 
+            data.updatedAt.toDate() : new Date(data.updatedAt);
+          
+          return {
+            ...data,
+            id: doc.id,
+            dueDate: data.dueDate,
+            completedAt: data.completedAt,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt,
+            dueDateObj,
+            completedAtObj,
+            createdAtObj,
+            updatedAtObj
+          } as unknown as Payment;
+        });
+        
+        logQuery('Payment query results by teacher and month', { totalPayments: payments.length });
+        
+        // Store in cache before returning
+        paymentsCache.setByTeacherMonth(teacherId, monthKey, payments);
+        
+        return payments;
+      } finally {
+        // Remove from in-flight queries when done
+        inFlightQueries.delete(cacheKey);
+      }
+    })();
+    
+    // Store the promise in the in-flight queries map
+    inFlightQueries.set(cacheKey, queryPromise);
+    
+    return queryPromise;
+  } catch (error) {
+    console.error('Error getting payments by teacher and month:', error);
+    return [];
+  }
+};
 
 export const checkExistingPayment = async (userId: string, classSessionId: string, dueDate: Date): Promise<Payment | null> => {
   const startOfDay = new Date(dueDate);
@@ -135,6 +260,7 @@ export const createPayment = async (
   amount: number,
   currency: string,
   dueDate: Date,
+  teacherId: string,
   completedAt?: Date
 ): Promise<string> => {
   // Check if payment already exists
@@ -146,10 +272,15 @@ export const createPayment = async (
   // Extract the base class ID for consistency with multiple schedule classes
   const baseClassId = classSessionId.split('-')[0];
   
+  // Create month key for efficient querying
+  const monthKey = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}`;
+  
   // Use the base class ID for storing the payment to avoid duplicates across different days
   const paymentData: Omit<Payment, 'id'> = {
     userId,
     classSessionId: baseClassId, // Store with the base class ID
+    teacherId, // Add teacherId for efficient lookups
+    month: monthKey, // Add month key for efficient lookups
     amount,
     currency,
     status: 'completed',
@@ -169,6 +300,7 @@ export const createPayment = async (
   return docRef.id;
 };
 
+// Keep existing functions but they will be deprecated
 export const getPaymentsForDates = async (dates: Date[], classSessionIds?: string[]): Promise<Payment[]> => {
   // Check cache first
   const cachedPayments = paymentsCache.get(dates, classSessionIds);
@@ -238,76 +370,61 @@ export const getPaymentsByDueDate = async (dueDate: Date, classSessionId: string
   // If the classSessionId contains a day suffix, we need to check for both the original and base IDs
   const hasMultipleSchedules = classSessionId !== baseClassId;
   
-  let querySnapshot;
+  let paymentsQuery;
   
   if (hasMultipleSchedules) {
     logQuery('Querying payments for multiple schedules', { dueDate, classSessionId, baseClassId });
     // For multiple schedules, check for payments with either the specific day ID or the base ID
-    const q1 = query(
+    paymentsQuery = query(
       collection(db, PAYMENTS_COLLECTION),
-      where('classSessionId', '==', classSessionId),
+      where('classSessionId', 'in', [classSessionId, baseClassId]),
       where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
       where('dueDate', '<=', Timestamp.fromDate(endOfDay))
     );
-    
-    const q2 = query(
-      collection(db, PAYMENTS_COLLECTION),
-      where('classSessionId', '==', baseClassId),
-      where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
-      where('dueDate', '<=', Timestamp.fromDate(endOfDay))
-    );
-    
-    // Execute both queries
-    const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-    logQuery('Multiple schedule payment results', {
-      snapshot1Size: snapshot1.size,
-      snapshot2Size: snapshot2.size
-    });
-    
-    // Combine and deduplicate results
-    const allDocs = [...snapshot1.docs, ...snapshot2.docs];
-    const uniquePayments = new Map<string, Payment>();
-    
-    allDocs.forEach(doc => {
-      const payment = { id: doc.id, ...doc.data() } as Payment;
-      uniquePayments.set(doc.id, payment);
-    });
-    
-    return Array.from(uniquePayments.values());
   } else {
+    // For single schedule classes, just check for the exact ID
     logQuery('Querying payments for single schedule', { dueDate, classSessionId });
-    const q = query(
+    paymentsQuery = query(
       collection(db, PAYMENTS_COLLECTION),
       where('classSessionId', '==', classSessionId),
       where('dueDate', '>=', Timestamp.fromDate(startOfDay)),
       where('dueDate', '<=', Timestamp.fromDate(endOfDay))
     );
-    
-    querySnapshot = await getDocs(q);
-    logQuery('Single schedule payment results', { size: querySnapshot.size });
-    
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Payment);
   }
+  
+  const querySnapshot = await getDocs(paymentsQuery);
+  logQuery('Payment query result by due date', { size: querySnapshot.size });
+  
+  const payments: Payment[] = [];
+  querySnapshot.forEach(doc => {
+    payments.push({ id: doc.id, ...doc.data() } as Payment);
+  });
+  
+  return payments;
 };
 
 export const getPaymentById = async (paymentId: string): Promise<Payment | null> => {
-  logQuery('Getting payment by ID', { paymentId });
-  const docRef = doc(db, PAYMENTS_COLLECTION, paymentId);
-  const docSnap = await getDoc(docRef);
-  
-  if (!docSnap.exists()) {
+  try {
+    const docRef = doc(db, PAYMENTS_COLLECTION, paymentId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as Payment;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting payment by ID:', error);
     return null;
   }
-  
-  return { id: docSnap.id, ...docSnap.data() } as Payment;
 };
 
 export const deletePayment = async (paymentId: string): Promise<void> => {
-  logQuery('Deleting payment', { paymentId });
-  const docRef = doc(db, PAYMENTS_COLLECTION, paymentId);
-  await deleteDoc(docRef);
-  
-  // Invalidate cache when payment is deleted
-  logQuery('Invalidating payments cache');
-  paymentsCache.invalidate();
+  try {
+    await deleteDoc(doc(db, PAYMENTS_COLLECTION, paymentId));
+    // Invalidate cache when payment is deleted
+    paymentsCache.invalidate();
+  } catch (error) {
+    console.error('Error deleting payment:', error);
+    throw error;
+  }
 }; 

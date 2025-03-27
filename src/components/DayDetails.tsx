@@ -10,6 +10,7 @@ import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
 import { ClassSection } from './ClassSection';
 import { User } from '../types/interfaces';
 import { formatDateWithShortDay } from '../utils/dateUtils';
+import { useAuth } from '../hooks/useAuth';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -52,6 +53,13 @@ interface DayDetailsProps {
   isLoadingPayments?: boolean;
 }
 
+interface PendingPaymentAction {
+  userId: string;
+  classSession: ClassSession;
+  amount: number;
+  currency: string;
+}
+
 export const DayDetails = ({
   selectedDayDetails,
   setSelectedDayDetails,
@@ -92,12 +100,10 @@ export const DayDetails = ({
   const [loadingPaymentIncomplete, setLoadingPaymentIncomplete] = useState<{[key: string]: boolean}>({});
   const [showCompletionDateModal, setShowCompletionDateModal] = useState(false);
   const [selectedCompletionDate, setSelectedCompletionDate] = useState<Date>(new Date());
-  const [pendingPaymentAction, setPendingPaymentAction] = useState<{
-    userId: string;
-    classSession: ClassSession;
-  } | null>(null);
+  const [pendingPaymentAction, setPendingPaymentAction] = useState<PendingPaymentAction | null>(null);
   const CLASSES_PER_PAGE = 3;
   const detailsContainerRef = useRef<HTMLDivElement>(null);
+  const { currentUser } = useAuth();
 
   // Function to get day name from dayOfWeek number
   const getDayName = (dayOfWeek: number | undefined): string => {
@@ -172,30 +178,27 @@ export const DayDetails = ({
   }, [selectedDayDetails]);
 
   const handleMarkPaymentCompleted = async (userId: string, classSession: ClassSession) => {
-    setPendingPaymentAction({ userId, classSession });
+    setPendingPaymentAction({
+      userId,
+      classSession,
+      amount: classSession.paymentConfig?.amount || 0,
+      currency: classSession.paymentConfig?.currency || 'USD'
+    });
     setSelectedCompletionDate(new Date());
     setShowCompletionDateModal(true);
   };
 
   const handleConfirmPaymentCompletion = async () => {
-    if (!pendingPaymentAction || !selectedDayDetails) return;
-    const { userId, classSession } = pendingPaymentAction;
-
     try {
+      if (!pendingPaymentAction || !selectedDayDetails) return;
+      
+      const { userId, classSession, amount, currency } = pendingPaymentAction;
       const paymentKey = `${userId}-${classSession.id}`;
+      
       setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: true }));
       
-      console.log('Starting payment completion...', { userId, classSessionId: classSession.id });
-      
-      // Get amount and currency from class configuration
-      const amount = classSession.paymentConfig?.amount || 0;
-      const currency = classSession.paymentConfig?.currency || 'USD';
-      
-      console.log('Payment details:', { amount, currency });
-      
-      // Find the user in the paymentsDue array to get their email
       const userPaymentDue = selectedDayDetails.paymentsDue.find(
-        payment => payment.classSession.id === classSession.id && payment.user.email === userId
+        payment => payment.user.email === userId && payment.classSession.id === classSession.id
       );
       
       if (!userPaymentDue) {
@@ -207,13 +210,14 @@ export const DayDetails = ({
       // Extract the base class ID for consistency with multiple schedule classes
       const baseClassId = getBaseClassId(classSession.id);
       
-      // Use the user's email as the userId since that's what we have
+      // Get the current user ID for the teacherId parameter
       await createPayment(
         userPaymentDue.user.email,
         baseClassId,
         amount,
         currency,
         selectedDayDetails.date,
+        currentUser?.uid || '', // Add teacherId parameter
         selectedCompletionDate
       );
       
@@ -227,8 +231,10 @@ export const DayDetails = ({
       setPendingPaymentAction(null);
     } catch (error) {
       console.error('Error marking payment completed:', error);
-      const paymentKey = `${userId}-${classSession.id}`;
-      setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
+      if (pendingPaymentAction) {
+        const paymentKey = `${pendingPaymentAction.userId}-${pendingPaymentAction.classSession.id}`;
+        setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
+      }
       setShowCompletionDateModal(false);
       setPendingPaymentAction(null);
     }
@@ -681,7 +687,42 @@ export const DayDetails = ({
           <h3 className="text-lg font-medium mb-4">{t.paymentsDue}</h3>
           <div className="space-y-4">
             {paginatedPayments.map(({ user, classSession }) => {
-              const payment = completedPayments[classSession.id]?.find(p => p.userId === user.email);
+              // Get the selected date from context
+              const selectedDateStart = new Date(selectedDayDetails.date);
+              selectedDateStart.setHours(0, 0, 0, 0);
+              const selectedDateEnd = new Date(selectedDayDetails.date);
+              selectedDateEnd.setHours(23, 59, 59, 999);
+              
+              // Find payment that matches classSessionId, userId, and has a dueDate that falls on the selected date
+              const payment = completedPayments[classSession.id]?.find(p => {
+                // First check if this payment is for the correct user
+                if (p.userId !== user.email) return false;
+                
+                // Then check if the payment's due date matches the selected date
+                if (p.dueDate) {
+                  // Convert Firebase Timestamp to JavaScript Date
+                  let dueDateObj;
+                  if (typeof p.dueDate === 'object' && 'seconds' in p.dueDate) {
+                    // If it's a Firestore Timestamp
+                    dueDateObj = new Date(p.dueDate.seconds * 1000);
+                  } else if (Object.prototype.toString.call(p.dueDate) === '[object Date]') {
+                    // If it's already a Date object
+                    dueDateObj = p.dueDate as unknown as Date;
+                  } else {
+                    // If it's a date string or timestamp
+                    dueDateObj = new Date(p.dueDate as any);
+                  }
+                  
+                  // Reset hours to compare just the date
+                  dueDateObj.setHours(0, 0, 0, 0);
+                  
+                  // Compare the dates
+                  return dueDateObj.getTime() === selectedDateStart.getTime();
+                }
+                
+                return false;
+              });
+              
               const completed = !!payment;
               return (
                 <div
@@ -749,7 +790,43 @@ export const DayDetails = ({
                           </div>
                           {classSession.paymentConfig?.amount !== undefined && classSession.paymentConfig.amount > 0 && classSession.paymentConfig?.currency && (
                             <div className="mt-1">
-                              {completedPayments[classSession.id]?.find(p => p.userId === user.email) ? t.amountPaid : t.amountDue}: {classSession.paymentConfig.currency} {classSession.paymentConfig.amount.toFixed(2)}
+                              {(() => {
+                                // Get the selected date from context
+                                const selectedDateStart = new Date(selectedDayDetails.date);
+                                selectedDateStart.setHours(0, 0, 0, 0);
+                                
+                                // Find valid payment with matching date
+                                const paymentForAmount = completedPayments[classSession.id]?.find(p => {
+                                  // First check if this payment is for the correct user
+                                  if (p.userId !== user.email) return false;
+                                  
+                                  // Then check if the payment's due date matches the selected date
+                                  if (p.dueDate) {
+                                    // Convert Firebase Timestamp to JavaScript Date
+                                    let dueDateObj;
+                                    if (typeof p.dueDate === 'object' && 'seconds' in p.dueDate) {
+                                      // If it's a Firestore Timestamp
+                                      dueDateObj = new Date(p.dueDate.seconds * 1000);
+                                    } else if (Object.prototype.toString.call(p.dueDate) === '[object Date]') {
+                                      // If it's already a Date object
+                                      dueDateObj = p.dueDate as unknown as Date;
+                                    } else {
+                                      // If it's a date string or timestamp
+                                      dueDateObj = new Date(p.dueDate as any);
+                                    }
+                                    
+                                    // Reset hours to compare just the date
+                                    dueDateObj.setHours(0, 0, 0, 0);
+                                    
+                                    // Compare the dates
+                                    return dueDateObj.getTime() === selectedDateStart.getTime();
+                                  }
+                                  
+                                  return false;
+                                });
+                                
+                                return paymentForAmount ? t.amountPaid : t.amountDue;
+                              })()}: {classSession.paymentConfig.currency} {classSession.paymentConfig.amount.toFixed(2)}
                             </div>
                           )}
                           

@@ -3,9 +3,10 @@ import { Calendar } from './Calendar';
 import { CalendarDay } from './CalendarDay';
 import { ClassSession } from '../utils/scheduleUtils';
 import { getPaymentsDueForDay } from '../utils/paymentUtils';
-import { getPaymentsForDates } from '../services/paymentService';
+import { getPaymentsByTeacherAndMonth } from '../services/paymentService';
 import { Payment } from '../types/payment';
 import { User } from '../types/interfaces';
+import { useAuth } from '../hooks/useAuth';
 
 interface CalendarSectionProps {
   selectedDate: Date;
@@ -26,6 +27,7 @@ export const CalendarSection = ({
   getClassesForDay,
   users
 }: CalendarSectionProps) => {
+  const { currentUser } = useAuth();
   const [completedPayments, setCompletedPayments] = useState<Payment[]>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
   const previousClassMonthRef = useRef<string>('');
@@ -33,13 +35,11 @@ export const CalendarSection = ({
   const calendarClassesRef = useRef<Record<string, ClassSession[]>>({});
   const [monthPaymentDueDates, setMonthPaymentDueDates] = useState<{
     datesWithPayments: Date[];
-    classSessionIds: string[];
-  }>({ datesWithPayments: [], classSessionIds: [] });
+  }>({ datesWithPayments: [] });
 
   // Pre-calculate all payment due dates for the month
   useEffect(() => {
     const datesWithPayments: Date[] = [];
-    const classSessionIds = new Set<string>();
     
     const firstDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
     const lastDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
@@ -53,13 +53,11 @@ export const CalendarSection = ({
       );
       if (paymentsDue.length > 0) {
         datesWithPayments.push(new Date(date));
-        paymentsDue.forEach(({ classSession }) => classSessionIds.add(classSession.id));
       }
     }
     
     setMonthPaymentDueDates({
-      datesWithPayments,
-      classSessionIds: Array.from(classSessionIds)
+      datesWithPayments
     });
   }, [selectedDate, upcomingClasses, users, isDateInRelevantMonthRange]);
 
@@ -89,8 +87,8 @@ export const CalendarSection = ({
     const currentMonth = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}`;
     
     const fetchMonthPayments = async () => {
-      // Don't fetch if we're already loading or if there are no payment dates
-      if (isLoadingPayments || monthPaymentDueDates.datesWithPayments.length === 0) {
+      // Don't fetch if we're already loading or if we don't have a user ID
+      if (isLoadingPayments || !currentUser?.uid) {
         setCompletedPayments([]);
         setIsLoadingPayments(false);
         return;
@@ -104,9 +102,10 @@ export const CalendarSection = ({
       setIsLoadingPayments(true);
       
       try {
-        const payments = await getPaymentsForDates(
-          monthPaymentDueDates.datesWithPayments,
-          monthPaymentDueDates.classSessionIds
+        // Use the new teacher-based lookup, more efficient
+        const payments = await getPaymentsByTeacherAndMonth(
+          currentUser.uid,
+          selectedDate
         );
         setCompletedPayments(payments);
         previousPaymentMonthRef.current = currentMonth;
@@ -119,7 +118,7 @@ export const CalendarSection = ({
     };
 
     fetchMonthPayments();
-  }, [selectedDate, monthPaymentDueDates]);
+  }, [selectedDate, currentUser?.uid, isLoadingPayments]);
 
   const handleDayClick = useCallback((date: Date) => {
     const classes = getClassesForDayWithCache(date);

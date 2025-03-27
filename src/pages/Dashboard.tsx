@@ -176,6 +176,42 @@ export const Dashboard = () => {
         });
       }
 
+      // Fetch payments for the selected date
+      const fetchPayments = async () => {
+        try {
+          // Import the getPaymentsByTeacherAndMonth function
+          const { getPaymentsByTeacherAndMonth } = await import('../services/paymentService');
+          
+          // Only fetch if we have a teacher ID
+          if (currentUser?.uid) {
+            // Fetch payments for the teacher and this month
+            const payments = await getPaymentsByTeacherAndMonth(currentUser.uid, date);
+            
+            // Group payments by classSessionId
+            const newCompletedPayments: Record<string, Payment[]> = {};
+            
+            payments.forEach(payment => {
+              if (payment.classSessionId) {
+                if (!newCompletedPayments[payment.classSessionId]) {
+                  newCompletedPayments[payment.classSessionId] = [];
+                }
+                newCompletedPayments[payment.classSessionId].push(payment);
+              }
+            });
+            
+            // Update state with the fetched payments
+            setCompletedPayments(newCompletedPayments);
+          }
+        } catch (error) {
+          console.error('Error fetching payments:', error);
+          // In case of error, ensure we have an empty object
+          setCompletedPayments({});
+        }
+      };
+      
+      // Call the function to fetch payments
+      fetchPayments();
+
       setSelectedDayDetails({
         date,
         classes: updatedClasses,
@@ -226,7 +262,9 @@ export const Dashboard = () => {
     isDateInRelevantMonthRange,
     setLoadedMaterialMonths,
     setSelectedDayDetails,
-    currentUser
+    currentUser,
+    classMaterials,
+    setCompletedPayments
   ]);
 
   // Create a wrapper function that matches the expected signature for CalendarSection
@@ -952,6 +990,33 @@ export const Dashboard = () => {
       const updatedPaymentsDue = getPaymentsDueForDay(date, upcomingClasses, users, isDateInRelevantMonthRange);
       const updatedClasses = getClassesForDay(date.getDay(), date);
 
+      // Also refresh the completed payments
+      try {
+        const { getPaymentsByTeacherAndMonth } = await import('../services/paymentService');
+        
+        // Only fetch if we have a teacher ID
+        if (currentUser?.uid) {
+          // Fetch payments for the teacher and this month
+          const payments = await getPaymentsByTeacherAndMonth(currentUser.uid, date);
+          
+          // Group payments by classSessionId
+          const newCompletedPayments: Record<string, Payment[]> = {};
+          
+          payments.forEach(payment => {
+            if (payment.classSessionId) {
+              if (!newCompletedPayments[payment.classSessionId]) {
+                newCompletedPayments[payment.classSessionId] = [];
+              }
+              newCompletedPayments[payment.classSessionId].push(payment);
+            }
+          });
+          
+          setCompletedPayments(newCompletedPayments);
+        }
+      } catch (error) {
+        console.error('Error refreshing payments:', error);
+      }
+
       // Update the selected day details with the updated payments and classes
       setSelectedDayDetails({
         ...selectedDayDetails,
@@ -964,7 +1029,7 @@ export const Dashboard = () => {
 
     // Force a refresh of the calendar by setting a new date object with the same value
     setSelectedDate(new Date(date));
-  }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, upcomingClasses, users, isDateInRelevantMonthRange, getClassesForDay, setLoadedMonths]);
+  }, [fetchClasses, getMonthKey, loadedMonths, selectedDayDetails, upcomingClasses, users, isDateInRelevantMonthRange, getClassesForDay, setLoadedMonths, setCompletedPayments, currentUser]);
 
   // Add a function to fetch homework for a class and update the state
   const fetchHomeworkForClass = async (classId: string) => {
@@ -1080,6 +1145,7 @@ export const Dashboard = () => {
             isDateInRelevantMonthRange={isDateInRelevantMonthRange}
             getClassesForDay={getClassesForDay}
             users={users}
+            teacherId={currentUser?.uid || ''}
           />
         </div>
 

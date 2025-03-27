@@ -96,6 +96,14 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "teacherId", "order": "ASCENDING" },
+        { "fieldPath": "month", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

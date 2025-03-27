@@ -29,9 +29,41 @@ export function CalendarDay({
 
   // Check if all payments for this day are completed
   const allPaymentsCompleted = isPaymentDay && paymentsDue.every(({ user, classSession }) => {
-    return completedPayments.some(payment => 
-      payment.userId === user.email && payment.classSessionId === classSession.id
-    );
+    // Start by getting the date in midnight form for comparison
+    const selectedDateStart = new Date(date);
+    selectedDateStart.setHours(0, 0, 0, 0);
+    
+    return completedPayments.some(payment => {
+      // First check if this payment is for the correct user and class
+      if (payment.userId !== user.email || payment.classSessionId !== classSession.id) {
+        return false;
+      }
+      
+      // Then check if the payment's due date matches the calendar day
+      if (payment.dueDate) {
+        // Convert Firebase Timestamp to JavaScript Date
+        let dueDateObj;
+        if (typeof payment.dueDate === 'object' && 'seconds' in payment.dueDate) {
+          // If it's a Firestore Timestamp
+          dueDateObj = new Date(payment.dueDate.seconds * 1000);
+        } else if (Object.prototype.toString.call(payment.dueDate) === '[object Date]') {
+          // If it's already a Date object
+          dueDateObj = payment.dueDate as unknown as Date;
+        } else {
+          // If it's a date string or timestamp
+          dueDateObj = new Date(payment.dueDate as any);
+        }
+        
+        // Reset hours to compare just the date
+        dueDateObj.setHours(0, 0, 0, 0);
+        
+        // Compare the dates
+        return dueDateObj.getTime() === selectedDateStart.getTime();
+      }
+      
+      // If no date info is available, fall back to just checking ID matches
+      return true;
+    });
   });
 
   // Handle day click
@@ -150,10 +182,42 @@ export function CalendarDay({
             >
               {allPaymentsCompleted ? t.allPaymentsCompleted : 
                 (() => {
+                  // Get the selected date for date comparison
+                  const selectedDateStart = new Date(date);
+                  selectedDateStart.setHours(0, 0, 0, 0);
+                  
                   const pendingPayments = paymentsDue.filter(({ user, classSession }) => 
-                    !completedPayments.some(payment => 
-                      payment.userId === user.email && payment.classSessionId === classSession.id
-                    )
+                    !completedPayments.some(payment => {
+                      // First check if this payment is for the correct user and class
+                      if (payment.userId !== user.email || payment.classSessionId !== classSession.id) {
+                        return false;
+                      }
+                      
+                      // Then check if the payment's due date matches the calendar day
+                      if (payment.dueDate) {
+                        // Convert Firebase Timestamp to JavaScript Date
+                        let dueDateObj;
+                        if (typeof payment.dueDate === 'object' && 'seconds' in payment.dueDate) {
+                          // If it's a Firestore Timestamp
+                          dueDateObj = new Date(payment.dueDate.seconds * 1000);
+                        } else if (Object.prototype.toString.call(payment.dueDate) === '[object Date]') {
+                          // If it's already a Date object
+                          dueDateObj = payment.dueDate as unknown as Date;
+                        } else {
+                          // If it's a date string or timestamp
+                          dueDateObj = new Date(payment.dueDate as any);
+                        }
+                        
+                        // Reset hours to compare just the date
+                        dueDateObj.setHours(0, 0, 0, 0);
+                        
+                        // Compare the dates
+                        return dueDateObj.getTime() === selectedDateStart.getTime();
+                      }
+                      
+                      // If no due date, just check the IDs
+                      return true;
+                    })
                   ).length;
                   return `${pendingPayments} ${pendingPayments === 1 ? t.paymentDue : t.paymentsDue}`;
                 })()
