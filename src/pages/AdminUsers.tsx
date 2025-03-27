@@ -615,7 +615,7 @@ export const AdminUsers = () => {
           </>
         ) : (
           <>
-            <div className="relative">
+            <div className="relative z-50 mb-8">
               <button
                 onClick={async () => {
                   try {
@@ -643,9 +643,9 @@ export const AdminUsers = () => {
                 <div className="relative inline-block">
                   <div className="group">
                     <InformationCircleIcon className="h-4 w-4 text-white/70 flex-shrink-0" />
-                    <div className="absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-normal text-center pointer-events-none">
+                    <div className="absolute top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 whitespace-normal text-center pointer-events-none">
                       {t.signupLinkExpires}
-                      <div className="absolute bottom-0 right-[60px] transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                      <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
                     </div>
                   </div>
                 </div>
@@ -823,7 +823,7 @@ export const AdminUsers = () => {
               
               <div className="table-container overflow-x-auto overflow-y-auto max-h-[600px] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-gray-500">
                 <table className="min-w-full divide-y divide-gray-200 table-fixed">
-                  <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+                  <thead className="bg-gray-50 sticky top-0 z-20 shadow-sm">
                     <tr>
                       <th scope="col" className={`${styles.table.header} w-1/4`}>
                         {t.name}
@@ -1031,7 +1031,7 @@ export const AdminUsers = () => {
                               </>
                             ) : (
                               <>
-                                <div className="relative">
+                                <div className="relative z-50 mb-8">
                                   <button
                                     onClick={async () => {
                                       try {
@@ -1059,9 +1059,9 @@ export const AdminUsers = () => {
                                     <div className="relative inline-block">
                                       <div className="group">
                                         <InformationCircleIcon className="h-4 w-4 text-white/70 flex-shrink-0" />
-                                        <div className="absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-normal text-center pointer-events-none">
+                                        <div className="absolute top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 whitespace-normal text-center pointer-events-none">
                                           {t.signupLinkExpires}
-                                          <div className="absolute bottom-0 right-[60px] transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                                          <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
                                         </div>
                                       </div>
                                     </div>
