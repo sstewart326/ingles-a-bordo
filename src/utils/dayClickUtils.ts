@@ -20,7 +20,7 @@ export const handleDayClickInternal = async (
     date,
     classes,
     users,
-    isDateInRelevantMonthRange || ((date: Date) => true)
+    isDateInRelevantMonthRange || ((_: Date) => true)
   );
   const materials: Record<string, ClassMaterial[]> = {};
   const completedPayments: Record<string, Payment[]> = {};

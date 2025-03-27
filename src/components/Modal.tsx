@@ -5,10 +5,9 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  paddingTop?: string; // Optional padding top value
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, paddingTop = '0px' }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
   if (!isOpen) return null;
 
   const modalContentRef = useRef<HTMLDivElement>(null);

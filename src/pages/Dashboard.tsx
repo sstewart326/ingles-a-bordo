@@ -91,9 +91,6 @@ export const Dashboard = () => {
       setSelectedDate(date);
     }
 
-    const monthKey = getMonthKey(date);
-    const materialsAlreadyLoaded = loadedMaterialMonths.has(monthKey);
-
     // Get birthdays for the selected date
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
@@ -1145,7 +1142,6 @@ export const Dashboard = () => {
             isDateInRelevantMonthRange={isDateInRelevantMonthRange}
             getClassesForDay={getClassesForDay}
             users={users}
-            teacherId={currentUser?.uid || ''}
           />
         </div>
 

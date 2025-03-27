@@ -27,7 +27,6 @@ import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { Class, SelectOption, User } from '../types/interfaces';
-import { formatDateWithShortDay } from '../utils/dateUtils';
 
 type SelectStyles = StylesConfig<SelectOption, true>;
 
@@ -145,7 +144,7 @@ export const AdminSchedule = () => {
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
   const [currentStep, setCurrentStep] = useState<'schedule' | 'payment'>('schedule');
 
-  const { setLoadedMonths } = useDashboardData();
+  const {} = useDashboardData();
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -240,11 +239,6 @@ export const AdminSchedule = () => {
       };
       
       const updatedSchedules = [...prev.schedules, newSchedule];
-      
-      // Check if the current start date's day of week is in the selected days
-      const currentStartDateDay = prev.startDate.getDay();
-      const selectedDays = updatedSchedules.map(schedule => schedule.dayOfWeek);
-      const isCurrentStartDateValid = selectedDays.includes(currentStartDateDay);
       
       return {
         ...prev,
@@ -1177,7 +1171,7 @@ export const AdminSchedule = () => {
         </div>
 
         {/* Add Class Form */}
-        <Modal isOpen={isModalOpen} onClose={handleCloseModal} paddingTop="20px">
+        <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
           <div className="max-w-4xl w-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-800">

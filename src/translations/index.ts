@@ -112,6 +112,7 @@ interface Translation {
   loading: string;
   error: string;
   success: string;
+  saving: string;
   of: string;
   page: string;
   total: string;
@@ -463,6 +464,7 @@ const translations: Record<Language, Translation> = {
     loading: 'Loading...',
     error: 'Error',
     success: 'Success',
+    saving: 'Saving...',
     of: 'of',
     page: 'Page',
     total: 'total',
@@ -812,6 +814,7 @@ const translations: Record<Language, Translation> = {
     loading: 'Carregando...',
     error: 'Erro',
     success: 'Sucesso',
+    saving: 'Salvando...',
     of: 'de',
     page: 'Página',
     total: 'total',

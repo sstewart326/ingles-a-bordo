@@ -33,33 +33,6 @@ export const CalendarSection = ({
   const previousClassMonthRef = useRef<string>('');
   const previousPaymentMonthRef = useRef<string>('');
   const calendarClassesRef = useRef<Record<string, ClassSession[]>>({});
-  const [monthPaymentDueDates, setMonthPaymentDueDates] = useState<{
-    datesWithPayments: Date[];
-  }>({ datesWithPayments: [] });
-
-  // Pre-calculate all payment due dates for the month
-  useEffect(() => {
-    const datesWithPayments: Date[] = [];
-    
-    const firstDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-    const lastDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-    
-    for (let date = new Date(firstDay); date <= lastDay; date.setDate(date.getDate() + 1)) {
-      const paymentsDue = getPaymentsDueForDay(
-        new Date(date), 
-        upcomingClasses, 
-        users, 
-        (date) => isDateInRelevantMonthRange(date, selectedDate)
-      );
-      if (paymentsDue.length > 0) {
-        datesWithPayments.push(new Date(date));
-      }
-    }
-    
-    setMonthPaymentDueDates({
-      datesWithPayments
-    });
-  }, [selectedDate, upcomingClasses, users, isDateInRelevantMonthRange]);
 
   // Cache classes for each day to prevent recalculation
   const getClassesForDayWithCache = useCallback((date: Date) => {

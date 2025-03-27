@@ -5,7 +5,7 @@ import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
 import { PencilIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Payment } from '../types/payment';
-import { createPayment, getPaymentsByDueDate, deletePayment, getPaymentsForDates } from '../services/paymentService';
+import { createPayment, deletePayment } from '../services/paymentService';
 import { updateClassPaymentLink, getClassById } from '../utils/firebaseUtils';
 import { ClassSection } from './ClassSection';
 import { User } from '../types/interfaces';
@@ -50,7 +50,6 @@ interface DayDetailsProps {
   refreshHomework?: () => Promise<void>;
   formatStudentNames: (emails: string[]) => string;
   completedPayments: Record<string, Payment[]>;
-  isLoadingPayments?: boolean;
 }
 
 interface PendingPaymentAction {
@@ -85,8 +84,7 @@ export const DayDetails = ({
   homeworkByClassId,
   refreshHomework,
   formatStudentNames,
-  completedPayments,
-  isLoadingPayments
+  completedPayments
 }: DayDetailsProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
