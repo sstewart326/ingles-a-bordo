@@ -22,23 +22,28 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, paddingTop = '
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 overflow-y-auto"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-y-auto"
       onClick={handleOverlayClick}
-      style={{ paddingTop }}
     >
       <div 
         ref={modalContentRef}
-        className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative my-4 mx-4"
-        style={{ maxHeight: 'calc(100vh - 100px)', overflowY: 'auto' }}
+        className="bg-white rounded-lg shadow-xl w-full max-w-lg relative"
+        style={{ 
+          maxHeight: 'calc(100vh - 2rem)',
+          marginTop: 'max(1rem, env(safe-area-inset-top))',
+          marginBottom: 'max(1rem, env(safe-area-inset-bottom))'
+        }}
       >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded-full p-1 z-10"
-          aria-label="Close modal"
-        >
-          <XMarkIcon className="h-5 w-5" />
-        </button>
-        {children}
+        <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 4rem)' }}>
+          <button
+            onClick={onClose}
+            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded-full p-1 z-[101]"
+            aria-label="Close modal"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+          {children}
+        </div>
       </div>
     </div>
   );
