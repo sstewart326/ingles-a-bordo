@@ -246,38 +246,74 @@ export const addHomework = async (
 const pendingHomeworkRequests: Map<string, Promise<Homework[]>> = new Map();
 const pendingSubmissionRequests: Map<string, Promise<HomeworkSubmission[]>> = new Map();
 const pendingSubmissionDetailRequests: Map<string, Promise<HomeworkSubmission | null>> = new Map();
+const pendingMonthlyHomeworkRequests: Map<string, Promise<Homework[]>> = new Map();
 
 // Get homework assignments for a specific month
 export const getHomeworkForMonth = async (classId: string, date: Date): Promise<Homework[]> => {
   try {
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const monthStr = date.toISOString().split('T')[0].substring(0, 7);
     
-    logQuery('Querying homework for month', { classId, month: date.toISOString().split('T')[0].substring(0, 7) });
-    const homeworkRef = collection(db, 'homework');
-    const q = query(
-      homeworkRef,
-      where('classId', '==', classId),
-      where('classDate', '>=', startOfMonth),
-      where('classDate', '<=', endOfMonth),
-      orderBy('classDate', 'asc')
-    );
-
-    const homeworkSnapshots = await getDocs(q);
-    logQuery('Homework query result', { classId, size: homeworkSnapshots.docs.length });
+    // Create a unique key for this request
+    const requestKey = `${classId}_${monthStr}`;
     
-    const homework = homeworkSnapshots.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        classDate: data.classDate.toDate(),
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate()
-      } as Homework;
-    });
+    // Check if we have a pending request for this data
+    const pendingRequest = pendingMonthlyHomeworkRequests.get(requestKey);
+    if (pendingRequest) {
+      logQuery('Reusing pending homework request', { classId, month: monthStr });
+      return pendingRequest;
+    }
+    
+    // Check cache first
+    const cacheKey = `${HOMEWORK_COLLECTION}_month_${requestKey}`;
+    const cached = getCached<Homework[]>(cacheKey);
+    if (cached) {
+      logQuery('Cache hit for monthly homework', { classId, month: monthStr });
+      return cached;
+    }
+    
+    // Create new request
+    logQuery('Querying homework for month', { classId, month: monthStr });
+    const promise = (async () => {
+      try {
+        const homeworkRef = collection(db, 'homework');
+        const q = query(
+          homeworkRef,
+          where('classId', '==', classId),
+          where('classDate', '>=', startOfMonth),
+          where('classDate', '<=', endOfMonth),
+          orderBy('classDate', 'asc')
+        );
 
-    return homework;
+        const homeworkSnapshots = await getDocs(q);
+        logQuery('Homework query result', { classId, size: homeworkSnapshots.docs.length });
+        
+        const homework = homeworkSnapshots.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            classDate: data.classDate.toDate(),
+            createdAt: data.createdAt?.toDate(),
+            updatedAt: data.updatedAt?.toDate()
+          } as Homework;
+        });
+
+        // Cache the results
+        setCached(cacheKey, homework);
+        
+        return homework;
+      } finally {
+        // Remove from pending requests in finally block to ensure it's always removed
+        pendingMonthlyHomeworkRequests.delete(requestKey);
+      }
+    })();
+    
+    // Store the pending request
+    pendingMonthlyHomeworkRequests.set(requestKey, promise);
+    
+    return promise;
   } catch (error) {
     logQuery('Error getting homework for month', error);
     throw error;
@@ -289,6 +325,7 @@ export const clearAllPendingRequests = (): void => {
   pendingHomeworkRequests.clear();
   pendingSubmissionRequests.clear();
   pendingSubmissionDetailRequests.clear();
+  pendingMonthlyHomeworkRequests.clear();
 };
 
 // Modify the cache invalidation to also clear all pending requests
@@ -300,10 +337,10 @@ export const invalidateHomeworkCache = () => {
   // Clear all pending requests
   clearAllPendingRequests();
   
-  // Also clear any student-specific caches
+  // Also clear any student-specific and monthly caches
   const cacheKeys = Object.keys(localStorage);
   cacheKeys.forEach(key => {
-    if (key.startsWith(`${HOMEWORK_COLLECTION}_student_`) || 
+    if (key.startsWith(`${HOMEWORK_COLLECTION}_`) || 
         key.startsWith(`${SUBMISSION_COLLECTION}_`)) {
       localStorage.removeItem(key);
     }
