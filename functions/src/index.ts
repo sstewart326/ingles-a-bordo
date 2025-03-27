@@ -8,6 +8,7 @@
  */
 
 import { onRequest } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import * as cors from 'cors';
@@ -1469,4 +1470,98 @@ export const getAllClassesForMonthHttp = onRequest({
       response.status(500).json({ error: 'Internal server error' });
     }
   });
+});
+
+// Create callable function for completing signup process
+export const completeSignupHttp = onCall({
+  region: REGION
+}, async (request) => {
+  try {
+    // Auth context is automatically verified
+    if (!request.auth) {
+      throw new Error('Unauthorized - No valid token provided');
+    }
+
+    const { email, uid, token } = request.data;
+
+    if (!email || !uid || !token) {
+      throw new Error('Email, UID, and token are required');
+    }
+
+    // Verify that the token UID matches the request UID
+    if (request.auth.uid !== uid) {
+      logger.error('Token UID does not match request UID', { tokenUid: request.auth.uid, requestUid: uid });
+      throw new Error('Unauthorized - Token mismatch');
+    }
+
+    logger.info('Starting signup completion', { email, uid });
+
+    // Verify the signup token
+    const tokenDoc = await admin.firestore().collection('signupTokens').doc(token).get();
+    if (!tokenDoc.exists || tokenDoc.data()?.used) {
+      logger.error('Invalid or used token', { token });
+      throw new Error('Invalid or used token');
+    }
+
+    // Find the pending user document
+    const pendingUserQuery = await admin.firestore()
+      .collection('users')
+      .where('email', '==', email)
+      .where('status', '==', 'pending')
+      .get();
+
+    if (pendingUserQuery.empty) {
+      logger.error('No pending user found', { email });
+      throw new Error('No pending user found');
+    }
+
+    const pendingUserDoc = pendingUserQuery.docs[0];
+    const currentData = pendingUserDoc.data();
+
+    try {
+      // Start a batch write to ensure atomicity
+      const batch = admin.firestore().batch();
+
+      if (currentData.isAdmin) {
+        // For admin users, create new document with auth UID
+        const newUserRef = admin.firestore().collection('users').doc(uid);
+        batch.set(newUserRef, {
+          uid,
+          email: currentData.email,
+          name: currentData.name,
+          isAdmin: currentData.isAdmin,
+          status: 'active',
+          createdAt: currentData.createdAt,
+          updatedAt: new Date().toISOString()
+        });
+        
+        // Delete the pending document
+        batch.delete(pendingUserDoc.ref);
+      } else {
+        // For non-admin users, update the pending document
+        batch.update(pendingUserDoc.ref, {
+          uid,
+          status: 'active',
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      // Mark token as used
+      batch.update(tokenDoc.ref, {
+        used: true,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Commit the batch
+      await batch.commit();
+      logger.info('Successfully completed signup', { email, uid });
+      return { success: true };
+    } catch (error) {
+      logger.error('Error during batch operations:', error);
+      throw error;
+    }
+  } catch (error) {
+    logger.error('Error in completeSignup:', error);
+    throw error;
+  }
 });

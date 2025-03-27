@@ -127,9 +127,8 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const fetchClasses = useCallback(async (targetDate: Date = new Date(), isInitialLoad: boolean = false, shouldBypassCache: boolean = false) => {
     if (!currentUser || adminLoading) return;
 
+    try {
       const monthsToLoad = getRelevantMonthKeys(targetDate);
-
-      // Filter out months that have already been loaded
       const newMonthsToLoad = monthsToLoad.filter(month => !loadedMonths.has(month));
 
       if (newMonthsToLoad.length > 0) {
@@ -137,33 +136,40 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         let userDocs: User[] = [];
         let combinedDailyClassMap: Record<string, any[]> = { ...dailyClassMap };
 
-        if (isAdmin) {
-          // For admin users, fetch data for all relevant months sequentially to prevent race conditions
-          for (const monthKey of newMonthsToLoad) {
-            const [year, month] = monthKey.split('-').map(Number);
-            const response = await getAllClassesForMonth(month, year, { bypassCache: shouldBypassCache });
-            if (response) {
-              // Merge the response data with existing data
-              transformedClasses = [...transformedClasses, ...response.classes];
-              if (response.users) {
-                userDocs = [...userDocs, ...response.users];
-              }
-              if (response.dailyClassMap) {
-                combinedDailyClassMap = {
-                  ...combinedDailyClassMap,
-                  ...response.dailyClassMap
-                };
+        // Only attempt admin data fetching if user is confirmed to be an admin
+        if (!adminLoading && isAdmin) {
+          try {
+            for (const monthKey of newMonthsToLoad) {
+              const [year, month] = monthKey.split('-').map(Number);
+              const response = await getAllClassesForMonth(month, year, { bypassCache: shouldBypassCache });
+              if (response) {
+                transformedClasses = [...transformedClasses, ...response.classes];
+                if (response.users) {
+                  userDocs = [...userDocs, ...response.users];
+                }
+                if (response.dailyClassMap) {
+                  combinedDailyClassMap = {
+                    ...combinedDailyClassMap,
+                    ...response.dailyClassMap
+                  };
+                }
               }
             }
+
+            // Only update admin-specific state if we successfully fetched admin data
+            if (transformedClasses.length > 0) {
+              setDailyClassMap(combinedDailyClassMap);
+              userDocs = Array.from(new Map(userDocs.map(user => [user.email, user])).values());
+            }
+          } catch (error) {
+            // Reset data and fall through to student data fetching
+            transformedClasses = [];
+            userDocs = [];
           }
+        }
 
-          // Update the dailyClassMap state
-          setDailyClassMap(combinedDailyClassMap);
-
-          // Remove duplicate users by email
-          userDocs = Array.from(new Map(userDocs.map(user => [user.email, user])).values());
-        } else {
-          // For non-admin users, use the original implementation but bypass cache
+        // Fetch student data if we're not an admin or if admin data fetch failed
+        if (!isAdmin || transformedClasses.length === 0) {
           const allClasses = await getCachedCollection<ClassSession>(
             'classes',
             [where('studentEmails', 'array-contains', currentUser.email)],
@@ -190,10 +196,12 @@ export const useDashboardData = (): UseDashboardDataReturn => {
             }
           });
 
-          // Fetch users
-          userDocs = await getCachedCollection<User>('users', [
-            where('email', 'in', Array.from(uniqueEmails))
-          ], { userId: currentUser.uid });
+          // Fetch users only if we have emails to look up
+          if (uniqueEmails.size > 0) {
+            userDocs = await getCachedCollection<User>('users', [
+              where('email', 'in', Array.from(uniqueEmails))
+            ], { userId: currentUser.uid });
+          }
         }
 
         // Process user data
@@ -284,6 +292,9 @@ export const useDashboardData = (): UseDashboardDataReturn => {
           selectedDate: targetDate
         });
       }
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
   }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails, loadedMonths, upcomingClasses, pastClasses, dailyClassMap]);
 
   const invalidateCache = useCallback(() => {

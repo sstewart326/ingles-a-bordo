@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { validateSignupToken, consumeSignupToken } from '../utils/signupLinks';
+import { validateSignupToken, ValidationResult } from '../utils/signupLinks';
 
 export const Signup = () => {
   const [searchParams] = useSearchParams();
@@ -12,6 +12,7 @@ export const Signup = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [validatingToken, setValidatingToken] = useState(true);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const navigate = useNavigate();
   const { signup, loginWithGoogle, clearAuthError } = useAuth();
 
@@ -61,21 +62,22 @@ export const Signup = () => {
       }
 
       try {
-        console.log('[POST-REDIRECT] Validating token after redirect:', {
-          token,
-          timestamp: new Date().toISOString()
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[POST-REDIRECT] Validating token after redirect:', { token, timestamp: new Date().toISOString() });
+        }
         
         const result = await validateSignupToken(token);
-        console.log('[POST-REDIRECT] Token validation result:', {
-          valid: result.valid,
-          email: result.email,
-          timestamp: new Date().toISOString()
-        });
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[POST-REDIRECT] Token validation result:', { 
+            valid: result.valid, 
+            email: result.email,
+            timestamp: new Date().toISOString() 
+          });
+        }
         
         if (!result.valid) {
-          setError('This signup link is invalid or has expired. Please contact your administrator.');
-          setValidatingToken(false);
+          navigate('/');
           return;
         }
 
@@ -83,6 +85,7 @@ export const Signup = () => {
           setEmail(result.email);
         }
         setName(result.name || '');
+        setValidationResult(result);
         setValidatingToken(false);
       } catch (err) {
         console.error('[POST-REDIRECT] Error validating token:', err);
@@ -92,7 +95,7 @@ export const Signup = () => {
     };
 
     validateToken();
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,9 +128,6 @@ export const Signup = () => {
 
       console.log('Creating account...');
       await signup(email, password, token);
-
-      // After successful signup, mark the token as used
-      await consumeSignupToken(token);
       
       console.log('Account created successfully');
       

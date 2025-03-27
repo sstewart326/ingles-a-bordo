@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect } from 'react';
-import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { logQuery } from '../utils/firebaseUtils';
@@ -26,74 +26,28 @@ export const AdminProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    // Check session storage first
-    const cachedIsAdmin = sessionStorage.getItem('isAdmin');
-    if (cachedIsAdmin !== null) {
-      setIsAdmin(cachedIsAdmin === 'true');
-      setLoading(false);
-      return;
-    }
-
-    const checkAdminStatus = async () => {
-      try {
-        // Try by UID first
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        logQuery('Checking admin status by UID', { uid: currentUser.uid });
-        const unsubscribe = onSnapshot(userDocRef, (doc) => {
-          logQuery('User document snapshot by UID', {
-            exists: doc.exists(),
-            data: doc.data()
-          });
-
-          if (doc.exists()) {
-            const userData = doc.data();
-            const isAdminUser = userData?.isAdmin === true;
-            logQuery('Setting admin status from UID document', { isAdmin: isAdminUser });
-            setIsAdmin(isAdminUser);
-            sessionStorage.setItem('isAdmin', isAdminUser.toString());
-            setLoading(false);
-            return;
-          }
-
-          // If no document found by UID, try by email
-          const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('email', '==', currentUser.email));
-          
-          logQuery('Checking admin status by email', { email: currentUser.email });
-          getDocs(q).then((querySnapshot) => {
-            logQuery('User document query by email result', {
-              empty: querySnapshot.empty,
-              size: querySnapshot.size
-            });
-
-            if (!querySnapshot.empty) {
-              const userDoc = querySnapshot.docs[0];
-              const userData = userDoc.data();
-              const isAdminUser = userData?.isAdmin === true;
-              logQuery('Setting admin status from email document', {
-                docId: userDoc.id,
-                isAdmin: isAdminUser
-              });
-              setIsAdmin(isAdminUser);
-              sessionStorage.setItem('isAdmin', isAdminUser.toString());
-            } else {
-              logQuery('No user document found by email');
-              setIsAdmin(false);
-              sessionStorage.setItem('isAdmin', 'false');
-            }
-            setLoading(false);
-          });
-        });
-
-        return unsubscribe;
-      } catch (error) {
-        logQuery('Error checking admin status', error);
+    // Set up real-time listener for admin status
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    logQuery('Setting up admin status listener', { uid: currentUser.uid });
+    
+    const unsubscribe = onSnapshot(userDocRef, (doc) => {
+      if (doc.exists()) {
+        const userData = doc.data();
+        const isAdminUser = userData?.isAdmin === true;
+        logQuery('Admin status updated', { isAdmin: isAdminUser });
+        setIsAdmin(isAdminUser);
+      } else {
+        logQuery('No user document found');
         setIsAdmin(false);
-        setLoading(false);
       }
-    };
+      setLoading(false);
+    }, (error) => {
+      logQuery('Error in admin status listener', error);
+      setIsAdmin(false);
+      setLoading(false);
+    });
 
-    checkAdminStatus();
+    return () => unsubscribe();
   }, [currentUser]);
 
   return (

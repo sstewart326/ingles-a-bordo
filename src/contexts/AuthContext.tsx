@@ -15,6 +15,8 @@ import { auth, db } from '../config/firebase';
 import { doc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { updateCachedDocument, deleteCachedDocument, setCachedDocument } from '../utils/firebaseUtils';
+import { functions } from '../config/firebase';
+import { httpsCallable } from 'firebase/functions';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -196,68 +198,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Now that we're authenticated, find the pending user document
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email), where('status', '==', 'pending'));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        // If no pending user found, delete the auth user we just created
-        await user.delete();
-        throw new Error('No pending user found');
-      }
-
-      const pendingUserDoc = querySnapshot.docs[0];
-      const currentData = pendingUserDoc.data();
-
       try {
-        // For admin users, create new document with auth UID and delete pending
-        if (currentData.isAdmin) {
-          const newUserData = {
-            uid: user.uid,
-            email: currentData.email,
-            name: currentData.name,
-            isAdmin: currentData.isAdmin,
-            status: 'active',
-            createdAt: currentData.createdAt,
-            updatedAt: new Date().toISOString()
-          };
+        // Call the Cloud Function using httpsCallable
+        const completeSignup = httpsCallable(functions, 'completeSignupHttp');
+        const result = await completeSignup({
+          email,
+          uid: user.uid,
+          token
+        });
 
-          // Create new document with auth UID
-          await setCachedDocument('users', user.uid, newUserData);
-          
-          // Delete the pending document
-          await deleteCachedDocument('users', pendingUserDoc.id);
-        } else {
-          // For non-admin users, update the pending document
-          const newUserData = {
-            uid: user.uid,
-            email: currentData.email,
-            name: currentData.name,
-            isAdmin: currentData.isAdmin,
-            status: 'active',
-            createdAt: currentData.createdAt,
-            updatedAt: new Date().toISOString()
-          };
-
-          // Update the pending document to active
-          await updateCachedDocument('users', pendingUserDoc.id, newUserData);
+        if (!result.data || (result.data as any).error) {
+          console.error('Signup completion failed:', result.data);
+          throw new Error((result.data as any).error || 'Failed to complete signup');
         }
 
-        // Mark the signup token as used
-        await updateDoc(doc(db, 'signupTokens', token), {
-          used: true,
-          updatedAt: new Date().toISOString()
-        });
+        // Set the current user and navigate to dashboard
+        setCurrentUser(user);
+        navigate('/dashboard');
 
         return userCredential;
       } catch (error) {
+        console.error('Error during signup completion:', error);
         // If anything fails after creating the auth user, delete it
         await user.delete();
         throw error;
       }
     } catch (error) {
+      console.error('Error during signup:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 

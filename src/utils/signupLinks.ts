@@ -9,7 +9,7 @@ export interface SignupTokenPayload {
   expiresAt: string;
 }
 
-interface ValidationResult {
+export interface ValidationResult {
   valid: boolean;
   email?: string;
   name?: string;
@@ -104,15 +104,6 @@ export const validateSignupToken = async (token?: string): Promise<ValidationRes
     logQuery('Token validation error', error);
     return { valid: false };
   }
-};
-
-// Consume a signup token (mark it as used)
-export const consumeSignupToken = async (token: string) => {
-  logQuery('Consuming signup token', { token });
-  const tokenRef = doc(db, 'signupTokens', token);
-  await updateDoc(tokenRef, {
-    used: true
-  });
 };
 
 // Extend the expiration date of a signup token
