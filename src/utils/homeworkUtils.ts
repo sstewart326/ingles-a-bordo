@@ -253,6 +253,7 @@ export const getHomeworkForMonth = async (classId: string, date: Date): Promise<
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     
+    logQuery('Querying homework for month', { classId, month: date.toISOString().split('T')[0].substring(0, 7) });
     const homeworkRef = collection(db, 'homework');
     const q = query(
       homeworkRef,
@@ -263,6 +264,8 @@ export const getHomeworkForMonth = async (classId: string, date: Date): Promise<
     );
 
     const homeworkSnapshots = await getDocs(q);
+    logQuery('Homework query result', { classId, size: homeworkSnapshots.docs.length });
+    
     const homework = homeworkSnapshots.docs.map(doc => {
       const data = doc.data();
       return {
@@ -310,6 +313,7 @@ export const invalidateHomeworkCache = () => {
 // Get homework assignments for a specific date
 export const getHomeworkForDate = async (classId: string, date: Date): Promise<Homework[]> => {
   try {
+    logQuery('Getting homework for date', { classId, date: date.toISOString().split('T')[0] });
     // Get all homework for the month
     const monthHomework = await getHomeworkForMonth(classId, date);
     
@@ -317,10 +321,13 @@ export const getHomeworkForDate = async (classId: string, date: Date): Promise<H
     const dateString = date.toISOString().split('T')[0];
     
     // Filter homework for the specific date
-    return monthHomework.filter(hw => {
+    const result = monthHomework.filter(hw => {
       const homeworkDateString = hw.classDate.toISOString().split('T')[0];
       return homeworkDateString === dateString;
     });
+    
+    logQuery('Homework for date result', { classId, date: dateString, size: result.length });
+    return result;
   } catch (error) {
     logQuery('Error getting homework for date', error);
     throw error;
@@ -330,9 +337,12 @@ export const getHomeworkForDate = async (classId: string, date: Date): Promise<H
 // Get homework assignments for a specific class
 export const getHomeworkForClass = async (classId: string): Promise<Homework[]> => {
   try {
+    logQuery('Getting homework for class', { classId });
     // Get current month's homework
     const now = new Date();
-    return getHomeworkForMonth(classId, now);
+    const result = await getHomeworkForMonth(classId, now);
+    logQuery('Homework for class result', { classId, size: result.length });
+    return result;
   } catch (error) {
     logQuery('Error getting homework for class', error);
     throw error;
