@@ -8,7 +8,9 @@ import {
   setCachedDocument, 
   deleteCachedDocument,
   updateCachedDocument,
-  logQuery 
+  logQuery,
+  getTeacherUsers,
+  getUsersClasses
 } from '../utils/firebaseUtils';
 import { Timestamp } from 'firebase/firestore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -27,6 +29,8 @@ import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { Class, SelectOption, User } from '../types/interfaces';
+import { useAuth } from '../hooks/useAuth';
+import { useAdmin } from '../hooks/useAdmin';
 
 type SelectStyles = StylesConfig<SelectOption, true>;
 
@@ -144,20 +148,17 @@ export const AdminSchedule = () => {
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
   const [currentStep, setCurrentStep] = useState<'schedule' | 'payment'>('schedule');
 
-  const {} = useDashboardData();
+  const { currentUser } = useAuth();
+  const { isAdmin } = useAdmin();
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchAllUsers();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
+    let lastFetchTime = 0;
+    
     const loadData = async () => {
       setLoading(true);
       try {
+        lastFetchTime = Date.now();
+        logQuery('Initial data load');
         await fetchAllUsers();
         await fetchClasses();
       } catch (error) {
@@ -167,8 +168,19 @@ export const AdminSchedule = () => {
         setLoading(false);
       }
     };
-    
-    loadData();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        // Only refetch if we've been hidden for more than 5 minutes
+        if (now - lastFetchTime > 5 * 60 * 1000) {
+          logQuery('Refreshing data after visibility change');
+          loadData();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     const handleResize = () => {
       setShowMobileView(window.innerWidth < 768);
@@ -176,37 +188,87 @@ export const AdminSchedule = () => {
 
     window.addEventListener('resize', handleResize);
 
+    // Only load data if we have a current user
+    if (currentUser?.uid) {
+      loadData();
+    }
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [currentUser?.uid]); // Add currentUser?.uid as dependency
 
   const fetchClasses = async () => {
+    if (!currentUser?.uid) {
+      setClasses([]);
+      return;
+    }
+
     try {
-      logQuery('Querying all classes');
-      const classesData = await getCachedCollection<Class>('classes', [], { includeIds: true });
-      setClasses(classesData);
+      if (isAdmin) {
+        logQuery('Querying classes as admin', { userId: currentUser.uid });
+        const classesData = await getCachedCollection<Class>('classes', [], { 
+          userId: currentUser.uid,
+          includeIds: true
+        });
+        logQuery('Admin classes query result', { count: classesData.length });
+        setClasses(classesData);
+      } else {
+        // For teachers, first get their students
+        logQuery('Fetching teacher users', { teacherAuthId: currentUser.uid });
+        const students = await getTeacherUsers<User>(currentUser.uid, {
+          userId: currentUser.uid
+        });
+        logQuery('Teacher users query result', { count: students.length });
+
+        if (students.length > 0) {
+          // Get all classes for these students
+          const studentEmails = students.map(student => student.email);
+          logQuery('Fetching classes for students', { studentCount: studentEmails.length });
+          const classes = await getUsersClasses(studentEmails, {
+            userId: currentUser.uid
+          });
+          logQuery('Classes query result', { count: classes.length });
+          setClasses(classes);
+        } else {
+          setClasses([]);
+        }
+      }
     } catch (error) {
       logQuery('Error fetching classes', error);
-      throw error; // Propagate error to be handled by loadData
+      throw error;
     }
   };
 
   const fetchAllUsers = async () => {
+    if (!currentUser?.uid) {
+      setUsers([]);
+      return;
+    }
+
     try {
-      logQuery('Querying all users');
-      // Fetch all users directly from Firestore to get fresh data
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      logQuery('Users query result', { size: usersSnapshot.docs.length });
-      const users = usersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as User[];
-      setUsers(users);
+      let usersList: User[] = [];
+      if (isAdmin) {
+        logQuery('Querying all users as admin', { userId: currentUser.uid });
+        // If admin, get all users
+        usersList = await getCachedCollection<User>('users', [], { 
+          userId: currentUser.uid
+        });
+        logQuery('Admin users query result', { count: usersList.length });
+      } else {
+        logQuery('Fetching teacher users', { teacherAuthId: currentUser.uid });
+        // If teacher, only get their students
+        usersList = await getTeacherUsers<User>(currentUser.uid, {
+          userId: currentUser.uid
+        });
+        logQuery('Teacher users query result', { count: usersList.length });
+      }
+
+      setUsers(usersList);
     } catch (error) {
       logQuery('Error fetching users', error);
-      throw error; // Propagate error to be handled by loadData
+      throw error;
     }
   };
 
@@ -413,7 +475,7 @@ export const AdminSchedule = () => {
       }
 
       // Create the class document
-      const classData = {
+      const classToCreate = {
         ...newClass,
         contractUrl,
         timezone: newClass.timezone || 'America/New_York', // Ensure timezone is set
@@ -421,17 +483,28 @@ export const AdminSchedule = () => {
           ...schedule,
           timezone: schedule.timezone || newClass.timezone || 'America/New_York' // Ensure timezone is set in each schedule
         })),
+        startDate: Timestamp.fromDate(newClass.startDate),
+        endDate: newClass.endDate ? Timestamp.fromDate(newClass.endDate) : null,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       };
 
-      logQuery('Creating new class', classData);
+      logQuery('Creating new class', classToCreate);
       const classId = Date.now().toString();
-      await setCachedDocument('classes', classId, classData);
+      
+      // Create the class document
+      await setCachedDocument('classes', classId, classToCreate, {
+        userId: currentUser?.uid
+      });
+      
       logQuery('Invalidating calendar cache');
       await invalidateCalendarCache();
 
-      // Reset form and refresh data
+      // Add the new class to the local state immediately
+      const createdClass = { id: classId, ...classToCreate };
+      setClasses(prevClasses => [...prevClasses, createdClass]);
+
+      // Reset form
       setNewClass({
         scheduleType: 'multiple',
         dayOfWeek: 1,
@@ -459,7 +532,7 @@ export const AdminSchedule = () => {
         }
       });
       setContractFile(null);
-      await fetchClasses();
+      
       toast.success(t.admin.schedule.success.classCreated);
       
       // Close modal and reset step
@@ -616,7 +689,7 @@ export const AdminSchedule = () => {
       ...classItem,
       schedules,
       startDate: startDate,
-      endDate: classItem.endDate.toDate(),
+      endDate: classItem.endDate ? classItem.endDate.toDate() : null,
       timezone: timezone, // Set timezone with fixed value
       paymentConfig: {
         ...classItem.paymentConfig,
@@ -1348,7 +1421,7 @@ export const AdminSchedule = () => {
                       <div className="flex-1">
                         <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
                         <DatePicker
-                          selected={newClass.startDate}
+                          selected={newClass.startDate || new Date()}
                           onChange={(date: Date | null) => {
                             if (date) {
                               setNewClass((prev: typeof newClass) => ({
@@ -2226,7 +2299,7 @@ export const AdminSchedule = () => {
                   <div>
                     <label className={styles.form.label}>{t.classStartDate || "Class Start Date"}</label>
                     <DatePicker
-                      selected={editingClass?.startDate}
+                      selected={editingClass?.startDate || new Date()}
                       onChange={(date: Date | null) => {
                         if (!editingClass || !date) return;
                         setEditingClass((prev: any) => ({

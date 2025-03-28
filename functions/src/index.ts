@@ -1180,8 +1180,11 @@ export const getAllClassesForMonthHttp = onRequest({
       }
 
       // Create date range for the requested month
-      const startDate = new Date(yearInt, monthInt, 1);
-      const endDate = new Date(yearInt, monthInt + 1, 0); // Last day of the month
+      // Start at the beginning of the month in UTC-12 (earliest timezone)
+      const startDate = new Date(Date.UTC(yearInt, monthInt, 1, -12, 0, 0));
+      // End at the end of the month in UTC+14 (latest timezone)
+      const endDate = new Date(Date.UTC(yearInt, monthInt + 1, 1, 14, 0, 0));
+      endDate.setUTCDate(endDate.getUTCDate() - 1);
 
       // Get birthdays for the month - only for users taught by this admin
       const birthdays: Array<{

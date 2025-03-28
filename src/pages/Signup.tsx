@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { validateSignupToken, ValidationResult } from '../utils/signupLinks';
+import { validateSignupToken } from '../utils/signupLinks';
 
 export const Signup = () => {
   const [searchParams] = useSearchParams();
@@ -12,7 +12,6 @@ export const Signup = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [validatingToken, setValidatingToken] = useState(true);
-  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const navigate = useNavigate();
   const { signup, loginWithGoogle, clearAuthError } = useAuth();
 
@@ -85,7 +84,6 @@ export const Signup = () => {
           setEmail(result.email);
         }
         setName(result.name || '');
-        setValidationResult(result);
         setValidatingToken(false);
       } catch (err) {
         console.error('[POST-REDIRECT] Error validating token:', err);

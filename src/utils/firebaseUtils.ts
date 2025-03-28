@@ -9,7 +9,8 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
-  Timestamp
+  Timestamp,
+  where
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { cache } from './cache';
@@ -65,11 +66,12 @@ const shouldCache = (collectionPath: string, options: CacheOptions = {}): boolea
     return false;
   }
 
-  if (options.userId) {
-    const shouldCacheUser = USER_SCOPED_COLLECTIONS.has(collectionPath);
-    return shouldCacheUser;
+  // If it's a user-scoped collection, only cache if we have a userId
+  if (USER_SCOPED_COLLECTIONS.has(collectionPath)) {
+    return !!options.userId;
   }
 
+  // For all other collections, we can cache
   return true;
 };
 
@@ -80,36 +82,249 @@ export const logQuery = (operation: string, details?: any) => {
   }
 };
 
+// Helper function to log user operations in non-production environments
+export const logUserOp = (operation: string, details?: any) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[User Operation] ${operation}`, details || '');
+  }
+};
+
+// Track in-flight requests with proper typing
+const inFlightRequests: Record<string, Promise<unknown> | undefined> = {};
+
+// Helper function to get admin/teacher document ID from auth ID
+export const getAdminDocId = async (authUid: string): Promise<string | null> => {
+  try {
+    logUserOp('Getting admin document ID', { authUid });
+    const querySnapshot = await getDocs(
+      query(collection(db, 'users'), 
+        where('uid', '==', authUid)
+      )
+    );
+    
+    if (querySnapshot.empty) {
+      logUserOp('No admin document found', { authUid });
+      return null;
+    }
+
+    const docId = querySnapshot.docs[0].id;
+    logUserOp('Found admin document', { authUid, docId });
+    return docId;
+  } catch (error) {
+    logUserOp('Error getting admin document', { authUid, error });
+    return null;
+  }
+};
+
+// Function to get users for a teacher with caching and in-flight request handling
+export const getTeacherUsers = async <T = DocumentData>(
+  teacherAuthId: string,
+  options: CacheOptions = {}
+): Promise<T[]> => {
+  logUserOp('Starting teacher users query', { teacherAuthId });
+  
+  // First get the teacher's document ID
+  const teacherId = await getAdminDocId(teacherAuthId);
+  if (!teacherId) {
+    logUserOp('No teacher document found, returning empty list', { teacherAuthId });
+    return [];
+  }
+  
+  const cacheKey = `teacher_users_${teacherId}`;
+  logUserOp('Using cache key', { cacheKey });
+  
+  // Check if there's an in-flight request
+  const existingRequest = inFlightRequests[cacheKey];
+  if (existingRequest) {
+    logUserOp('Returning in-flight request for teacher users', { teacherId });
+    return existingRequest as Promise<T[]>;
+  }
+
+  // Create the request promise
+  const promise = (async () => {
+    try {
+      // Check cache first
+      if (shouldCache('users', options)) {
+        const cachedData = cache.get<T[]>(cacheKey);
+        if (cachedData !== null) {
+          logUserOp('Returning cached teacher users', { teacherId, count: cachedData.length });
+          return rehydrateTimestamps(cachedData) as T[];
+        }
+      }
+
+      // Query users where teacher field matches teacherId
+      logUserOp('Querying teacher users from Firestore', { teacherId });
+      const querySnapshot = await getDocs(
+        query(collection(db, 'users'), 
+          where('teacher', '==', teacherId),
+          where('isAdmin', '==', false),
+          where('isTeacher', '==', false)
+        )
+      );
+      
+      logUserOp('Teacher users query result', { teacherId, size: querySnapshot.docs.length });
+      const data = querySnapshot.docs.map((doc) => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      })) as T[];
+
+      // Cache the result
+      if (shouldCache('users', options)) {
+        cache.set(cacheKey, data);
+        logUserOp('Cached teacher users', { teacherId, count: data.length });
+      }
+      
+      return data;
+    } catch (error) {
+      logUserOp('Error getting teacher users', { teacherId, error });
+      throw error;
+    } finally {
+      // Clean up the in-flight request
+      delete inFlightRequests[cacheKey];
+    }
+  })();
+
+  inFlightRequests[cacheKey] = promise;
+  return promise;
+};
+
+// Function to get classes for specific users with caching and in-flight request handling
+export const getUsersClasses = async <T = DocumentData>(
+  userEmails: string[],
+  options: CacheOptions = {}
+): Promise<T[]> => {
+  if (!userEmails.length) return [];
+  
+  const cacheKey = `users_classes_${userEmails.sort().join('_')}`;
+  
+  logUserOp('Getting users classes', { userCount: userEmails.length });
+  
+  // Check if there's an in-flight request
+  const existingRequest = inFlightRequests[cacheKey];
+  if (existingRequest) {
+    logUserOp('Returning in-flight request for users classes', { userCount: userEmails.length });
+    return existingRequest as Promise<T[]>;
+  }
+
+  // Create the request promise
+  const promise = (async () => {
+    try {
+      // Check cache first
+      if (shouldCache('classes', options)) {
+        const cachedData = cache.get<T[]>(cacheKey);
+        if (cachedData !== null) {
+          logUserOp('Returning cached users classes', { userCount: userEmails.length, classCount: cachedData.length });
+          return rehydrateTimestamps(cachedData) as T[];
+        }
+      }
+
+      // Firestore has a limit of 10 items for array-contains-any queries
+      // So we need to batch the requests if we have more than 10 emails
+      const batchSize = 10;
+      const batches = [];
+      
+      for (let i = 0; i < userEmails.length; i += batchSize) {
+        const batch = userEmails.slice(i, i + batchSize);
+        batches.push(batch);
+      }
+
+      // Execute all batch queries
+      logUserOp('Querying users classes from Firestore', { batchCount: batches.length, totalUsers: userEmails.length });
+      const batchQueries = batches.map(batch =>
+        getDocs(query(
+          collection(db, 'classes'),
+          where('studentEmails', 'array-contains-any', batch)
+        ))
+      );
+
+      const batchResults = await Promise.all(batchQueries);
+
+      // Combine results, avoiding duplicates
+      const classesMap = new Map();
+      batchResults.forEach(querySnapshot => {
+        querySnapshot.docs.forEach(doc => {
+          classesMap.set(doc.id, { id: doc.id, ...doc.data() });
+        });
+      });
+
+      const data = Array.from(classesMap.values()) as T[];
+      logUserOp('Users classes query result', { userCount: userEmails.length, classCount: data.length });
+
+      // Cache the result
+      if (shouldCache('classes', options)) {
+        cache.set(cacheKey, data);
+        logUserOp('Cached users classes', { userCount: userEmails.length, classCount: data.length });
+      }
+
+      return data;
+    } catch (error) {
+      logUserOp('Error getting users classes', { userCount: userEmails.length, error });
+      throw error;
+    } finally {
+      // Clean up the in-flight request
+      delete inFlightRequests[cacheKey];
+    }
+  })();
+
+  inFlightRequests[cacheKey] = promise;
+  return promise;
+};
+
 // Function to get collection data with caching
 export const getCachedCollection = async <T = DocumentData>(
   collectionPath: string,
   queryConstraints: QueryConstraint[] = [],
   options: CacheOptions = {}
 ): Promise<T[]> => {
-  if (!shouldCache(collectionPath, options)) {
-    logQuery('Querying collection', { collectionPath, queryConstraints });
-    const querySnapshot = await getDocs(
-      query(collection(db, collectionPath), ...queryConstraints)
-    );
-    logQuery('Collection Query result', { collectionPath, size: querySnapshot.docs.length });
-    return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as T[];
+  const cacheKey = encodeCacheKey(`${collectionPath}${options.userId || ''}`);
+  logQuery('Getting collection', { collectionPath, cacheKey });
+
+  // Check if there's an in-flight request
+  const existingRequest = inFlightRequests[cacheKey];
+  if (existingRequest) {
+    logQuery('Returning in-flight request', { collectionPath, cacheKey });
+    return existingRequest as Promise<T[]>;
   }
 
-  const queryKey = encodeCacheKey(`${collectionPath}${options.userId || ''}`);
-  const cachedData = cache.get<T[]>(queryKey);
+  // Create the request promise
+  const promise = (async () => {
+    try {
+      // Check cache first
+      if (shouldCache(collectionPath, options)) {
+        const cachedData = cache.get<T[]>(cacheKey);
+        if (cachedData !== null) {
+          logQuery('Returning cached collection', { collectionPath, size: cachedData.length });
+          return rehydrateTimestamps(cachedData) as T[];
+        }
+      }
 
-  if (cachedData !== null) {
-    return rehydrateTimestamps(cachedData) as T[];
-  }
+      // If not in cache or shouldn't cache, query Firestore
+      logQuery('Querying collection from Firestore', { collectionPath, queryConstraints });
+      const querySnapshot = await getDocs(
+        query(collection(db, collectionPath), ...queryConstraints)
+      );
+      const data = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as T[];
+      logQuery('Collection query result', { collectionPath, size: data.length });
 
-  const querySnapshot = await getDocs(
-    query(collection(db, collectionPath), ...queryConstraints)
-  );
-  const data = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as T[];
+      // Cache the result if we should
+      if (shouldCache(collectionPath, options)) {
+        cache.set(cacheKey, data);
+        logQuery('Cached collection data', { collectionPath, size: data.length });
+      }
+      
+      return data;
+    } catch (error) {
+      logQuery('Error getting collection', { collectionPath, error });
+      throw error;
+    } finally {
+      // Clean up the in-flight request
+      delete inFlightRequests[cacheKey];
+    }
+  })();
 
-  cache.set(queryKey, data);
-  
-  return data;
+  // Store the in-flight request
+  inFlightRequests[cacheKey] = promise;
+  return promise;
 };
 
 // Function to get document data with caching

@@ -6,7 +6,14 @@ import { createSignupLink, extendSignupTokenExpiration } from '../utils/signupLi
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
-import { getCachedCollection, deleteCachedDocument, setCachedDocument, updateCachedDocument } from '../utils/firebaseUtils';
+import { 
+  getCachedCollection, 
+  deleteCachedDocument, 
+  setCachedDocument, 
+  updateCachedDocument,
+  getTeacherUsers,
+  getUsersClasses 
+} from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { cache } from '../utils/cache';
@@ -37,14 +44,19 @@ interface SignupLinkData {
   token: string;
 }
 
-const logAdmin = (message: string, data?: any) => {
+interface ExtendedUser extends User {
+  isAdmin: boolean;
+  isTeacher: boolean;
+}
+
+const logUserOp = (message: string, data?: any) => {
   if (process.env.NODE_ENV === 'development') {
     console.log(`[ADMIN-USERS] ${message}`, data ? data : '');
   }
 };
 
 export const AdminUsers = () => {
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuth() as { currentUser: ExtendedUser | null };
   const { isAdmin } = useAdmin();
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -70,25 +82,53 @@ export const AdminUsers = () => {
   const [updatingBirthdate, setUpdatingBirthdate] = useState(false);
 
   const fetchUsers = useCallback(async () => {
+    if (!currentUser?.uid) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Force a fresh fetch from Firestore by clearing the cache first
-      cache.clearAll();
-      
-      const usersList = await getCachedCollection<User>('users', [], { 
-        userId: currentUser?.uid
-      });
+      let usersList: User[] = [];
+      if (isAdmin) {
+        logUserOp('Fetching all users as admin', {userId: currentUser?.uid});
+        // If admin, get all users
+        usersList = await getCachedCollection<User>('users', [], { 
+          userId: currentUser?.uid
+        });
+        logUserOp('Admin users query result', { count: usersList.length });
+      } else {
+        logUserOp('Fetching teacher users', { teacherAuthId: currentUser.uid });
+        // If teacher, only get their students
+        usersList = await getTeacherUsers<User>(currentUser.uid, {
+          userId: currentUser?.uid
+        });
+        logUserOp('Teacher users query result', { count: usersList.length });
+      }
+
       const updatedUsersList = usersList.map(user => ({
         ...user,
         status: user.status === 'pending' ? 'pending' : 'active'
       })) as User[];
+      
+      // If teacher, also fetch all classes for these users
+      if (!isAdmin && updatedUsersList.length > 0) {
+        const userEmails = updatedUsersList.map(user => user.email);
+        logUserOp('Fetching classes for users', { userCount: userEmails.length });
+        const classes = await getUsersClasses(userEmails, {
+          userId: currentUser?.uid
+        });
+        logUserOp('Classes query result', { classCount: classes.length });
+      }
+
       setUsers(updatedUsersList);
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users');
+      logUserOp('Error in fetchUsers', { error });
+      toast.error(t.failedToFetchUsers);
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, isAdmin, t]);
 
   useEffect(() => {
     const fetchUsersData = async () => {
@@ -144,7 +184,7 @@ export const AdminUsers = () => {
       return;
     }
 
-    logAdmin('User to delete:', { email: userToDelete.email, uid: userToDelete.uid });
+    logUserOp('User to delete:', { email: userToDelete.email, uid: userToDelete.uid });
 
     const userType = userToDelete.isAdmin ? 'admin' : userToDelete.isTeacher ? 'teacher' : 'student';
     const confirmMessage = `Are you sure you want to delete ${userToDelete.name} (${userToDelete.email})?\n\nThis will permanently delete this ${userType}'s account and remove them from all associated classes.\n\nThis action cannot be undone.`;
@@ -195,7 +235,7 @@ export const AdminUsers = () => {
           const functionUrl = isDevelopment
             ? `http://localhost:5001/${functions.app.options.projectId}/${functions.region}/deleteAuthUserHttp`
             : `${functions.customDomain || `https://${functions.region}-${functions.app.options.projectId}.cloudfunctions.net`}/deleteAuthUserHttp`;
-          logAdmin('Attempting to delete user with auth ID:', userToDelete.uid);
+          logUserOp('Attempting to delete user with auth ID:', userToDelete.uid);
           
           const response = await fetch(functionUrl, {
             method: 'POST',
@@ -212,16 +252,16 @@ export const AdminUsers = () => {
           }
 
           const result = await response.json();
-          logAdmin('Delete auth user function result:', result);
-          logAdmin('Successfully called delete function');
+          logUserOp('Delete auth user function result:', result);
+          logUserOp('Successfully called delete function');
         } else {
-          logAdmin('No Firebase Auth user found - skipping auth deletion');
+          logUserOp('No Firebase Auth user found - skipping auth deletion');
         }
         
         await deleteCachedDocument('users', userId);
-        logAdmin('Successfully deleted user document');
+        logUserOp('Successfully deleted user document');
       } catch (error: unknown) {
-        logAdmin('Error in delete process:', {
+        logUserOp('Error in delete process:', {
           error,
           message: error instanceof Error ? error.message : 'Unknown error'
         });
