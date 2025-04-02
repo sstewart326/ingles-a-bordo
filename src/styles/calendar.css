@@ -197,6 +197,22 @@
   flex-direction: column;
   justify-content: flex-start;
   min-height: 0;
+  max-height: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+}
+
+/* Adjust class details container */
+.class-details .flex-col {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-height: min-content;
+  justify-content: flex-start;
+  position: relative;
+  gap: 0.25rem;
 }
 
 /* Common Pill Base */
@@ -213,7 +229,6 @@
   transition: background-color 0.2s ease;
   color: white;
   width: calc(100% - 8px);
-  max-width: 120px;
   min-height: 24px;
   height: auto;
   line-height: 1.2;
@@ -222,6 +237,8 @@
   word-break: break-word;
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 /* Ensure icons stay on the same line as text */
@@ -230,19 +247,6 @@
 .calendar-pill .feedback-icon {
   flex-shrink: 0;
   margin-left: 4px;
-}
-
-/* Adjust class details container */
-.class-details .flex-col {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  justify-content: flex-start;
-  position: relative;
-  gap: 0.25rem;
 }
 
 /* Customize scrollbar for better aesthetics */
