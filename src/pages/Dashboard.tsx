@@ -140,6 +140,24 @@ export const Dashboard = () => {
           const classId = material.classId;
           if (!classId) return;
 
+          // Check if the material's classDate matches the selected date
+          // For materials without a date, include them on all dates (legacy support)
+          const materialDate = material.classDate instanceof Date ? material.classDate : new Date(material.classDate);
+          const materialDay = new Date(
+            materialDate.getFullYear(), 
+            materialDate.getMonth(), 
+            materialDate.getDate()
+          );
+          const selectedDay = new Date(
+            date.getFullYear(), 
+            date.getMonth(), 
+            date.getDate()
+          );
+          const dateMatches = !material.classDate || materialDay.getTime() === selectedDay.getTime();
+
+          // Only include materials for this date
+          if (!dateMatches) return;
+
           // For classes with multiple schedules, get all related class IDs
           const baseClassId = getBaseClassId(classId);
           const relatedClassIds = updatedClasses
@@ -168,8 +186,46 @@ export const Dashboard = () => {
         updatedClasses.forEach(classSession => {
           const classId = classSession.id;
           if (classMaterials[classId] && classMaterials[classId].length > 0) {
-            materialsMap[classId] = classMaterials[classId];
+            // Filter materials by date
+            const filteredMaterials = classMaterials[classId].filter(material => {
+              if (!material.classDate) return true; // Include materials without a date
+              
+              // Compare dates at midnight for consistency
+              const materialDate = material.classDate instanceof Date 
+                ? material.classDate 
+                : new Date(material.classDate);
+              
+              const materialDay = new Date(
+                materialDate.getFullYear(), 
+                materialDate.getMonth(), 
+                materialDate.getDate()
+              );
+              const selectedDay = new Date(
+                date.getFullYear(), 
+                date.getMonth(), 
+                date.getDate()
+              );
+              
+              return materialDay.getTime() === selectedDay.getTime();
+            });
+            
+            if (filteredMaterials.length > 0) {
+              materialsMap[classId] = filteredMaterials;
+            }
           }
+        });
+      }
+
+      // Log the materials map for debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Dashboard - fetchMaterials materialsMap:', {
+          date: date.toISOString().slice(0, 10),
+          monthKey,
+          classIds: Object.keys(materialsMap),
+          materialCounts: Object.keys(materialsMap).map(id => ({
+            classId: id,
+            count: materialsMap[id].length
+          }))
         });
       }
 
@@ -223,7 +279,38 @@ export const Dashboard = () => {
       date,
       classes: updatedClasses,
       paymentsDue: paymentsDue,
-      materials: selectedDayDetails?.materials || {},
+      // Always include materials from classMaterials for any classes in updatedClasses
+      materials: updatedClasses.reduce((acc, cls) => {
+        if (classMaterials[cls.id] && classMaterials[cls.id].length > 0) {
+          // Filter materials to only include those matching this date
+          const filteredMaterials = classMaterials[cls.id].filter(material => {
+            if (!material.classDate) return true; // Include materials without a date
+            
+            // Compare dates at midnight for consistency
+            const materialDate = material.classDate instanceof Date 
+              ? material.classDate 
+              : new Date(material.classDate);
+            
+            const materialDay = new Date(
+              materialDate.getFullYear(), 
+              materialDate.getMonth(), 
+              materialDate.getDate()
+            );
+            const selectedDay = new Date(
+              date.getFullYear(), 
+              date.getMonth(), 
+              date.getDate()
+            );
+            
+            return materialDay.getTime() === selectedDay.getTime();
+          });
+          
+          if (filteredMaterials.length > 0) {
+            acc[cls.id] = filteredMaterials;
+          }
+        }
+        return acc;
+      }, {} as Record<string, ClassMaterial[]>),
       birthdays
     });
 
@@ -270,21 +357,9 @@ export const Dashboard = () => {
     classes: ClassSession[],
     paymentsDue: { user: User; classSession: ClassSession; }[]
   ) => {
-    setSelectedDate(date);
-    setSelectedDayDetails({
-      date,
-      classes,
-      paymentsDue,
-      materials: {},
-      birthdays: []
-    });
-
-    // Check if screen is in mobile layout (details below calendar)
-    if (window.innerWidth < 1280) { // xl breakpoint
-      // Scroll the details section into view with smooth behavior
-      detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, []);
+    // We'll delegate to the internal function with shouldScroll=true
+    handleDayClickInternal(date, classes, paymentsDue, true);
+  }, [handleDayClickInternal]);
 
   // Add a specific effect to handle initial data loading after auth and admin status are determined
   useEffect(() => {
@@ -650,9 +725,19 @@ export const Dashboard = () => {
         const materials = await getClassMaterials('', selectedDayDetails.date, currentUser?.uid);
         
         // Make sure all materials have an id for tracking
-        const materialsWithIds = materials.map(material =>
-          material.id ? material : { ...material, id: Math.random().toString(36).substring(2) }
-        );
+        const materialsWithIds = materials.map(material => {
+          // Add id if missing
+          const id = material.id || Math.random().toString(36).substring(2);
+          
+          // Check if the material has a classDate, and if not, use the selectedDayDetails.date
+          const classDate = material.classDate || selectedDayDetails.date;
+          
+          return {
+            ...material,
+            id,
+            classDate
+          };
+        });
 
         // Use batched state updates to reduce the number of renders
         const batchStateUpdates = () => {
@@ -662,15 +747,27 @@ export const Dashboard = () => {
             actualClassId,
             baseClassId,
             ...upcomingClasses.map(c => c.id).filter(id => id.startsWith(baseClassId)),
-            ...pastClasses.map(c => c.id).filter(id => id.startsWith(baseClassId))
+            ...pastClasses.map(c => c.id).filter(id => id.startsWith(baseClassId)),
+            // Ensure we also include all class IDs in selectedDayDetails
+            ...selectedDayDetails.classes.map(c => c.id).filter(id => id.startsWith(baseClassId))
           ];
 
           const uniqueClassIdsToUpdate = [...new Set(classIdsToUpdate)];
 
+          // Log for debugging
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Refreshing materials for classes:', {
+              actualClassId,
+              baseClassId,
+              uniqueClassIdsToUpdate,
+              materialCount: materialsWithIds.length
+            });
+          }
+
           // ============== STEP 2: Update the materials map ==============
           // Create updated materials map for selectedDayDetails
           const updatedMaterialsMap = {
-            ...selectedDayDetails.materials
+            ...(selectedDayDetails.materials || {})
           };
 
           // Add materials for all relevant class IDs

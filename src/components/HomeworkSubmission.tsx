@@ -1,8 +1,12 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent, useCallback } from 'react';
 import { 
   getHomeworkSubmission, 
   submitHomework, 
-  validateHomeworkFile 
+  validateHomeworkFile,
+  deleteHomeworkSubmissionFile,
+  subscribeToHomeworkChanges,
+  clearHomeworkCache,
+  notifyHomeworkChange
 } from '../utils/homeworkUtils';
 import { FaUpload, FaFile, FaTrash } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -10,6 +14,7 @@ import { Homework, HomeworkSubmission as HomeworkSubmissionType } from '../types
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { logQuery } from '../utils/firebaseUtils';
+
 interface HomeworkSubmissionProps {
   homework: Homework;
   studentEmail: string;
@@ -26,32 +31,63 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
   const [textResponse, setTextResponse] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [submission, setSubmission] = useState<HomeworkSubmissionType | null>(null);
+  const [deletingFile, setDeletingFile] = useState<number | null>(null);
+  // Add a refresh counter to force re-fetches
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
-  // Fetch existing submission if any
-  useEffect(() => {
-    const fetchSubmission = async () => {
-      try {
-        setLoading(true);
-        const existingSubmission = await getHomeworkSubmission(homework.id, studentEmail);
-        logQuery('Homework Submission Query result', { existingSubmission });
-        
-        if (existingSubmission) {
-          setSubmission(existingSubmission);
-          
-          // Pre-fill text response if it exists
-          if (existingSubmission.textResponse) {
-            setTextResponse(existingSubmission.textResponse);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching submission:', error);
-      } finally {
-        setLoading(false);
+  // Memoize fetchSubmission with useCallback
+  const fetchSubmission = useCallback(async (forceRefresh = false) => {
+    try {
+      setLoading(true);
+      
+      // Clear cache if forcing a refresh
+      if (forceRefresh) {
+        console.log("HomeworkSubmission: Forcing cache clear for submission refresh");
+        clearHomeworkCache();
       }
-    };
+      
+      const existingSubmission = await getHomeworkSubmission(homework.id, studentEmail);
+      console.log('HomeworkSubmission: Fetched submission', existingSubmission);
+      
+      if (existingSubmission) {
+        setSubmission(existingSubmission);
+        
+        // Pre-fill text response if it exists and no user edits
+        if (existingSubmission.textResponse && !textResponse) {
+          setTextResponse(existingSubmission.textResponse);
+        }
+      } else {
+        // Clear previous submission state if no submission exists
+        setSubmission(null);
+      }
+    } catch (error) {
+      console.error('Error fetching submission:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [homework.id, studentEmail, textResponse]);
+
+  // Initial fetch and when refreshCounter changes
+  useEffect(() => {
+    fetchSubmission(refreshCounter > 0);
+  }, [fetchSubmission, refreshCounter]);
+
+  // Subscribe to homework changes
+  useEffect(() => {
+    console.log(`HomeworkSubmission: Setting up homework change subscription for homework ${homework.id}`);
     
-    fetchSubmission();
-  }, [homework.id, studentEmail]);
+    // Subscribe to homework changes
+    const unsubscribe = subscribeToHomeworkChanges(() => {
+      console.log(`HomeworkSubmission: Received homework change notification, refreshing submission`);
+      // Force a refresh by incrementing the counter
+      setRefreshCounter(prev => prev + 1);
+    });
+    
+    return () => {
+      console.log(`HomeworkSubmission: Cleaning up homework change subscription for homework ${homework.id}`);
+      unsubscribe();
+    };
+  }, [homework.id]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -97,7 +133,7 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
     setSubmitting(true);
     
     try {
-      await submitHomework(
+      const submissionId = await submitHomework(
         homework.id,
         studentEmail,
         textResponse,
@@ -109,10 +145,31 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
       // Reset file upload state but keep text response
       setFiles([]);
       
-      // Refetch submission
-      const updatedSubmission = await getHomeworkSubmission(homework.id, studentEmail);
-      logQuery('Homework Submission Query result', { updatedSubmission });
-      setSubmission(updatedSubmission);
+      // If this was a first-time submission, we need to explicitly trigger updates
+      if (!submission) {
+        console.log("HomeworkSubmission: First-time submission completed, ID:", submissionId);
+        
+        // Clear all caches to force fresh data everywhere
+        clearHomeworkCache();
+        
+        // Force an immediate fetch of the submission
+        await fetchSubmission(true);
+        
+        // Force a counter update to ensure all subscribers are notified
+        setRefreshCounter(prev => prev + 2);
+        
+        // Explicitly notify about homework change a second time to ensure propagation
+        setTimeout(() => {
+          const classId = homework.classId;
+          console.log("HomeworkSubmission: Sending delayed notification for first submission in class:", classId);
+          // Import this function at the top if not already there
+          // import { notifyHomeworkChange } from '../utils/homeworkUtils';
+          notifyHomeworkChange(classId);
+        }, 500);
+      } else {
+        // Regular update for existing submission
+        setRefreshCounter(prev => prev + 1);
+      }
     } catch (error) {
       console.error('Error submitting homework:', error);
       if (error instanceof Error) {
@@ -122,6 +179,33 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubmittedFile = async (index: number) => {
+    if (!submission || !submission.id) {
+      toast.error(t.error);
+      return;
+    }
+    
+    try {
+      setDeletingFile(index);
+      
+      await deleteHomeworkSubmissionFile(submission.id, index);
+      
+      toast.success(t.fileDeleted);
+      
+      // Force a refresh to show the updated submission
+      setRefreshCounter(prev => prev + 1);
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      if (error instanceof Error) {
+        toast.error(error.message || t.error);
+      } else {
+        toast.error(t.error);
+      }
+    } finally {
+      setDeletingFile(null);
     }
   };
 
@@ -159,6 +243,64 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
             <span className="font-medium">Submitted {new Date(submission.submittedAt).toLocaleString()}</span>
           </div>
           <p className="text-sm text-gray-600">You can update your submission below.</p>
+          
+          {/* Display previously submitted files */}
+          {submission.files && submission.files.length > 0 && (
+            <div className="mt-3 border-t border-green-200 pt-3">
+              <h4 className="text-sm font-medium text-green-800 mb-2">Your Submitted Files:</h4>
+              <ul className="bg-white rounded-md border border-green-100 divide-y divide-green-100">
+                {submission.files.map((file, index) => (
+                  <li key={index} className="p-2 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FaFile className="mr-2 text-green-500" />
+                      <span className="text-sm">{file.name}</span>
+                      <span className="text-xs text-gray-500 ml-2">
+                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <a 
+                        href={file.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
+                      >
+                        Download
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSubmittedFile(index)}
+                        disabled={deletingFile === index}
+                        className={`p-2 rounded text-red-500 hover:bg-red-50 ${
+                          deletingFile === index ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                        title={t.deleteFile}
+                      >
+                        {deletingFile === index ? (
+                          <svg className="animate-spin h-4 w-4 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <FaTrash />
+                        )}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* Display previously submitted text response */}
+          {submission.textResponse && (
+            <div className="mt-3 border-t border-green-200 pt-3">
+              <h4 className="text-sm font-medium text-green-800 mb-2">Your Written Response:</h4>
+              <div className="bg-white p-3 rounded-md border border-green-100">
+                <p className="text-gray-700 whitespace-pre-line">{submission.textResponse}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
       
@@ -183,22 +325,6 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
         {/* File Upload Section */}
         {homework.allowFileSubmission && (
           <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm text-gray-700 font-medium">
-                {t.materials}
-              </label>
-              <label className="inline-flex items-center cursor-pointer px-3 py-1.5 border border-indigo-500 rounded text-indigo-500 hover:bg-indigo-50 text-sm">
-                <FaUpload className="mr-2" />
-                {t.uploadMaterials}
-                <input
-                  type="file"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  multiple
-                />
-              </label>
-            </div>
-            
             {files.length > 0 && (
               <ul className="bg-gray-50 rounded-md border border-gray-200 divide-y divide-gray-200">
                 {files.map((file, index) => (
@@ -224,7 +350,19 @@ export const HomeworkSubmission: React.FC<HomeworkSubmissionProps> = ({
           </div>
         )}
         
-        <div className="flex justify-end">
+        <div className="flex justify-end items-center space-x-4">
+          {homework.allowFileSubmission && (
+            <label className="inline-flex items-center cursor-pointer px-3 py-1.5 border border-indigo-500 rounded text-indigo-500 hover:bg-indigo-50 text-sm">
+              <FaUpload className="mr-2" />
+              {t.uploadMaterials}
+              <input
+                type="file"
+                onChange={handleFileChange}
+                className="hidden"
+                multiple
+              />
+            </label>
+          )}
           <button
             type="submit"
             disabled={submitting}

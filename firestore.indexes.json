@@ -87,14 +87,8 @@
       "collectionGroup": "homework",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "classId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "classDate",
-          "order": "DESCENDING"
-        }
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "classDate", "order": "ASCENDING" }
       ]
     },
     {

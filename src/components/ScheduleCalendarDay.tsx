@@ -10,12 +10,12 @@ export interface ScheduleCalendarDayProps<T extends ClassSession> {
   isToday: boolean;
   classes: T[];
   paymentsDue: { user: User; classSession: ClassSession }[] | boolean;
-  onClassCountClick?: (e: React.MouseEvent, classes: T[], date: Date) => void;
+  onClassCountClick?: (e: React.MouseEvent, date: Date) => void;
   onPaymentPillClick?: (e: React.MouseEvent, date: Date, classes: T[]) => void;
   onDayClick?: (date: Date, classes: T[]) => void;
   materialsInfo?: Map<string, { hasSlides: boolean; hasLinks: boolean }>;
   homeworkInfo?: Map<string, number>; // Map of classId to homework count for this date
-  onHomeworkPillClick?: (e: React.MouseEvent, date: Date, classes: T[]) => void;
+  onHomeworkPillClick?: (e: React.MouseEvent, date: Date) => void;
   homeworkFeedbackInfo?: Map<string, boolean>; // Map of classId_date to boolean indicating if feedback exists
   paymentStatus?: { isCompleted: boolean; completedAt?: string };
 }

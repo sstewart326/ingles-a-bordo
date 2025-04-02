@@ -15,12 +15,9 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { db } from '../config/firebase';
-import { getDocs, collection } from 'firebase/firestore';
 import { styles, classNames } from '../styles/styleUtils';
 import { getDayName } from '../utils/dateUtils';
 import Modal from '../components/Modal';
-import { useDashboardData } from '../hooks/useDashboardData';
 import { ClassSchedule } from '../types/interfaces';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
@@ -731,6 +728,8 @@ export const AdminSchedule = () => {
       const updatedClass = {
         ...editingClass,
         contractUrl: updatedContractUrl,
+        startDate: Timestamp.fromDate(editingClass.startDate instanceof Date ? editingClass.startDate : editingClass.startDate.toDate()),
+        endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate instanceof Date ? editingClass.endDate : editingClass.endDate.toDate()) : null,
         updatedAt: Timestamp.now()
       };
 

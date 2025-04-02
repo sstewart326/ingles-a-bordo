@@ -115,6 +115,21 @@ export const notifyHomeworkChange = (classId: string): void => {
   const baseClassId = extractBaseClassId(classId);
   console.log(`Notifying all components about homework change for class: ${baseClassId}`);
   
+  // More aggressive cache clearing to ensure fresh data
+  clearHomeworkCache();
+  
+  // Also clear specific cache items that might be missed
+  invalidateCache(HOMEWORK_COLLECTION);
+  invalidateCache(SUBMISSION_COLLECTION);
+  
+  // Clear monthly homework cache for this class
+  const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM format
+  const monthCacheKey = `${HOMEWORK_COLLECTION}_month_${baseClassId}_${currentMonth}`;
+  localStorage.removeItem(monthCacheKey);
+  
+  // Clear all pending requests to force fresh fetches
+  clearAllPendingRequests();
+  
   // Notify all listeners
   homeworkChangeListeners.forEach(listener => {
     try {
@@ -372,18 +387,9 @@ export const getHomeworkForDate = async (classId: string, date: Date): Promise<H
 };
 
 // Get homework assignments for a specific class
-export const getHomeworkForClass = async (classId: string): Promise<Homework[]> => {
-  try {
-    logQuery('Getting homework for class', { classId });
-    // Get current month's homework
-    const now = new Date();
-    const result = await getHomeworkForMonth(classId, now);
-    logQuery('Homework for class result', { classId, size: result.length });
-    return result;
-  } catch (error) {
-    logQuery('Error getting homework for class', error);
-    throw error;
-  }
+export const getHomeworkForClass = async (classId: string, date: Date = new Date()): Promise<Homework[]> => {
+  // Simply forward the request to getHomeworkForMonth
+  return getHomeworkForMonth(classId, date);
 };
 
 // Get homework assignments for a specific student
@@ -892,6 +898,77 @@ export const updateHomework = async (
     notifyHomeworkChange(classId);
   } catch (error) {
     logQuery('Error updating homework', error);
+    throw error;
+  }
+};
+
+// Delete a specific file from a homework submission
+export const deleteHomeworkSubmissionFile = async (
+  submissionId: string,
+  fileIndex: number
+): Promise<void> => {
+  try {
+    // Get the submission to find the homework and class
+    logQuery('Getting submission document for file deletion', { submissionId, fileIndex });
+    const submissionDoc = await getDoc(doc(db, SUBMISSION_COLLECTION, submissionId));
+    
+    if (!submissionDoc.exists()) {
+      throw new Error('Submission not found');
+    }
+    
+    const submissionData = submissionDoc.data() as HomeworkSubmission;
+    
+    // Validate file index
+    if (!submissionData.files || submissionData.files.length <= fileIndex || fileIndex < 0) {
+      throw new Error('File not found');
+    }
+    
+    // Get the file to be deleted
+    const fileToDelete = submissionData.files[fileIndex];
+    
+    // Get the homework to retrieve the class ID for cache invalidation
+    logQuery('Getting homework document', { homeworkId: submissionData.homeworkId });
+    const homeworkSnap = await getDoc(doc(db, HOMEWORK_COLLECTION, submissionData.homeworkId));
+    
+    if (!homeworkSnap.exists()) {
+      throw new Error('Homework not found');
+    }
+    
+    const homeworkData = homeworkSnap.data() as Homework;
+    const classId = homeworkData.classId;
+    
+    // Delete the file from storage
+    try {
+      // Extract storage path from URL
+      const url = new URL(fileToDelete.url);
+      const storagePath = decodeURIComponent(url.pathname.split('/o/')[1].split('?')[0]);
+      const storageRef = ref(storage, storagePath);
+      
+      logQuery('Deleting submission file from storage', { storagePath });
+      await deleteObject(storageRef);
+    } catch (error) {
+      logQuery('Error deleting file from storage', { error });
+      // Continue with document update even if file deletion fails
+    }
+    
+    // Update the submission document to remove the file
+    const updatedFiles = [...submissionData.files];
+    updatedFiles.splice(fileIndex, 1);
+    
+    logQuery('Updating submission document', { submissionId, remainingFiles: updatedFiles.length });
+    await updateDoc(doc(db, SUBMISSION_COLLECTION, submissionId), {
+      files: updatedFiles,
+      updatedAt: new Date()
+    });
+    
+    // Invalidate cache
+    logQuery('Invalidating submissions cache');
+    await invalidateCache(SUBMISSION_COLLECTION);
+    
+    // Notify about the change
+    notifyHomeworkChange(classId);
+  } catch (error) {
+    logQuery('Error deleting homework submission file', error);
     throw error;
   }
 }; 

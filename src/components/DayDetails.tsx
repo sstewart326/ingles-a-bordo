@@ -631,6 +631,20 @@ export const DayDetails = ({
     </div>
   );
 
+  // Add a debugging useEffect
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && selectedDayDetails) {
+      console.log('DayDetails materials map:', {
+        date: selectedDayDetails.date,
+        classes: selectedDayDetails.classes.length,
+        materialsMap: Object.keys(selectedDayDetails.materials).map(key => ({
+          classId: key,
+          count: selectedDayDetails.materials[key]?.length || 0
+        }))
+      });
+    }
+  }, [selectedDayDetails]);
+
   if (!selectedDayDetails) {
     return (
       <div className="bg-white rounded-lg p-6 h-full flex items-center justify-center text-gray-500">

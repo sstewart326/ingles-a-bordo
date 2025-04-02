@@ -16,7 +16,6 @@ import {
 } from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { cache } from '../utils/cache';
 import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 import Modal from '../components/Modal';

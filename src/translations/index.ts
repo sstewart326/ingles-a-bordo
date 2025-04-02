@@ -349,6 +349,8 @@ interface Translation {
   noUpcomingHomework: string;
   noPastHomework: string;
   yourHomework: string;
+  fileDeleted: string;
+  deleteFile: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -701,6 +703,8 @@ const translations: Record<Language, Translation> = {
     noUpcomingHomework: 'No upcoming homework assignments.',
     noPastHomework: 'No past homework assignments.',
     yourHomework: 'Your Homework',
+    fileDeleted: 'File deleted successfully',
+    deleteFile: 'Delete File',
   },
   'pt-BR': {
     // Auth & Profile
@@ -1028,29 +1032,31 @@ const translations: Record<Language, Translation> = {
     templateStructureNote: 'Para alterações mais complexas na estrutura do modelo, aplique o modelo a um plano de aula, faça suas alterações lá e salve como um novo modelo.',
 
     // Homework
-    homework: 'Tarefa',
-    addHomework: 'Adicionar Tarefa',
-    noHomework: 'Sem tarefa',
-    homeworkTitle: 'Título',
+    homework: 'Lição de Casa',
+    addHomework: 'Adicionar Lição',
+    noHomework: 'Nenhuma lição atribuída',
+    homeworkTitle: 'Título da Lição',
     homeworkDescription: 'Descrição',
-    allowTextSubmission: 'Permitir envio de texto',
-    allowFileSubmission: 'Permitir envio de arquivo',
+    allowTextSubmission: 'Permitir resposta em texto',
+    allowFileSubmission: 'Permitir envio de arquivos',
     submissionType: 'Tipo de Envio',
     dueDate: 'Data de Entrega',
-    noHomeworkAssignments: 'Nenhuma tarefa encontrada.',
+    noHomeworkAssignments: 'Nenhuma lição atribuída',
     homeworkSubmissions: 'Envios dos Alunos',
-    noSubmissionsYet: 'Nenhum envio ainda.',
+    noSubmissionsYet: 'Nenhum envio ainda',
     submittedOn: 'Enviado em',
     grade: 'Nota',
     feedback: 'Feedback',
     submitFeedback: 'Enviar Feedback',
     upcoming: 'Próximas',
     past: 'Passadas',
-    upcomingHomework: 'Próximas Tarefas',
-    pastHomework: 'Tarefas Passadas',
-    noUpcomingHomework: 'Nenhuma tarefa futura.',
-    noPastHomework: 'Nenhuma tarefa passada.',
-    yourHomework: 'Suas Tarefas',
+    upcomingHomework: 'Próximas Lições',
+    pastHomework: 'Lições Passadas',
+    noUpcomingHomework: 'Nenhuma lição futura',
+    noPastHomework: 'Nenhuma lição passada',
+    yourHomework: 'Suas Lições',
+    fileDeleted: 'Arquivo excluído com sucesso',
+    deleteFile: 'Excluir Arquivo',
   }
 };
 

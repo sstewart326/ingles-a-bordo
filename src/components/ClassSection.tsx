@@ -40,7 +40,8 @@ interface ClassSectionProps {
   homeworkByClassId?: Record<string, Homework[]>;
   refreshHomework?: () => Promise<void>;
   hideDateDisplay?: boolean;
-  noContainer?: boolean; // Add this prop to optionally hide the container
+  noContainer?: boolean;
+  disableDateFiltering?: boolean;
   t: {
     upcomingClasses: string;
     pastClasses: string;
@@ -96,6 +97,7 @@ export const ClassSection = ({
   refreshHomework,
   hideDateDisplay = false,
   noContainer = false, // Default to false to maintain backward compatibility
+  disableDateFiltering = false,
   t
 }: ClassSectionProps) => {
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
@@ -443,8 +445,30 @@ export const ClassSection = ({
                                     const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
                                     const displayDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
                                     
+                                    // When disableDateFiltering is enabled in DayDetails view, we actually 
+                                    // DO want to filter by the specific day that's selected
+                                    // This ensures materials for each day are shown correctly
                                     return materialDay.getTime() === displayDay.getTime();
                                   };
+                                  
+                                  // Log material details for debugging in development
+                                  if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) {
+                                    const allFilteredMaterials = allMaterials.filter(isForCurrentDate);
+                                    console.log('ClassSection - Materials filtered by date:', {
+                                      classId: classSession.id,
+                                      date: date instanceof Date ? date.toISOString().split('T')[0] : 'invalid date',
+                                      totalMaterials: allMaterials.length,
+                                      filteredMaterials: allFilteredMaterials.length,
+                                      materialDates: allMaterials.map(m => ({
+                                        id: m.id,
+                                        date: m.classDate instanceof Date 
+                                          ? m.classDate.toISOString().split('T')[0] 
+                                          : m.classDate 
+                                          ? new Date(m.classDate).toISOString().split('T')[0]
+                                          : 'no date'
+                                      }))
+                                    });
+                                  }
                                   
                                   return allMaterials.filter(isForCurrentDate);
                                 })().map((material, index) => (

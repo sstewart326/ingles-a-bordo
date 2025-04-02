@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Homework } from '../types/interfaces';
-import { getHomeworkForMonth } from '../utils/homeworkUtils';
+import { getHomeworkForMonth, subscribeToHomeworkChanges, clearHomeworkCache } from '../utils/homeworkUtils';
 import { HomeworkSubmission } from './HomeworkSubmission';
 import { FaChevronDown, FaChevronUp, FaFilePdf, FaFileWord, FaFilePowerpoint, FaFileAudio, FaFileVideo, FaFile } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -27,36 +27,82 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
   const [expandedHomeworkId, setExpandedHomeworkId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
-  useEffect(() => {
-    const fetchHomework = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // Get all homework for the month
-        const monthHomework = await getHomeworkForMonth(classId, classDate);
-        
-        // Filter for the specific date
-        const dateString = classDate.toISOString().split('T')[0];
-        const homeworkForDate = monthHomework.filter(hw => {
-          const hwDateStr = hw.classDate.toISOString().split('T')[0];
-          return hwDateStr === dateString;
-        });
-        
-        setHomeworkList(homeworkForDate);
-      } catch (error) {
-        console.error('Error fetching homework:', error);
-        setError(t.failedToLoad);
-        toast.error(t.failedToLoad);
-      } finally {
-        setIsLoading(false);
+  const fetchHomework = useCallback(async (forceRefresh = false) => {
+    if (!classId || !classDate || !isOpen) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      if (forceRefresh) {
+        clearHomeworkCache();
       }
-    };
-
-    if (classId && classDate && isOpen) {
-      fetchHomework();
+      
+      const monthHomework = await getHomeworkForMonth(classId, classDate);
+      
+      const dateString = classDate.toISOString().split('T')[0];
+      const homeworkForDate = monthHomework.filter(hw => {
+        const hwDateStr = hw.classDate.toISOString().split('T')[0];
+        return hwDateStr === dateString;
+      });
+      
+      setHomeworkList(homeworkForDate);
+      console.log(`ScheduleHomeworkView: Fetched ${homeworkForDate.length} homework assignments for ${dateString}`);
+    } catch (error) {
+      console.error('Error fetching homework:', error);
+      setError(t.failedToLoad);
+      toast.error(t.failedToLoad);
+    } finally {
+      setIsLoading(false);
     }
   }, [classId, classDate, isOpen, t]);
+
+  useEffect(() => {
+    fetchHomework(refreshCounter > 0);
+  }, [fetchHomework, refreshCounter]);
+
+  useEffect(() => {
+    if (!classId || !isOpen) return;
+    
+    console.log(`ScheduleHomeworkView: Setting up homework change subscription for class ${classId}`);
+    
+    const unsubscribe = subscribeToHomeworkChanges((updatedClassId) => {
+      console.log(`ScheduleHomeworkView: Received homework change for class ${updatedClassId}, our class: ${classId}`);
+      
+      if (updatedClassId === classId) {
+        console.log(`ScheduleHomeworkView: Refreshing homework for class ${classId} due to change notification`);
+        
+        clearHomeworkCache();
+        fetchHomework(true);
+        
+        setRefreshCounter(prev => prev + 1);
+      } else {
+        setRefreshCounter(prev => prev + 1);
+      }
+    });
+    
+    return () => {
+      console.log(`ScheduleHomeworkView: Cleaning up homework change subscription for class ${classId}`);
+      unsubscribe();
+    };
+  }, [classId, isOpen, fetchHomework]);
+
+  useEffect(() => {
+    if (!classId || !isOpen || homeworkList.length === 0) return;
+    
+    console.log(`ScheduleHomeworkView: Setting up refresh timer for homework`);
+    
+    const timer = setTimeout(() => {
+      console.log(`ScheduleHomeworkView: Running timed refresh for homework`);
+      fetchHomework(true);
+    }, 2000);
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [classId, isOpen, homeworkList.length, fetchHomework]);
 
   const toggleExpandHomework = (homeworkId: string) => {
     setExpandedHomeworkId(expandedHomeworkId === homeworkId ? null : homeworkId);
@@ -73,26 +119,20 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
 
   const formatDate = (date: any) => {
     try {
-      // Handle various date formats
       let jsDate: Date;
       
-      // If it's already a Date object
       if (date instanceof Date) {
         jsDate = date;
       }
-      // If it's a string, convert to Date
       else if (typeof date === 'string') {
         jsDate = new Date(date);
       }
-      // If it's a Firestore Timestamp (has toDate method)
       else if (typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
         jsDate = date.toDate();
       }
-      // If it's a number, treat as milliseconds
       else if (typeof date === 'number') {
         jsDate = new Date(date);
       }
-      // Default case
       else {
         console.warn('Unknown date format in formatDate:', date);
         return 'Unknown date';
@@ -155,7 +195,6 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
             
             {expandedHomeworkId === homework.id && (
               <div className="p-3 border-t">
-                {/* Description */}
                 {homework.description && (
                   <div className="mb-3">
                     <h5 className="font-medium text-xs mb-1 text-gray-700">Description:</h5>
@@ -165,7 +204,6 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
                   </div>
                 )}
                 
-                {/* Attached Files */}
                 {homework.documents && homework.documents.length > 0 && (
                   <div className="mb-3">
                     <h5 className="font-medium text-xs mb-1 text-gray-700">Attached Files:</h5>
@@ -194,7 +232,6 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
                   </div>
                 )}
                 
-                {/* Submission Section - only shown if student is logged in */}
                 {studentEmail ? (
                   <div className="mt-3">
                     <HomeworkSubmission 

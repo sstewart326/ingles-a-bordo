@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Homework } from '../types/interfaces';
 import { getHomeworkForMonth, deleteHomework, getHomeworkSubmissions, addHomeworkFeedback, subscribeToHomeworkChanges, updateHomework } from '../utils/homeworkUtils';
-import { FaTrash, FaInbox, FaUserGraduate } from 'react-icons/fa';
+import { FaTrash, FaInbox, FaUserGraduate, FaFilePdf, FaFileWord, FaFilePowerpoint, FaFileAudio, FaFileVideo, FaFile } from 'react-icons/fa';
 import { HomeworkForm } from './HomeworkForm';
 import toast from 'react-hot-toast';
 import { styles } from '../styles/styleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { logQuery } from '../utils/firebaseUtils';
+import Modal from './Modal';
+
 interface HomeworkManagerProps {
   classId: string;
   classDate: Date;
@@ -295,7 +297,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({
   }
 
   return (
-    <div className="mt-4 w-full overflow-hidden" style={{ position: 'relative', zIndex: 10, boxSizing: 'border-box', maxWidth: '100%' }}>
+    <div className="mt-4 w-full overflow-hidden" style={{ position: 'relative', boxSizing: 'border-box', maxWidth: '100%' }}>
       <div className="flex justify-between items-center">
         <div className={styles.card.label}>{t.homework}</div>
         {isAdmin && (
@@ -605,6 +607,8 @@ const HomeworkSubmissionsManager: React.FC<HomeworkSubmissionsManagerProps> = ({
   const t = useTranslation(language);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewingSubmission, setViewingSubmission] = useState<any>(null);
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -646,6 +650,11 @@ const HomeworkSubmissionsManager: React.FC<HomeworkSubmissionsManagerProps> = ({
       minute: '2-digit'
     });
   };
+
+  const handleViewSubmission = (submission: any) => {
+    setViewingSubmission(submission);
+    setShowSubmissionModal(true);
+  };
   
   return (
     <div className="space-y-2">
@@ -658,12 +667,20 @@ const HomeworkSubmissionsManager: React.FC<HomeworkSubmissionsManagerProps> = ({
                 {t.submittedOn}: {formatDate(submission.submittedAt)}
               </div>
             </div>
-            <button
-              onClick={() => onEditFeedback(submission.id, submission.feedback, submission.grade)}
-              className="text-blue-600 hover:text-blue-800 text-sm"
-            >
-              {submission.feedback ? t.edit : t.submitFeedback}
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handleViewSubmission(submission)}
+                className="text-indigo-600 hover:text-indigo-800 text-sm"
+              >
+                View Submission
+              </button>
+              <button
+                onClick={() => onEditFeedback(submission.id, submission.feedback, submission.grade)}
+                className="text-blue-600 hover:text-blue-800 text-sm"
+              >
+                {submission.feedback ? t.edit : t.submitFeedback}
+              </button>
+            </div>
           </div>
           
           {submission.feedback && (
@@ -679,6 +696,87 @@ const HomeworkSubmissionsManager: React.FC<HomeworkSubmissionsManagerProps> = ({
           )}
         </div>
       ))}
+
+      {/* Submission View Modal */}
+      {viewingSubmission && (
+        <Modal isOpen={showSubmissionModal} onClose={() => setShowSubmissionModal(false)}>
+          <div className="p-4">
+            <h3 className="text-lg font-semibold mb-4">
+              Submission from {viewingSubmission.studentName || viewingSubmission.studentEmail}
+            </h3>
+            
+            <div className="text-sm text-gray-500 mb-4">
+              Submitted on {formatDate(viewingSubmission.submittedAt)}
+            </div>
+            
+            {/* Text Response */}
+            {viewingSubmission.textResponse && (
+              <div className="mb-6">
+                <h4 className="text-md font-medium mb-2">Written Response:</h4>
+                <div className="bg-gray-50 p-4 rounded-md border border-gray-200 whitespace-pre-line">
+                  {viewingSubmission.textResponse}
+                </div>
+              </div>
+            )}
+            
+            {/* Submitted Files */}
+            {viewingSubmission.files && viewingSubmission.files.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-md font-medium mb-2">Submitted Files:</h4>
+                <ul className="bg-gray-50 rounded-md border border-gray-200 divide-y divide-gray-200">
+                  {viewingSubmission.files.map((file: any, index: number) => {
+                    // Helper function to get file icon
+                    const getFileIcon = (type: string) => {
+                      if (type.includes('pdf')) return <FaFilePdf className="text-red-500" />;
+                      if (type.includes('word')) return <FaFileWord className="text-blue-500" />;
+                      if (type.includes('powerpoint')) return <FaFilePowerpoint className="text-orange-500" />;
+                      if (type.includes('audio')) return <FaFileAudio className="text-purple-500" />;
+                      if (type.includes('video')) return <FaFileVideo className="text-green-500" />;
+                      return <FaFile className="text-gray-500" />;
+                    };
+                    
+                    return (
+                      <li key={index} className="p-3 flex items-center justify-between">
+                        <div className="flex items-center">
+                          {getFileIcon(file.type)}
+                          <span className="text-sm ml-2">{file.name}</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                          </span>
+                        </div>
+                        <a 
+                          href={file.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-white hover:text-blue-700 hover:border hover:border-blue-700 transition-all"
+                        >
+                          Download
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            
+            {/* If there's no content */}
+            {!viewingSubmission.textResponse && (!viewingSubmission.files || viewingSubmission.files.length === 0) && (
+              <div className="text-center py-6 text-gray-500">
+                No content in this submission.
+              </div>
+            )}
+            
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setShowSubmissionModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }; 
