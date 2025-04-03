@@ -1166,6 +1166,35 @@ export const AdminSchedule = () => {
     });
   };
 
+  // Add sorting function before the return statement
+  const getSortedClasses = () => {
+    return [...classes].sort((a, b) => {
+      if (a.scheduleType === 'multiple' && b.scheduleType === 'multiple') {
+        // For multiple schedules, sort by the first schedule's day and time
+        const aSchedule = a.schedules[0];
+        const bSchedule = b.schedules[0];
+        if (!aSchedule || !bSchedule) return 0;
+        
+        if (aSchedule.dayOfWeek !== bSchedule.dayOfWeek) {
+          return aSchedule.dayOfWeek - bSchedule.dayOfWeek;
+        }
+        return aSchedule.startTime.localeCompare(bSchedule.startTime);
+      } else if (a.scheduleType === 'multiple') {
+        // Multiple schedule classes come after single schedule
+        return 1;
+      } else if (b.scheduleType === 'multiple') {
+        // Single schedule classes come before multiple schedule
+        return -1;
+      } else {
+        // Both are single schedule
+        if (a.dayOfWeek !== b.dayOfWeek) {
+          return a.dayOfWeek - b.dayOfWeek;
+        }
+        return a.startTime.localeCompare(b.startTime);
+      }
+    });
+  };
+
   return (
     <div className="flex-1">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1813,7 +1842,7 @@ export const AdminSchedule = () => {
 
         {showMobileView ? (
           <div className="space-y-4">
-            {classes.map(renderMobileCard)}
+            {getSortedClasses().map(renderMobileCard)}
           </div>
         ) : (
           <div className="bg-white shadow-md rounded-lg overflow-hidden relative">
@@ -1860,7 +1889,7 @@ export const AdminSchedule = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {classes.map((classItem) => (
+                    {getSortedClasses().map((classItem) => (
                       <tr key={classItem.id}>
                         <td className={`${styles.table.cell} text-center`}>
                           <div className="flex justify-center items-center gap-3">
