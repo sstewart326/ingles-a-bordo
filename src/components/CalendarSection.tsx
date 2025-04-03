@@ -31,7 +31,6 @@ export const CalendarSection = ({
 }: CalendarSectionProps) => {
   const { currentUser } = useAuth();
   const [completedPayments, setCompletedPayments] = useState<Payment[]>([]);
-  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
   const previousClassMonthRef = useRef<string>('');
   const previousPaymentMonthRef = useRef<string>('');
   const calendarClassesRef = useRef<Record<string, ClassSession[]>>({});
@@ -80,11 +79,6 @@ export const CalendarSection = ({
         return;
       }
       
-      // Only set loading if this isn't the initial load
-      if (previousPaymentMonthRef.current !== '') {
-        setIsLoadingPayments(true);
-      }
-      
       try {
         const payments = await getPaymentsByTeacherAndMonth(
           currentUser.uid,
@@ -95,8 +89,6 @@ export const CalendarSection = ({
       } catch (error) {
         console.error('Error fetching payments:', error);
         setCompletedPayments([]);
-      } finally {
-        setIsLoadingPayments(false);
       }
     };
 

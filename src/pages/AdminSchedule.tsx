@@ -858,12 +858,6 @@ export const AdminSchedule = () => {
               </div>
             </div>
             <div className="mt-2">
-              <div className={styles.card.label}>Payment Type</div>
-              <div className="text-gray-800">
-                {classItem.paymentConfig?.type === 'weekly' ? 'Weekly' : 'Monthly'}
-              </div>
-            </div>
-            <div className="mt-2">
               <div className={styles.card.label}>Payment Details</div>
               <div className="text-sm text-gray-600 mt-1">
                 <span className="font-medium">Payment:</span> {classItem.paymentConfig?.type === 'weekly'
@@ -917,28 +911,34 @@ export const AdminSchedule = () => {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
             <button
               onClick={() => openEditModal(classItem)}
-              className={styles.buttons.primary}
+              className="p-2 text-indigo-600 hover:text-indigo-800 transition-colors duration-200"
+              title={t.edit}
             >
-              {t.edit}
+              <PencilIcon className="h-5 w-5" />
+              <span className="sr-only">{t.edit}</span>
             </button>
             <button
               onClick={() => handleDeleteClass(classItem.id)}
               disabled={deletingClassId === classItem.id}
-              className={`${styles.buttons.danger} ${deletingClassId === classItem.id ? 'opacity-80' : ''} flex items-center justify-center`}
+              className={`p-2 ${deletingClassId === classItem.id ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:text-red-800'} transition-colors duration-200`}
+              title={t.delete}
             >
               {deletingClassId === classItem.id ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  {"Deleting..."}
+                  <span className="sr-only">Deleting...</span>
                 </>
               ) : (
-                t.delete
+                <>
+                  <TrashIcon className="h-5 w-5" />
+                  <span className="sr-only">{t.delete}</span>
+                </>
               )}
             </button>
           </div>
@@ -1862,8 +1862,8 @@ export const AdminSchedule = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                     <tr>
-                      <th scope="col" className={`${styles.table.header} text-center`}>
-                        {t.actions}
+                      <th scope="col" className={`${styles.table.header} w-20`}>
+                        {/* Empty header for actions */}
                       </th>
                       <th scope="col" className={styles.table.header}>
                         {t.dayAndTime}
@@ -1890,18 +1890,22 @@ export const AdminSchedule = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {getSortedClasses().map((classItem) => (
-                      <tr key={classItem.id}>
-                        <td className={`${styles.table.cell} text-center`}>
-                          <div className="flex justify-center items-center gap-3">
-                            <Tooltip text={t.edit} width="w-20">
+                      <tr key={classItem.id} className="group hover:bg-gray-50">
+                        <td className={`${styles.table.cell} w-20`}>
+                          <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <div className="relative">
                               <button
                                 onClick={() => openEditModal(classItem)}
                                 className="p-1.5 text-indigo-600 hover:text-indigo-800 rounded-full hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                               >
                                 <PencilIcon className="h-4 w-4" />
+                                <span className="sr-only">{t.edit}</span>
                               </button>
-                            </Tooltip>
-                            <Tooltip text={deletingClassId === classItem.id ? "Deleting..." : t.delete} width="w-20">
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 invisible hover:opacity-100 hover:visible transition-opacity duration-200 whitespace-nowrap">
+                                {t.edit}
+                              </div>
+                            </div>
+                            <div className="relative">
                               <button
                                 onClick={() => handleDeleteClass(classItem.id)}
                                 disabled={deletingClassId === classItem.id}
@@ -1919,21 +1923,25 @@ export const AdminSchedule = () => {
                                 ) : (
                                   <TrashIcon className="h-4 w-4" />
                                 )}
+                                <span className="sr-only">{deletingClassId === classItem.id ? "Deleting..." : t.delete}</span>
                               </button>
-                            </Tooltip>
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 invisible hover:opacity-100 hover:visible transition-opacity duration-200 whitespace-nowrap">
+                                {deletingClassId === classItem.id ? "Deleting..." : t.delete}
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td className={styles.table.cell}>
                           {classItem.scheduleType === 'single' ? (
                             <>
-                          {getDayName(classItem.dayOfWeek, t)}<br />
-                          {formatTimeWithTimezones(
-                            classItem.startTime,
-                            classItem.endTime,
-                            classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-                            Intl.DateTimeFormat().resolvedOptions().timeZone,
-                            classItem.startDate?.toDate()
-                          )}
+                              {getDayName(classItem.dayOfWeek, t)}<br />
+                              {formatTimeWithTimezones(
+                                classItem.startTime,
+                                classItem.endTime,
+                                classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+                                Intl.DateTimeFormat().resolvedOptions().timeZone,
+                                classItem.startDate?.toDate()
+                              )}
                             </>
                           ) : (
                             <div className="max-h-32 overflow-y-auto">
