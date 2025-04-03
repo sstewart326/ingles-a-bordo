@@ -1040,19 +1040,6 @@ export const AdminClassPlans = () => {
                         </button>
                       </Tooltip>
                       
-                      {templates.length > 0 && (
-                        <button
-                          onClick={() => {
-                            setSelectedTemplate('');
-                            setShowApplyTemplateModal(true);
-                          }}
-                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        >
-                          <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                          Apply Template
-                        </button>
-                      )}
-                      
                       <button
                         onClick={() => setShowDeletePlanModal(true)}
                         className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
@@ -1394,20 +1381,7 @@ export const AdminClassPlans = () => {
               </p>
             )}
             
-            {!classPlan && (
-              <div className="bg-blue-50 p-4 rounded-md">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <InformationCircleIcon className="h-5 w-5 text-blue-400" aria-hidden="true" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-blue-700">
-                      No plan exists for {months[selectedMonth]} {selectedYear}. A new plan will be created when you apply this template.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+            
             
             <div className="flex justify-end space-x-3 pt-4">
               <button
