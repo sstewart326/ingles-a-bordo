@@ -825,10 +825,16 @@ export const AdminSchedule = () => {
                 <div className="text-gray-800">
                   {classItem.schedules && classItem.schedules.length > 0 ? (
                     <div className="space-y-1">
-                      {classItem.schedules.map((schedule: ClassSchedule, index) => (
-                        <div key={index} className="flex items-center text-sm">
-                          <span className="font-medium mr-2">{DAYS_OF_WEEK[schedule.dayOfWeek]}:</span>
-                          <span>{schedule.startTime} - {schedule.endTime}</span>
+                      {classItem.schedules.map((schedule: ClassSchedule, index: number) => (
+                        <div key={index} className="text-sm">
+                          <span className="font-medium">{DAYS_OF_WEEK[schedule.dayOfWeek]}:</span>{' '}
+                          {formatTimeWithTimezones(
+                            schedule.startTime,
+                            schedule.endTime,
+                            schedule.timezone || classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            classItem.startDate?.toDate()
+                          )}
                         </div>
                       ))}
                     </div>
@@ -2362,6 +2368,7 @@ export const AdminSchedule = () => {
                   </div>
                 </div>
                 
+                {/* Contract Section */}
                 <div>
                   <label className={styles.form.label}>
                     Contract (PDF, max 5MB)
@@ -2379,13 +2386,25 @@ export const AdminSchedule = () => {
                           href={editingClass.contractUrl} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-indigo-600 hover:text-indigo-800 mr-2"
+                          className="text-indigo-600 hover:text-indigo-800 mr-2 text-sm"
                         >
                           View Current Contract
                         </a>
-                        <span className="text-sm text-gray-500">
-                          (Upload a new file to replace)
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingClass((prev: any) => ({
+                              ...prev!,
+                              contractUrl: ''
+                            }));
+                          }}
+                          className="p-0.5 bg-red-600 rounded-full hover:bg-red-700 transition-colors"
+                          aria-label="Delete contract"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                        </button>
                       </div>
                     )}
                     <input
@@ -2399,9 +2418,22 @@ export const AdminSchedule = () => {
                         file:bg-indigo-50 file:text-indigo-700
                         hover:file:bg-indigo-100"
                     />
+                    <span className="text-sm text-gray-500">
+                      (Upload a new file to replace)
+                    </span>
                     {editContractFile && (
-                      <div className="mt-2 text-sm text-gray-700">
-                        Selected file: {editContractFile.name}
+                      <div className="mt-2 text-sm text-gray-700 flex items-center">
+                        <span>Selected file: {editContractFile.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditContractFile(null)}
+                          className="p-0.5 bg-red-600 rounded-full hover:bg-red-700 transition-colors ml-2"
+                          aria-label="Remove selected file"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                        </button>
                       </div>
                     )}
                   </div>
