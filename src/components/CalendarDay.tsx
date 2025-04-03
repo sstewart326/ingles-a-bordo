@@ -140,14 +140,7 @@ export function CalendarDay({
   const createBirthdayTooltip = (): string => {
     if (!birthdays.length) return '';
     
-    return birthdays.map(user => {
-      // Format the date string for display
-      const formattedDate = new Date(new Date().getFullYear(), parseInt(month) - 1, parseInt(day))
-        .toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', { 
-          month: 'long', 
-          day: 'numeric' 
-        });
-      
+    return birthdays.map(user => {      
       return `${user.name}`;
     }).join('\n\n');
   };

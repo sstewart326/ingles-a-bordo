@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Select, { MultiValue, StylesConfig } from 'react-select';
 import DatePicker from 'react-datepicker';

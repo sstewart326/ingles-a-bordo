@@ -44,6 +44,7 @@ export const Dashboard = () => {
   const [lastVisitTimestamp, setLastVisitTimestamp] = useState<number>(Date.now());
   const prevPathRef = useRef<string | null>(null);
   const isFetchingRef = useRef<boolean>(false);
+  const [isLoadingCalendarData, setIsLoadingCalendarData] = useState(false);
 
   const [homeworkByClassId, setHomeworkByClassId] = useState<Record<string, Homework[]>>({});
   const lastHomeworkFetchRef = useRef<number>(0);
@@ -365,10 +366,12 @@ export const Dashboard = () => {
   useEffect(() => {
     if (!authLoading && !adminLoading && currentUser && !initialDataFetched && !isFetchingRef.current) {
       isFetchingRef.current = true;
+      setIsLoadingCalendarData(true);
       fetchClasses(new Date(), true).finally(() => {
         isFetchingRef.current = false;
+        setIsLoadingCalendarData(false);
+        setInitialDataFetched(true);
       });
-      setInitialDataFetched(true);
     }
   }, [authLoading, adminLoading, currentUser, initialDataFetched, fetchClasses]);
 
@@ -398,8 +401,10 @@ export const Dashboard = () => {
     // If we're coming back to the dashboard from another page
     if (currentPath === '/dashboard' && prevPathRef.current && prevPathRef.current !== '/dashboard' && !isFetchingRef.current) {
       isFetchingRef.current = true;
+      setIsLoadingCalendarData(true);
       fetchClasses(selectedDate, false).finally(() => {
         isFetchingRef.current = false;
+        setIsLoadingCalendarData(false);
       });
       setLastVisitTimestamp(Date.now());
     }
@@ -415,8 +420,10 @@ export const Dashboard = () => {
         // If it's been more than 5 minutes since last visit, refresh data
         if (now - lastVisitTimestamp > 5 * 60 * 1000) {
           isFetchingRef.current = true;
+          setIsLoadingCalendarData(true);
           fetchClasses(selectedDate, false).finally(() => {
             isFetchingRef.current = false;
+            setIsLoadingCalendarData(false);
           });
           setLastVisitTimestamp(now);
         }
@@ -449,27 +456,24 @@ export const Dashboard = () => {
     };
   }, [isMobileView]);
 
-  const handleMonthChange = (newDate: Date) => {
-    // Only update the selected date and fetch classes if the month or year has changed
-    const currentMonth = selectedDate.getMonth();
-    const currentYear = selectedDate.getFullYear();
+  const handleMonthChange = async (newDate: Date) => {
+    setSelectedDate(newDate);
+    setIsLoadingCalendarData(true);
+    
+    // Fetch data for the new month
     const newMonth = newDate.getMonth();
     const newYear = newDate.getFullYear();
-
-    if (currentMonth !== newMonth || currentYear !== newYear) {
-      setSelectedDate(newDate);
-
+    
+    try {
       // Check if we've already loaded this month
       const monthKey = getMonthKey(newDate);
       if (!loadedMonths.has(monthKey) && !isFetchingRef.current) {
         isFetchingRef.current = true;
-        fetchClasses(newDate, false).finally(() => {
-          isFetchingRef.current = false;
-        });
+        await fetchClasses(newDate, false);
       }
-    } else {
-      // If only the day changed, just update the selected date
-      setSelectedDate(newDate);
+    } finally {
+      isFetchingRef.current = false;
+      setIsLoadingCalendarData(false);
     }
   };
 
@@ -1239,6 +1243,7 @@ export const Dashboard = () => {
             isDateInRelevantMonthRange={isDateInRelevantMonthRange}
             getClassesForDay={getClassesForDay}
             users={users}
+            isLoading={isLoadingCalendarData}
           />
         </div>
 

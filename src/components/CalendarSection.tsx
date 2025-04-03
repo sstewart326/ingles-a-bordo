@@ -16,6 +16,7 @@ interface CalendarSectionProps {
   isDateInRelevantMonthRange: (date: Date, selectedDate?: Date) => boolean;
   getClassesForDay: (dayOfWeek: number, date: Date) => ClassSession[];
   users: User[];
+  isLoading?: boolean;
 }
 
 export const CalendarSection = ({
@@ -25,14 +26,16 @@ export const CalendarSection = ({
   onDayClick,
   isDateInRelevantMonthRange,
   getClassesForDay,
-  users
+  users,
+  isLoading = false
 }: CalendarSectionProps) => {
   const { currentUser } = useAuth();
   const [completedPayments, setCompletedPayments] = useState<Payment[]>([]);
-  const [isLoadingPayments, setIsLoadingPayments] = useState(true);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
   const previousClassMonthRef = useRef<string>('');
   const previousPaymentMonthRef = useRef<string>('');
   const calendarClassesRef = useRef<Record<string, ClassSession[]>>({});
+  const initialLoadDoneRef = useRef(false);
 
   // Cache classes for each day to prevent recalculation
   const getClassesForDayWithCache = useCallback((date: Date) => {
@@ -57,13 +60,18 @@ export const CalendarSection = ({
 
   // Fetch all payments for the visible month
   useEffect(() => {
+    // Skip payment fetch on initial render until classes are loaded
+    if (!initialLoadDoneRef.current && isLoading) {
+      return;
+    }
+    initialLoadDoneRef.current = true;
+
     const currentMonth = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}`;
     
     const fetchMonthPayments = async () => {
-      // Don't fetch if we're already loading or if we don't have a user ID
-      if (isLoadingPayments || !currentUser?.uid) {
+      // Don't fetch if we don't have a user ID
+      if (!currentUser?.uid) {
         setCompletedPayments([]);
-        setIsLoadingPayments(false);
         return;
       }
 
@@ -72,10 +80,12 @@ export const CalendarSection = ({
         return;
       }
       
-      setIsLoadingPayments(true);
+      // Only set loading if this isn't the initial load
+      if (previousPaymentMonthRef.current !== '') {
+        setIsLoadingPayments(true);
+      }
       
       try {
-        // Use the new teacher-based lookup, more efficient
         const payments = await getPaymentsByTeacherAndMonth(
           currentUser.uid,
           selectedDate
@@ -91,7 +101,7 @@ export const CalendarSection = ({
     };
 
     fetchMonthPayments();
-  }, [selectedDate, currentUser?.uid, isLoadingPayments]);
+  }, [selectedDate, currentUser?.uid, isLoading]);
 
   const handleDayClick = useCallback((date: Date) => {
     const classes = getClassesForDayWithCache(date);
@@ -109,7 +119,7 @@ export const CalendarSection = ({
       selectedDate={selectedDate}
       onMonthChange={onMonthChange}
       onDayClick={handleDayClick}
-      isLoading={isLoadingPayments}
+      isLoading={isLoading}
       renderDay={(date, isToday) => {
         const dayPaymentsDue = getPaymentsDueForDay(
           date, 
@@ -126,7 +136,7 @@ export const CalendarSection = ({
             paymentsDue={dayPaymentsDue}
             isDateInRelevantMonthRange={isDateInRelevantMonthRange}
             completedPayments={completedPayments}
-            isLoading={isLoadingPayments}
+            isLoading={isLoading}
             users={users}
             onDayClick={handleDayClick}
             onClassCountClick={(_) => handleDayClick(date)}

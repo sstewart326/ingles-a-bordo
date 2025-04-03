@@ -29,7 +29,6 @@ import {
   PencilIcon, 
   CheckIcon, 
   DocumentDuplicateIcon,
-  InformationCircleIcon,
   ChevronLeftIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
