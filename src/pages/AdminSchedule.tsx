@@ -1488,8 +1488,18 @@ export const AdminSchedule = () => {
                           hover:file:bg-indigo-100"
                       />
                       {contractFile && (
-                        <div className="mt-2 text-sm text-gray-700">
-                          Selected file: {contractFile.name}
+                        <div className="mt-2 text-sm text-gray-700 flex items-center gap-2">
+                          <span>Selected file: {contractFile.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setContractFile(null)}
+                            className="p-0.5 bg-red-600 rounded-full hover:bg-red-700 transition-colors"
+                            aria-label="Remove file"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
                         </div>
                       )}
                     </div>
