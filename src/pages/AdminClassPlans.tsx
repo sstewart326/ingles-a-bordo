@@ -107,6 +107,13 @@ export const AdminClassPlans = () => {
   const [highlightMonth, setHighlightMonth] = useState(false);
   const [highlightYear, setHighlightYear] = useState(false);
   
+  // Add state for last modified timestamp
+  const [lastModified, setLastModified] = useState<Date | null>(null);
+  
+  // At the top level of AdminClassPlans component, add:
+  const [hoveredAddButton, setHoveredAddButton] = useState<string | null>(null);
+  const [isWithinSection, setIsWithinSection] = useState(false);
+  
   // Fetch all students
   const fetchStudents = useCallback(async () => {
     try {
@@ -160,8 +167,11 @@ export const AdminClassPlans = () => {
       
       if (plans.length > 0) {
         setClassPlan(plans[0]);
+        // Set last modified from the plan's updatedAt timestamp
+        setLastModified(plans[0].updatedAt?.toDate() || null);
       } else {
         setClassPlan(null);
+        setLastModified(null);
       }
     } catch (error) {
       console.error('Error fetching class plan:', error);
@@ -210,6 +220,7 @@ export const AdminClassPlans = () => {
       setNewItemTitle('');
       setNewItemDescription('');
       setShowAddItemModal(false);
+      setLastModified(new Date());
       toast.success('Item added to class plan');
     } catch (error) {
       console.error('Error adding first item:', error);
@@ -222,13 +233,13 @@ export const AdminClassPlans = () => {
     if (!classPlan || !newItemTitle.trim()) return;
     
     try {
-      // Use the regular addClassPlanItem to add to the end of the list
       await addClassPlanItem(classPlan.id, newItemTitle, newItemDescription);
       
       await fetchClassPlan();
       setNewItemTitle('');
       setNewItemDescription('');
       setShowAddItemModal(false);
+      setLastModified(new Date());
       toast.success('Item added');
     } catch (error) {
       console.error('Error adding item:', error);
@@ -251,6 +262,7 @@ export const AdminClassPlans = () => {
       setEditItemTitle('');
       setEditItemDescription('');
       setShowEditItemModal(false);
+      setLastModified(new Date());
       toast.success('Item updated');
     } catch (error) {
       console.error('Error updating item:', error);
@@ -268,6 +280,7 @@ export const AdminClassPlans = () => {
       });
       
       await fetchClassPlan();
+      setLastModified(new Date());
       toast.success(item.completed ? 'Item marked as incomplete' : 'Item marked as completed');
     } catch (error) {
       console.error('Error toggling item completion:', error);
@@ -282,6 +295,7 @@ export const AdminClassPlans = () => {
     try {
       await deleteClassPlanItem(classPlan.id, itemId);
       await fetchClassPlan();
+      setLastModified(new Date());
       toast.success('Item deleted');
     } catch (error) {
       console.error('Error deleting item:', error);
@@ -299,22 +313,50 @@ export const AdminClassPlans = () => {
   
   // Create a new empty template
   const handleCreateNewTemplate = async () => {
-    if (!templateName.trim() || !currentUser) return;
+    if (!templateName.trim() || !currentUser || !classPlan) return;
     
     try {
-      // Create a template with empty items array
+      // Check for existing templates with the same name
+      const baseTemplateName = templateName.trim();
+      let finalTemplateName = baseTemplateName;
+      let counter = 1;
+      
+      // Find templates with the same base name or with (x) pattern
+      const matchingTemplates = templates.filter(t => 
+        t.name === baseTemplateName || 
+        t.name.startsWith(baseTemplateName + ' (')
+      );
+      
+      if (matchingTemplates.length > 0) {
+        // Extract existing numbers from template names
+        const existingNumbers = matchingTemplates
+          .map(t => {
+            const match = t.name.match(/\((\d+)\)$/);
+            return match ? parseInt(match[1]) : 0;
+          })
+          .filter(n => !isNaN(n));
+        
+        // Find the highest number and increment by 1
+        if (existingNumbers.length > 0) {
+          counter = Math.max(...existingNumbers) + 1;
+        }
+        
+        finalTemplateName = `${baseTemplateName} (${counter})`;
+      }
+      
+      // Create a template with the current plan's items
       await createClassPlanTemplate(
-        templateName,
-        [], // Empty items array
+        finalTemplateName,
+        classPlan.items,
         currentUser.email || ''
       );
       
       await fetchTemplates();
       setTemplateName('');
       setShowTemplateModal(false);
-      toast.success('Template created successfully. You can now add items to it.');
+      toast.success('Template created successfully');
     } catch (error) {
-      console.error('Error creating empty template:', error);
+      console.error('Error creating template:', error);
       toast.error('Failed to create template');
     }
   };
@@ -419,6 +461,7 @@ export const AdminClassPlans = () => {
       setShowAddChildModal(false);
       setParentItemId(null);
       setInsertBeforeId(null);
+      setLastModified(new Date());
       toast.success('Child item added');
     } catch (error) {
       console.error('Error adding child item:', error);
@@ -464,6 +507,7 @@ export const AdminClassPlans = () => {
       setNewItemDescription('');
       setShowInsertParentModal(false);
       setInsertBeforeParentId(null);
+      setLastModified(new Date());
       toast.success('Item inserted');
     } catch (error) {
       console.error('Error inserting parent item:', error);
@@ -482,48 +526,66 @@ export const AdminClassPlans = () => {
   // Recursive function to render an item and its children
   const renderItem = (item: ClassPlanItem, index: number, isChild: boolean = false) => {
     const hasChildren = item.children && item.children.length > 0;
+    const buttonId = `${item.id}-${isChild ? 'child' : 'parent'}`;
+    const bottomButtonId = `${item.id}-bottom`;
+    const isLastItem = !isChild && index === classPlan!.items.length - 1;
+    
+    const showButton = (id: string) => {
+      if (window.innerWidth < 768) {
+        // On mobile, always show buttons
+        return true;
+      }
+      if (!isWithinSection) {
+        // When outside section, only show bottom button of last item
+        return isLastItem && id === bottomButtonId;
+      }
+      // When inside section, show the currently hovered button
+      return hoveredAddButton === id;
+    };
     
     return (
-      <li key={item.id} className={`py-4 relative ${isChild ? 'ml-8 border-l border-gray-200 pl-4 group/child' : 'group/parent'}`}>
-        {/* Insert button for top-level items - make all controlled by hover */}
-        {!isChild && (
-          <div className="absolute -top-3 left-6 z-10 opacity-0 group-hover/parent:opacity-100 transition-opacity duration-200">
+      <li key={item.id} className={`py-4 relative ${isChild ? 'ml-8 border-l border-gray-200 pl-4' : ''} group/item`}>
+        {/* Top hover area */}
+        <div 
+          className="absolute -top-3 md:-top-4 left-0 w-full h-6 md:h-8"
+          onMouseEnter={() => setHoveredAddButton(buttonId)}
+        >
+          <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-10">
             <button
-              onClick={() => openInsertParentModal(item.id)}
-              className="p-1 rounded-full bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              onClick={() => !isChild ? openInsertParentModal(item.id) : openAddChildModal(item.id, item.id)}
+              className={`p-0.5 md:p-1 rounded-full bg-green-500 text-white transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 touch-manipulation ${
+                showButton(buttonId) ? 'opacity-100' : 'opacity-0'
+              }`}
               title="Insert item above"
             >
-              <PlusIcon className="h-4 w-4" />
+              <PlusIcon className="h-3 w-3 md:h-4 md:w-4" />
             </button>
           </div>
-        )}
-        
-        {/* Main content area with hover effect */}
-        <div className="group">
-          {/* Insert button that appears on hover - removed to avoid confusion with other plus buttons */}
-          
+        </div>
+
+        {/* Main item content */}
+        <div className="relative">
           <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-3 flex-1">
+            <div className="flex items-start space-x-2 md:space-x-3 flex-1">
               {/* Expand/collapse button for items with children */}
               {hasChildren && (
                 <button
                   onClick={() => handleToggleExpanded(item.id)}
-                  className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 bg-transparent"
+                  className="flex-shrink-0 w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 bg-transparent touch-manipulation"
                 >
                   {item.isExpanded ? (
-                    <span className="text-lg font-medium">-</span>
+                    <span className="text-base md:text-lg font-medium">-</span>
                   ) : (
-                    <span className="text-lg font-medium">+</span>
+                    <span className="text-base md:text-lg font-medium">+</span>
                   )}
                 </button>
               )}
               
-              {/* Spacer for items without children to maintain alignment */}
-              {!hasChildren && <div className="w-5"></div>}
+              {!hasChildren && <div className="w-4 md:w-5"></div>}
               
               <div 
                 onClick={() => handleToggleComplete(item)}
-                className={`flex-shrink-0 w-6 h-6 flex items-center justify-center cursor-pointer
+                className={`flex-shrink-0 w-4 h-4 md:w-6 md:h-6 flex items-center justify-center cursor-pointer touch-manipulation
                   ${item.completed 
                     ? 'bg-green-500 text-white' 
                     : 'bg-white text-transparent'
@@ -532,44 +594,43 @@ export const AdminClassPlans = () => {
                   rounded-full shadow-sm hover:shadow`}
               >
                 {item.completed ? (
-                  <CheckIcon className="h-4 w-4" strokeWidth={3} />
+                  <CheckIcon className="h-3 w-3 md:h-4 md:w-4" strokeWidth={3} />
                 ) : (
-                  <div className="w-4 h-4 rounded-full"></div>
+                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full"></div>
                 )}
               </div>
               
               <div className="flex-1">
-                <div className="flex items-center">
-                  <p className={`text-sm font-medium mr-2 ${
+                <div className="flex items-center flex-wrap gap-1 md:gap-2">
+                  <p className={`text-sm font-medium ${
                     item.completed ? 'text-gray-500' : 'text-gray-900'
                   }`}>
                     {item.title}
                   </p>
                   
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-1 md:gap-2">
                     <button
                       onClick={() => handleEditItem(item)}
-                      className="p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                      className="p-1 md:p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors touch-manipulation"
                       title="Edit item"
                     >
-                      <PencilIcon className="h-5 w-5" />
+                      <PencilIcon className="h-3 w-3 md:h-5 md:w-5" />
                     </button>
                     
                     <button
                       onClick={() => handleDeleteItem(item.id)}
-                      className="p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+                      className="p-1 md:p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors touch-manipulation"
                       title="Delete item"
                     >
-                      <TrashIcon className="h-5 w-5" />
+                      <TrashIcon className="h-3 w-3 md:h-5 md:w-5" />
                     </button>
                     
-                    {/* Add a button to add children to this item */}
                     <button
                       onClick={() => openAddChildModal(item.id)}
-                      className="p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors"
+                      className="p-1 md:p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors touch-manipulation"
                       title="Add child item"
                     >
-                      <PlusIcon className="h-5 w-5" />
+                      <PlusIcon className="h-3 w-3 md:h-5 md:w-5" />
                     </button>
                   </div>
                 </div>
@@ -590,54 +651,32 @@ export const AdminClassPlans = () => {
         {hasChildren && item.isExpanded && (
           <ul className="mt-2 divide-y divide-gray-100">
             {item.children!.map((child, childIndex) => (
-              <li key={child.id} className="relative group/child">
-                {/* Insert button that appears on hover above each child */}
-                <div className="absolute -top-3 left-6 z-10">
-                  <button
-                    onClick={() => openAddChildModal(item.id, child.id)}
-                    className="p-1 rounded-full bg-green-500 text-white opacity-0 group-hover/child:opacity-100 transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    title="Add child item above"
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                  </button>
-                </div>
-                
-                {renderItem(child, childIndex, true)}
-              </li>
+              renderItem(child, childIndex, true)
             ))}
-            
-            {/* Add button at the bottom of child items list - perfectly aligned with child checkboxes */}
-            <li className="ml-8 border-l border-gray-200 pl-4 py-4">
-              <div className="flex items-start space-x-3">
-                <div className="w-5"></div> {/* Spacer for expand/collapse button */}
-                <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                  <button
-                    onClick={() => openAddChildModal(item.id)}
-                    className="p-1.5 rounded-full bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    title="Add new child item"
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </li>
           </ul>
         )}
-        
-        {/* Show the insert button only for the last top-level item */}
-        {!isChild && index === classPlan!.items.length - 1 && (
-          <div className="flex justify-start ml-6 mt-4">
-            <button
-              onClick={() => {
-                setNewItemTitle('');
-                setNewItemDescription('');
-                setShowAddItemModal(true);
-              }}
-              className="p-2 rounded-full bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              title="Add new item at end"
-            >
-              <PlusIcon className="h-5 w-5" />
-            </button>
+
+        {/* Bottom hover area for last item */}
+        {isLastItem && (
+          <div 
+            className="absolute -bottom-3 md:-bottom-4 left-0 w-full h-6 md:h-8"
+            onMouseEnter={() => setHoveredAddButton(bottomButtonId)}
+          >
+            <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-10">
+              <button
+                onClick={() => {
+                  setNewItemTitle('');
+                  setNewItemDescription('');
+                  setShowAddItemModal(true);
+                }}
+                className={`p-0.5 md:p-1 rounded-full bg-green-500 text-white transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 touch-manipulation ${
+                  showButton(bottomButtonId) ? 'opacity-100' : 'opacity-0'
+                }`}
+                title="Add new item"
+              >
+                <PlusIcon className="h-3 w-3 md:h-4 md:w-4" />
+              </button>
+            </div>
           </div>
         )}
       </li>
@@ -956,6 +995,11 @@ export const AdminClassPlans = () => {
             className="bg-white rounded-lg shadow-md p-6"
             tabIndex={0}
             onKeyDown={handleKeyDown}
+            onMouseEnter={() => setIsWithinSection(true)}
+            onMouseLeave={() => {
+              setIsWithinSection(false);
+              setHoveredAddButton(null);
+            }}
             aria-label={`Class plan for ${selectedStudent.label}, ${months[selectedMonth]} ${selectedYear}`}
           >
             <div className="mb-6">
@@ -987,16 +1031,14 @@ export const AdminClassPlans = () => {
                 <div className="flex space-x-2">
                   {classPlan && (
                     <>
-                      <button
-                        onClick={() => setShowTemplateModal(true)}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                        Save as Template
-                        <Tooltip text="Save the current class plan structure as a reusable template that can be applied to other students or months.">
-                          <InformationCircleIcon className="h-4 w-4 ml-1 text-indigo-200" />
-                        </Tooltip>
-                      </button>
+                      <Tooltip text="Optional: Save this plan structure for reuse with other students">
+                        <button
+                          onClick={() => setShowTemplateModal(true)}
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          Save as Template
+                        </button>
+                      </Tooltip>
                       
                       {templates.length > 0 && (
                         <button
@@ -1023,11 +1065,16 @@ export const AdminClassPlans = () => {
                 </div>
               </div>
               
-              <div className="flex items-center mt-2">
+              <div className="flex items-center justify-between mt-2">
                 <p className="text-sm text-gray-500">
                   Plan for {selectedStudent.label}
                 </p>
-                <span className="mx-2 text-xs text-gray-400">•</span>
+                {classPlan && lastModified && (
+                  <p className="text-sm text-gray-400 flex items-center">
+                    <span className="mr-1">Last saved:</span>
+                    <span className="font-medium">{lastModified.toLocaleString()}</span>
+                  </p>
+                )}
               </div>
             </div>
             
@@ -1288,20 +1335,6 @@ export const AdminClassPlans = () => {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 placeholder="Enter template name"
               />
-            </div>
-            
-            <div className="bg-gray-50 p-4 rounded-md">
-              <div className="flex items-start mb-4">
-                <div className="flex-shrink-0">
-                  <DocumentDuplicateIcon className="h-5 w-5 text-indigo-500" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-gray-900">Create New Template</h3>
-                  <p className="text-sm text-gray-500">
-                    After creating the template, you'll be able to add items to it using the edit button in the template library.
-                  </p>
-                </div>
-              </div>
             </div>
             
             <div className="flex justify-end space-x-3 pt-4">
