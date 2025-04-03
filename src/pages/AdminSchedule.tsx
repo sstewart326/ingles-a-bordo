@@ -453,8 +453,9 @@ export const AdminSchedule = () => {
       if (contractFile) {
         const cleanFileName = contractFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const timestamp = Date.now();
+        const classId = timestamp.toString(); // Using timestamp as classId since we use it below
         const finalFileName = `${timestamp}_${cleanFileName}`;
-        const storageRef = ref(storage, `contracts/${finalFileName}`);
+        const storageRef = ref(storage, `contracts/${classId}/${finalFileName}`);
         
         // Upload with metadata
         const metadata = {
@@ -708,7 +709,7 @@ export const AdminSchedule = () => {
         const cleanFileName = editContractFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const timestamp = Date.now();
         const finalFileName = `${timestamp}_${cleanFileName}`;
-        const storageRef = ref(storage, `contracts/${finalFileName}`);
+        const storageRef = ref(storage, `contracts/${editingClass.id}/${finalFileName}`);
         
         // Upload with metadata
         const metadata = {
