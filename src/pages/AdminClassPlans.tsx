@@ -45,7 +45,7 @@ const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }
       <span className="cursor-help">
         {children}
       </span>
-      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-3 py-2 w-56 max-w-xs bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-3 py-2 w-20 max-w-xs bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
         {text}
         <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></span>
       </span>

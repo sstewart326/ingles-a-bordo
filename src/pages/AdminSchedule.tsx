@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import Select, { MultiValue, StylesConfig } from 'react-select';
 import DatePicker from 'react-datepicker';
@@ -22,12 +22,12 @@ import { ClassSchedule } from '../types/interfaces';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import { invalidateCalendarCache } from '../services/calendarService';
-import { PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { Class, SelectOption, User } from '../types/interfaces';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
+import { Tooltip } from '../../app/components/Tooltip';
 
 type SelectStyles = StylesConfig<SelectOption, true>;
 
@@ -88,20 +88,6 @@ const getNextDayOccurrence = (dayOfWeek: number) => {
 };
 
 const timeOptions = generateTimeOptions();
-
-const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }) => {
-  return (
-    <span className="relative inline-flex items-center group">
-      <span className="cursor-help">
-        {children}
-      </span>
-      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-3 py-2 w-56 max-w-xs bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-        {text}
-        <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></span>
-      </span>
-    </span>
-  );
-};
 
 export const AdminSchedule = () => {
   const { language } = useLanguage();
@@ -1481,6 +1467,9 @@ export const AdminSchedule = () => {
                       <label className={styles.form.label}>
                         Contract (PDF, max 5MB)
                         <span className="ml-1 text-gray-500 text-xs">(optional)</span>
+                        <Tooltip text="Upload a PDF contract document for this class. This is optional but recommended for keeping track of agreements with students.">
+                          <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
+                        </Tooltip>
                       </label>
                       <input
                         type="file"
@@ -1875,7 +1864,7 @@ export const AdminSchedule = () => {
                       <tr key={classItem.id}>
                         <td className={`${styles.table.cell} text-center`}>
                           <div className="flex justify-center items-center gap-3">
-                            <Tooltip text={t.edit}>
+                            <Tooltip text={t.edit} width="w-20">
                               <button
                                 onClick={() => openEditModal(classItem)}
                                 className="p-1.5 text-indigo-600 hover:text-indigo-800 rounded-full hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
@@ -1883,7 +1872,7 @@ export const AdminSchedule = () => {
                                 <PencilIcon className="h-4 w-4" />
                               </button>
                             </Tooltip>
-                            <Tooltip text={deletingClassId === classItem.id ? "Deleting..." : t.delete}>
+                            <Tooltip text={deletingClassId === classItem.id ? "Deleting..." : t.delete} width="w-20">
                               <button
                                 onClick={() => handleDeleteClass(classItem.id)}
                                 disabled={deletingClassId === classItem.id}
@@ -2378,11 +2367,9 @@ export const AdminSchedule = () => {
                   <label className={styles.form.label}>
                     Contract (PDF, max 5MB)
                     <span className="text-sm text-gray-500 ml-1">(Optional)</span>
-                    <span className="ml-1 inline-block" title="Upload a PDF contract document for this class. This is optional but recommended for keeping track of agreements with students.">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </span>
+                    <Tooltip text="Upload a PDF contract document for this class. This is optional but recommended for keeping track of agreements with students.">
+                      <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 ml-1 inline-block" />
+                    </Tooltip>
                   </label>
                   <div className="flex flex-col space-y-2">
                     {editingClass?.contractUrl && (
