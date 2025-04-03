@@ -162,6 +162,14 @@ export const Login = () => {
             </div>
           </div>
 
+          <div className="flex items-center justify-end">
+            <div className="text-sm">
+              <Link to="/reset-password" className="link !text-gray-700">
+                Forgot your password?
+              </Link>
+            </div>
+          </div>
+
           <div className="flex flex-col space-y-4">
             <button
               type="submit"

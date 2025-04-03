@@ -7,6 +7,7 @@ import Footer from './components/Footer';
 import { MasqueradeIndicator } from './components/MasqueradeIndicator';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Schedule } from './pages/Schedule';
 import { Profile } from './pages/Profile';
@@ -33,6 +34,7 @@ export const AppRoutes = () => {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<><Login /><Footer /></>} />
         <Route path="/signup" element={<><Signup /><Footer /></>} />
+        <Route path="/reset-password" element={<><ResetPassword /><Footer /></>} />
         
         {/* Protected Routes */}
         <Route

@@ -9,7 +9,8 @@ import {
   signInWithPopup,
   signInWithRedirect,
   UserCredential,
-  browserLocalPersistence
+  browserLocalPersistence,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
 import { doc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -24,6 +25,7 @@ interface AuthContextType {
   signup: (email: string, password: string, token: string) => Promise<UserCredential>;
   loginWithGoogle: (signupData?: { token: string, validation: Record<string, unknown> }) => Promise<UserCredential | null>;
   logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   loading: boolean;
   authError: string | null;
   clearAuthError: () => void;
@@ -296,12 +298,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setCurrentUser(null);
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      throw error;
+    }
+  };
+
   const value = {
     currentUser,
     login,
     signup,
     loginWithGoogle,
     logout,
+    resetPassword,
     loading,
     authError,
     clearAuthError
