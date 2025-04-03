@@ -97,7 +97,6 @@ export const ClassSection = ({
   refreshHomework,
   hideDateDisplay = false,
   noContainer = false, // Default to false to maintain backward compatibility
-  disableDateFiltering = false,
   t
 }: ClassSectionProps) => {
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});

@@ -109,7 +109,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
   const handleClassCountClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the calendar day click
     if (onClassCountClick) {
-      onClassCountClick(e, classes, date);
+      onClassCountClick(e, date);
     }
   };
 
@@ -125,7 +125,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
   const handleHomeworkPillClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the calendar day click
     if (onHomeworkPillClick) {
-      onHomeworkPillClick(e, date, classes);
+      onHomeworkPillClick(e, date);
     }
   };
   

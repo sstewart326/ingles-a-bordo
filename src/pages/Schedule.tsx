@@ -16,7 +16,6 @@ import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
-import { logQuery } from '../utils/firebaseUtils';
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
   dates: string[];
@@ -208,10 +207,8 @@ export const Schedule = () => {
   const currentRequestRef = useRef<{ month: number, year: number } | null>(null);
 
   // Class Materials Modal State
-  const [selectedClass, setSelectedClass] = useState<CalendarClass | null>(null);
   const [selectedMaterial, setSelectedMaterial] = useState<CalendarMaterial | null>(null);
   const [loadingMaterial, setLoadingMaterial] = useState(false);
-  const [slidesUrl, setSlidesUrl] = useState<string | null>(null);
 
   // Homework State
   const [homeworkByClass, setHomeworkByClass] = useState<Record<string, Homework[]>>({});
@@ -334,7 +331,6 @@ export const Schedule = () => {
     const classId = classItem.id;
     if (!calendarData.materials[classId]) return;
 
-    setSelectedClass(classItem);
     setLoadingMaterial(true);
 
     try {
@@ -348,13 +344,9 @@ export const Schedule = () => {
 
       if (material) {
         setSelectedMaterial(material);
-        if (material.slides && material.slides.length > 0) {
-          setSlidesUrl(material.slides[0]);
-        }
         setIsModalOpen(true);
       } else {
         setSelectedMaterial(null);
-        setSlidesUrl(null);
       }
     } catch (error) {
       toast.error(t.failedToLoad);
@@ -610,7 +602,7 @@ export const Schedule = () => {
   };
 
   // Handle payment pill click
-  const handlePaymentPillClick = (e: React.MouseEvent, date: Date, classes: CalendarClass[]) => {
+  const handlePaymentPillClick = (e: React.MouseEvent, date: Date) => {
     e.stopPropagation();
     setSelectedDate(date);
     const isPaymentDay = isPaymentDueOnDate(date);

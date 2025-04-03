@@ -89,21 +89,6 @@ const ScheduleHomeworkView: React.FC<ScheduleHomeworkViewProps> = ({
     };
   }, [classId, isOpen, fetchHomework]);
 
-  useEffect(() => {
-    if (!classId || !isOpen || homeworkList.length === 0) return;
-    
-    console.log(`ScheduleHomeworkView: Setting up refresh timer for homework`);
-    
-    const timer = setTimeout(() => {
-      console.log(`ScheduleHomeworkView: Running timed refresh for homework`);
-      fetchHomework(true);
-    }, 2000);
-    
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [classId, isOpen, homeworkList.length, fetchHomework]);
-
   const toggleExpandHomework = (homeworkId: string) => {
     setExpandedHomeworkId(expandedHomeworkId === homeworkId ? null : homeworkId);
   };

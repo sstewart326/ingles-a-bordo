@@ -13,7 +13,6 @@ import toast from 'react-hot-toast';
 import { Homework, HomeworkSubmission as HomeworkSubmissionType } from '../types/interfaces';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { logQuery } from '../utils/firebaseUtils';
 
 interface HomeworkSubmissionProps {
   homework: Homework;
