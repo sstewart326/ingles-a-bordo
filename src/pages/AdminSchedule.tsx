@@ -27,7 +27,7 @@ import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { Class, SelectOption, User } from '../types/interfaces';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
-import { Tooltip } from '../../app/components/Tooltip';
+import { Tooltip } from '../components/Tooltip';
 
 type SelectStyles = StylesConfig<SelectOption, true>;
 

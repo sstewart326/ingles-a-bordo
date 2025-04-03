@@ -37,21 +37,9 @@ import { styles } from '../styles/styleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { SelectOption, User } from '../types/interfaces';
+import { Tooltip } from '../components/Tooltip';
 
-// Simple tooltip component
-const Tooltip = ({ children, text }: { children: React.ReactNode, text: string }) => {
-  return (
-    <span className="relative inline-flex items-center group">
-      <span className="cursor-help">
-        {children}
-      </span>
-      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-3 py-2 w-20 max-w-xs bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-        {text}
-        <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></span>
-      </span>
-    </span>
-  );
-};
+
 
 const months = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -1010,6 +998,19 @@ export const AdminClassPlans = () => {
                         </Tooltip>
                       </button>
                       
+                      {templates.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setSelectedTemplate('');
+                            setShowApplyTemplateModal(true);
+                          }}
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                          Apply Template
+                        </button>
+                      )}
+                      
                       <button
                         onClick={() => setShowDeletePlanModal(true)}
                         className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
@@ -1052,17 +1053,19 @@ export const AdminClassPlans = () => {
                         Add First Item
                       </button>
                       
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTemplate('');
-                          setShowApplyTemplateModal(true);
-                        }}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                        Apply Template
-                      </button>
+                      {templates.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTemplate('');
+                            setShowApplyTemplateModal(true);
+                          }}
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                          Apply Template
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1089,17 +1092,19 @@ export const AdminClassPlans = () => {
                     Add First Item
                   </button>
                   
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedTemplate('');
-                      setShowApplyTemplateModal(true);
-                    }}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                    Apply Template
-                  </button>
+                  {templates.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplate('');
+                        setShowApplyTemplateModal(true);
+                      }}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                      Apply Template
+                    </button>
+                  )}
                 </div>
               </div>
             )}

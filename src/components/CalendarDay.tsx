@@ -114,8 +114,42 @@ export function CalendarDay({
         ? ` (${classSession.paymentConfig.currency} ${classSession.paymentConfig.amount.toFixed(2)})`
         : '';
       
-      return `${user.name}: ${dayName} ${time}${amountText}`;
+      return `${user.name}: ${dayName} ${t.class} ${time}${amountText}`;
     }).join('\n');
+  };
+
+  // Create tooltip text for class pill
+  const createClassTooltip = (): string => {
+    if (!dayClasses.length) return '';
+    
+    return dayClasses.map(classSession => {
+      const time = classSession.startTime && classSession.endTime 
+        ? `${classSession.startTime} - ${classSession.endTime}` 
+        : '';
+      
+      const studentNames = classSession.studentEmails.map(email => {
+        const user = users.find(u => u.email === email);
+        return user?.name || email;
+      });
+      
+      return `${studentNames.join(', ')}\n${time}`;
+    }).join('\n\n');
+  };
+
+  // Create tooltip text for birthday pill
+  const createBirthdayTooltip = (): string => {
+    if (!birthdays.length) return '';
+    
+    return birthdays.map(user => {
+      // Format the date string for display
+      const formattedDate = new Date(new Date().getFullYear(), parseInt(month) - 1, parseInt(day))
+        .toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', { 
+          month: 'long', 
+          day: 'numeric' 
+        });
+      
+      return `${user.name}`;
+    }).join('\n\n');
   };
 
   const isRelevant = isDateInRelevantMonthRange(date, date);
@@ -165,6 +199,7 @@ export function CalendarDay({
             <div 
               className="calendar-pill class-count-pill"
               onClick={handlePillClick}
+              title={createClassTooltip()}
             >
               {dayClasses.length} {dayClasses.length === 1 ? t.class : t.class}
             </div>
@@ -229,7 +264,7 @@ export function CalendarDay({
             <div 
               className="calendar-pill birthday-pill"
               onClick={handlePillClick}
-              title={birthdays.map(user => user.name).join('\n')}
+              title={createBirthdayTooltip()}
             >
               {birthdays.length} {birthdays.length === 1 ? t.birthday : t.birthdays}
             </div>
