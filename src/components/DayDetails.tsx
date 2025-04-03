@@ -182,7 +182,9 @@ export const DayDetails = ({
       amount: classSession.paymentConfig?.amount || 0,
       currency: classSession.paymentConfig?.currency || 'USD'
     });
-    setSelectedCompletionDate(new Date());
+    const defaultCompletionDate = new Date();
+    defaultCompletionDate.setHours(12, 0, 0, 0);
+    setSelectedCompletionDate(defaultCompletionDate);
     setShowCompletionDateModal(true);
   };
 
@@ -1009,8 +1011,17 @@ export const DayDetails = ({
             <h3 className="text-lg font-medium mb-4">{t.selectCompletionDate}</h3>
             <input
               type="date"
-              value={selectedCompletionDate.toISOString().split('T')[0]}
-              onChange={(e) => setSelectedCompletionDate(new Date(e.target.value))}
+              value={selectedCompletionDate instanceof Date && !isNaN(selectedCompletionDate.getTime()) 
+                ? selectedCompletionDate.toISOString().split('T')[0] 
+                : new Date().toISOString().split('T')[0]}
+              onChange={(e) => {
+                // Create date in local timezone by appending the timezone offset
+                const date = new Date(e.target.value + 'T12:00:00');
+                // Only update if it's a valid date
+                if (!isNaN(date.getTime())) {
+                  setSelectedCompletionDate(date);
+                }
+              }}
               className="w-full p-2 border rounded mb-4"
             />
             <div className="flex justify-end space-x-2">
