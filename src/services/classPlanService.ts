@@ -686,4 +686,29 @@ export const insertItemBefore = async (
     logQuery('Error inserting item before', error);
     throw error;
   }
+};
+
+// Update the order of items in a class plan
+export const updateClassPlanItemOrder = async (
+  planId: string,
+  items: ClassPlanItem[]
+): Promise<void> => {
+  try {
+    logQuery('Updating class plan item order', { planId });
+    
+    const planRef = doc(db, COLLECTION_PLANS, planId);
+    const planDoc = await getDoc(planRef);
+    
+    if (!planDoc.exists()) {
+      throw new Error('Class plan not found');
+    }
+    
+    await updateDoc(planRef, {
+      items,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    logQuery('Error updating class plan item order', error);
+    throw error;
+  }
 }; 

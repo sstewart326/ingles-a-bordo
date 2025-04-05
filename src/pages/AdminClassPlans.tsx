@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import Select from 'react-select';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useAuth } from '../hooks/useAuth';
 import { 
   getStudentClassPlans, 
@@ -17,7 +18,8 @@ import {
   addChildItem,
   toggleItemExpanded,
   insertItemBefore,
-  getAllStudentClassPlans
+  getAllStudentClassPlans,
+  updateClassPlanItemOrder
 } from '../services/classPlanService';
 import { ClassPlan, ClassPlanItem, ClassPlanTemplate } from '../types/interfaces';
 import { collection, getDocs } from 'firebase/firestore';
@@ -44,6 +46,14 @@ const months = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+// Add reorderItems helper function after the months array
+const reorderItems = (items: ClassPlanItem[], startIndex: number, endIndex: number): ClassPlanItem[] => {
+  const result = Array.from(items);
+  const [removed] = result.splice(startIndex, 1);
+  result.splice(endIndex, 0, removed);
+  return result;
+};
 
 export const AdminClassPlans = () => {
   const { currentUser } = useAuth();
@@ -112,6 +122,48 @@ export const AdminClassPlans = () => {
   // At the top level of AdminClassPlans component, add:
   const [hoveredAddButton, setHoveredAddButton] = useState<string | null>(null);
   const [isWithinSection, setIsWithinSection] = useState(false);
+  
+  // Add new state for drag disabled
+  const [isDragDisabled, setIsDragDisabled] = useState(false);
+  
+  // Add drag end handler
+  const onDragEnd = async (result: any) => {
+    // Dropped outside the list
+    if (!result.destination || !classPlan) {
+      return;
+    }
+
+    // If dropped in the same position
+    if (result.destination.index === result.source.index) {
+      return;
+    }
+
+    try {
+      const newItems = reorderItems(
+        classPlan.items,
+        result.source.index,
+        result.destination.index
+      );
+
+      // Optimistically update the UI
+      setClassPlan({
+        ...classPlan,
+        items: newItems
+      });
+
+      // Update in the backend
+      // Note: You'll need to implement this function in your classPlanService
+      await updateClassPlanItemOrder(classPlan.id, newItems);
+      
+      setLastModified(new Date());
+      toast.success('Items reordered successfully');
+    } catch (error) {
+      console.error('Error reordering items:', error);
+      toast.error('Failed to reorder items');
+      // Revert to original order by re-fetching
+      await fetchClassPlan();
+    }
+  };
   
   // Fetch all students
   const fetchStudents = useCallback(async () => {
@@ -543,106 +595,89 @@ export const AdminClassPlans = () => {
     };
     
     return (
-      <li key={item.id} className={`py-4 relative ${isChild ? 'ml-8 border-l border-gray-200 pl-4' : ''} group/item`}>
-        {/* Top hover area */}
-        <div 
-          className="absolute -top-3 md:-top-4 left-0 w-full h-6 md:h-8"
-          onMouseEnter={() => setHoveredAddButton(buttonId)}
-        >
-          <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-10">
+      <div className="flex-1">
+        <div className="flex items-start space-x-2 md:space-x-3">
+          {/* Expand/collapse button for items with children */}
+          {hasChildren && (
             <button
-              onClick={() => !isChild ? openInsertParentModal(item.id) : openAddChildModal(item.id, item.id)}
-              className={`p-0.5 md:p-1 rounded-full bg-green-500 text-white transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 touch-manipulation ${
-                showButton(buttonId) ? 'opacity-100' : 'opacity-0'
-              }`}
-              title="Insert item above"
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent drag when clicking expand/collapse
+                handleToggleExpanded(item.id);
+              }}
+              className="flex-shrink-0 w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 bg-transparent touch-manipulation"
             >
-              <PlusIcon className="h-3 w-3 md:h-4 md:w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Main item content */}
-        <div className="relative">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-2 md:space-x-3 flex-1">
-              {/* Expand/collapse button for items with children */}
-              {hasChildren && (
-                <button
-                  onClick={() => handleToggleExpanded(item.id)}
-                  className="flex-shrink-0 w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 bg-transparent touch-manipulation"
-                >
-                  {item.isExpanded ? (
-                    <span className="text-base md:text-lg font-medium">-</span>
-                  ) : (
-                    <span className="text-base md:text-lg font-medium">+</span>
-                  )}
-                </button>
+              {item.isExpanded ? (
+                <span className="text-base md:text-lg font-medium">-</span>
+              ) : (
+                <span className="text-base md:text-lg font-medium">+</span>
               )}
+            </button>
+          )}
+          
+          {!hasChildren && <div className="w-4 md:w-5"></div>}
+          
+          <div 
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent drag when clicking checkbox
+              handleToggleComplete(item);
+            }}
+            className={`flex-shrink-0 w-4 h-4 md:w-6 md:h-6 flex items-center justify-center cursor-pointer touch-manipulation
+              ${item.completed 
+                ? 'bg-green-500 text-white' 
+                : 'bg-white text-transparent'
+              } 
+              border-2 ${item.completed ? 'border-green-500' : 'border-gray-400'} 
+              rounded-full shadow-sm hover:shadow`}
+          >
+            {item.completed ? (
+              <CheckIcon className="h-3 w-3 md:h-4 md:w-4" strokeWidth={3} />
+            ) : (
+              <div className="w-3 h-3 md:w-4 md:h-4 rounded-full"></div>
+            )}
+          </div>
+          
+          <div className="flex-1">
+            <div className="flex items-center flex-wrap gap-1 md:gap-2">
+              <p className={`text-sm font-medium ${
+                item.completed ? 'text-gray-500' : 'text-gray-900'
+              }`}>
+                {item.title}
+              </p>
               
-              {!hasChildren && <div className="w-4 md:w-5"></div>}
-              
-              <div 
-                onClick={() => handleToggleComplete(item)}
-                className={`flex-shrink-0 w-4 h-4 md:w-6 md:h-6 flex items-center justify-center cursor-pointer touch-manipulation
-                  ${item.completed 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-white text-transparent'
-                  } 
-                  border-2 ${item.completed ? 'border-green-500' : 'border-gray-400'} 
-                  rounded-full shadow-sm hover:shadow`}
-              >
-                {item.completed ? (
-                  <CheckIcon className="h-3 w-3 md:h-4 md:w-4" strokeWidth={3} />
-                ) : (
-                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full"></div>
-                )}
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex items-center flex-wrap gap-1 md:gap-2">
-                  <p className={`text-sm font-medium ${
-                    item.completed ? 'text-gray-500' : 'text-gray-900'
-                  }`}>
-                    {item.title}
-                  </p>
-                  
-                  <div className="flex flex-wrap gap-1 md:gap-2">
-                    <button
-                      onClick={() => handleEditItem(item)}
-                      className="p-1 md:p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors touch-manipulation"
-                      title="Edit item"
-                    >
-                      <PencilIcon className="h-3 w-3 md:h-5 md:w-5" />
-                    </button>
-                    
-                    <button
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="p-1 md:p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors touch-manipulation"
-                      title="Delete item"
-                    >
-                      <TrashIcon className="h-3 w-3 md:h-5 md:w-5" />
-                    </button>
-                    
-                    <button
-                      onClick={() => openAddChildModal(item.id)}
-                      className="p-1 md:p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors touch-manipulation"
-                      title="Add child item"
-                    >
-                      <PlusIcon className="h-3 w-3 md:h-5 md:w-5" />
-                    </button>
-                  </div>
-                </div>
+              <div className="flex flex-wrap gap-1 md:gap-2" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => handleEditItem(item)}
+                  className="p-1 md:p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors touch-manipulation"
+                  title="Edit item"
+                >
+                  <PencilIcon className="h-3 w-3 md:h-5 md:w-5" />
+                </button>
                 
-                {item.description && (
-                  <p className={`mt-1 text-sm ${
-                    item.completed ? 'text-gray-400' : 'text-gray-500'
-                  }`}>
-                    {item.description}
-                  </p>
-                )}
+                <button
+                  onClick={() => handleDeleteItem(item.id)}
+                  className="p-1 md:p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors touch-manipulation"
+                  title="Delete item"
+                >
+                  <TrashIcon className="h-3 w-3 md:h-5 md:w-5" />
+                </button>
+                
+                <button
+                  onClick={() => openAddChildModal(item.id)}
+                  className="p-1 md:p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors touch-manipulation"
+                  title="Add child item"
+                >
+                  <PlusIcon className="h-3 w-3 md:h-5 md:w-5" />
+                </button>
               </div>
             </div>
+            
+            {item.description && (
+              <p className={`mt-1 text-sm ${
+                item.completed ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                {item.description}
+              </p>
+            )}
           </div>
         </div>
         
@@ -654,31 +689,7 @@ export const AdminClassPlans = () => {
             ))}
           </ul>
         )}
-
-        {/* Bottom hover area for last item */}
-        {isLastItem && (
-          <div 
-            className="absolute -bottom-3 md:-bottom-4 left-0 w-full h-6 md:h-8"
-            onMouseEnter={() => setHoveredAddButton(bottomButtonId)}
-          >
-            <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-10">
-              <button
-                onClick={() => {
-                  setNewItemTitle('');
-                  setNewItemDescription('');
-                  setShowAddItemModal(true);
-                }}
-                className={`p-0.5 md:p-1 rounded-full bg-green-500 text-white transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 touch-manipulation ${
-                  showButton(bottomButtonId) ? 'opacity-100' : 'opacity-0'
-                }`}
-                title="Add new item"
-              >
-                <PlusIcon className="h-3 w-3 md:h-4 md:w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </li>
+      </div>
     );
   };
   
@@ -1102,11 +1113,42 @@ export const AdminClassPlans = () => {
                     </div>
                   </div>
                 ) : (
-                  <ul className="divide-y divide-gray-200">
-                    {classPlan.items.map((item, index) => 
-                      renderItem(item, index, false)
-                    )}
-                  </ul>
+                  <DragDropContext onDragEnd={onDragEnd}>
+                    <Droppable droppableId="class-plan-items">
+                      {(provided) => (
+                        <ul 
+                          className="divide-y divide-gray-200"
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                        >
+                          {classPlan.items.map((item, index) => (
+                            <Draggable 
+                              key={item.id} 
+                              draggableId={item.id} 
+                              index={index}
+                              isDragDisabled={isDragDisabled}
+                            >
+                              {(provided, snapshot) => (
+                                <li
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`py-4 relative cursor-move transition-colors duration-200 ${
+                                    snapshot.isDragging 
+                                      ? 'bg-gray-50 shadow-lg rounded' 
+                                      : 'hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {renderItem(item, index)}
+                                </li>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </ul>
+                      )}
+                    </Droppable>
+                  </DragDropContext>
                 )}
               </>
             ) : (

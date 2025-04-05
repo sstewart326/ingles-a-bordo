@@ -460,10 +460,6 @@ export const Dashboard = () => {
     setSelectedDate(newDate);
     setIsLoadingCalendarData(true);
     
-    // Fetch data for the new month
-    const newMonth = newDate.getMonth();
-    const newYear = newDate.getFullYear();
-    
     try {
       // Check if we've already loaded this month
       const monthKey = getMonthKey(newDate);
