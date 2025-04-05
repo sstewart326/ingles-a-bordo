@@ -34,6 +34,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
+import { SubdirectoryArrowRight } from '@mui/icons-material';
 import { styles } from '../styles/styleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
@@ -595,7 +596,7 @@ export const AdminClassPlans = () => {
     };
     
     return (
-      <div className="flex-1">
+      <div className={`flex-1 ${isChild ? 'ml-6 md:ml-8' : ''}`}>
         <div className="flex items-start space-x-2 md:space-x-3">
           {/* Expand/collapse button for items with children */}
           {hasChildren && (
@@ -647,26 +648,26 @@ export const AdminClassPlans = () => {
               <div className="flex flex-wrap gap-1 md:gap-2" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => handleEditItem(item)}
-                  className="p-1 md:p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors touch-manipulation"
+                  className="p-0.5 md:p-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors touch-manipulation"
                   title="Edit item"
                 >
-                  <PencilIcon className="h-3 w-3 md:h-5 md:w-5" />
+                  <PencilIcon className="h-2.5 w-2.5 md:h-4 md:w-4" />
                 </button>
                 
                 <button
                   onClick={() => handleDeleteItem(item.id)}
-                  className="p-1 md:p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors touch-manipulation"
+                  className="p-0.5 md:p-1 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors touch-manipulation"
                   title="Delete item"
                 >
-                  <TrashIcon className="h-3 w-3 md:h-5 md:w-5" />
+                  <TrashIcon className="h-2.5 w-2.5 md:h-4 md:w-4" />
                 </button>
                 
                 <button
                   onClick={() => openAddChildModal(item.id)}
-                  className="p-1 md:p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors touch-manipulation"
+                  className="p-0.5 md:p-1 rounded-full bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors touch-manipulation"
                   title="Add child item"
                 >
-                  <PlusIcon className="h-3 w-3 md:h-5 md:w-5" />
+                  <SubdirectoryArrowRight className="h-2.5 w-2.5 md:h-4 md:w-4" />
                 </button>
               </div>
             </div>
@@ -1421,8 +1422,6 @@ export const AdminClassPlans = () => {
                 No templates available. Save a plan as a template first.
               </p>
             )}
-            
-            
             
             <div className="flex justify-end space-x-3 pt-4">
               <button
