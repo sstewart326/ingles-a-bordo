@@ -439,9 +439,25 @@ export const AdminUsers = () => {
   const allUsers = users
     .filter(user => !user.isAdmin) // Filter out admin users
     .sort((a, b) => {
+      // First sort by status (pending first)
       if (a.status === 'pending' && b.status !== 'pending') return -1;
       if (a.status !== 'pending' && b.status === 'pending') return 1;
-      return a.name.localeCompare(b.name);
+      
+      // Then sort alphabetically by name
+      // Split names to get first and last names
+      const aParts = a.name.trim().split(' ');
+      const bParts = b.name.trim().split(' ');
+      
+      // Compare first names first
+      const aFirstName = aParts[0].toLowerCase();
+      const bFirstName = bParts[0].toLowerCase();
+      
+      if (aFirstName !== bFirstName) {
+        return aFirstName.localeCompare(bFirstName);
+      }
+      
+      // If first names are the same, compare full names
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
     });
 
   const renderMobileCard = (user: User) => (
