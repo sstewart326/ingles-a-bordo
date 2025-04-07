@@ -588,15 +588,24 @@ export const AdminUsers = () => {
               <div className="text-sm text-gray-600 flex items-center gap-1">
                 <div className="flex items-center gap-1">
                   {user.email}
-                  <div className="relative">
-                    <div className="group">
-                      <div className="group">
-                        <InformationCircleIcon className="h-4 w-4 text-gray-400" />
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-normal text-center">
-                          {t.emailNotEditable}
-                          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-                        </div>
-                      </div>
+                  <div className="relative inline-block">
+                    <InformationCircleIcon 
+                      className="h-4 w-4 text-gray-400 cursor-help hover:text-gray-600"
+                      onMouseOver={() => {
+                        const tooltip = document.getElementById(`email-tooltip-mobile-${user.id}`);
+                        if (tooltip) tooltip.classList.add('opacity-100');
+                      }}
+                      onMouseOut={() => {
+                        const tooltip = document.getElementById(`email-tooltip-mobile-${user.id}`);
+                        if (tooltip) tooltip.classList.remove('opacity-100');
+                      }}
+                    />
+                    <div 
+                      id={`email-tooltip-mobile-${user.id}`}
+                      className="absolute pointer-events-none opacity-0 top-full left-1/2 transform -translate-x-1/2 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
+                    >
+                      {t.emailNotEditable}
+                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
                     </div>
                   </div>
                 </div>
@@ -696,12 +705,23 @@ export const AdminUsers = () => {
               >
                 <span>{t.copyLink}</span>
                 <div className="relative inline-block">
-                  <div className="group">
-                    <InformationCircleIcon className="h-4 w-4 text-white/70 flex-shrink-0" />
-                    <div className="absolute top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 whitespace-normal text-center pointer-events-none">
-                      {t.signupLinkExpires}
-                      <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-                    </div>
+                  <InformationCircleIcon 
+                    className="h-4 w-4 text-white/70 flex-shrink-0 cursor-help" 
+                    onMouseOver={() => {
+                      const tooltip = document.getElementById(`signup-tooltip-mobile-${user.id}`);
+                      if (tooltip) tooltip.classList.add('opacity-100');
+                    }}
+                    onMouseOut={() => {
+                      const tooltip = document.getElementById(`signup-tooltip-mobile-${user.id}`);
+                      if (tooltip) tooltip.classList.remove('opacity-100');
+                    }}
+                  />
+                  <div 
+                    id={`signup-tooltip-mobile-${user.id}`}
+                    className="absolute pointer-events-none opacity-0 top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
+                  >
+                    {t.signupLinkExpires}
+                    <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
                   </div>
                 </div>
               </button>
@@ -955,13 +975,24 @@ export const AdminUsers = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex items-center gap-1">
                             {user.email}
-                            <div className="relative">
-                              <div className="group">
-                                <InformationCircleIcon className="h-4 w-4 text-gray-400" />
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-normal text-center">
-                                  {t.emailNotEditable}
-                                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-                                </div>
+                            <div className="relative inline-block">
+                              <InformationCircleIcon 
+                                className="h-4 w-4 text-gray-400 cursor-help hover:text-gray-600"
+                                onMouseOver={() => {
+                                  const tooltip = document.getElementById(`email-tooltip-desktop-${user.id}`);
+                                  if (tooltip) tooltip.classList.add('opacity-100');
+                                }}
+                                onMouseOut={() => {
+                                  const tooltip = document.getElementById(`email-tooltip-desktop-${user.id}`);
+                                  if (tooltip) tooltip.classList.remove('opacity-100');
+                                }}
+                              />
+                              <div 
+                                id={`email-tooltip-desktop-${user.id}`}
+                                className="absolute pointer-events-none opacity-0 top-full left-1/2 transform -translate-x-1/2 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
+                              >
+                                {t.emailNotEditable}
+                                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
                               </div>
                             </div>
                           </div>
@@ -1112,12 +1143,23 @@ export const AdminUsers = () => {
                                   >
                                     <span>{t.copyLink}</span>
                                     <div className="relative inline-block">
-                                      <div className="group">
-                                        <InformationCircleIcon className="h-4 w-4 text-white/70 flex-shrink-0" />
-                                        <div className="absolute top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 whitespace-normal text-center pointer-events-none">
-                                          {t.signupLinkExpires}
-                                          <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-                                        </div>
+                                      <InformationCircleIcon 
+                                        className="h-4 w-4 text-white/70 flex-shrink-0 cursor-help" 
+                                        onMouseOver={() => {
+                                          const tooltip = document.getElementById(`signup-tooltip-table-${user.id}`);
+                                          if (tooltip) tooltip.classList.add('opacity-100');
+                                        }}
+                                        onMouseOut={() => {
+                                          const tooltip = document.getElementById(`signup-tooltip-table-${user.id}`);
+                                          if (tooltip) tooltip.classList.remove('opacity-100');
+                                        }}
+                                      />
+                                      <div 
+                                        id={`signup-tooltip-table-${user.id}`}
+                                        className="absolute pointer-events-none opacity-0 top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
+                                      >
+                                        {t.signupLinkExpires}
+                                        <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
                                       </div>
                                     </div>
                                   </button>
