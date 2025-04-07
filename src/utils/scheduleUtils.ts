@@ -70,7 +70,7 @@ export interface ClassSession {
 export type ClassWithStudents = ClassSession;
 
 // Helper function to convert string or Timestamp to Date
-const toDate = (date: string | Timestamp | undefined | null): Date | undefined => {
+export const toDate = (date: string | Timestamp | undefined | null): Date | undefined => {
   if (!date) return undefined;
   if (date instanceof Timestamp) return date.toDate();
   return new Date(date);
