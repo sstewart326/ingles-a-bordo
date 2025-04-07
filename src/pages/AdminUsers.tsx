@@ -90,16 +90,18 @@ export const AdminUsers = () => {
       let usersList: User[] = [];
       if (isAdmin) {
         logUserOp('Fetching all users as admin', {userId: currentUser?.uid});
-        // If admin, get all users
+        // If admin, get all users - bypass cache to get fresh data
         usersList = await getCachedCollection<User>('users', [], { 
-          userId: currentUser?.uid
+          userId: currentUser?.uid,
+          bypassCache: true  // Force fresh data fetch
         });
         logUserOp('Admin users query result', { count: usersList.length });
       } else {
         logUserOp('Fetching teacher users', { teacherAuthId: currentUser.uid });
-        // If teacher, only get their students
+        // If teacher, only get their students - bypass cache
         usersList = await getTeacherUsers<User>(currentUser.uid, {
-          userId: currentUser?.uid
+          userId: currentUser?.uid,
+          bypassCache: true  // Force fresh data fetch
         });
         logUserOp('Teacher users query result', { count: usersList.length });
       }
@@ -114,7 +116,8 @@ export const AdminUsers = () => {
         const userEmails = updatedUsersList.map(user => user.email);
         logUserOp('Fetching classes for users', { userCount: userEmails.length });
         const classes = await getUsersClasses(userEmails, {
-          userId: currentUser?.uid
+          userId: currentUser?.uid,
+          bypassCache: true  // Force fresh data fetch
         });
         logUserOp('Classes query result', { classCount: classes.length });
       }
@@ -193,11 +196,15 @@ export const AdminUsers = () => {
     }
 
     try {
+      // Update UI state immediately to show the deletion
+      setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+
       // First, get all classes where this user is a student
       const userClasses = await getCachedCollection<{ id: string }>('classes', [
         where('studentEmails', 'array-contains', userToDelete.email)
       ], {
-        userId: currentUser.uid
+        userId: currentUser.uid,
+        bypassCache: true
       });
 
       // For each class, get and delete associated materials
@@ -206,7 +213,8 @@ export const AdminUsers = () => {
           where('classId', '==', classDoc.id),
           where('studentEmails', 'array-contains', userToDelete.email)
         ], {
-          userId: currentUser.uid
+          userId: currentUser.uid,
+          bypassCache: true
         });
 
         // Delete each material document
@@ -264,10 +272,19 @@ export const AdminUsers = () => {
           error,
           message: error instanceof Error ? error.message : 'Unknown error'
         });
+        
+        // If there was an error, refresh the UI to restore the original state
+        await fetchUsers();
+        
         throw error;
       }
 
-      await fetchUsers();
+      // Force a refresh of the users collection in the background
+      // This is handled in a background task, so the UI isn't blocked
+      setTimeout(() => {
+        fetchUsers().catch(e => console.error('Background refresh error:', e));
+      }, 500);
+      
       toast.success(t.userDeleted);
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -318,8 +335,9 @@ export const AdminUsers = () => {
       // Use setCachedDocument to properly handle caching
       await setCachedDocument('users', tempId, newUserData, { userId: currentUser?.uid });
       
-      // Update local state immediately with the new user
-      setUsers(prevUsers => [...prevUsers, newUserData]);
+      // Force a full refresh of the users collection
+      // This will ensure the cache is updated properly
+      await fetchUsers();
       
       // Copy to clipboard
       await navigator.clipboard.writeText(signupLinkData.signupLink);
