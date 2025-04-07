@@ -1,6 +1,7 @@
 import { ClassSession } from './scheduleUtils';
 import { getBaseClassId } from './scheduleUtils';
 import { User } from '../types/interfaces';
+import { toDate } from './scheduleUtils';
 
 // Define the PaymentDue interface locally
 interface PaymentDue {
@@ -109,7 +110,7 @@ export const getNextPaymentDates = (paymentConfig: User['paymentConfig'], classS
     }
     
     if (paymentDate >= paymentStartDate && 
-        (!classSession.endDate || paymentDate <= classSession.endDate.toDate())) {
+        (!classSession.endDate || (toDate(classSession.endDate) && paymentDate <= toDate(classSession.endDate)!))) {
       dates.push(paymentDate);
     }
   }
