@@ -30,7 +30,8 @@ import {
   CheckIcon, 
   DocumentDuplicateIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ArrowDownRightIcon
 } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 import { useLanguage } from '../hooks/useLanguage';
@@ -550,15 +551,16 @@ export const AdminClassPlans = () => {
           onMouseEnter={() => setHoveredAddButton(buttonId)}
         >
           <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-10">
-            <button
-              onClick={() => !isChild ? openInsertParentModal(item.id) : openAddChildModal(item.id, item.id)}
-              className={`p-0.5 md:p-1 rounded-full bg-green-500 text-white transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 touch-manipulation ${
-                showButton(buttonId) ? 'opacity-100' : 'opacity-0'
-              }`}
-              title="Insert item above"
-            >
-              <PlusIcon className="h-3 w-3 md:h-4 md:w-4" />
-            </button>
+            {!isChild ? <Tooltip text={!isChild ? "Insert a new item above" : "Insert a new sub-item above"} width='w-48' >
+              <button
+                onClick={() => !isChild ? openInsertParentModal(item.id) : openAddChildModal(item.id, item.id)}
+                className={`p-0.5 md:p-1 rounded-full bg-green-500 text-white transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 touch-manipulation ${
+                  showButton(buttonId) ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <PlusIcon className="h-3 w-3 md:h-4 md:w-4" />
+              </button>
+            </Tooltip> : null}
           </div>
         </div>
 
@@ -608,29 +610,32 @@ export const AdminClassPlans = () => {
                   </p>
                   
                   <div className="flex flex-wrap gap-1 md:gap-2">
-                    <button
-                      onClick={() => handleEditItem(item)}
-                      className="p-1 md:p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors touch-manipulation"
-                      title="Edit item"
-                    >
-                      <PencilIcon className="h-3 w-3 md:h-5 md:w-5" />
-                    </button>
+                    <Tooltip text="Edit this item" width='w-28' >
+                      <button
+                        onClick={() => handleEditItem(item)}
+                        className="p-1 md:p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors touch-manipulation"
+                      >
+                        <PencilIcon className="h-3 w-3 md:h-5 md:w-5" />
+                      </button>
+                    </Tooltip>
                     
-                    <button
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="p-1 md:p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors touch-manipulation"
-                      title="Delete item"
-                    >
-                      <TrashIcon className="h-3 w-3 md:h-5 md:w-5" />
-                    </button>
+                    <Tooltip text="Delete this item" width='w-32' >
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="p-1 md:p-1.5 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors touch-manipulation"
+                      >
+                        <TrashIcon className="h-3 w-3 md:h-5 md:w-5" />
+                      </button>
+                    </Tooltip>
                     
-                    <button
-                      onClick={() => openAddChildModal(item.id)}
-                      className="p-1 md:p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors touch-manipulation"
-                      title="Add child item"
-                    >
-                      <PlusIcon className="h-3 w-3 md:h-5 md:w-5" />
-                    </button>
+                    <Tooltip text="Add a sub-item underneath this item" width='w-72' >
+                      <button
+                        onClick={() => openAddChildModal(item.id)}
+                        className="p-1 md:p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors touch-manipulation"
+                      >
+                        <ArrowDownRightIcon className="h-3 w-3 md:h-5 md:w-5" />
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
                 
@@ -662,19 +667,20 @@ export const AdminClassPlans = () => {
             onMouseEnter={() => setHoveredAddButton(bottomButtonId)}
           >
             <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-10">
-              <button
-                onClick={() => {
-                  setNewItemTitle('');
-                  setNewItemDescription('');
-                  setShowAddItemModal(true);
-                }}
-                className={`p-0.5 md:p-1 rounded-full bg-green-500 text-white transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 touch-manipulation ${
-                  showButton(bottomButtonId) ? 'opacity-100' : 'opacity-0'
-                }`}
-                title="Add new item"
-              >
-                <PlusIcon className="h-3 w-3 md:h-4 md:w-4" />
-              </button>
+              <Tooltip text="Add a new top-level item">
+                <button
+                  onClick={() => {
+                    setNewItemTitle('');
+                    setNewItemDescription('');
+                    setShowAddItemModal(true);
+                  }}
+                  className={`p-0.5 md:p-1 rounded-full bg-green-500 text-white transition-opacity duration-200 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 touch-manipulation ${
+                    showButton(bottomButtonId) ? 'opacity-100' : 'opacity-0'
+                  }`}
+                >
+                  <PlusIcon className="h-3 w-3 md:h-4 md:w-4" />
+                </button>
+              </Tooltip>
             </div>
           </div>
         )}
@@ -1379,8 +1385,6 @@ export const AdminClassPlans = () => {
                 No templates available. Save a plan as a template first.
               </p>
             )}
-            
-            
             
             <div className="flex justify-end space-x-3 pt-4">
               <button
