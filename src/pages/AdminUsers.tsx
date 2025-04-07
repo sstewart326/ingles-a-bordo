@@ -301,11 +301,8 @@ export const AdminUsers = () => {
         throw error;
       }
 
-      // Force a refresh of the users collection in the background
-      // This is handled in a background task, so the UI isn't blocked
-      setTimeout(() => {
-        fetchUsers().catch(e => console.error('Background refresh error:', e));
-      }, 500);
+      // Don't refresh the users in the background - it can cause stale data to reappear
+      // The UI is already updated through setUsers() earlier, and the cache is invalidated
       
       toast.success(t.userDeleted);
     } catch (error) {
