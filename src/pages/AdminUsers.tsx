@@ -168,6 +168,12 @@ export const AdminUsers = () => {
   }, [fetchUsers]);
 
   const deleteUser = async (userId: string) => {
+    // IMPORTANT: This function handles deletion of a user. When deleting a user:
+    // 1. We must NOT delete classes that have other students - only remove the deleted user from them
+    // 2. We must NOT delete class materials that other students use - only remove the deleted user
+    // 3. Only delete materials and classes that are exclusively used by this student
+    // Failure to follow these rules can result in accidental data loss
+
     // Security checks
     if (!currentUser || !isAdmin) {
       toast.error(t.unauthorizedAction);
@@ -199,17 +205,18 @@ export const AdminUsers = () => {
       // Update UI state immediately to show the deletion
       setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
 
-      // First, get all classes where this user is a student
-      const userClasses = await getCachedCollection<{ id: string }>('classes', [
+      // Get all classes where this user is enrolled as a student
+      // We will update these classes to remove the student, not delete them
+      const userClasses = await getCachedCollection<{ id: string, studentEmails: string[] }>('classes', [
         where('studentEmails', 'array-contains', userToDelete.email)
       ], {
         userId: currentUser.uid,
         bypassCache: true
       });
 
-      // For each class, get and delete associated materials
+      // For each class, get and update associated materials
       for (const classDoc of userClasses) {
-        const classMaterials = await getCachedCollection<{ id: string }>('classMaterials', [
+        const classMaterials = await getCachedCollection<{ id: string, studentEmails: string[] }>('classMaterials', [
           where('classId', '==', classDoc.id),
           where('studentEmails', 'array-contains', userToDelete.email)
         ], {
@@ -217,13 +224,28 @@ export const AdminUsers = () => {
           bypassCache: true
         });
 
-        // Delete each material document
+        // Update or delete each material document based on whether other students are using it
         for (const material of classMaterials) {
-          await deleteCachedDocument('classMaterials', material.id);
+          if (material.studentEmails.length <= 1) {
+            // If this is the only student using this material, delete it
+            await deleteCachedDocument('classMaterials', material.id);
+          } else {
+            // If other students are using this material, just remove this student
+            await updateCachedDocument('classMaterials', material.id, {
+              studentEmails: material.studentEmails.filter(email => email !== userToDelete.email)
+            }, {
+              userId: currentUser.uid
+            });
+          }
         }
 
-        // Delete the class document
-        await deleteCachedDocument('classes', classDoc.id);
+        // Update the class to remove this student instead of deleting the whole class
+        // Only remove the student from the class, not delete the entire class
+        await updateCachedDocument('classes', classDoc.id, {
+          studentEmails: classDoc.studentEmails.filter(email => email !== userToDelete.email)
+        }, {
+          userId: currentUser.uid
+        });
       }
 
       try {
