@@ -746,9 +746,6 @@ export const AdminUsers = () => {
                 </button>
               </Tooltip>
             </div>
-            <div className="relative">
-              Tooltip text={t.signup}
-            </div>
           </>
         ) : (
           <>
@@ -775,28 +772,15 @@ export const AdminUsers = () => {
                       toast.error(t.failedToCopyLink);
                     }
                   }}
-                  className={`${styles.buttons.primary} w-[130px] flex items-center justify-center gap-1`}
+                  className="p-1.5 text-indigo-600 hover:text-indigo-800 rounded-full hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 relative group/button"
                 >
-                  <span>{t.copyLink}</span>
-                  <div className="relative inline-block">
-                    <InformationCircleIcon
-                      className="h-4 w-4 text-white/70 flex-shrink-0 cursor-help"
-                      onMouseOver={() => {
-                        const tooltip = document.getElementById(`signup-tooltip-mobile-${user.id}`);
-                        if (tooltip) tooltip.classList.add('opacity-100');
-                      }}
-                      onMouseOut={() => {
-                        const tooltip = document.getElementById(`signup-tooltip-mobile-${user.id}`);
-                        if (tooltip) tooltip.classList.remove('opacity-100');
-                      }}
-                    />
-                    <div
-                      id={`signup-tooltip-mobile-${user.id}`}
-                      className="absolute pointer-events-none opacity-0 top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
-                    >
-                      {t.signupLinkExpires}
-                      <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-                    </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <span className="sr-only">{t.copyLink}</span>
+                  <div className="absolute bottom-full right-0 mb-1 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover/button:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none whitespace-normal text-center">
+                    {t.signupLinkExpires}
+                    <div className="absolute bottom-0 right-[8px] transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
                   </div>
                 </button>
               </Tooltip>
