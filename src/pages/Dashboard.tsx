@@ -20,7 +20,6 @@ import {
   handleCancelEditNotes as handleCancelEditNotesUtil
 } from '../utils/notesUtils';
 import { CalendarSection } from '../components/CalendarSection';
-import { ClassesSection } from '../components/ClassesSection';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { getPaymentsDueForDay } from '../utils/paymentUtils';
 import { StudentHomework } from '../components/StudentHomework';
@@ -38,8 +37,6 @@ export const Dashboard = () => {
   const [savingPrivateNotes, setSavingPrivateNotes] = useState<{ [classId: string]: boolean }>({});
   const [deletingMaterial, setDeletingMaterial] = useState<{ [materialId: string]: boolean }>({});
   const [visibleUploadForm, setVisibleUploadForm] = useState<string | null>(null);
-  const [upcomingClassesPage, setUpcomingClassesPage] = useState(0);
-  const [pastClassesPage, setPastClassesPage] = useState(0);
   const [initialDataFetched, setInitialDataFetched] = useState(false);
   const [lastVisitTimestamp, setLastVisitTimestamp] = useState<number>(Date.now());
   const prevPathRef = useRef<string | null>(null);
@@ -441,10 +438,7 @@ export const Dashboard = () => {
   useEffect(() => {
     const handleResize = () => {
       const newIsMobileView = window.innerWidth < 768;
-
       if (newIsMobileView !== isMobileView) {
-        setUpcomingClassesPage(0);
-        setPastClassesPage(0);
         setIsMobileView(newIsMobileView);
       }
     };
@@ -855,14 +849,6 @@ export const Dashboard = () => {
   const handleCloseUploadForm = () => {
     setVisibleUploadForm(null);
     refreshMaterialsForClass();
-  };
-
-  const handleUpcomingClassesPagination = (newPage: number) => {
-    setUpcomingClassesPage(newPage);
-  };
-
-  const handlePastClassesPagination = (newPage: number) => {
-    setPastClassesPage(newPage);
   };
 
   const formatStudentNames = (studentEmails: string[]) => {
@@ -1280,66 +1266,6 @@ export const Dashboard = () => {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Classes section - at the bottom */}
-      <div className="mt-8 pt-8 border-t-4 border-gray-200 lg:grid lg:grid-cols-2 lg:gap-8 lg:border-t-0 lg:pt-0">
-        <ClassesSection
-          upcomingClasses={upcomingClasses}
-          pastClasses={pastClasses}
-          classMaterials={classMaterials}
-          editingNotes={editingNotes}
-          savingNotes={savingNotes}
-          editingPrivateNotes={editingPrivateNotes}
-          savingPrivateNotes={savingPrivateNotes}
-          deletingMaterial={deletingMaterial}
-          isAdmin={isAdmin}
-          isMobileView={isMobileView}
-          upcomingClassesPage={upcomingClassesPage}
-          pastClassesPage={pastClassesPage}
-          formatClassTime={formatClassTime}
-          formatClassDate={formatClassDate}
-          formatStudentNames={formatStudentNames}
-          getNextClassDate={getNextClassDate}
-          getPreviousClassDate={getPreviousClassDate}
-          onEditNotes={handleEditNotes}
-          onSaveNotes={handleSaveNotes}
-          onCancelEditNotes={handleCancelEditNotes}
-          onEditPrivateNotes={handleEditPrivateNotes}
-          onSavePrivateNotes={handleSavePrivateNotes}
-          onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
-          onDeleteMaterial={handleDeleteMaterial}
-          onOpenUploadForm={handleOpenUploadForm}
-          onCloseUploadForm={handleCloseUploadForm}
-          visibleUploadForm={visibleUploadForm}
-          textareaRefs={textareaRefs.current}
-          onUpcomingClassesPageChange={handleUpcomingClassesPagination}
-          onPastClassesPageChange={handlePastClassesPagination}
-          selectedDate={selectedDate}
-          homeworkByClassId={homeworkByClassId}
-          refreshHomework={refreshAllHomework}
-          t={{
-            upcomingClasses: t.upcomingClasses,
-            pastClasses: t.pastClasses,
-            noUpcomingClasses: t.noUpcomingClasses,
-            noPastClasses: t.noPastClasses,
-            addNotes: t.edit,
-            addPrivateNotes: t.edit,
-            materials: t.materials,
-            addMaterials: t.addMaterials,
-            slides: t.slides,
-            link: t.add,
-            previous: t.previous,
-            next: t.next,
-            notes: t.notes,
-            notesInfo: t.notesInfo,
-            cancel: t.cancel,
-            noNotes: t.noNotes,
-            edit: t.edit,
-            privateNotes: t.privateNotes,
-            privateNotesInfo: t.privateNotesInfo
-          }}
-        />
       </div>
 
       {/* Homework section - only show for non-admin users */}
