@@ -693,7 +693,30 @@ export const AdminUsers = () => {
               {user.isAdmin ? 'Admin' : user.isTeacher ? t.teacherAccount : t.activeUser}
             </span>
           ) : (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            <span 
+              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 cursor-pointer hover:bg-yellow-200 transition-colors duration-200"
+              onClick={async () => {
+                try {
+                  let signupLinkData = recentSignupLinks[user.email];
+                  if (!signupLinkData) {
+                    signupLinkData = await createSignupLink(user.email, user.name);
+                    setRecentSignupLinks(prev => ({
+                      ...prev,
+                      [user.email]: signupLinkData
+                    }));
+                  } else {
+                    // Extend the expiration date
+                    await extendSignupTokenExpiration(signupLinkData.token);
+                  }
+                  await navigator.clipboard.writeText(signupLinkData.signupLink);
+                  toast.success(t.signupLinkCopied);
+                } catch (error) {
+                  console.error('Error copying signup link:', error);
+                  toast.error(t.failedToCopyLink);
+                }
+              }}
+              title={t.copySignupLink}
+            >
               {t.pendingSignup}
             </span>
           )}
@@ -1250,7 +1273,30 @@ export const AdminUsers = () => {
                               {user.isAdmin ? 'Admin' : user.isTeacher ? t.teacherAccount : t.activeUser}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-4 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                            <span 
+                              className="inline-flex items-center px-4 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 cursor-pointer hover:bg-yellow-200 transition-colors duration-200"
+                              onClick={async () => {
+                                try {
+                                  let signupLinkData = recentSignupLinks[user.email];
+                                  if (!signupLinkData) {
+                                    signupLinkData = await createSignupLink(user.email, user.name);
+                                    setRecentSignupLinks(prev => ({
+                                      ...prev,
+                                      [user.email]: signupLinkData
+                                    }));
+                                  } else {
+                                    // Extend the expiration date
+                                    await extendSignupTokenExpiration(signupLinkData.token);
+                                  }
+                                  await navigator.clipboard.writeText(signupLinkData.signupLink);
+                                  toast.success(t.signupLinkCopied);
+                                } catch (error) {
+                                  console.error('Error copying signup link:', error);
+                                  toast.error(t.failedToCopyLink);
+                                }
+                              }}
+                              title={t.copySignupLink}
+                            >
                               {t.pendingSignup}
                             </span>
                           )}

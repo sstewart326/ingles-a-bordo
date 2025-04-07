@@ -177,6 +177,7 @@ interface Translation {
   activeUser: string;
   pendingSignup: string;
   copyLink: string;
+  copySignupLink: string;
   confirmDelete: string;
   signupLinkCopied: string;
   signupLinkExpires: string;
@@ -531,6 +532,7 @@ const translations: Record<Language, Translation> = {
     activeUser: 'User',
     pendingSignup: 'Pending Signup',
     copyLink: 'Copy Link',
+    copySignupLink: 'Copy signup link',
     confirmDelete: 'Are you sure you want to delete {name} ({email})?',
     signupLinkCopied: 'Signup link copied to clipboard. Link expires in 24 hours.',
     signupLinkExpires: 'Link expires in 24 hours. Copying the link extends the expiration date.',
@@ -876,13 +878,14 @@ const translations: Record<Language, Translation> = {
 
     // Admin Users
     teacherAccount: 'Conta de Professor',
-    adminAccount: 'Conta de Admin',
+    adminAccount: 'Conta de Administrador',
     enterFullName: 'Digite o nome completo',
-    enterEmailAddress: 'Digite o endereço de email',
+    enterEmailAddress: 'Digite o endereço de e-mail',
     userStatus: 'Status',
     activeUser: 'Usuário',
-    pendingSignup: 'Pendente',
+    pendingSignup: 'Cadastro Pendente',
     copyLink: 'Copiar Link',
+    copySignupLink: 'Copiar link de cadastro',
     confirmDelete: 'Tem certeza que deseja excluir {name} ({email})?',
     signupLinkCopied: 'Link de cadastro copiado para a área de transferência. Link expira em 24 horas.',
     signupLinkExpires: 'O link expira em 24 horas. Copiar o link estende a data de expiração.',
