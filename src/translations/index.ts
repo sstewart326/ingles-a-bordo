@@ -581,7 +581,7 @@ const translations: Record<Language, Translation> = {
           classCreated: 'Class created successfully',
           classDeleted: 'Class deleted successfully'
         },
-        confirmDelete: 'Are you sure you want to delete this {courseType} class on {day} at {time}?'
+        confirmDelete: 'Are you sure you want to delete this class?'
       }
     },
 
@@ -649,7 +649,7 @@ const translations: Record<Language, Translation> = {
     enterItemTitle: 'Enter Item Title',
     enterItemDescription: 'Enter Item Description',
     saveChanges: 'Save Changes',
-    addChildItem: 'Add Child Item',
+    addChildItem: 'Add Sub-Item',
     insertItemAbove: 'Insert Item Above',
     deleteClassPlan: 'Delete Class Plan',
     deleteClassPlanWarning: 'Are you sure you want to delete this class plan?',
@@ -933,7 +933,7 @@ const translations: Record<Language, Translation> = {
           classCreated: 'Aula criada com sucesso',
           classDeleted: 'Aula excluída com sucesso'
         },
-        confirmDelete: 'Tem certeza que deseja excluir esta aula {courseType} na {day} às {time}?'
+        confirmDelete: 'Tem certeza que deseja excluir esta aula?'
       }
     },
 
@@ -1001,7 +1001,7 @@ const translations: Record<Language, Translation> = {
     enterItemTitle: 'Digite o Título do Item',
     enterItemDescription: 'Digite a Descrição do Item',
     saveChanges: 'Salvar Alterações',
-    addChildItem: 'Adicionar Item Filho',
+    addChildItem: 'Adicionar Subtopico',
     insertItemAbove: 'Inserir Item Acima',
     deleteClassPlan: 'Excluir Plano de Aula',
     deleteClassPlanWarning: 'Tem certeza que deseja excluir este plano de aula?',

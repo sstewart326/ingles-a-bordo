@@ -22,7 +22,7 @@ import { ClassSchedule } from '../types/interfaces';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import { invalidateCalendarCache } from '../services/calendarService';
-import { PlusIcon, TrashIcon, PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, PencilIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { Class, SelectOption, User } from '../types/interfaces';
 import { useAuth } from '../hooks/useAuth';
@@ -130,6 +130,8 @@ export const AdminSchedule = () => {
   });
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
   const [currentStep, setCurrentStep] = useState<'schedule' | 'payment'>('schedule');
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<string | null>(null);
 
   const { currentUser } = useAuth();
   const { isAdmin } = useAdmin();
@@ -545,7 +547,19 @@ export const AdminSchedule = () => {
       toast.error(t.admin.schedule.errors.deleteClass);
     } finally {
       setDeletingClassId(null);
+      setClassToDelete(null);
+      setShowDeleteConfirmation(false);
     }
+  };
+
+  const confirmDeleteClass = (classId: string) => {
+    setClassToDelete(classId);
+    setShowDeleteConfirmation(true);
+  };
+
+  const cancelDeleteClass = () => {
+    setClassToDelete(null);
+    setShowDeleteConfirmation(false);
   };
 
   const studentOptions = users
@@ -921,7 +935,7 @@ export const AdminSchedule = () => {
               <span className="sr-only">{t.edit}</span>
             </button>
             <button
-              onClick={() => handleDeleteClass(classItem.id)}
+              onClick={() => confirmDeleteClass(classItem.id)}
               disabled={deletingClassId === classItem.id}
               className={`p-2 ${deletingClassId === classItem.id ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:text-red-800'} transition-colors duration-200`}
               title={t.delete}
@@ -1840,6 +1854,51 @@ export const AdminSchedule = () => {
           </div>
         </Modal>
 
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirmation && (
+          <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 transform transition-all">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 bg-red-100 rounded-full p-2">
+                  <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    {t.manageClasses}
+                  </h3>
+                  <p className="mt-2 text-sm text-gray-500">
+                    {t.admin.schedule.confirmDelete}
+                  </p>
+                  <div className="mt-4 flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      onClick={cancelDeleteClass}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      {t.cancel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => classToDelete && handleDeleteClass(classToDelete)}
+                      className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      {deletingClassId ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          {t.loading}
+                        </>
+                      ) : t.delete}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showMobileView ? (
           <div className="space-y-4">
             {getSortedClasses().map(renderMobileCard)}
@@ -1907,7 +1966,7 @@ export const AdminSchedule = () => {
                             </div>
                             <div className="relative">
                               <button
-                                onClick={() => handleDeleteClass(classItem.id)}
+                                onClick={() => confirmDeleteClass(classItem.id)}
                                 disabled={deletingClassId === classItem.id}
                                 className={`p-1.5 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                                   deletingClassId === classItem.id 
