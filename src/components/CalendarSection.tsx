@@ -87,7 +87,6 @@ export const CalendarSection = ({
         setCompletedPayments(payments);
         previousPaymentMonthRef.current = currentMonth;
       } catch (error) {
-        console.error('Error fetching payments:', error);
         setCompletedPayments([]);
       }
     };

@@ -152,7 +152,6 @@ export const DayDetails = ({
             paymentLink: classData?.paymentConfig?.paymentLink || null 
           };
         } catch (error) {
-          console.error(`Error fetching payment link for class ${classId}:`, error);
           return { classId, paymentLink: null };
         }
       });
@@ -202,7 +201,6 @@ export const DayDetails = ({
       );
       
       if (!userPaymentDue) {
-        console.error('User payment due not found');
         setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
         return;
       }
@@ -230,7 +228,6 @@ export const DayDetails = ({
       setShowCompletionDateModal(false);
       setPendingPaymentAction(null);
     } catch (error) {
-      console.error('Error marking payment completed:', error);
       if (pendingPaymentAction) {
         const paymentKey = `${pendingPaymentAction.userId}-${pendingPaymentAction.classSession.id}`;
         setLoadingPaymentComplete(prev => ({ ...prev, [paymentKey]: false }));
@@ -251,7 +248,6 @@ export const DayDetails = ({
         onPaymentStatusChange(selectedDayDetails.date);
       }
     } catch (error) {
-      console.error('Error marking payment as incomplete:', error);
     } finally {
       setLoadingPaymentIncomplete(prev => ({ ...prev, [payment.id]: false }));
     }
@@ -289,13 +285,9 @@ export const DayDetails = ({
             [updatedClassSession.id]: latestClassData.paymentConfig.paymentLink || ''
           });
           
-          // Log for debugging
-          console.log('Editing payment link for class:', updatedClassSession.id);
-          console.log('Latest payment link from DB:', latestClassData.paymentConfig.paymentLink);
           return;
         }
       } catch (error) {
-        console.error('Error fetching latest class data:', error);
         // Continue with local data if fetch fails
       }
       
@@ -311,12 +303,7 @@ export const DayDetails = ({
           [updatedClassSession.id]: updatedClassSession.paymentConfig.paymentLink
         });
       }
-      
-      // Log for debugging
-      console.log('Editing payment link for class:', updatedClassSession.id);
-      console.log('Current payment link (from local state):', updatedClassSession.paymentConfig?.paymentLink);
     } catch (error) {
-      console.error('Error in handleEditPaymentLink:', error);
     }
   };
 
@@ -330,14 +317,11 @@ export const DayDetails = ({
       });
       
       const paymentLink = editingPaymentLink[classSession.id] || '';
-      console.log('Saving payment link:', paymentLink);
       
       // Extract the base class ID for consistency with multiple schedule classes
       const baseClassId = getBaseClassId(classSession.id);
-      console.log('Using base class ID:', baseClassId);
       
       await updateClassPaymentLink(baseClassId, paymentLink);
-      console.log('Payment link saved to database');
       
       // Fetch the latest class data from the database to ensure we have the most up-to-date data
       const latestClassData = await getClassById(baseClassId);
@@ -366,9 +350,6 @@ export const DayDetails = ({
             ...(latestClassData.paymentConfig || {})
           }
         };
-        
-        console.log('Updated class session:', updatedClassSession);
-        console.log('Updated payment link:', updatedClassSession.paymentConfig?.paymentLink);
         
         // Update the classes array in selectedDayDetails
         const updatedClasses = selectedDayDetails.classes.map(c => {
@@ -430,9 +411,7 @@ export const DayDetails = ({
         ...editingPaymentLink,
         [classSession.id]: null
       });
-      console.log('Editing state cleared');
     } catch (error) {
-      console.error('Error saving payment link:', error);
     } finally {
       setSavingPaymentLink({
         ...savingPaymentLink,
@@ -632,20 +611,6 @@ export const DayDetails = ({
       </button>
     </div>
   );
-
-  // Add a debugging useEffect
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && selectedDayDetails) {
-      console.log('DayDetails materials map:', {
-        date: selectedDayDetails.date,
-        classes: selectedDayDetails.classes.length,
-        materialsMap: Object.keys(selectedDayDetails.materials).map(key => ({
-          classId: key,
-          count: selectedDayDetails.materials[key]?.length || 0
-        }))
-      });
-    }
-  }, [selectedDayDetails]);
 
   if (!selectedDayDetails) {
     return (

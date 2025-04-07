@@ -402,16 +402,6 @@ export const ClassSection = ({
                                   // First get materials from either source
                                   const materialsFromClass = classSession.materials || [];
                                   const materialsFromMap = classMaterials[classSession.id] || [];
-                                  
-                                  // Only log in development and not for every class
-                                  if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) {
-                                    console.log('ClassSection - Materials for class', classSession.id, {
-                                      materialsFromClass: materialsFromClass.length,
-                                      materialsFromMap: materialsFromMap.length,
-                                      date: date.toISOString().split('T')[0]
-                                    });
-                                  }
-                                  
                                   // For performance, use a Set to track already added material IDs
                                   const addedMaterialIds = new Set<string>();
                                   const allMaterials: ClassMaterial[] = [];
@@ -449,25 +439,6 @@ export const ClassSection = ({
                                     // This ensures materials for each day are shown correctly
                                     return materialDay.getTime() === displayDay.getTime();
                                   };
-                                  
-                                  // Log material details for debugging in development
-                                  if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) {
-                                    const allFilteredMaterials = allMaterials.filter(isForCurrentDate);
-                                    console.log('ClassSection - Materials filtered by date:', {
-                                      classId: classSession.id,
-                                      date: date instanceof Date ? date.toISOString().split('T')[0] : 'invalid date',
-                                      totalMaterials: allMaterials.length,
-                                      filteredMaterials: allFilteredMaterials.length,
-                                      materialDates: allMaterials.map(m => ({
-                                        id: m.id,
-                                        date: m.classDate instanceof Date 
-                                          ? m.classDate.toISOString().split('T')[0] 
-                                          : m.classDate 
-                                          ? new Date(m.classDate).toISOString().split('T')[0]
-                                          : 'no date'
-                                      }))
-                                    });
-                                  }
                                   
                                   return allMaterials.filter(isForCurrentDate);
                                 })().map((material, index) => (
