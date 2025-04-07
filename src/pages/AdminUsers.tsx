@@ -6,21 +6,23 @@ import { createSignupLink, extendSignupTokenExpiration } from '../utils/signupLi
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
-import { 
-  getCachedCollection, 
-  deleteCachedDocument, 
-  setCachedDocument, 
+import { useMasquerade } from '../hooks/useMasquerade';
+import {
+  getCachedCollection,
+  deleteCachedDocument,
+  setCachedDocument,
   updateCachedDocument,
   getTeacherUsers,
-  getUsersClasses 
+  getUsersClasses
 } from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, InformationCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 import Modal from '../components/Modal';
-import { MasqueradeButton } from '../components/MasqueradeButton';
 import { User } from '../types/interfaces';
+import { useNavigate } from 'react-router-dom';
+import { Tooltip } from '../components/Tooltip';
 
 interface NewUser {
   email: string;
@@ -57,6 +59,7 @@ const logUserOp = (message: string, data?: any) => {
 export const AdminUsers = () => {
   const { currentUser } = useAuth() as { currentUser: ExtendedUser | null };
   const { isAdmin } = useAdmin();
+  const { startMasquerade } = useMasquerade();
   const { language } = useLanguage();
   const t = useTranslation(language);
   const [users, setUsers] = useState<User[]>([]);
@@ -64,21 +67,22 @@ export const AdminUsers = () => {
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newUser, setNewUser] = useState<NewUser>({ 
-    email: '', 
+  const [newUser, setNewUser] = useState<NewUser>({
+    email: '',
     name: '',
     isTeacher: false,
     isAdmin: false,
     birthdate: '',  // Initialize birthdate field
     teacher: undefined  // Initialize teacher field
   });
-  const [recentSignupLinks, setRecentSignupLinks] = useState<{[email: string]: SignupLinkData}>({});
+  const [recentSignupLinks, setRecentSignupLinks] = useState<{ [email: string]: SignupLinkData }>({});
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [editingBirthdate, setEditingBirthdate] = useState('');
   const [editingField, setEditingField] = useState<'name' | 'birthdate' | null>(null);
   const [updatingName, setUpdatingName] = useState(false);
   const [updatingBirthdate, setUpdatingBirthdate] = useState(false);
+  const navigate = useNavigate();
 
   const fetchUsers = useCallback(async () => {
     if (!currentUser?.uid) {
@@ -89,9 +93,9 @@ export const AdminUsers = () => {
     try {
       let usersList: User[] = [];
       if (isAdmin) {
-        logUserOp('Fetching all users as admin', {userId: currentUser?.uid});
+        logUserOp('Fetching all users as admin', { userId: currentUser?.uid });
         // If admin, get all users - bypass cache to get fresh data
-        usersList = await getCachedCollection<User>('users', [], { 
+        usersList = await getCachedCollection<User>('users', [], {
           userId: currentUser?.uid,
           bypassCache: true  // Force fresh data fetch
         });
@@ -110,7 +114,7 @@ export const AdminUsers = () => {
         ...user,
         status: user.status === 'pending' ? 'pending' : 'active'
       })) as User[];
-      
+
       // If teacher, also fetch all classes for these users
       if (!isAdmin && updatedUsersList.length > 0) {
         const userEmails = updatedUsersList.map(user => user.email);
@@ -145,7 +149,7 @@ export const AdminUsers = () => {
     const handleScroll = (e: Event) => {
       const target = e.target as HTMLElement;
       if (!target) return;
-      
+
       const hasHorizontalScroll = target.scrollWidth > target.clientWidth;
       const isScrolledToEnd = target.scrollLeft + target.clientWidth >= target.scrollWidth - 10;
       setShowScrollIndicator(hasHorizontalScroll && !isScrolledToEnd);
@@ -265,7 +269,7 @@ export const AdminUsers = () => {
             ? `http://localhost:5001/${functions.app.options.projectId}/${functions.region}/deleteAuthUserHttp`
             : `${functions.customDomain || `https://${functions.region}-${functions.app.options.projectId}.cloudfunctions.net`}/deleteAuthUserHttp`;
           logUserOp('Attempting to delete user with auth ID:', userToDelete.uid);
-          
+
           const response = await fetch(functionUrl, {
             method: 'POST',
             headers: {
@@ -286,7 +290,7 @@ export const AdminUsers = () => {
         } else {
           logUserOp('No Firebase Auth user found - skipping auth deletion');
         }
-        
+
         await deleteCachedDocument('users', userId);
         logUserOp('Successfully deleted user document');
       } catch (error: unknown) {
@@ -294,16 +298,16 @@ export const AdminUsers = () => {
           error,
           message: error instanceof Error ? error.message : 'Unknown error'
         });
-        
+
         // If there was an error, refresh the UI to restore the original state
         await fetchUsers();
-        
+
         throw error;
       }
 
       // Don't refresh the users in the background - it can cause stale data to reappear
       // The UI is already updated through setUsers() earlier, and the cache is invalidated
-      
+
       toast.success(t.userDeleted);
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -321,16 +325,16 @@ export const AdminUsers = () => {
     try {
       setLoading(true);
       const signupLinkData = await createSignupLink(newUser.email, newUser.name);
-      
+
       // Store the signup link
       setRecentSignupLinks(prev => ({
         ...prev,
         [newUser.email]: signupLinkData
       }));
-      
+
       // Create a new document with a temporary ID that includes 'pending_' prefix
       const tempId = `${doc(collection(db, 'users')).id}`;
-      
+
       const newUserData: User = {
         id: tempId,
         email: newUser.email,
@@ -340,39 +344,39 @@ export const AdminUsers = () => {
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
-      
+
       // Only add birthdate field if it's not empty
       if (newUser.birthdate && newUser.birthdate.trim() !== '') {
         newUserData.birthdate = newUser.birthdate.trim();
       }
-      
+
       // Set the teacher field to the current admin's ID if the user is not an admin or teacher
       if (!newUser.isAdmin && !newUser.isTeacher && currentUser?.uid) {
         newUserData.teacher = currentUser.uid;
       }
-      
+
       // Use setCachedDocument to properly handle caching
       await setCachedDocument('users', tempId, newUserData, { userId: currentUser?.uid });
-      
+
       // Force a full refresh of the users collection
       // This will ensure the cache is updated properly
       await fetchUsers();
-      
+
       // Copy to clipboard
       await navigator.clipboard.writeText(signupLinkData.signupLink);
-      
-      setNewUser({ 
-        email: '', 
-        name: '', 
+
+      setNewUser({
+        email: '',
+        name: '',
         isTeacher: false,
         isAdmin: false,
         birthdate: '',  // Reset birthdate field
         teacher: undefined  // Reset teacher field
       }); // Reset form
-      
+
       // Close the modal
       setShowAddForm(false);
-      
+
       toast.success(t.signupLinkCopied);
     } catch (error) {
       console.error('Error generating signup link:', error);
@@ -403,7 +407,7 @@ export const AdminUsers = () => {
       // Set loading state to true
       setUpdatingName(true);
 
-      await updateCachedDocument('users', userId, { 
+      await updateCachedDocument('users', userId, {
         name: editingName.trim(),
         updatedAt: new Date().toISOString()
       }, { userId: currentUser.uid });
@@ -442,7 +446,7 @@ export const AdminUsers = () => {
       const updateData: any = {
         updatedAt: new Date().toISOString()
       };
-      
+
       // Only add birthdate field if it's not empty
       if (editingBirthdate.trim() !== '') {
         updateData.birthdate = editingBirthdate.trim();
@@ -452,7 +456,7 @@ export const AdminUsers = () => {
         // For now, we'll just set it to null which Firestore accepts
         updateData.birthdate = null;
       }
-      
+
       await updateCachedDocument('users', userId, updateData, { userId: currentUser.uid });
 
       await fetchUsers();
@@ -479,20 +483,20 @@ export const AdminUsers = () => {
       // First sort by status (pending first)
       if (a.status === 'pending' && b.status !== 'pending') return -1;
       if (a.status !== 'pending' && b.status === 'pending') return 1;
-      
+
       // Then sort alphabetically by name
       // Split names to get first and last names
       const aParts = a.name.trim().split(' ');
       const bParts = b.name.trim().split(' ');
-      
+
       // Compare first names first
       const aFirstName = aParts[0].toLowerCase();
       const bFirstName = bParts[0].toLowerCase();
-      
+
       if (aFirstName !== bFirstName) {
         return aFirstName.localeCompare(bFirstName);
       }
-      
+
       // If first names are the same, compare full names
       return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
     });
@@ -552,29 +556,29 @@ export const AdminUsers = () => {
                       setEditingBirthdate('');
                       return;
                     }
-                    
+
                     // Only allow digits and hyphen
                     if (!/^[\d-]*$/.test(value)) return;
-                    
+
                     // Auto-add hyphen after MM
                     let formattedValue = value;
                     if (value.length === 2 && !value.includes('-')) {
                       formattedValue = value + '-';
                     }
-                    
+
                     // Limit to MM-DD format
                     if (formattedValue.length > 5) return;
-                    
+
                     // Validate month and day
                     if (formattedValue.includes('-')) {
                       const [month, day] = formattedValue.split('-');
                       const monthNum = parseInt(month);
                       const dayNum = parseInt(day);
-                      
+
                       if (monthNum < 1 || monthNum > 12) return;
                       if (dayNum < 1 || dayNum > 31) return;
                     }
-                    
+
                     setEditingBirthdate(formattedValue);
                   }}
                   className="px-2 py-1 border border-gray-300 rounded text-sm"
@@ -626,7 +630,7 @@ export const AdminUsers = () => {
                 <div className="flex items-center gap-1">
                   {user.email}
                   <div className="relative inline-block">
-                    <InformationCircleIcon 
+                    <InformationCircleIcon
                       className="h-4 w-4 text-gray-400 cursor-help hover:text-gray-600"
                       onMouseOver={() => {
                         const tooltip = document.getElementById(`email-tooltip-mobile-${user.id}`);
@@ -637,7 +641,7 @@ export const AdminUsers = () => {
                         if (tooltip) tooltip.classList.remove('opacity-100');
                       }}
                     />
-                    <div 
+                    <div
                       id={`email-tooltip-mobile-${user.id}`}
                       className="absolute pointer-events-none opacity-0 top-full left-1/2 transform -translate-x-1/2 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
                     >
@@ -680,13 +684,12 @@ export const AdminUsers = () => {
         </div>
         <div className="flex flex-col items-end gap-2">
           {user.status === 'active' ? (
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-              user.isAdmin
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${user.isAdmin
                 ? 'bg-green-100 text-green-800'
                 : user.isTeacher
-                ? 'bg-blue-100 text-blue-800'
-                : 'bg-gray-100 text-gray-800'
-            }`}>
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
               {user.isAdmin ? 'Admin' : user.isTeacher ? t.teacherAccount : t.activeUser}
             </span>
           ) : (
@@ -701,74 +704,114 @@ export const AdminUsers = () => {
         {user.status === 'active' ? (
           <>
             {!user.isAdmin && (
-              <MasqueradeButton 
-                userId={user.id} 
-                userName={user.name} 
-                userEmail={user.email} 
-              />
+              <div className="relative">
+                <Tooltip text="Impersonate" width="w-28">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await startMasquerade(user.id);
+                        toast.success(`Now viewing as ${user.name || user.email}`);
+                        navigate('/schedule');
+                      } catch (error) {
+                        console.error('Error starting masquerade:', error);
+                        toast.error('Failed to masquerade as user');
+                      }
+                    }}
+                    className="p-1.5 text-indigo-600 hover:text-indigo-800 rounded-full hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 relative group/button"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span className="sr-only">Impersonate</span>
+                    <span className="absolute bottom-full left-0 mb-1 px-3 py-2 w-28 bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/button:opacity-100 group-hover/button:visible transition-all duration-200 z-[100] pointer-events-none whitespace-nowrap">
+                      Impersonate
+                      <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-4 -bottom-1"></span>
+                    </span>
+                  </button>
+                </Tooltip>
+              </div>
             )}
-            <button
-              onClick={() => deleteUser(user.id)}
-              className={`${styles.buttons.danger} w-[130px]`}
-            >
-              {t.delete}
-            </button>
+            <div className="relative">
+              <Tooltip text={t.delete} width="w-20">
+                <button
+                  onClick={() => deleteUser(user.id)}
+                  className="p-1.5 rounded-full text-red-600 hover:text-red-800 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 relative group/button"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  <span className="sr-only">{t.delete}</span>
+                  <span className="absolute bottom-full left-0 mb-1 px-3 py-2 w-20 bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/button:opacity-100 group-hover/button:visible transition-all duration-200 z-[100] pointer-events-none whitespace-nowrap">
+                    {t.delete}
+                    <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-4 -bottom-1"></span>
+                  </span>
+                </button>
+              </Tooltip>
+            </div>
+            <div className="relative">
+              Tooltip text={t.signup}
+            </div>
           </>
         ) : (
           <>
-            <div className="relative z-50 mb-8">
-              <button
-                onClick={async () => {
-                  try {
-                    let signupLinkData = recentSignupLinks[user.email];
-                    if (!signupLinkData) {
-                      signupLinkData = await createSignupLink(user.email, user.name);
-                      setRecentSignupLinks(prev => ({
-                        ...prev,
-                        [user.email]: signupLinkData
-                      }));
-                    } else {
-                      // Extend the expiration date
-                      await extendSignupTokenExpiration(signupLinkData.token);
+            <div className="relative">
+              <Tooltip text={t.signup} width="w-24">
+                <button
+                  onClick={async () => {
+                    try {
+                      let signupLinkData = recentSignupLinks[user.email];
+                      if (!signupLinkData) {
+                        signupLinkData = await createSignupLink(user.email, user.name);
+                        setRecentSignupLinks(prev => ({
+                          ...prev,
+                          [user.email]: signupLinkData
+                        }));
+                      } else {
+                        // Extend the expiration date
+                        await extendSignupTokenExpiration(signupLinkData.token);
+                      }
+                      await navigator.clipboard.writeText(signupLinkData.signupLink);
+                      toast.success(t.signupLinkCopied);
+                    } catch (error) {
+                      console.error('Error copying signup link:', error);
+                      toast.error(t.failedToCopyLink);
                     }
-                    await navigator.clipboard.writeText(signupLinkData.signupLink);
-                    toast.success(t.signupLinkCopied);
-                  } catch (error) {
-                    console.error('Error copying signup link:', error);
-                    toast.error(t.failedToCopyLink);
-                  }
-                }}
-                className={`${styles.buttons.primary} w-[130px] flex items-center justify-center gap-1`}
-              >
-                <span>{t.copyLink}</span>
-                <div className="relative inline-block">
-                  <InformationCircleIcon 
-                    className="h-4 w-4 text-white/70 flex-shrink-0 cursor-help" 
-                    onMouseOver={() => {
-                      const tooltip = document.getElementById(`signup-tooltip-mobile-${user.id}`);
-                      if (tooltip) tooltip.classList.add('opacity-100');
-                    }}
-                    onMouseOut={() => {
-                      const tooltip = document.getElementById(`signup-tooltip-mobile-${user.id}`);
-                      if (tooltip) tooltip.classList.remove('opacity-100');
-                    }}
-                  />
-                  <div 
-                    id={`signup-tooltip-mobile-${user.id}`}
-                    className="absolute pointer-events-none opacity-0 top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
-                  >
-                    {t.signupLinkExpires}
-                    <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                  }}
+                  className={`${styles.buttons.primary} w-[130px] flex items-center justify-center gap-1`}
+                >
+                  <span>{t.copyLink}</span>
+                  <div className="relative inline-block">
+                    <InformationCircleIcon
+                      className="h-4 w-4 text-white/70 flex-shrink-0 cursor-help"
+                      onMouseOver={() => {
+                        const tooltip = document.getElementById(`signup-tooltip-mobile-${user.id}`);
+                        if (tooltip) tooltip.classList.add('opacity-100');
+                      }}
+                      onMouseOut={() => {
+                        const tooltip = document.getElementById(`signup-tooltip-mobile-${user.id}`);
+                        if (tooltip) tooltip.classList.remove('opacity-100');
+                      }}
+                    />
+                    <div
+                      id={`signup-tooltip-mobile-${user.id}`}
+                      className="absolute pointer-events-none opacity-0 top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
+                    >
+                      {t.signupLinkExpires}
+                      <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </Tooltip>
             </div>
-            <button
-              onClick={() => deleteUser(user.id)}
-              className={`${styles.buttons.danger} w-[130px]`}
-            >
-              {t.delete}
-            </button>
+            <div className="relative">
+              <Tooltip text={t.delete} width="w-20">
+                <button
+                  onClick={() => deleteUser(user.id)}
+                  className="p-1.5 rounded-full text-red-600 hover:text-red-800 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  <span className="sr-only">{t.delete}</span>
+                </button>
+              </Tooltip>
+            </div>
           </>
         )}
       </div>
@@ -783,13 +826,11 @@ export const AdminUsers = () => {
           <div className="relative">
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className={`${
-                showAddForm 
-                  ? "bg-gray-200 hover:bg-gray-300 text-gray-800 w-8 h-8" 
+              className={`${showAddForm
+                  ? "bg-gray-200 hover:bg-gray-300 text-gray-800 w-8 h-8"
                   : "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2"
-              } rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                showAddForm ? "focus:ring-gray-500" : "focus:ring-indigo-500"
-              } flex items-center justify-center`}
+                } rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${showAddForm ? "focus:ring-gray-500" : "focus:ring-indigo-500"
+                } flex items-center justify-center`}
             >
               {showAddForm ? (
                 "\u00D7"
@@ -832,26 +873,26 @@ export const AdminUsers = () => {
                           setNewUser(prev => ({ ...prev, birthdate: value }));
                           return;
                         }
-                        
+
                         // Auto-add hyphen after MM
                         let formattedValue = value;
                         if (value.length === 2 && !value.includes('-')) {
                           formattedValue = value + '-';
                         }
-                        
+
                         // Limit to MM-DD format
                         if (formattedValue.length > 5) return;
-                        
+
                         // Validate month and day
                         if (formattedValue.includes('-')) {
                           const [month, day] = formattedValue.split('-');
                           const monthNum = parseInt(month);
                           const dayNum = parseInt(day);
-                          
+
                           if (monthNum < 1 || monthNum > 12) return;
                           if (dayNum < 1 || dayNum > 31) return;
                         }
-                        
+
                         setNewUser(prev => ({ ...prev, birthdate: formattedValue }));
                       }}
                       placeholder={t.birthdateFormat}
@@ -932,11 +973,14 @@ export const AdminUsers = () => {
               </div>
               {/* Left fade indicator */}
               <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none hidden md:block"></div>
-              
+
               <div className="table-container overflow-x-auto overflow-y-auto max-h-[600px] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-gray-500">
                 <table className="min-w-full divide-y divide-gray-200 table-fixed">
                   <thead className="bg-gray-50 sticky top-0 z-20 shadow-sm">
                     <tr>
+                      <th scope="col" className={`${styles.table.header} w-20`}>
+                        {/* Action buttons */}
+                      </th>
                       <th scope="col" className={`${styles.table.header} w-1/4`}>
                         {t.name}
                       </th>
@@ -949,14 +993,108 @@ export const AdminUsers = () => {
                       <th scope="col" className={`${styles.table.header} text-center w-1/6`}>
                         {t.userStatus}
                       </th>
-                      <th scope="col" className={`${styles.table.header} text-center w-1/6`}>
-                        {t.actions}
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {allUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
+                      <tr key={user.id} className="group hover:bg-gray-50">
+                        <td className={`${styles.table.cell} w-20 relative`}>
+                          <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            {user.status === 'active' ? (
+                              <>
+                                {!user.isAdmin && (
+                                  <div className="relative">
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          await startMasquerade(user.id);
+                                          toast.success(`Now viewing as ${user.name || user.email}`);
+                                          navigate('/schedule');
+                                        } catch (error) {
+                                          console.error('Error starting masquerade:', error);
+                                          toast.error('Failed to masquerade as user');
+                                        }
+                                      }}
+                                      className="p-1.5 text-indigo-600 hover:text-indigo-800 rounded-full hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 relative group/button"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                      </svg>
+                                      <span className="sr-only">Impersonate</span>
+                                      <span className="absolute bottom-full left-0 mb-1 px-3 py-2 w-28 bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/button:opacity-100 group-hover/button:visible transition-all duration-200 z-[100] pointer-events-none whitespace-nowrap">
+                                        Impersonate
+                                        <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-4 -bottom-1"></span>
+                                      </span>
+                                    </button>
+                                  </div>
+                                )}
+                                <div className="relative">
+                                  <button
+                                    onClick={() => deleteUser(user.id)}
+                                    className="p-1.5 rounded-full text-red-600 hover:text-red-800 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 relative group/button"
+                                  >
+                                    <TrashIcon className="h-4 w-4" />
+                                    <span className="sr-only">{t.delete}</span>
+                                    <span className="absolute bottom-full left-0 mb-1 px-3 py-2 w-20 bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/button:opacity-100 group-hover/button:visible transition-all duration-200 z-[100] pointer-events-none whitespace-nowrap">
+                                      {t.delete}
+                                      <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-4 -bottom-1"></span>
+                                    </span>
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="relative">
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        let signupLinkData = recentSignupLinks[user.email];
+                                        if (!signupLinkData) {
+                                          signupLinkData = await createSignupLink(user.email, user.name);
+                                          setRecentSignupLinks(prev => ({
+                                            ...prev,
+                                            [user.email]: signupLinkData
+                                          }));
+                                        } else {
+                                          // Extend the expiration date
+                                          await extendSignupTokenExpiration(signupLinkData.token);
+                                        }
+                                        await navigator.clipboard.writeText(signupLinkData.signupLink);
+                                        toast.success(t.signupLinkCopied);
+                                      } catch (error) {
+                                        console.error('Error copying signup link:', error);
+                                        toast.error(t.failedToCopyLink);
+                                      }
+                                    }}
+                                    className="p-1.5 text-indigo-600 hover:text-indigo-800 rounded-full hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 relative group/button"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    <span className="sr-only">{t.signup}</span>
+                                    <span className="absolute bottom-full left-0 mb-1 px-3 py-2 w-20 bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/button:opacity-100 group-hover/button:visible transition-all duration-200 z-[100] pointer-events-none whitespace-nowrap">
+                                      {t.signup}
+                                      <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-4 -bottom-1"></span>
+                                    </span>
+                                  </button>
+                                </div>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => deleteUser(user.id)}
+                                    className="p-1.5 rounded-full text-red-600 hover:text-red-800 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 relative group/button"
+                                  >
+                                    <TrashIcon className="h-4 w-4" />
+                                    <span className="sr-only">{t.delete}</span>
+                                    <span className="absolute bottom-full left-0 mb-1 px-3 py-2 w-20 bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/button:opacity-100 group-hover/button:visible transition-all duration-200 z-[100] pointer-events-none whitespace-nowrap">
+                                      {t.delete}
+                                      <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-4 -bottom-1"></span>
+                                    </span>
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {editingUserId === user.id && editingField === 'name' ? (
                             <div className="flex items-center gap-2">
@@ -1013,7 +1151,7 @@ export const AdminUsers = () => {
                           <div className="flex items-center gap-1">
                             {user.email}
                             <div className="relative inline-block">
-                              <InformationCircleIcon 
+                              <InformationCircleIcon
                                 className="h-4 w-4 text-gray-400 cursor-help hover:text-gray-600"
                                 onMouseOver={() => {
                                   const tooltip = document.getElementById(`email-tooltip-desktop-${user.id}`);
@@ -1024,7 +1162,7 @@ export const AdminUsers = () => {
                                   if (tooltip) tooltip.classList.remove('opacity-100');
                                 }}
                               />
-                              <div 
+                              <div
                                 id={`email-tooltip-desktop-${user.id}`}
                                 className="absolute pointer-events-none opacity-0 top-full left-1/2 transform -translate-x-1/2 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
                               >
@@ -1047,29 +1185,29 @@ export const AdminUsers = () => {
                                     setEditingBirthdate('');
                                     return;
                                   }
-                                  
+
                                   // Only allow digits and hyphen
                                   if (!/^[\d-]*$/.test(value)) return;
-                                  
+
                                   // Auto-add hyphen after MM
                                   let formattedValue = value;
                                   if (value.length === 2 && !value.includes('-')) {
                                     formattedValue = value + '-';
                                   }
-                                  
+
                                   // Limit to MM-DD format
                                   if (formattedValue.length > 5) return;
-                                  
+
                                   // Validate month and day
                                   if (formattedValue.includes('-')) {
                                     const [month, day] = formattedValue.split('-');
                                     const monthNum = parseInt(month);
                                     const dayNum = parseInt(day);
-                                    
+
                                     if (monthNum < 1 || monthNum > 12) return;
                                     if (dayNum < 1 || dayNum > 31) return;
                                   }
-                                  
+
                                   setEditingBirthdate(formattedValue);
                                 }}
                                 className="px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1119,13 +1257,12 @@ export const AdminUsers = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           {user.status === 'active' ? (
-                            <span className={`inline-flex items-center px-4 py-1 rounded-full text-sm font-medium ${
-                              user.isAdmin
+                            <span className={`inline-flex items-center px-4 py-1 rounded-full text-sm font-medium ${user.isAdmin
                                 ? 'bg-green-100 text-green-800'
                                 : user.isTeacher
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
                               {user.isAdmin ? 'Admin' : user.isTeacher ? t.teacherAccount : t.activeUser}
                             </span>
                           ) : (
@@ -1133,83 +1270,6 @@ export const AdminUsers = () => {
                               {t.pendingSignup}
                             </span>
                           )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="flex flex-col gap-2 items-end">
-                            {user.status === 'active' ? (
-                              <>
-                                {!user.isAdmin && (
-                                  <MasqueradeButton 
-                                    userId={user.id} 
-                                    userName={user.name} 
-                                    userEmail={user.email} 
-                                  />
-                                )}
-                                <button
-                                  onClick={() => deleteUser(user.id)}
-                                  className={`${styles.buttons.danger} w-[130px]`}
-                                >
-                                  {t.delete}
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <div className="relative z-50 mb-8">
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        let signupLinkData = recentSignupLinks[user.email];
-                                        if (!signupLinkData) {
-                                          signupLinkData = await createSignupLink(user.email, user.name);
-                                          setRecentSignupLinks(prev => ({
-                                            ...prev,
-                                            [user.email]: signupLinkData
-                                          }));
-                                        } else {
-                                          // Extend the expiration date
-                                          await extendSignupTokenExpiration(signupLinkData.token);
-                                        }
-                                        await navigator.clipboard.writeText(signupLinkData.signupLink);
-                                        toast.success(t.signupLinkCopied);
-                                      } catch (error) {
-                                        console.error('Error copying signup link:', error);
-                                        toast.error(t.failedToCopyLink);
-                                      }
-                                    }}
-                                    className={`${styles.buttons.primary} w-[130px] flex items-center justify-center gap-1`}
-                                  >
-                                    <span>{t.copyLink}</span>
-                                    <div className="relative inline-block">
-                                      <InformationCircleIcon 
-                                        className="h-4 w-4 text-white/70 flex-shrink-0 cursor-help" 
-                                        onMouseOver={() => {
-                                          const tooltip = document.getElementById(`signup-tooltip-table-${user.id}`);
-                                          if (tooltip) tooltip.classList.add('opacity-100');
-                                        }}
-                                        onMouseOut={() => {
-                                          const tooltip = document.getElementById(`signup-tooltip-table-${user.id}`);
-                                          if (tooltip) tooltip.classList.remove('opacity-100');
-                                        }}
-                                      />
-                                      <div 
-                                        id={`signup-tooltip-table-${user.id}`}
-                                        className="absolute pointer-events-none opacity-0 top-full right-0 mt-2 w-72 max-w-[calc(100vw-40px)] p-3 bg-gray-800 text-white text-xs rounded shadow-lg transition-opacity duration-200 z-[100] whitespace-normal text-center"
-                                      >
-                                        {t.signupLinkExpires}
-                                        <div className="absolute top-0 right-[60px] transform -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
-                                      </div>
-                                    </div>
-                                  </button>
-                                </div>
-                                <button
-                                  onClick={() => deleteUser(user.id)}
-                                  className={`${styles.buttons.danger} w-[130px]`}
-                                >
-                                  {t.delete}
-                                </button>
-                              </>
-                            )}
-                          </div>
                         </td>
                       </tr>
                     ))}
