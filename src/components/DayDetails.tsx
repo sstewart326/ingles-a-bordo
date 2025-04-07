@@ -339,17 +339,6 @@ export const DayDetails = ({
       
       // Update the class session in the selected day details
       if (selectedDayDetails && latestClassData) {
-        // Create updated class session with the latest data from the database
-        const updatedClassSession: ClassSession = {
-          ...classSession,
-          ...latestClassData,
-          paymentConfig: {
-            type: latestClassData.paymentConfig?.type || 'monthly',
-            startDate: latestClassData.paymentConfig?.startDate || new Date().toISOString().split('T')[0],
-            paymentLink,
-            ...(latestClassData.paymentConfig || {})
-          }
-        };
         
         // Update the classes array in selectedDayDetails
         const updatedClasses = selectedDayDetails.classes.map(c => {

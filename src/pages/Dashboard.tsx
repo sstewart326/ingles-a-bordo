@@ -967,16 +967,6 @@ export const Dashboard = () => {
     return formatTimeWithTimezones(startTime, endTime, timezone, userTimezone, displayDate, true);
   };
 
-  const formatClassDate = (date: Date | null): string => {
-    if (!date) return '';
-
-    return date.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
   const getNextClassDate = (classSession: ClassSession): Date | null => {
     const details = classSession;
 
