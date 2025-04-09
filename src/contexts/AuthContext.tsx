@@ -300,7 +300,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     try {
-      await sendPasswordResetEmail(auth, email);
+      // Define actionCodeSettings with the URL to redirect after password reset
+      const actionCodeSettings = {
+        // Get the current URL's origin (protocol + domain) for the redirect
+        url: window.location.origin + '/login',
+        // The URL will be opened in the same window/tab
+        handleCodeInApp: false
+      };
+      
+      await sendPasswordResetEmail(auth, email, actionCodeSettings);
     } catch (error) {
       console.error('Error sending password reset email:', error);
       throw error;
