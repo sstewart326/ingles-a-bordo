@@ -106,20 +106,26 @@
 }
 
 /* Indicators */
-.calendar-day-indicators {
-  display: flex;
-  gap: 0.25rem;
-  justify-content: center;
+@media (max-width: 639px) {
+  .calendar-day-indicators {
+    display: flex;
+    gap: 0.25rem;
+    justify-content: center;
+  }
 }
 
-.calendar-day-indicators .indicator {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+@media (max-width: 639px) {
+  .calendar-day-indicators .indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
 }
 
+@media (max-width: 639px) {
 .calendar-day-indicators .class-indicator {
   background-color: #6366f1;
+}
 }
 
 .calendar-day-indicators .payment-indicator {
