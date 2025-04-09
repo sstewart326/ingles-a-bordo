@@ -3,7 +3,7 @@ import { where } from 'firebase/firestore';
 import { useAuth } from './useAuth';
 import { useAdmin } from './useAdmin';
 import { getCachedCollection } from '../utils/firebaseUtils';
-import { ClassSession } from '../utils/scheduleUtils';
+import { ClassSession, sortClassesByTime } from '../utils/scheduleUtils';
 import { ClassMaterial, User } from '../types/interfaces';
 import { updateClassList, fetchMaterialsForClasses } from '../utils/classUtils';
 import { getAllClassesForMonth, invalidateCalendarCache } from '../services/calendarService';
@@ -108,7 +108,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
       const classesForDay = dailyClassMap[dateString] || [];
 
       // Process the classes to ensure student information is complete
-      return classesForDay.map(classObj => {
+      const processedClasses = classesForDay.map(classObj => {
         // If studentEmails is missing or empty but we have students, populate from students
         if ((!classObj.studentEmails || classObj.studentEmails.length === 0) && classObj.students && classObj.students.length > 0) {
           return {
@@ -120,6 +120,9 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         }
         return classObj;
       });
+      
+      // Sort classes by time
+      return sortClassesByTime(processedClasses);
     }
     return [];
   }, [dailyClassMap, isAdmin]);
