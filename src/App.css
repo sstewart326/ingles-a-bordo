@@ -3,8 +3,10 @@
   --brand-color-light: rgba(225, 201, 230, 0.1);
   --brand-color-medium: rgba(225, 201, 230, 0.3);
   --brand-color-hover: rgba(225, 201, 230, 0.2);
-  --brand-color-dark: #9B8BA0;  /* Darker version of brand color for text */
-  --header-bg: #6B5590;  /* Darker version of requested purple */
+  --brand-color-dark: #9B8BA0;
+  /* Darker version of brand color for text */
+  --header-bg: #6B5590;
+  /* Darker version of requested purple */
   --header-hover: #7B65A0;
 }
 
@@ -44,9 +46,11 @@ body {
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -55,6 +59,7 @@ body {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -73,7 +78,7 @@ body {
   transition: all 0.3s ease;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(8px);
-  box-shadow: 
+  box-shadow:
     0 4px 6px rgba(0, 0, 0, 0.02),
     0 1px 3px rgba(0, 0, 0, 0.05);
   @apply text-black;
@@ -81,7 +86,7 @@ body {
 
 .card:hover {
   border-color: var(--brand-color);
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.05),
     0 1px 3px rgba(0, 0, 0, 0.1),
     0 0 0 3px var(--brand-color-light);
@@ -212,7 +217,7 @@ nav.header-nav .header-profile-button {
   }
 }
 
-nav.header-nav .header-profile-button:hover > div {
+nav.header-nav .header-profile-button:hover>div {
   transform: scale(1.05);
   border-color: var(--brand-color) !important;
   box-shadow: 0 0 4px 0px var(--brand-color-light);
@@ -313,12 +318,20 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
 }
 
 @keyframes fadeInMenu {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Mobile Menu Styles */
 @media (max-width: 640px) {
+
   /* Fix navigation height and elements */
   nav.header-nav {
     height: auto;
@@ -373,11 +386,11 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
     background-color: transparent !important;
     cursor: pointer;
   }
-  
-  nav.header-nav .header-profile-button > div {
+
+  nav.header-nav .header-profile-button>div {
     box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
   }
-  
+
   /* Mobile profile dropdown */
   .profile-dropdown {
     position: fixed !important;
@@ -387,7 +400,7 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
     width: auto !important;
     min-width: 10rem !important;
   }
-  
+
   .profile-dropdown a,
   .profile-dropdown button {
     padding: 0.75rem 1rem !important;
@@ -405,7 +418,7 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
     border-top: 1px solid var(--brand-color-medium);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   }
-  
+
   /* Ensure transparent button container for mobile menu */
   nav.header-nav .absolute.inset-y-0.left-0 {
     background-color: transparent !important;
@@ -462,7 +475,7 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
   border: 1px solid #6366F1;
 }
 
-.calendar-day > div {
+.calendar-day>div {
   position: relative;
   height: 100%;
   display: flex;
@@ -477,11 +490,19 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
   margin-bottom: 0.25rem;
 }
 
-.calendar-day-indicators {
-  display: flex;
-  gap: 0.25rem;
-  justify-content: center;
-  margin-bottom: 0.5rem;
+@media (max-width: 639px) {
+  .calendar-day-indicators {
+    display: flex;
+    gap: 0.25rem;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .calendar-day-indicators {
+    display: none;
+  }
 }
 
 .calendar-day-indicators .indicator {
@@ -490,8 +511,10 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
   border-radius: 50%;
 }
 
-.calendar-day-indicators .class-indicator {
-  background-color: #6366f1;
+@media (max-width: 639px) {
+  .calendar-day-indicators .class-indicator {
+    background-color: #6366f1;
+  }
 }
 
 .calendar-day-indicators .payment-indicator {
@@ -592,7 +615,7 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
   .calendar-day {
     aspect-ratio: 0.85;
   }
-  
+
   .class-details {
     min-height: 120px;
   }
@@ -743,13 +766,13 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
     aspect-ratio: 1/1;
   }
 
-  .calendar-day > div {
+  .calendar-day>div {
     top: 0.25rem;
     left: 0.25rem;
     right: 0.25rem;
     bottom: 0.25rem;
   }
-  
+
   .calendar-day-header {
     font-size: 0.75rem;
     padding: 0.5rem 0;
@@ -945,17 +968,29 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Text Colors */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   @apply text-black;
 }
 
 /* Form Elements */
-input, select, textarea {
+input,
+select,
+textarea {
   @apply text-black bg-white;
 }
 
