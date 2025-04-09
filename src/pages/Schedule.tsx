@@ -16,6 +16,7 @@ import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
+import { formatLocalizedDate } from '../utils/dateUtils';
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
   dates: string[];
@@ -1054,7 +1055,7 @@ export const Schedule = () => {
                           }`}>
                           {getPaymentStatus(selectedDayDetails.date).isCompleted
                             ? t.paymentCompleted
-                            : t.paymentDue} ({formatDateWithShortDay(selectedDayDetails.date, language)})
+                            : t.paymentDue}
                         </span>
                         {selectedDayDetails.isPaymentSoon && !getPaymentStatus(selectedDayDetails.date).isCompleted && (
                           <span className="text-xs ml-2 text-[#ef4444]">Due soon</span>
@@ -1065,7 +1066,7 @@ export const Schedule = () => {
                     {/* Show completion date if payment is completed */}
                     {getPaymentStatus(selectedDayDetails.date).isCompleted && getPaymentStatus(selectedDayDetails.date).completedAt && (
                       <div className="mt-2 ml-4 text-sm text-[#22c55e]">
-                        {t.completedOn}: {formatDateWithShortDay(new Date(getPaymentStatus(selectedDayDetails.date).completedAt!), language)}
+                        {t.completedOn}: {formatLocalizedDate(new Date(getPaymentStatus(selectedDayDetails.date).completedAt!), language)}
                       </div>
                     )}
 
@@ -1178,7 +1179,7 @@ export const Schedule = () => {
 
                         <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2">
                           <span className="text-sm font-medium text-[#4b5563]">{t.dayOfWeek}</span>
-                          <span className="text-sm text-[#1a1a1a]">{formatDateWithShortDay(selectedDayDetails.date, language)}</span>
+                          <span className="text-sm text-[#1a1a1a]">{formatLocalizedDate(selectedDayDetails.date, language)}</span>
 
                           <span className="text-sm font-medium text-[#4b5563]">{t.time}</span>
                           <span className="text-sm text-[#1a1a1a]">

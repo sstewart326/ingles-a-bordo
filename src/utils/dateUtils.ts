@@ -208,4 +208,47 @@ export const formatDateForComparison = (date: any): string => {
     console.error('Error formatting date:', error, date);
     return '';
   }
+};
+
+/**
+ * Formats a date according to the user's language preference:
+ * - English (en): "Mon, 12/31/2023"
+ * - Portuguese (pt-BR): "Seg, 31/12/2023"
+ * 
+ * @param date The date to format
+ * @param language The user's language preference ('en' or 'pt-BR')
+ * @returns A localized date string with short weekday
+ */
+export const formatLocalizedDate = (date: Date, language: string = 'en'): string => {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+    console.error('Invalid date provided to formatLocalizedDate:', date);
+    return '';
+  }
+  
+  try {
+    // Format the weekday name
+    const weekdayOptions = { weekday: 'short' } as const;
+    const weekday = date.toLocaleDateString(
+      language === 'pt-BR' ? 'pt-BR' : 'en-US', 
+      weekdayOptions
+    );
+    
+    // Format the date based on locale
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    
+    // Format according to language (MM/DD/YYYY for en, DD/MM/YYYY for pt-BR)
+    let dateString;
+    if (language === 'pt-BR') {
+      dateString = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+    } else {
+      dateString = `${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}/${year}`;
+    }
+    
+    return `${weekday}, ${dateString}`;
+  } catch (error) {
+    console.error('Error formatting localized date:', error, date);
+    return '';
+  }
 }; 
