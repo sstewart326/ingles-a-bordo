@@ -386,7 +386,7 @@ export const ClassSection = ({
                                   e.preventDefault();
                                   onOpenUploadForm(`${classSession.id}-${date.getTime()}`);
                                 }}
-                                className="text-sm text-blue-600 hover:text-blue-800"
+                                className="text-sm text-blue-600 hover:text-blue-800 link-container"
                               >
                                 {t.addMaterials}
                               </a>
@@ -455,7 +455,7 @@ export const ClassSection = ({
                                               href={slideUrl} 
                                               target="_blank" 
                                               rel="noopener noreferrer"
-                                              className="text-blue-600 hover:text-blue-800"
+                                              className="text-blue-600 hover:text-blue-800 link-container"
                                             >
                                               <span className="text-sm">{t.slides || "Slides"} {material.slides && material.slides.length > 1 ? `(${slideIndex + 1}/${material.slides.length})` : ''}</span>
                                             </a>
@@ -488,7 +488,7 @@ export const ClassSection = ({
                                               href={link} 
                                               target="_blank" 
                                               rel="noopener noreferrer"
-                                              className="text-blue-600 hover:text-blue-800"
+                                              className="text-blue-600 hover:text-blue-800 link-container"
                                             >
                                               <span className="text-sm truncate max-w-[200px]">{link}</span>
                                             </a>

@@ -475,6 +475,13 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
   border: 1px solid #6366F1;
 }
 
+.link-container {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
 .calendar-day>div {
   position: relative;
   height: 100%;
