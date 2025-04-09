@@ -77,6 +77,9 @@ export const Dashboard = () => {
   // Add state for completed payments
   const [completedPayments, setCompletedPayments] = useState<Record<string, Payment[]>>({});
 
+  // Add state for payments pagination
+  const [paymentsPageByDate, setPaymentsPageByDate] = useState<Record<string, number>>({});
+
   // Define the internal handleDayClick implementation with the shouldScroll parameter
   const handleDayClickInternal = useCallback((
     date: Date,
@@ -1186,6 +1189,17 @@ export const Dashboard = () => {
     return () => unsubscribe();
   }, [upcomingClasses, pastClasses]); // Re-run when the classes change
 
+  // Add a handler for payments page changes
+  const handlePaymentsPageChange = (newPage: number) => {
+    if (selectedDayDetails?.date) {
+      const dateKey = selectedDayDetails.date.toDateString();
+      setPaymentsPageByDate(prev => ({
+        ...prev,
+        [dateKey]: newPage
+      }));
+    }
+  };
+
   // Show loading state if auth or admin status is still loading
   if (authLoading || adminLoading) {
     return (
@@ -1248,6 +1262,11 @@ export const Dashboard = () => {
               homeworkByClassId={homeworkByClassId}
               refreshHomework={refreshAllHomework}
               completedPayments={completedPayments}
+              paymentsPage={selectedDayDetails?.date 
+                ? (paymentsPageByDate[selectedDayDetails.date.toDateString()] || 0)
+                : 0
+              }
+              onPaymentsPageChange={handlePaymentsPageChange}
             />
           ) : (
             <div className="bg-white rounded-lg shadow p-6 text-center">

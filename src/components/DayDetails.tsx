@@ -50,6 +50,8 @@ interface DayDetailsProps {
   refreshHomework?: () => Promise<void>;
   formatStudentNames: (emails: string[]) => string;
   completedPayments: Record<string, Payment[]>;
+  paymentsPage: number;
+  onPaymentsPageChange: (newPage: number) => void;
 }
 
 interface PendingPaymentAction {
@@ -84,12 +86,13 @@ export const DayDetails = ({
   homeworkByClassId,
   refreshHomework,
   formatStudentNames,
-  completedPayments
+  completedPayments,
+  paymentsPage,
+  onPaymentsPageChange
 }: DayDetailsProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
   const [currentPage, setCurrentPage] = useState(0);
-  const [paymentsPage, setPaymentsPage] = useState(0);
   const [editingPaymentLink, setEditingPaymentLink] = useState<{[classId: string]: string | null}>({});
   const [savingPaymentLink, setSavingPaymentLink] = useState<{[classId: string]: boolean}>({});
   const [paymentLinks, setPaymentLinks] = useState<{[classId: string]: string | null}>({});
@@ -119,11 +122,6 @@ export const DayDetails = ({
     
     return days[dayOfWeek];
   };
-
-  // Reset payments page when selected day changes
-  useEffect(() => {
-    setPaymentsPage(0);
-  }, [selectedDayDetails?.date]);
 
   // Add a useEffect to fetch payment links for all classes in selectedDayDetails
   useEffect(() => {
@@ -440,7 +438,7 @@ export const DayDetails = ({
   const PaymentsPagination = () => (
     <div className="flex justify-center items-center space-x-4 mt-4 mb-2">
       <button
-        onClick={() => setPaymentsPage(prev => Math.max(0, prev - 1))}
+        onClick={() => onPaymentsPageChange(Math.max(0, paymentsPage - 1))}
         disabled={paymentsPage === 0}
         className={`px-3 py-1 rounded ${
           paymentsPage === 0
@@ -454,7 +452,7 @@ export const DayDetails = ({
         {t.page || 'Page'} {paymentsPage + 1} {t.of || 'of'} {totalPaymentsPages}
       </span>
       <button
-        onClick={() => setPaymentsPage(prev => Math.min(totalPaymentsPages - 1, prev + 1))}
+        onClick={() => onPaymentsPageChange(Math.min(totalPaymentsPages - 1, paymentsPage + 1))}
         disabled={paymentsPage >= totalPaymentsPages - 1}
         className={`px-3 py-1 rounded ${
           paymentsPage >= totalPaymentsPages - 1
