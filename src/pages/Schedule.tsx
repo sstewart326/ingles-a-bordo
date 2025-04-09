@@ -189,6 +189,7 @@ const MaterialsModal = ({
 export const Schedule = () => {
   const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [calendarLoading, setCalendarLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedDayDetails, setSelectedDayDetails] = useState<{
     date: Date;
@@ -719,7 +720,7 @@ export const Schedule = () => {
   const hasInitializedDayDetailsRef = useRef<boolean>(false);
 
   // Add back fetchCalendarDataSafely
-  const fetchCalendarDataSafely = useCallback(async (month: number, year: number) => {
+  const fetchCalendarDataSafely = useCallback(async (month: number, year: number, isInitialLoad = false) => {
     // Check if we're already fetching this exact data
     if (currentRequestRef.current &&
       currentRequestRef.current.month === month &&
@@ -732,19 +733,33 @@ export const Schedule = () => {
 
     if (!currentUser) {
       setCalendarData(null);
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      } else {
+        setCalendarLoading(false);
+      }
       currentRequestRef.current = null;
       return;
     }
 
     try {
-      setLoading(true);
+      // Use different loading state based on whether this is initial load or month change
+      if (isInitialLoad) {
+        setLoading(true);
+      } else {
+        setCalendarLoading(true);
+      }
+      
       const data = await getCalendarData(month, year);
       setCalendarData(data);
     } catch (error) {
       toast.error(t.failedToLoad);
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      } else {
+        setCalendarLoading(false);
+      }
       currentRequestRef.current = null;
     }
   }, [currentUser, t]);
@@ -922,7 +937,7 @@ export const Schedule = () => {
     if (currentUser) {
       const month = selectedDate.getMonth();
       const year = selectedDate.getFullYear();
-      fetchCalendarDataSafely(month, year).then(() => {
+      fetchCalendarDataSafely(month, year, true).then(() => {
         // After calendar data is loaded, set initial load to false
         isInitialLoadRef.current = false;
       });
@@ -940,7 +955,7 @@ export const Schedule = () => {
     const month = selectedDate.getMonth();
     const year = selectedDate.getFullYear();
 
-    fetchCalendarDataSafely(month, year).then(() => {
+    fetchCalendarDataSafely(month, year, true).then(() => {
       // After initial calendar data is loaded, set initial load to false
       isInitialLoadRef.current = false;
     });
@@ -981,13 +996,14 @@ export const Schedule = () => {
           <div>
             <Calendar
               selectedDate={selectedDate}
+              isLoading={calendarLoading}
               onMonthChange={(date) => {
                 // Update selected date
                 setSelectedDate(date);
                 // Fetch data for the new month
                 const newMonth = date.getMonth();
                 const newYear = date.getFullYear();
-                fetchCalendarDataSafely(newMonth, newYear);
+                fetchCalendarDataSafely(newMonth, newYear, false);
               }}
               onDayClick={(date: Date) => {
                 // Update selectedDate
