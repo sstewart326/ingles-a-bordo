@@ -2581,7 +2581,7 @@ export const AdminSchedule = () => {
                               type,
                               startDate: startDateStr,
                               monthlyOption,
-                              weeklyInterval: undefined
+                              weeklyInterval: null
                             }
                           };
                         } else {
