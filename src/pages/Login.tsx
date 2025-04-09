@@ -117,7 +117,14 @@ export const Login = () => {
       
       <div className="max-w-md w-full card space-y-8 bg-white/95 backdrop-blur-sm shadow-xl rounded-xl p-8 relative z-10">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold section-title">
+          <div className="flex justify-center">
+            <img 
+              src="/IAB.png" 
+              alt="Inglés a Bordo" 
+              className="h-24 mb-3"
+            />
+          </div>
+          <h2 className="text-center text-xl font-medium text-gray-600">
             Sign in to your account
           </h2>
         </div>
@@ -207,9 +214,9 @@ export const Login = () => {
           </div>
         </form>
         <div className="text-sm text-center">
-          <Link to="/signup" className="link !text-gray-700">
+          <p className="link !text-gray-700">
             Don't have an account? Contact cursoinglesabordo@gmail.com
-          </Link>
+          </p>
         </div>
       </div>
     </div>
