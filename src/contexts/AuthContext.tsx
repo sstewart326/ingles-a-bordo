@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               const pendingToken = localStorage.getItem('pendingSignupToken');
               const pendingValidationStr = localStorage.getItem('pendingSignupValidation');
               
-              if (pendingToken && pendingValidationStr) {
+              if (location.pathname === '/signup' && pendingToken && pendingValidationStr) {
                 try {
                   const pendingValidation = JSON.parse(pendingValidationStr);
                   

@@ -27,13 +27,7 @@ export const Signup = () => {
       localStorage.removeItem('pendingSignupToken');
       localStorage.removeItem('pendingSignupValidation');
       
-      if (error) {
-        console.log('[POST-REDIRECT] Handling error from redirect:', {
-          error,
-          token,
-          timestamp: new Date().toISOString()
-        });
-        
+      if (error) { 
         switch (error) {
           case 'email_mismatch':
             setError('The Google account email does not match the invitation email. Please try again with the correct Google account.');
@@ -62,18 +56,9 @@ export const Signup = () => {
 
       try {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[POST-REDIRECT] Validating token after redirect:', { token, timestamp: new Date().toISOString() });
         }
         
         const result = await validateSignupToken(token);
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[POST-REDIRECT] Token validation result:', { 
-            valid: result.valid, 
-            email: result.email,
-            timestamp: new Date().toISOString() 
-          });
-        }
         
         if (!result.valid) {
           navigate('/');
@@ -86,7 +71,6 @@ export const Signup = () => {
         setName(result.name || '');
         setValidatingToken(false);
       } catch (err) {
-        console.error('[POST-REDIRECT] Error validating token:', err);
         setError('Error validating signup link. Please contact your administrator.');
         setValidatingToken(false);
       }
@@ -97,15 +81,12 @@ export const Signup = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Starting form submission...');
 
     if (password !== confirmPassword) {
-      console.log('Password mismatch');
       return setError('Passwords do not match');
     }
 
     const token = searchParams.get('token');
-    console.log('Form submission - token present:', !!token);
     if (!token) {
       return setError('Invalid signup link');
     }
@@ -114,31 +95,17 @@ export const Signup = () => {
       setError('');
       setLoading(true);
       
-      console.log('Validating token before signup...');
       const result = await validateSignupToken(token);
-      console.log('Pre-signup validation result:', result);
       
       if (!result.valid || result.email !== email) {
-        console.log('Token validation failed:', { valid: result.valid, emailMatch: result.email === email });
         setError('This signup link is invalid or has expired');
         return;
       }
 
-      console.log('Creating account...');
       await signup(email, password, token);
-      
-      console.log('Account created successfully');
-      
+            
       navigate('/dashboard');
     } catch (err) {
-      console.error('Error in handleSubmit:', err);
-      if (err instanceof Error) {
-        console.error('Error details:', {
-          message: err.message,
-          stack: err.stack,
-          name: err.name
-        });
-      }
       setError('Failed to create an account');
     } finally {
       setLoading(false);
@@ -147,7 +114,6 @@ export const Signup = () => {
 
   const handleGoogleSignIn = async () => {
     const token = searchParams.get('token');
-    console.log('[PRE-REDIRECT] Starting Google sign-in');
     
     if (!token) {
       return setError('Invalid signup link');
@@ -159,10 +125,6 @@ export const Signup = () => {
       clearAuthError();
 
       const result = await validateSignupToken(token);
-      console.log('[PRE-REDIRECT] Token validation:', {
-        valid: result.valid,
-        email: result.email
-      });
       
       if (!result.valid) {
         setError('This signup link is invalid or has expired');
@@ -179,13 +141,11 @@ export const Signup = () => {
         }
       };
       
-      console.log('[PRE-REDIRECT] Storing signup data and initiating redirect');
       localStorage.setItem('pendingSignupToken', token);
       localStorage.setItem('pendingSignupValidation', JSON.stringify(signupData.validation));
 
       await loginWithGoogle(signupData);
     } catch (err) {
-      console.error('[PRE-REDIRECT] Error initiating signup:', err);
       setError('Failed to complete signup. Please try again.');
     } finally {
       setLoading(false);
@@ -320,7 +280,6 @@ export const Signup = () => {
               type="button"
               onClick={(e) => {
                 e.preventDefault();
-                console.log('[SIGNUP-DEBUG] Button clicked (inline)');
                 handleGoogleSignIn();
               }}
               disabled={loading}
