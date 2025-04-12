@@ -213,10 +213,9 @@ export const Login = () => {
             </button>
           </div>
         </form>
-        <div className="text-sm text-center">
-          <p className="link !text-gray-700">
-            Don't have an account? Contact cursoinglesabordo@gmail.com
-          </p>
+        <div className="text-sm text-center link !text-gray-700">
+          <p>Don't have an account?</p>
+          <p>Contact cursoinglesabordo@gmail.com</p>
         </div>
       </div>
     </div>
