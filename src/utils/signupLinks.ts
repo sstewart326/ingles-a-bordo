@@ -23,12 +23,15 @@ const generateToken = () => {
 
 // Create a signup link for a student
 export const createSignupLink = async (studentEmail: string, studentName: string): Promise<{ signupLink: string, token: string }> => {
+  // Normalize email to lowercase
+  const normalizedEmail = studentEmail.toLowerCase();
+  
   // Check for existing valid tokens first
   const tokensRef = collection(db, 'signupTokens');
-  logQuery('Querying signup tokens', { studentEmail });
-  const q = query(tokensRef, where('email', '==', studentEmail));
+  logQuery('Querying signup tokens', { studentEmail: normalizedEmail });
+  const q = query(tokensRef, where('email', '==', normalizedEmail));
   const existingTokens = await getDocs(q);
-  logQuery('Signup Tokens Query result', { studentEmail, size: existingTokens.docs.length });
+  logQuery('Signup Tokens Query result', { studentEmail: normalizedEmail, size: existingTokens.docs.length });
   
   // Try to find a valid existing token
   const now = new Date();
@@ -49,10 +52,10 @@ export const createSignupLink = async (studentEmail: string, studentName: string
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + 24);
 
-  logQuery('Creating new signup token', { token, studentEmail });
+  logQuery('Creating new signup token', { token, studentEmail: normalizedEmail });
   await setDoc(doc(db, 'signupTokens', token), {
     token,
-    email: studentEmail,
+    email: normalizedEmail,
     name: studentName,
     expiresAt: expiresAt.toISOString(),
     used: false,

@@ -324,12 +324,14 @@ export const AdminUsers = () => {
 
     try {
       setLoading(true);
-      const signupLinkData = await createSignupLink(newUser.email, newUser.name);
+      // Normalize email to lowercase
+      const normalizedEmail = newUser.email.toLowerCase();
+      const signupLinkData = await createSignupLink(normalizedEmail, newUser.name);
 
       // Store the signup link
       setRecentSignupLinks(prev => ({
         ...prev,
-        [newUser.email]: signupLinkData
+        [normalizedEmail]: signupLinkData
       }));
 
       // Create a new document with a temporary ID that includes 'pending_' prefix
@@ -337,7 +339,7 @@ export const AdminUsers = () => {
 
       const newUserData: User = {
         id: tempId,
-        email: newUser.email,
+        email: normalizedEmail,
         name: newUser.name,
         isAdmin: newUser.isAdmin,
         isTeacher: newUser.isTeacher,

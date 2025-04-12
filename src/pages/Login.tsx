@@ -77,7 +77,7 @@ export const Login = () => {
       const usersRef = collection(db, 'users');
       const q = query(
         usersRef, 
-        where('email', '==', result.user.email),
+        where('email', '==', result.user.email.toLowerCase()),
         where('status', '==', 'active')
       );
       const querySnapshot = await getDocs(q);

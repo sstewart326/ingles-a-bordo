@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
                   // Find the pending user document
                   const usersRef = collection(db, 'users');
-                  const q = query(usersRef, where('email', '==', user.email), where('status', '==', 'pending'));
+                  const q = query(usersRef, where('email', '==', user.email?.toLowerCase()), where('status', '==', 'pending'));
                   const querySnapshot = await getDocs(q);
 
                   if (querySnapshot.empty) {
@@ -149,7 +149,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 const usersRef = collection(db, 'users');
                 const q = query(
                   usersRef,
-                  where('email', '==', user.email),
+                  where('email', '==', user.email?.toLowerCase()),
                   where('status', '==', 'active')
                 );
                 
@@ -196,15 +196,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
+      // Normalize email to lowercase
+      const normalizedEmail = email.toLowerCase();
+      
       // Create the authentication user first to get the UID
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
       const user = userCredential.user;
 
       try {
         // Call the Cloud Function using httpsCallable
         const completeSignup = httpsCallable(functions, 'completeSignupHttp');
         const result = await completeSignup({
-          email,
+          email: normalizedEmail,
           uid: user.uid,
           token
         });
@@ -267,13 +270,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Normalize email to lowercase before authentication
+      const normalizedEmail = email.toLowerCase();
+      const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
 
       // Check user status immediately after successful login
       const usersRef = collection(db, 'users');
       const q = query(
         usersRef,
-        where('email', '==', userCredential.user.email),
+        where('email', '==', userCredential.user.email?.toLowerCase()),
         where('status', '==', 'active')
       );
       
@@ -300,6 +305,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     try {
+      // Normalize email to lowercase
+      const normalizedEmail = email.toLowerCase();
+      
       // Define actionCodeSettings with the URL to redirect after password reset
       const actionCodeSettings = {
         // Get the current URL's origin (protocol + domain) for the redirect
@@ -308,7 +316,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         handleCodeInApp: false
       };
       
-      await sendPasswordResetEmail(auth, email, actionCodeSettings);
+      await sendPasswordResetEmail(auth, normalizedEmail, actionCodeSettings);
     } catch (error) {
       console.error('Error sending password reset email:', error);
       throw error;
