@@ -42,6 +42,9 @@ interface PaymentDueDate {
   date: string;
   classId: string;
   paymentLink: string | null;
+  classSession: {
+    id: string;
+  };
 }
 
 interface CompletedPayment {
@@ -299,7 +302,7 @@ export const Schedule = () => {
   };
 
   // Add function to check if payment is completed
-  const getPaymentStatus = (date: Date): { isCompleted: boolean; completedAt?: string } => {
+  const getPaymentStatus = (date: Date): { isCompleted: boolean; completedAt?: string; amount?: number; currency?: string } => {
     if (!calendarData?.completedPayments || !calendarData?.paymentDueDates) {
       return { isCompleted: false };
     }
@@ -320,9 +323,17 @@ export const Schedule = () => {
       return paymentDueDateStr === dateStr;
     });
 
+    // Find the associated class for this payment due date to get amount and currency
+    const associatedClass = calendarData.classes.find(cls => cls.id === paymentDue.classSession.id);
+    
+    const amount = completedPayment?.amount || associatedClass?.paymentConfig?.amount;
+    const currency = completedPayment?.currency || associatedClass?.paymentConfig?.currency;
+
     return {
       isCompleted: !!completedPayment,
-      completedAt: completedPayment?.completedAt
+      completedAt: completedPayment?.completedAt,
+      amount,
+      currency
     };
   };
 
@@ -1042,7 +1053,7 @@ export const Schedule = () => {
                     : 'bg-[#fffbeb]'  // Original yellow background for pending payments
                     }`}>
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${getPaymentStatus(selectedDayDetails.date).isCompleted
+                      <div className={`${getPaymentStatus(selectedDayDetails.date).isCompleted
                         ? 'bg-[#22c55e]'
                         : selectedDayDetails.isPaymentSoon
                           ? 'bg-[#ef4444]'
@@ -1062,6 +1073,29 @@ export const Schedule = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Show payment amount if available */}
+                    {getPaymentStatus(selectedDayDetails.date).amount && (
+                      <div className="mt-3 ml-4">
+                        <div className="flex items-baseline">
+                          <span className="text-md font-medium text-gray-500 mr-2">{t.amount || 'Amount'}:</span>
+                          <span className={`text-xl font-bold ${getPaymentStatus(selectedDayDetails.date).isCompleted
+                            ? 'text-[#22c55e]'  // Green for completed payments
+                            : selectedDayDetails.isPaymentSoon
+                              ? 'text-[#ef4444]' // Red for payments due soon
+                              : 'text-[#f59e0b]' // Orange/yellow for regular pending payments
+                            }`}>
+                            {getPaymentStatus(selectedDayDetails.date).currency === 'USD' ? '$' : 
+                             getPaymentStatus(selectedDayDetails.date).currency === 'EUR' ? '€' : 
+                             getPaymentStatus(selectedDayDetails.date).currency || '$'}
+                            {getPaymentStatus(selectedDayDetails.date).amount?.toLocaleString(
+                              language === 'pt-BR' ? 'pt-BR' : 'en-US',
+                              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Show completion date if payment is completed */}
                     {getPaymentStatus(selectedDayDetails.date).isCompleted && getPaymentStatus(selectedDayDetails.date).completedAt && (

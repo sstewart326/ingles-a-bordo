@@ -294,7 +294,8 @@ export const getClassScheduleHttp = onRequest({
           // Add payment dates to the overall list
           paymentDueDates.push(...paymentDates.map(date => ({
             date,
-            paymentLink: classData.paymentConfig?.paymentLink || null
+            paymentLink: classData.paymentConfig?.paymentLink || null,
+            amount: classData.paymentConfig?.amount || null
           })));
         }
       }
@@ -861,7 +862,8 @@ export const getCalendarDataHttp = onRequest({
               courseType: classData.courseType,
               paymentConfig: classData.paymentConfig
             },
-            paymentLink: classData.paymentConfig?.paymentLink || null
+            paymentLink: classData.paymentConfig?.paymentLink || null,
+            amount: classData.paymentConfig?.amount || null
           })));
         }
       }
