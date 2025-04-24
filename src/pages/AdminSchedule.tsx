@@ -53,8 +53,10 @@ const generateTimeOptions = () => {
 
 // Common timezones for the dropdown
 const getTimezoneOptions = () => {
-  // Include most common timezones with Eastern Time first
-  return [
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  // Common timezones with descriptive labels
+  const commonTimezones = [
     { value: 'America/New_York', label: 'Eastern Time (ET) - New York' },
     { value: 'America/Chicago', label: 'Central Time (CT) - Chicago' },
     { value: 'America/Denver', label: 'Mountain Time (MT) - Denver' },
@@ -66,15 +68,33 @@ const getTimezoneOptions = () => {
     { value: 'Asia/Tokyo', label: 'Japan Standard Time (JST) - Tokyo' },
     { value: 'Asia/Shanghai', label: 'China Standard Time (CST) - Shanghai' },
     { value: 'Australia/Sydney', label: 'Australian Eastern Time (AET) - Sydney' },
-    // Add user's local timezone if not already in the list
-    {
-      value: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      label: `${Intl.DateTimeFormat().resolvedOptions().timeZone} (Your local time)`
-    }
-  ].filter((tz, index, self) =>
-    // Remove duplicates
-    index === self.findIndex(t => t.value === tz.value)
-  );
+  ];
+  
+  // Check if user's timezone is already in the list
+  const userTimezoneIndex = commonTimezones.findIndex(tz => tz.value === userTimezone);
+  let result = [...commonTimezones];
+  
+  if (userTimezoneIndex !== -1) {
+    // If user's timezone is in the list, modify its label and move it to the top
+    const userTimezoneOption = { 
+      ...result[userTimezoneIndex],
+      label: `${result[userTimezoneIndex].label} (Your timezone)`
+    };
+    
+    // Remove it from its current position
+    result.splice(userTimezoneIndex, 1);
+    
+    // Add it to the top of the list
+    result.unshift(userTimezoneOption);
+  } else {
+    // If user's timezone is not in the list, add it to the top
+    result.unshift({
+      value: userTimezone,
+      label: `${userTimezone} (Your timezone)`
+    });
+  }
+  
+  return result;
 };
 
 const getNextDayOccurrence = (dayOfWeek: number) => {
@@ -107,7 +127,7 @@ export const AdminSchedule = () => {
     dayOfWeek: 1,
     startTime: '09:00 AM',
     endTime: '10:00 AM',
-    timezone: 'America/New_York',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Use user's local timezone
     schedules: [],
     courseType: 'Individual',
     studentEmails: [],
@@ -282,7 +302,7 @@ export const AdminSchedule = () => {
         dayOfWeek: newDayOfWeek, 
         startTime: defaultStartTime, 
         endTime: defaultEndTime,
-        timezone: prev.timezone || 'America/New_York' // Ensure timezone is set with fallback
+        timezone: prev.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone // Use local timezone as fallback
       };
       
       const updatedSchedules = [...prev.schedules, newSchedule];
@@ -290,7 +310,7 @@ export const AdminSchedule = () => {
       return {
         ...prev,
         schedules: updatedSchedules,
-        timezone: prev.timezone || 'America/New_York' // Ensure timezone is set in parent object too
+        timezone: prev.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone // Use local timezone as fallback for parent object too
       };
     });
   };
@@ -464,10 +484,10 @@ export const AdminSchedule = () => {
       const classToCreate = {
         ...newClass,
         contractUrl,
-        timezone: newClass.timezone || 'America/New_York', // Ensure timezone is set
+        timezone: newClass.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone, // Use local timezone as fallback
         schedules: newClass.schedules.map((schedule: any) => ({
           ...schedule,
-          timezone: schedule.timezone || newClass.timezone || 'America/New_York' // Ensure timezone is set in each schedule
+          timezone: schedule.timezone || newClass.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone // Use local timezone as fallback
         })),
         startDate: Timestamp.fromDate(newClass.startDate),
         endDate: newClass.endDate ? Timestamp.fromDate(newClass.endDate) : null,
@@ -496,7 +516,7 @@ export const AdminSchedule = () => {
         dayOfWeek: 1,
         startTime: '09:00 AM',
         endTime: '10:00 AM',
-        timezone: 'America/New_York',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Use user's local timezone
         schedules: [],
         courseType: 'Individual',
         studentEmails: [],
@@ -670,14 +690,14 @@ export const AdminSchedule = () => {
     const schedules = classItem.schedules?.map((schedule: ClassSchedule) => ({
       ...schedule,
       // Add timezone to schedule if missing
-      timezone: schedule.timezone || classItem.timezone || 'America/New_York' // Set to Eastern Time as default
+      timezone: schedule.timezone || classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone // Use local timezone as default
     })) || [];
     
     // For start date and end date, convert Timestamp to Date
     const startDate = classItem.startDate.toDate();
     
     // Ensure the timezone is set
-    const timezone = classItem.timezone || 'America/New_York'; // Set to Eastern Time as default
+    const timezone = classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone; // Use local timezone as default
     
     // Format monthly option for UI
     let monthlyOption = classItem.paymentConfig?.monthlyOption || null;
@@ -688,7 +708,7 @@ export const AdminSchedule = () => {
       schedules,
       startDate: startDate,
       endDate: classItem.endDate ? classItem.endDate.toDate() : null,
-      timezone: timezone, // Set timezone with fixed value
+      timezone: timezone, // Set timezone with user's local timezone as fallback
       paymentConfig: {
         ...classItem.paymentConfig,
         monthlyOption: monthlyOption
