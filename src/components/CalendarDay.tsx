@@ -1,6 +1,8 @@
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { CalendarDayProps } from '../types/interfaces';
+import { convertTimeToTimezone } from '../utils/dateUtils';
+
 export function CalendarDay({
   date,
   isToday,
@@ -106,8 +108,17 @@ export function CalendarDay({
     
     return paymentsDue.map(({ user, classSession }) => {
       const dayName = getDayName(classSession.dayOfWeek);
-      const time = classSession.startTime && classSession.endTime 
-        ? `${classSession.startTime} - ${classSession.endTime}` 
+      
+      // Convert times to local timezone if timezone is specified
+      const localStartTime = classSession.startTime && classSession.timezone 
+        ? convertTimeToTimezone(classSession.startTime, classSession.timezone, undefined, date)
+        : classSession.startTime;
+      const localEndTime = classSession.endTime && classSession.timezone
+        ? convertTimeToTimezone(classSession.endTime, classSession.timezone, undefined, date)
+        : classSession.endTime;
+      
+      const time = localStartTime && localEndTime 
+        ? `${localStartTime} - ${localEndTime}` 
         : '';
       
       const amountText = classSession.paymentConfig?.amount && classSession.paymentConfig?.currency
@@ -123,8 +134,16 @@ export function CalendarDay({
     if (!dayClasses.length) return '';
     
     return dayClasses.map(classSession => {
-      const time = classSession.startTime && classSession.endTime 
-        ? `${classSession.startTime} - ${classSession.endTime}` 
+      // Convert times to local timezone if timezone is specified
+      const localStartTime = classSession.startTime && classSession.timezone 
+        ? convertTimeToTimezone(classSession.startTime, classSession.timezone, undefined, date)
+        : classSession.startTime;
+      const localEndTime = classSession.endTime && classSession.timezone
+        ? convertTimeToTimezone(classSession.endTime, classSession.timezone, undefined, date)
+        : classSession.endTime;
+      
+      const time = localStartTime && localEndTime 
+        ? `${localStartTime} - ${localEndTime}` 
         : '';
       
       const studentNames = classSession.studentEmails.map(email => {
