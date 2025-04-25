@@ -38,7 +38,6 @@ interface DayDetailsProps {
   onSaveNotes: (classSession: ClassSession) => void;
   onCancelEditNotes: (classId: string) => void;
   onEditPrivateNotes: (classSession: ClassSession) => void;
-  onSavePrivateNotes: (classSession: ClassSession) => void;
   onCancelEditPrivateNotes: (classId: string) => void;
   onDeleteMaterial: (material: ClassMaterial, index: number, classId: string, type: 'slides' | 'link', itemIndex?: number) => void;
   onOpenUploadForm: (classId: string) => void;
@@ -75,7 +74,6 @@ export const DayDetails = ({
   onSaveNotes,
   onCancelEditNotes,
   onEditPrivateNotes,
-  onSavePrivateNotes,
   onCancelEditPrivateNotes,
   onDeleteMaterial,
   onOpenUploadForm,
@@ -911,7 +909,6 @@ export const DayDetails = ({
             onSaveNotes={onSaveNotes}
             onCancelEditNotes={onCancelEditNotes}
             onEditPrivateNotes={onEditPrivateNotes}
-            onSavePrivateNotes={onSavePrivateNotes}
             onCancelEditPrivateNotes={onCancelEditPrivateNotes}
             onDeleteMaterial={(material, index, classId, type = 'slides', itemIndex) => 
               onDeleteMaterial(material, index, classId, type, itemIndex)

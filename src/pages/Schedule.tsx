@@ -17,6 +17,7 @@ import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
 import { formatLocalizedDate } from '../utils/dateUtils';
+import { fetchNotesByMonthAndTeacher, ClassNote, findNoteForClassSession } from '../utils/notesUtils';
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
   dates: string[];
@@ -222,6 +223,9 @@ export const Schedule = () => {
 
   // Add a refresh counter to force updates
   const [homeworkRefreshCounter, setHomeworkRefreshCounter] = useState(0);
+  
+  // Notes State
+  const [prefetchedNotes, setPrefetchedNotes] = useState<ClassNote[]>([]);
 
   // Add a new useEffect to set the initial day details for the current day
   useEffect(() => {
@@ -379,10 +383,53 @@ export const Schedule = () => {
     // This ensures the homework section is displayed
     setSelectedHomeworkDate(date);
 
+    // Add notes data to classes if available
+    const classesWithNotes = uniqueClasses.map(classItem => {
+      // Create a copy to avoid mutating the original
+      const updatedClass = { ...classItem };
+      
+      // Set the _displayDate property required by findNoteForClassSession
+      updatedClass._displayDate = new Date(date);
+      
+      // Ensure startTime is defined before trying to match notes
+      // For classes with multiple schedules, find the matching schedule for this day
+      const dayOfWeek = date.getDay();
+      if (updatedClass.scheduleType === 'multiple' && Array.isArray(updatedClass.schedules)) {
+        const matchingSchedule = updatedClass.schedules.find(
+          (s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === dayOfWeek
+        );
+        
+        if (matchingSchedule) {
+          updatedClass.startTime = matchingSchedule.startTime;
+          updatedClass.endTime = matchingSchedule.endTime;
+          updatedClass.timezone = matchingSchedule.timezone || updatedClass.timezone;
+        }
+      }
+      
+      // If we still don't have a startTime, use the default one from the class
+      if (!updatedClass.startTime && updatedClass.schedules && updatedClass.schedules.length > 0) {
+        updatedClass.startTime = updatedClass.schedules[0].startTime;
+      }
+      
+      // Ensure we have a startTime before looking for matching notes
+      if (updatedClass.startTime) {
+        // Find matching note in the prefetched notes
+        const matchingNote = findNoteForClassSession(updatedClass, prefetchedNotes);
+        
+        // If we found a note, add its data to the class
+        if (matchingNote) {
+          updatedClass.notes = matchingNote.notes || '';
+          updatedClass.privateNotes = matchingNote.privateNotes || '';
+        }
+      }
+      
+      return updatedClass;
+    });
+
     // Update the day details
     setSelectedDayDetails({
       date,
-      classes: uniqueClasses,
+      classes: classesWithNotes,
       isPaymentDay,
       isPaymentSoon
     });
@@ -923,6 +970,36 @@ export const Schedule = () => {
     };
   }, [calendarData, fetchHomeworkForAllClasses]);
 
+  // Add effect to fetch notes when calendar data changes
+  useEffect(() => {
+    const fetchNotesForCurrentMonth = async () => {
+      // Skip if we have no data, are loading, or don't have calendar data with userData
+      if (!calendarData || loading || !calendarData.userData?.teacher) return;
+      
+      try {        
+        // Use the teacher ID from userData, not the current user's ID
+        const teacherId = calendarData.userData.teacher;
+        
+        // Fetch notes for the current month/year in the calendar
+        const notes = await fetchNotesByMonthAndTeacher(
+          calendarData.month + 1, // Convert from 0-indexed to 1-indexed month
+          calendarData.year,
+          teacherId
+        );
+        
+        setPrefetchedNotes(notes);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Schedule: Prefetched ${notes.length} notes for ${calendarData.year}-${calendarData.month + 1}`);
+        }
+      } catch (error) {
+        console.error('Error fetching notes:', error);
+      }
+    };
+    
+    fetchNotesForCurrentMonth();
+  }, [calendarData, loading]);
+
   // Add a ref to track if we've handled masquerade change
   const hasMasqueradeChangeRef = useRef(false);
 
@@ -1016,6 +1093,25 @@ export const Schedule = () => {
                 const newMonth = date.getMonth();
                 const newYear = date.getFullYear();
                 fetchCalendarDataSafely(newMonth, newYear, false);
+                
+                // Also fetch notes for the new month
+                if (calendarData?.userData?.teacher) {
+                  // Clear existing notes
+                  setPrefetchedNotes([]);
+                  
+                  // Use the teacher ID from userData, not the current user's ID
+                  const teacherId = calendarData.userData.teacher;
+                  
+                  // Fetch new notes for the month
+                  fetchNotesByMonthAndTeacher(newMonth + 1, newYear, teacherId)
+                    .then(notes => {
+                      setPrefetchedNotes(notes);
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`Schedule: Prefetched ${notes.length} notes for ${newYear}-${newMonth + 1}`);
+                      }
+                    })
+                    .catch(error => console.error('Error fetching notes:', error))
+                }
               }}
               onDayClick={(date: Date) => {
                 // Update selectedDate
@@ -1220,16 +1316,25 @@ export const Schedule = () => {
                             {formatClassTime(updatedClass)}
                           </span>
 
-                          <span className="text-sm font-medium text-[#4b5563]">{t.class}</span>
-                          <span className="text-sm text-[#1a1a1a]">{updatedClass.courseType || t.class}</span>
-
-                          {updatedClass.notes && (
-                            <>
-                              <span className="text-sm font-medium text-[#4b5563]">{t.notes}</span>
-                              <span className="text-sm text-[#1a1a1a]">{updatedClass.notes}</span>
-                            </>
-                          )}
+                          
                         </div>
+
+                        {/* Notes section with enhanced styling that pops out */}
+                        {updatedClass.notes && (
+                          <div className="mt-3 p-3 bg-gradient-to-r from-amber-50 to-amber-100 border-l-3 border-amber-500 rounded-md shadow-sm transform transition-all duration-200 hover:scale-[1.01]">
+                            <div className="flex items-start">
+                              <div className="bg-amber-500 p-1.5 rounded-full mr-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-semibold text-amber-800 mb-0.5">{t.notes || 'Class Notes'}</h4>
+                                <div className="text-xs leading-relaxed text-amber-900">{updatedClass.notes}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {hasMaterials && (
                           <div className="mt-4 pt-4 border-t border-[#e5e7eb] flex gap-2">
@@ -1295,5 +1400,5 @@ export const Schedule = () => {
         />
       </div>
     </div>
-  );
-}; 
+  ); 
+} 

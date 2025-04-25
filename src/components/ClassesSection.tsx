@@ -26,7 +26,6 @@ interface ClassesSectionProps {
   onSaveNotes: (classSession: ClassSession) => void;
   onCancelEditNotes: (classId: string) => void;
   onEditPrivateNotes: (classSession: ClassSession) => void;
-  onSavePrivateNotes: (classSession: ClassSession) => void;
   onCancelEditPrivateNotes: (classId: string) => void;
   onDeleteMaterial: (material: ClassMaterial, index: number, classId: string, type?: 'slides' | 'link', itemIndex?: number) => void;
   onOpenUploadForm: (classId: string) => void;
@@ -81,7 +80,6 @@ export const ClassesSection = ({
   onSaveNotes,
   onCancelEditNotes,
   onEditPrivateNotes,
-  onSavePrivateNotes,
   onCancelEditPrivateNotes,
   onDeleteMaterial,
   onOpenUploadForm,
@@ -117,7 +115,6 @@ export const ClassesSection = ({
           onSaveNotes={onSaveNotes}
           onCancelEditNotes={onCancelEditNotes}
           onEditPrivateNotes={onEditPrivateNotes}
-          onSavePrivateNotes={onSavePrivateNotes}
           onCancelEditPrivateNotes={onCancelEditPrivateNotes}
           onDeleteMaterial={onDeleteMaterial}
           onOpenUploadForm={onOpenUploadForm}
@@ -152,7 +149,6 @@ export const ClassesSection = ({
           onSaveNotes={onSaveNotes}
           onCancelEditNotes={onCancelEditNotes}
           onEditPrivateNotes={onEditPrivateNotes}
-          onSavePrivateNotes={onSavePrivateNotes}
           onCancelEditPrivateNotes={onCancelEditPrivateNotes}
           onDeleteMaterial={onDeleteMaterial}
           onOpenUploadForm={onOpenUploadForm}

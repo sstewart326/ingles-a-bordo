@@ -22,10 +22,9 @@ interface ClassSectionProps {
   formatClassTime: (classSession: ClassSession) => string;
   formatClassDate: (date: Date | null) => string;
   onEditNotes: (classSession: ClassSession) => void;
-  onSaveNotes: (classSession: ClassSession) => void;
+  onSaveNotes: (classSession: ClassSession, note?: string, privateNote?: string) => void;
   onCancelEditNotes: (classId: string) => void;
   onEditPrivateNotes: (classSession: ClassSession) => void;
-  onSavePrivateNotes: (classSession: ClassSession) => void;
   onCancelEditPrivateNotes: (classId: string) => void;
   onDeleteMaterial: (material: ClassMaterial, index: number, classId: string, type?: 'slides' | 'link', itemIndex?: number) => void;
   onOpenUploadForm: (classId: string) => void;
@@ -82,7 +81,6 @@ export const ClassSection = ({
   onSaveNotes,
   onCancelEditNotes,
   onEditPrivateNotes,
-  onSavePrivateNotes,
   onCancelEditPrivateNotes,
   onDeleteMaterial,
   onOpenUploadForm,
@@ -288,7 +286,12 @@ export const ClassSection = ({
                                 {t.cancel || 'Cancel'}
                               </button>
                               <button
-                                onClick={() => onSaveNotes(classSession)}
+                                onClick={async () => {
+                                  const noteText = textareaRefs[`${classSession.id}-${date.getTime()}-notes`]?.value;
+                                  onSaveNotes(classSession, noteText);
+                                  // Clear editing state
+                                  onCancelEditNotes(classSession.id);
+                                }}
                                 className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
                                 disabled={savingNotes[classSession.id]}
                               >
@@ -345,7 +348,12 @@ export const ClassSection = ({
                                 {t.cancel || 'Cancel'}
                               </button>
                               <button
-                                onClick={() => onSavePrivateNotes(classSession)}
+                                onClick={async () => {
+                                  const privateNoteText = textareaRefs[`${classSession.id}-${date.getTime()}-private_notes`]?.value;
+                                  onSaveNotes(classSession, undefined, privateNoteText);
+                                  // Clear editing state
+                                  onCancelEditPrivateNotes(classSession.id);
+                                }}
                                 className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
                                 disabled={savingPrivateNotes[classSession.id]}
                               >

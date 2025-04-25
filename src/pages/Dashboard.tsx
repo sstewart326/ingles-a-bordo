@@ -15,9 +15,12 @@ import {
   MaterialsState
 } from '../utils/materialsUtils';
 import {
-  handleEditNotes as handleEditNotesUtil,
   handleSaveNotes as handleSaveNotesUtil,
-  handleCancelEditNotes as handleCancelEditNotesUtil
+  handleCancelEditNotes as handleCancelEditNotesUtil,
+  fetchNotesByMonthAndTeacher,
+  ClassNote,
+  subscribeToMonthNotes,
+  subscribeToNotesChanges
 } from '../utils/notesUtils';
 import { CalendarSection } from '../components/CalendarSection';
 import { useDashboardData } from '../hooks/useDashboardData';
@@ -42,6 +45,8 @@ export const Dashboard = () => {
   const prevPathRef = useRef<string | null>(null);
   const isFetchingRef = useRef<boolean>(false);
   const [isLoadingCalendarData, setIsLoadingCalendarData] = useState(false);
+  // Add a state for prefetched notes
+  const [prefetchedNotes, setPrefetchedNotes] = useState<Record<string, ClassNote[]>>({});
 
   const [homeworkByClassId, setHomeworkByClassId] = useState<Record<string, Homework[]>>({});
   const lastHomeworkFetchRef = useRef<number>(0);
@@ -117,6 +122,23 @@ export const Dashboard = () => {
         if (matchingSchedule) {
           updatedClass.startTime = matchingSchedule.startTime;
           updatedClass.endTime = matchingSchedule.endTime;
+        }
+      }
+
+      // Check if we have prefetched notes for this month
+      const notesCacheKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+      if (prefetchedNotes[notesCacheKey]) {
+        // Look for matching notes in the prefetched data
+        const matchingNote = prefetchedNotes[notesCacheKey].find(note => 
+          note.classId === updatedClass.id && 
+          note.day === date.getDate() && 
+          note.classTime === updatedClass.startTime
+        );
+        
+        if (matchingNote) {
+          // Attach the notes data to the class session
+          updatedClass.notes = matchingNote.notes || '';
+          updatedClass.privateNotes = matchingNote.privateNotes || '';
         }
       }
 
@@ -214,19 +236,6 @@ export const Dashboard = () => {
               materialsMap[classId] = filteredMaterials;
             }
           }
-        });
-      }
-
-      // Log the materials map for debugging
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Dashboard - fetchMaterials materialsMap:', {
-          date: date.toISOString().slice(0, 10),
-          monthKey,
-          classIds: Object.keys(materialsMap),
-          materialCounts: Object.keys(materialsMap).map(id => ({
-            classId: id,
-            count: materialsMap[id].length
-          }))
         });
       }
 
@@ -349,7 +358,8 @@ export const Dashboard = () => {
     setSelectedDayDetails,
     currentUser,
     classMaterials,
-    setCompletedPayments
+    setCompletedPayments,
+    prefetchedNotes
   ]);
 
   // Create a wrapper function that matches the expected signature for CalendarSection
@@ -464,6 +474,29 @@ export const Dashboard = () => {
         isFetchingRef.current = true;
         await fetchClasses(newDate, false);
       }
+
+      // Prefetch notes for this month if the user is logged in
+      if (currentUser?.uid) {
+        const month = newDate.getMonth() + 1; // JavaScript months are 0-indexed
+        const year = newDate.getFullYear();
+        
+        // Check if we already have notes for this month
+        const notesCacheKey = `${year}-${month}`;
+        if (!prefetchedNotes[notesCacheKey]) {
+          try {
+            // Fetch notes for the current month
+            const notes = await fetchNotesByMonthAndTeacher(month, year, currentUser.uid);
+            
+            // Store the notes with the month key
+            setPrefetchedNotes(prev => ({
+              ...prev,
+              [notesCacheKey]: notes
+            }));
+          } catch (error) {
+            console.error('Error prefetching notes:', error);
+          }
+        }
+      }
     } finally {
       isFetchingRef.current = false;
       setIsLoadingCalendarData(false);
@@ -471,94 +504,67 @@ export const Dashboard = () => {
   };
 
   const handleEditNotes = useCallback((classSession: ClassSession) => {
-    handleEditNotesUtil(
-      classSession,
-      {
-        editingNotes,
-        savingNotes,
-        textareaRefs: textareaRefs.current,
-        editingPrivateNotes,
-        savingPrivateNotes
-      },
-      setEditingNotes
-    );
-  }, [editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes]);
+    setEditingNotes({
+      ...editingNotes,
+      [classSession.id]: classSession.notes || ''
+    });
+  }, [editingNotes]);
 
   const handleEditPrivateNotes = useCallback((classSession: ClassSession) => {
-    handleEditNotesUtil(
-      classSession,
-      {
-        editingNotes,
-        savingNotes,
-        textareaRefs: textareaRefs.current,
-        editingPrivateNotes,
-        savingPrivateNotes
-      },
-      setEditingPrivateNotes,
-      true
-    );
-  }, [editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes]);
+    setEditingPrivateNotes({
+      ...editingPrivateNotes,
+      [classSession.id]: classSession.privateNotes || ''
+    });
+  }, [editingPrivateNotes]);
 
-  const handleSaveNotes = useCallback(async (classSession: ClassSession) => {
+  const handleSaveNotes = useCallback(async (classSession: ClassSession, note?: string, privateNote?: string) => {
     if (!currentUser) return;
 
-    await handleSaveNotesUtil({
-      classSession,
-      state: {
-        editingNotes,
-        savingNotes,
-        textareaRefs: textareaRefs.current,
-        editingPrivateNotes,
-        savingPrivateNotes
-      },
-      setState: (updates) => {
-        if ('editingNotes' in updates) {
-          setEditingNotes(updates.editingNotes || {});
-        }
-        if ('savingNotes' in updates) {
-          setSavingNotes(updates.savingNotes || {});
-        }
-      },
-      currentUser,
-      selectedDayDetails,
-      setSelectedDayDetails,
-      upcomingClasses,
-      pastClasses,
-      setUpcomingClasses,
-      setPastClasses
-    });
-  }, [currentUser, editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes, selectedDayDetails, upcomingClasses, pastClasses, setSelectedDayDetails, setUpcomingClasses, setPastClasses]);
+    try {
+      // Set saving indicator for this class
+      if (note !== undefined) {
+        setSavingNotes(prev => ({ ...prev, [classSession.id]: true }));
+      }
+      if (privateNote !== undefined) {
+        setSavingPrivateNotes(prev => ({ ...prev, [classSession.id]: true }));
+      }
 
-  const handleSavePrivateNotes = useCallback(async (classSession: ClassSession) => {
-    if (!currentUser) return;
+      // Save the notes using the utility function
+      await handleSaveNotesUtil({
+        classSession,
+        note,
+        privateNote,
+        teacherId: currentUser.uid
+      });
 
-    await handleSaveNotesUtil({
-      classSession,
-      state: {
-        editingNotes,
-        savingNotes,
-        textareaRefs: textareaRefs.current,
-        editingPrivateNotes,
-        savingPrivateNotes
-      },
-      setState: (updates) => {
-        if ('editingPrivateNotes' in updates) {
-          setEditingPrivateNotes(updates.editingPrivateNotes || {});
-        }
-        if ('savingPrivateNotes' in updates) {
-          setSavingPrivateNotes(updates.savingPrivateNotes || {});
-        }
-      },
-      currentUser,
-      selectedDayDetails,
-      setSelectedDayDetails,
-      upcomingClasses,
-      pastClasses,
-      setUpcomingClasses,
-      setPastClasses,
-      isPrivate: true
-    });
-  }, [currentUser, editingNotes, savingNotes, editingPrivateNotes, savingPrivateNotes, selectedDayDetails, upcomingClasses, pastClasses, setSelectedDayDetails, setUpcomingClasses, setPastClasses]);
+      // Reset editing mode for this class
+      if (note !== undefined) {
+        setEditingNotes(prev => {
+          const newState = { ...prev };
+          delete newState[classSession.id];
+          return newState;
+        });
+      }
+      if (privateNote !== undefined) {
+        setEditingPrivateNotes(prev => {
+          const newState = { ...prev };
+          delete newState[classSession.id];
+          return newState;
+        });
+      }
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      toast.error('Failed to save notes. Please try again.');
+    } finally {
+      // Clear saving indicators
+      if (note !== undefined) {
+        setSavingNotes(prev => ({ ...prev, [classSession.id]: false }));
+      }
+      if (privateNote !== undefined) {
+        setSavingPrivateNotes(prev => ({ ...prev, [classSession.id]: false }));
+      }
+    }
+  }, [currentUser]);
 
   const handleCancelEditNotes = useCallback((classId: string) => {
     handleCancelEditNotesUtil(
@@ -750,16 +756,6 @@ export const Dashboard = () => {
           ];
 
           const uniqueClassIdsToUpdate = [...new Set(classIdsToUpdate)];
-
-          // Log for debugging
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Refreshing materials for classes:', {
-              actualClassId,
-              baseClassId,
-              uniqueClassIdsToUpdate,
-              materialCount: materialsWithIds.length
-            });
-          }
 
           // ============== STEP 2: Update the materials map ==============
           // Create updated materials map for selectedDayDetails
@@ -1200,6 +1196,153 @@ export const Dashboard = () => {
     }
   };
 
+  // Add an effect to prefetch notes for the current month on mount/user change
+  useEffect(() => {
+    const prefetchCurrentMonthNotes = async () => {
+      if (!currentUser?.uid) return;
+      
+      const today = new Date();
+      const month = today.getMonth() + 1;
+      const year = today.getFullYear();
+      const notesCacheKey = `${year}-${month}`;
+      
+      // Only fetch if we don't already have these notes
+      if (!prefetchedNotes[notesCacheKey]) {
+        try {
+          const notes = await fetchNotesByMonthAndTeacher(month, year, currentUser.uid);
+          
+          // Store the notes with the month key
+          setPrefetchedNotes(prev => ({
+            ...prev,
+            [notesCacheKey]: notes
+          }));  
+        } catch (error) {
+          console.error('Error prefetching initial notes:', error);
+        }
+      }
+    };
+    
+    prefetchCurrentMonthNotes();
+  }, [currentUser]); // Re-run when user changes
+
+  // Add effect to subscribe to notes changes
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    
+    
+    // Subscribe to changes in notes
+    const unsubscribe = subscribeToNotesChanges((changedMonthKey, changedNote) => {
+      
+      // Extract year and month from the key (format: YYYY-MM)
+      const [year, month] = changedMonthKey.split('-').map(Number);
+      
+      // Update the prefetched notes with the new data
+      setPrefetchedNotes(prev => {
+        // If we don't have this month's notes yet, fetch them all
+        if (!prev[changedMonthKey]) {
+          // Schedule a fetch for all notes for this month
+          fetchNotesByMonthAndTeacher(month, year, currentUser.uid)
+            .then(notes => {
+              setPrefetchedNotes(currentPrev => ({
+                ...currentPrev,
+                [changedMonthKey]: notes
+              }));
+            })
+            .catch(error => {
+              console.error('Error fetching notes after change:', error);
+            });
+            
+          // Return current state while async fetch is happening
+          return prev;
+        }
+        
+        // We have this month's notes, so update or add the changed note
+        const notes = [...(prev[changedMonthKey] || [])];
+        
+        // Find if this note already exists in our cache
+        const existingNoteIndex = notes.findIndex(note => 
+          note.id === changedNote.id
+        );
+        
+        if (existingNoteIndex >= 0) {
+          // Update existing note
+          notes[existingNoteIndex] = changedNote;
+        } else {
+          // Add new note
+          notes.push(changedNote);
+        }
+        
+        return {
+          ...prev,
+          [changedMonthKey]: notes
+        };
+      });
+      
+      // If this is the current month being displayed, also update the selected day details
+      if (selectedDayDetails && 
+          selectedDayDetails.date.getMonth() + 1 === month &&
+          selectedDayDetails.date.getFullYear() === year &&
+          selectedDayDetails.date.getDate() === changedNote.day) {
+                
+        // Update classes with the new note
+        const updatedClasses = selectedDayDetails.classes.map(classSession => {
+          if (classSession.id === changedNote.classId && 
+              classSession.startTime === changedNote.classTime) {
+            return {
+              ...classSession,
+              notes: changedNote.notes || '',
+              privateNotes: changedNote.privateNotes || ''
+            };
+          }
+          return classSession;
+        });
+        
+        // Update the selected day details with the new classes
+        setSelectedDayDetails({
+          ...selectedDayDetails,
+          classes: updatedClasses
+        });
+      }
+    });
+    
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUser, selectedDayDetails]);
+
+  // Add effect to set up real-time subscriptions for the current month
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    
+    const today = new Date();
+    const month = today.getMonth() + 1;
+    const year = today.getFullYear();
+    
+    
+    // Subscribe to real-time updates for the current month's notes
+    const unsubscribe = subscribeToMonthNotes(year, month, currentUser.uid);
+    
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUser]);
+  
+  // Add effect to set up real-time subscriptions when month changes
+  useEffect(() => {
+    if (!currentUser?.uid || !selectedDate) return;
+    
+    const month = selectedDate.getMonth() + 1;
+    const year = selectedDate.getFullYear();
+    
+    
+    // Subscribe to real-time updates for the selected month's notes
+    const unsubscribe = subscribeToMonthNotes(year, month, currentUser.uid);
+    
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUser, selectedDate]);
+
   // Show loading state if auth or admin status is still loading
   if (authLoading || adminLoading) {
     return (
@@ -1251,7 +1394,6 @@ export const Dashboard = () => {
               onSaveNotes={handleSaveNotes}
               onCancelEditNotes={handleCancelEditNotes}
               onEditPrivateNotes={handleEditPrivateNotes}
-              onSavePrivateNotes={handleSavePrivateNotes}
               onCancelEditPrivateNotes={handleCancelEditPrivateNotes}
               onDeleteMaterial={handleDeleteMaterial}
               onOpenUploadForm={handleOpenUploadForm}
