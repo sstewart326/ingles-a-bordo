@@ -116,7 +116,7 @@
 
 @media (max-width: 639px) {
   .calendar-day-indicators .indicator {
-    width: 12px;
+    width: 6px;
     height: 6px;
     border-radius: 50%;
   }
