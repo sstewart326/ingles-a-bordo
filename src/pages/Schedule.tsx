@@ -17,7 +17,11 @@ import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
 import { formatLocalizedDate } from '../utils/dateUtils';
-import { fetchNotesByMonthAndTeacher, ClassNote, findNoteForClassSession } from '../utils/notesUtils';
+import { 
+  fetchNotesByMonthTeacherAndClasses, 
+  ClassNote, 
+  findNoteForClassSession 
+} from '../utils/notesUtils';
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
   dates: string[];
@@ -980,18 +984,31 @@ export const Schedule = () => {
         // Use the teacher ID from userData, not the current user's ID
         const teacherId = calendarData.userData.teacher;
         
-        // Fetch notes for the current month/year in the calendar
-        const notes = await fetchNotesByMonthAndTeacher(
+        // Check if user is admin (used for authorization optimization)
+        const isAdmin = calendarData.userData.isAdmin || false;
+        
+        // Get unique class IDs from calendar data to comply with security rules
+        const uniqueClassIds = Array.from(new Set(
+          calendarData.classes
+            .map(classItem => classItem.id)
+            .filter(Boolean) // Remove undefined/null values
+        ));
+        
+        if (uniqueClassIds.length === 0) {
+          setPrefetchedNotes([]);
+          return;
+        }
+        
+        // Use the new function to fetch notes for all classes at once
+        const allNotes = await fetchNotesByMonthTeacherAndClasses(
           calendarData.month + 1, // Convert from 0-indexed to 1-indexed month
           calendarData.year,
-          teacherId
+          teacherId,
+          uniqueClassIds,
+          isAdmin
         );
         
-        setPrefetchedNotes(notes);
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`Schedule: Prefetched ${notes.length} notes for ${calendarData.year}-${calendarData.month + 1}`);
-        }
+        setPrefetchedNotes(allNotes);
       } catch (error) {
         console.error('Error fetching notes:', error);
       }
@@ -1102,15 +1119,33 @@ export const Schedule = () => {
                   // Use the teacher ID from userData, not the current user's ID
                   const teacherId = calendarData.userData.teacher;
                   
-                  // Fetch new notes for the month
-                  fetchNotesByMonthAndTeacher(newMonth + 1, newYear, teacherId)
-                    .then(notes => {
-                      setPrefetchedNotes(notes);
-                      if (process.env.NODE_ENV === 'development') {
-                        console.log(`Schedule: Prefetched ${notes.length} notes for ${newYear}-${newMonth + 1}`);
-                      }
+                  // Check if user is admin (used for authorization optimization)
+                  const isAdmin = calendarData.userData.isAdmin || false;
+                  
+                  // Get unique class IDs from calendar data to comply with security rules
+                  const uniqueClassIds = Array.from(new Set(
+                    calendarData.classes
+                      .map(classItem => classItem.id)
+                      .filter(Boolean) // Remove undefined/null values
+                  ));
+                  
+                  if (uniqueClassIds.length === 0) {
+                    setPrefetchedNotes([]);
+                    return;
+                  }
+                  
+                  // Use the new function to fetch notes for all classes at once
+                  fetchNotesByMonthTeacherAndClasses(
+                    newMonth + 1, 
+                    newYear, 
+                    teacherId,
+                    uniqueClassIds,
+                    isAdmin
+                  )
+                    .then(allNotes => {
+                      setPrefetchedNotes(allNotes);
                     })
-                    .catch(error => console.error('Error fetching notes:', error))
+                    .catch(error => console.error('Error fetching notes:', error));
                 }
               }}
               onDayClick={(date: Date) => {

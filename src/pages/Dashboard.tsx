@@ -485,7 +485,7 @@ export const Dashboard = () => {
         if (!prefetchedNotes[notesCacheKey]) {
           try {
             // Fetch notes for the current month
-            const notes = await fetchNotesByMonthAndTeacher(month, year, currentUser.uid);
+            const notes = await fetchNotesByMonthAndTeacher(month, year, currentUser.uid, null, isAdmin);
             
             // Store the notes with the month key
             setPrefetchedNotes(prev => ({
@@ -1209,7 +1209,7 @@ export const Dashboard = () => {
       // Only fetch if we don't already have these notes
       if (!prefetchedNotes[notesCacheKey]) {
         try {
-          const notes = await fetchNotesByMonthAndTeacher(month, year, currentUser.uid);
+          const notes = await fetchNotesByMonthAndTeacher(month, year, currentUser.uid, null, isAdmin);
           
           // Store the notes with the month key
           setPrefetchedNotes(prev => ({
@@ -1241,7 +1241,7 @@ export const Dashboard = () => {
         // If we don't have this month's notes yet, fetch them all
         if (!prev[changedMonthKey]) {
           // Schedule a fetch for all notes for this month
-          fetchNotesByMonthAndTeacher(month, year, currentUser.uid)
+          fetchNotesByMonthAndTeacher(month, year, currentUser.uid, null, isAdmin)
             .then(notes => {
               setPrefetchedNotes(currentPrev => ({
                 ...currentPrev,

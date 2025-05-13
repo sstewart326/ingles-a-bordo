@@ -141,7 +141,7 @@ export const handleSaveNotes = async ({
       where('day', '==', classSession._displayDate.getDate()),
       where('month', '==', monthKey),
       where('classTime', '==', classSession.startTime)
-    ]);
+    ], { bypassCache: true });
     
     // Create the note data, preserving any existing content if we're only updating one field
     let noteData: any = {
@@ -223,32 +223,104 @@ export const handleCancelEditNotes = (
 };
 
 /**
+ * Helper function to fetch notes for a specific month, teacher, and optionally class
+ * This handles the common logic for different authorization scenarios
+ * 
+ * @param month - Month number (1-12)
+ * @param year - Full year (e.g., 2023)
+ * @param teacherId - ID of the teacher whose notes to fetch
+ * @param isAdmin - Whether the current user is an admin
+ * @param classIds - Optional array of class IDs to filter notes for specific classes
+ * @returns Promise resolving to an array of class notes
+ */
+const fetchNotesInternal = async (
+  month: number, 
+  year: number, 
+  teacherId: string, 
+  isAdmin: boolean = false,
+  classIds?: string[]
+): Promise<ClassNote[]> => {
+  try {
+    // Format month to match the stored format (YYYY-MM)
+    const twoDigitMonth = month.toString().padStart(2, '0');
+    const monthFormatted = `${year}-${twoDigitMonth}`;
+    
+    // If user is an admin or teacher fetching their own notes,
+    // we can just fetch by month and teacher
+    if (isAdmin || !classIds || classIds.length === 0) {
+      const conditions = [
+        where('month', '==', monthFormatted),
+        where('teacherId', '==', teacherId)
+      ];
+      
+      const notes = await getCachedCollection<ClassNote>('classNotes', conditions);
+      return notes || [];
+    }
+    
+    // For non-admin users who aren't the teacher, we need to filter by classId
+    // Fetch notes for each class ID and combine the results
+    const notesPromises = classIds.map(classId => {
+      const conditions = [
+        where('month', '==', monthFormatted),
+        where('teacherId', '==', teacherId),
+        where('classId', '==', classId)
+      ];
+      
+      return getCachedCollection<ClassNote>('classNotes', conditions);
+    });
+    
+    const notesResults = await Promise.all(notesPromises);
+    // Combine all notes from different classes and flatten the array
+    return notesResults.flat().filter(Boolean);
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+    toast.error("Error loading class notes");
+    return [];
+  }
+};
+
+/**
  * Fetches all class notes for a specific month and teacher
  * This allows prefetching notes data for a calendar view
  * 
  * @param month - Month number (1-12)
  * @param year - Full year (e.g., 2023)
  * @param teacherId - ID of the teacher whose notes to fetch
+ * @param classId - Optional class ID to filter notes for a specific class
+ * @param isAdmin - Optional flag indicating if the user is an admin
  * @returns Promise resolving to an array of class notes
  */
-export const fetchNotesByMonthAndTeacher = async (month: number, year: number, teacherId: string): Promise<ClassNote[]> => {
-  try {
-    // Format month to match the stored format (YYYY-MM)
-    const twoDigitMonth = month.toString().padStart(2, '0');
-    const monthFormatted = `${year}-${twoDigitMonth}`;
-    
-    // Query class notes by month and teacherId
-    const notes = await getCachedCollection<ClassNote>('classNotes', [
-      where('month', '==', monthFormatted),
-      where('teacherId', '==', teacherId)
-    ]);
-    
-    return notes || [];
-  } catch (error) {
-    console.error('Error fetching notes by month and teacher:', error);
-    toast.error("Error loading class notes");
-    return [];
-  }
+export const fetchNotesByMonthAndTeacher = async (
+  month: number, 
+  year: number, 
+  teacherId: string, 
+  classId?: string | null,
+  isAdmin: boolean = false
+): Promise<ClassNote[]> => {
+  // If a specific classId is provided, use just that one
+  const classIds = classId ? [classId] : undefined;
+  return fetchNotesInternal(month, year, teacherId, isAdmin, classIds);
+};
+
+/**
+ * Fetches all class notes for a specific month, teacher, and multiple classes
+ * This is primarily used for the calendar view that shows notes for multiple classes
+ * 
+ * @param month - Month number (1-12)
+ * @param year - Full year (e.g., 2023)
+ * @param teacherId - ID of the teacher whose notes to fetch
+ * @param classIds - Array of class IDs to filter notes for
+ * @param isAdmin - Optional flag indicating if the user is an admin
+ * @returns Promise resolving to an array of class notes
+ */
+export const fetchNotesByMonthTeacherAndClasses = async (
+  month: number, 
+  year: number, 
+  teacherId: string, 
+  classIds: string[],
+  isAdmin: boolean = false
+): Promise<ClassNote[]> => {
+  return fetchNotesInternal(month, year, teacherId, isAdmin, classIds);
 };
 
 /**

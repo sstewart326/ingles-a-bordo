@@ -137,7 +137,20 @@ export const getTeacherUsers = async <T = DocumentData>(
   const existingRequest = inFlightRequests[cacheKey];
   if (existingRequest) {
     logUserOp('Returning in-flight request for teacher users', { teacherId });
-    return existingRequest as Promise<T[]>;
+    // Clone and add cleanup to the existing request
+    return existingRequest.then(
+      (result) => {
+        return result as T[];
+      },
+      (error) => {
+        throw error;
+      }
+    ).finally(() => {
+      // Also clean up when this promise completes
+      if (inFlightRequests[cacheKey] === existingRequest) {
+        delete inFlightRequests[cacheKey];
+      }
+    }) as Promise<T[]>;
   }
 
   // Create the request promise
@@ -178,13 +191,19 @@ export const getTeacherUsers = async <T = DocumentData>(
     } catch (error) {
       logUserOp('Error getting teacher users', { teacherId, error });
       throw error;
-    } finally {
-      // Clean up the in-flight request
-      delete inFlightRequests[cacheKey];
     }
   })();
 
   inFlightRequests[cacheKey] = promise;
+  
+  // Add a finally handler to clean up the in-flight request
+  promise.finally(() => {
+    // Clean up the in-flight request
+    if (inFlightRequests[cacheKey] === promise) {
+      delete inFlightRequests[cacheKey];
+    }
+  });
+  
   return promise;
 };
 
@@ -203,7 +222,20 @@ export const getUsersClasses = async <T = DocumentData>(
   const existingRequest = inFlightRequests[cacheKey];
   if (existingRequest) {
     logUserOp('Returning in-flight request for users classes', { userCount: userEmails.length });
-    return existingRequest as Promise<T[]>;
+    // Clone and add cleanup to the existing request
+    return existingRequest.then(
+      (result) => {
+        return result as T[];
+      },
+      (error) => {
+        throw error;
+      }
+    ).finally(() => {
+      // Also clean up when this promise completes
+      if (inFlightRequests[cacheKey] === existingRequest) {
+        delete inFlightRequests[cacheKey];
+      }
+    }) as Promise<T[]>;
   }
 
   // Create the request promise
@@ -283,7 +315,20 @@ export const getCachedCollection = async <T = DocumentData>(
   const existingRequest = inFlightRequests[cacheKey];
   if (existingRequest) {
     logQuery('Returning in-flight request', { collectionPath, cacheKey });
-    return existingRequest as Promise<T[]>;
+    // Clone and add cleanup to the existing request
+    return existingRequest.then(
+      (result) => {
+        return result as T[];
+      },
+      (error) => {
+        throw error;
+      }
+    ).finally(() => {
+      // Also clean up when this promise completes
+      if (inFlightRequests[cacheKey] === existingRequest) {
+        delete inFlightRequests[cacheKey];
+      }
+    }) as Promise<T[]>;
   }
 
   // Create the request promise
@@ -316,14 +361,20 @@ export const getCachedCollection = async <T = DocumentData>(
     } catch (error) {
       logQuery('Error getting collection', { collectionPath, error });
       throw error;
-    } finally {
-      // Clean up the in-flight request
-      delete inFlightRequests[cacheKey];
     }
   })();
 
   // Store the in-flight request
   inFlightRequests[cacheKey] = promise;
+  
+  // Add a finally handler to clean up the in-flight request
+  promise.finally(() => {
+    // Clean up the in-flight request
+    if (inFlightRequests[cacheKey] === promise) {
+      delete inFlightRequests[cacheKey];
+    }
+  });
+  
   return promise;
 };
 
