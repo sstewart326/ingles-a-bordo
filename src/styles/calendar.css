@@ -116,7 +116,7 @@
 
 @media (max-width: 639px) {
   .calendar-day-indicators .indicator {
-    width: 6px;
+    width: 12px;
     height: 6px;
     border-radius: 50%;
   }
@@ -473,8 +473,8 @@
   }
 
   .calendar-day-indicators .indicator {
-    width: 4px;
-    height: 4px;
+    width: 8px;
+    height: 8px;
   }
 
   /* Special handling for birthday indicator */
