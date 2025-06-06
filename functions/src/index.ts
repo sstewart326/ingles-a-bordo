@@ -919,63 +919,33 @@ export const getCalendarDataHttp = onRequest({
       // Get completed payments for the month - check both userId as ID and email
       const completedPayments = [];
       
-      if (userData.id || userEmail) {
+      if (userEmail) {
         try {
-          // Check if we should query by ID or email
           if (userEmail) {
-            logger.info('payments lookup by userEmail', { userEmail });
+
+              // due to oddities with the persisted time, range from the last day of the previous month to the first day of the next month
+              const paymentStartDate = new Date(startDate);
+              paymentStartDate.setDate(0);
+              paymentStartDate.setHours(0, 0, 0, 0);
+              const paymentEndDate = new Date(endDate);
+              paymentEndDate.setDate(paymentEndDate.getDate() + 1);
+              paymentEndDate.setHours(0, 0, 0, 0);
+            logger.info('payments lookup by userEmail', { userEmail, paymentStartDate, paymentEndDate });
             // Try both userId field formats
             const paymentsSnapshotByEmail = await admin.firestore().collection('payments')
               .where('userId', '==', userEmail)
-              .where('dueDate', '>=', startDate)
-              .where('dueDate', '<=', endDate)
+              .where('dueDate', '>=', paymentStartDate)
+              .where('dueDate', '<', paymentEndDate)
               .get();
 
             if(paymentsSnapshotByEmail.empty) {
-              logger.info('no payments found for the given userEmail');
+              logger.info('no payments found for the given userEmail', { userEmail, paymentStartDate, paymentEndDate });
             } else {
-              logger.info('number of payments found for the given userEmail', { numPayments: paymentsSnapshotByEmail.size });
+              logger.info('number of payments found for the given userEmail', { userEmail, paymentStartDate, paymentEndDate, numPayments: paymentsSnapshotByEmail.size });
             }
               
             // Process payments by email
             for (const doc of paymentsSnapshotByEmail.docs) {
-              const paymentData = doc.data();
-              
-              if (paymentData.dueDate) {
-                try {
-                  completedPayments.push({
-                    ...paymentData,
-                    id: doc.id,
-                    dueDate: paymentData.dueDate.toDate(),
-                    completedAt: paymentData.completedAt ? paymentData.completedAt.toDate() : null,
-                    createdAt: paymentData.createdAt.toDate(),
-                    updatedAt: paymentData.updatedAt.toDate()
-                  });
-                } catch (dateError) {
-                  logger.error("Error processing payment date:", dateError);
-                  // Skip this payment if there's an issue with the date
-                }
-              }
-            }
-          }
-          
-          // Also try with user ID if available
-          if (userData.id) {
-            logger.info('payments lookup by userId', { userId: userData.id });
-            const paymentsSnapshotById = await admin.firestore().collection('payments')
-              .where('userId', '==', userData.id)
-              .where('dueDate', '>=', startDate)
-              .where('dueDate', '<=', endDate)
-              .get();
-
-            if(paymentsSnapshotById.empty) {
-              logger.info('no payments found for the given userId');
-            } else {
-              logger.info('number of payments found for the given userId', { numPayments: paymentsSnapshotById.size });
-            }
-              
-            // Process payments by ID
-            for (const doc of paymentsSnapshotById.docs) {
               const paymentData = doc.data();
               
               if (paymentData.dueDate) {
