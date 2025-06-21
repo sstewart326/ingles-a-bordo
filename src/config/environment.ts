@@ -5,7 +5,7 @@ const getEnvironment = () => {
 
   // Determine auth domain from environment or fallback
   const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 
-    (hostname === 'localhost' ? 'localhost:5173' : 'app.inglesabordo.com');
+    (hostname === 'localhost' ? 'localhost:5173' : 'inglesabordo.com');
 
   if (isDevelopment) {
     console.log('[Environment] Using development configuration');
