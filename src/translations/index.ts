@@ -136,6 +136,7 @@ interface Translation {
   addPaymentLink: string;
   noPaymentLink: string;
   amount: string;
+  goToPaymentApp: string;
 
   // Days of Week - Short Names
   sundayShort: string;
@@ -491,6 +492,7 @@ const translations: Record<Language, Translation> = {
     addPaymentLink: 'Add payment link',
     noPaymentLink: 'No payment link available',
     amount: 'Amount',
+    goToPaymentApp: 'Go to Payment Portal',
 
     // Days of Week - Short Names
     sundayShort: 'Sun',
@@ -844,6 +846,7 @@ const translations: Record<Language, Translation> = {
     addPaymentLink: 'Adicionar link de pagamento',
     noPaymentLink: 'Link de pagamento não disponível',
     amount: 'Valor',
+    goToPaymentApp: 'Ir para Portal de Pagamento',
 
     // Days of Week - Short Names
     sundayShort: 'Dom',

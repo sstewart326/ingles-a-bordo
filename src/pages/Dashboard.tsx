@@ -30,6 +30,7 @@ import { getHomeworkForClass, subscribeToHomeworkChanges } from '../utils/homewo
 import { getBaseClassId } from '../utils/scheduleUtils';
 import { toast } from 'react-hot-toast';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
+import { RedirectToPaymentAppButton } from '../components/RedirectToPaymentAppButton';
 
 export const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -1357,6 +1358,9 @@ export const Dashboard = () => {
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h1 className={styles.headings.h1}>{t.home}</h1>
+        </div>
+        <div className="mt-4 md:mt-0 md:ml-4">
+          <RedirectToPaymentAppButton />
         </div>
       </div>
 

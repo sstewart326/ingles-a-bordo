@@ -15,6 +15,47 @@ import * as cors from 'cors';
 
 admin.initializeApp();
 
+// Helper function to get payment app credentials
+function getPaymentAppCredentials() {
+  logger.info('Getting payment app credentials...');
+  
+  // Use environment variables (required for Firebase Functions v2)
+  const payProjectId = process.env.PAY_PROJECT_ID;
+  const payPrivateKey = process.env.PAY_PRIVATE_KEY;
+  const payClientEmail = process.env.PAY_CLIENT_EMAIL;
+
+  if (!payProjectId || !payPrivateKey || !payClientEmail) {
+    logger.error('Missing payment app credentials in environment variables');
+    throw new Error('Missing payment app credentials. Please set PAY_PROJECT_ID, PAY_PRIVATE_KEY, and PAY_CLIENT_EMAIL environment variables.');
+  }
+
+  logger.info('Using environment variables for payment app credentials');
+  return {
+    projectId: payProjectId,
+    privateKey: payPrivateKey.replace(/\\n/g, '\n'),
+    clientEmail: payClientEmail
+  };
+}
+
+// Lazy initialization of payment app
+let paymentApp: admin.app.App | null = null;
+
+function getPaymentApp(): admin.app.App {
+  if (!paymentApp) {
+    try {
+      const credentials = getPaymentAppCredentials();
+      paymentApp = admin.initializeApp({
+        credential: admin.credential.cert(credentials),
+      }, 'paymentApp');
+      logger.info('Payment app initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize payment app:', error);
+      throw error;
+    }
+  }
+  return paymentApp;
+}
+
 interface FirebaseAuthError extends Error {
   code: string;
 }
@@ -32,7 +73,8 @@ const corsHandler = cors({
     "http://localhost:5173",
     "http://localhost",
     "https://app.inglesabordo.com",
-    "https://inglesabordo.com"
+    "https://inglesabordo.com",
+    "https://pay.inglesabordo.com"
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -67,6 +109,48 @@ export const deleteAuthUserHttp = onRequest({
     } catch (error) {
       logger.error("Error in deleteAuthUser:", error);
       response.status(500).json({ error: 'Internal server error' });
+    }
+  });
+});
+
+export const exchangeTokenForPayment = onRequest({
+  region: REGION,
+  cors: true
+}, async (request, response) => {
+  // Handle CORS
+  corsHandler(request, response, async () => {
+    try {
+      // Get the authorization header
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        response.status(401).json({ error: 'Unauthorized - No valid token provided' });
+        return;
+      }
+
+      // Extract the token
+      const idToken = authHeader.split('Bearer ')[1];
+      
+      // Verify the token
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const uid = decodedToken.uid;
+
+      // Get payment app (lazy initialization)
+      let paymentAppInstance: admin.app.App;
+      try {
+        paymentAppInstance = getPaymentApp();
+      } catch (error) {
+        logger.error('Payment app initialization failed:', error);
+        response.status(500).json({ error: 'Payment service not available' });
+        return;
+      }
+
+      // Create custom token for the Payment App
+      const customToken = await paymentAppInstance.auth().createCustomToken(uid)
+
+      response.status(200).json({ customToken });
+    } catch (error) {
+      logger.error('Token exchange error:', error);
+      response.status(500).json({ error: 'Failed to create token' });
     }
   });
 });
@@ -151,7 +235,7 @@ export const getClassScheduleHttp = onRequest({
   corsHandler(request, response, async () => {
     try {
       const { month, year, userId, email } = request.query;
-      
+
       // Validate required parameters
       if (!month || !year) {
         response.status(400).json({ error: 'Month and year are required' });
@@ -196,7 +280,7 @@ export const getClassScheduleHttp = onRequest({
       }
 
       const classesSnapshot = await classesQuery.get();
-      
+
       if (classesSnapshot.empty) {
         response.status(200).json({ classes: [] });
         return;
@@ -205,14 +289,14 @@ export const getClassScheduleHttp = onRequest({
       // Get user data for payment configuration
       let userData = null;
       let userEmail = null;
-      
+
       if (email) {
         userEmail = email as string;
         const usersSnapshot = await admin.firestore().collection('users')
           .where('email', '==', userEmail)
           .limit(1)
           .get();
-        
+
         if (!usersSnapshot.empty) {
           userData = usersSnapshot.docs[0].data();
         }
@@ -226,28 +310,28 @@ export const getClassScheduleHttp = onRequest({
       // Process classes and map them to dates
       const classSchedule = [];
       const paymentDueDates = [];
-      
+
       for (const doc of classesSnapshot.docs) {
         const classData = doc.data();
-        
+
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
           continue;
         }
-        
+
         // Skip classes that start after the requested month
         if (classData.startDate && classData.startDate.toDate() > endDate) {
           continue;
         }
 
         // Get the actual start date to use (either class start date or month start)
-        const effectiveStartDate = classData.startDate && classData.startDate.toDate() > startDate 
-          ? classData.startDate.toDate() 
+        const effectiveStartDate = classData.startDate && classData.startDate.toDate() > startDate
+          ? classData.startDate.toDate()
           : new Date(startDate);
-        
+
         // Get the actual end date to use (either class end date or month end)
-        const effectiveEndDate = classData.endDate && classData.endDate.toDate() < endDate 
-          ? classData.endDate.toDate() 
+        const effectiveEndDate = classData.endDate && classData.endDate.toDate() < endDate
+          ? classData.endDate.toDate()
           : new Date(endDate);
 
         // Calculate class dates based on recurrence pattern
@@ -300,7 +384,7 @@ export const getClassScheduleHttp = onRequest({
         }
       }
 
-      response.status(200).json({ 
+      response.status(200).json({
         classes: classSchedule,
         paymentDueDates: paymentDueDates.sort((a, b) => a.date.getTime() - b.date.getTime()),
         month: monthInt,
@@ -319,18 +403,18 @@ export const getClassScheduleHttp = onRequest({
  */
 function calculateClassDates(classData: any, startDate: Date, endDate: Date): Date[] {
   const dates: Date[] = [];
-  
+
   // Get recurrence pattern from class data or default to weekly
   const recurrencePattern = classData.recurrencePattern || 'weekly';
   const recurrenceInterval = classData.recurrenceInterval || 1; // Default to every week
-  
+
   // Handle multiple days of the week
   const daysOfWeek: number[] = [];
-  
+
   if (classData.scheduleType === 'multiple' && Array.isArray(classData.schedules)) {
     // Use the schedules array for multiple schedule type
     daysOfWeek.push(...classData.schedules.map((schedule: any) => schedule.dayOfWeek));
-    
+
   } else if (Array.isArray(classData.daysOfWeek) && classData.daysOfWeek.length > 0) {
     // Use the daysOfWeek array if it exists
     daysOfWeek.push(...classData.daysOfWeek);
@@ -348,10 +432,10 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
   const isBiweekly = frequency.type === 'biweekly';
   const isCustom = frequency.type === 'custom';
   const interval = isBiweekly ? 2 : (isCustom ? frequency.every : recurrenceInterval);
-  
+
   // Get the class start date for reference
   const classStartDate = classData.startDate ? classData.startDate.toDate() : new Date(startDate);
-  
+
   // Process each day of the week
   for (const dayOfWeek of daysOfWeek) {
     // For custom and biweekly frequencies, we need to calculate dates based on the original start date
@@ -359,22 +443,22 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
       // Find the first occurrence of this day of week from the class start date
       const firstOccurrence = new Date(classStartDate);
       const startDayOfWeek = firstOccurrence.getDay();
-      
+
       // Adjust to the first occurrence of this day of week
       if (startDayOfWeek !== dayOfWeek) {
         // Calculate days to add to reach the target day of week
         const daysToAdd = (dayOfWeek - startDayOfWeek + 7) % 7;
         firstOccurrence.setDate(firstOccurrence.getDate() + daysToAdd);
       }
-      
+
       // Now generate all occurrences based on the interval
       let currentDate = new Date(firstOccurrence);
-      
+
       // If the first occurrence is before our start date, move forward by intervals until we reach or pass the start date
       while (currentDate < startDate) {
         currentDate.setDate(currentDate.getDate() + (7 * interval));
       }
-      
+
       // Generate dates based on the interval
       while (currentDate <= endDate) {
         dates.push(new Date(currentDate));
@@ -384,16 +468,16 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
       // For weekly or monthly classes, use the original approach
       // Start from the effective start date
       const currentDate = new Date(startDate);
-      
+
       // Adjust to the first occurrence of this day of week
       const currentDayOfWeek = currentDate.getDay();
-      
+
       if (currentDayOfWeek !== dayOfWeek) {
         // Calculate days to add to reach the target day of week
         const daysToAdd = (dayOfWeek - currentDayOfWeek + 7) % 7;
         currentDate.setDate(currentDate.getDate() + daysToAdd);
       }
-      
+
       // If the adjusted date is before the start date, move to the next occurrence
       if (currentDate < startDate) {
         if (recurrencePattern === 'weekly') {
@@ -402,12 +486,12 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
           currentDate.setMonth(currentDate.getMonth() + 1);
         }
       }
-      
+
       // Generate dates based on recurrence pattern
       while (currentDate <= endDate) {
         // Add this date to our results
         dates.push(new Date(currentDate));
-        
+
         // Move to next occurrence based on pattern
         if (recurrencePattern === 'weekly') {
           currentDate.setDate(currentDate.getDate() + 7);
@@ -417,7 +501,7 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
       }
     }
   }
-  
+
   // Sort dates chronologically
   return dates.sort((a, b) => a.getTime() - b.getTime());
 }
@@ -427,14 +511,14 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
  */
 function calculatePaymentDueDates(classData: any, userData: any, startDate: Date, endDate: Date): Date[] {
   const dates: Date[] = [];
-  
+
   // Determine which payment config to use (class-level or user-level)
   const paymentConfig = classData.paymentConfig || (userData && userData.paymentConfig) || null;
-  
+
   if (!paymentConfig) {
     return dates;
   }
-  
+
   // Get payment start date
   let paymentStartDate: Date;
   if (paymentConfig.startDate) {
@@ -448,27 +532,27 @@ function calculatePaymentDueDates(classData: any, userData: any, startDate: Date
     // Default to the start of the requested month
     paymentStartDate = new Date(startDate);
   }
-  
+
   // If payment start date is after the end of the requested month, no payments are due
   if (paymentStartDate > endDate) {
     return dates;
   }
-  
+
   // Calculate payment dates based on payment type
   if (paymentConfig.type === 'weekly') {
     const interval = paymentConfig.weeklyInterval || 1;
     let currentPaymentDate = new Date(paymentStartDate);
-    
+
     // Adjust to be within the month range
     if (currentPaymentDate < startDate) {
       // Calculate how many intervals to add to reach or exceed the start date
       const diffTime = startDate.getTime() - currentPaymentDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const intervalsToAdd = Math.ceil(diffDays / (7 * interval));
-      
+
       currentPaymentDate.setDate(currentPaymentDate.getDate() + (intervalsToAdd * 7 * interval));
     }
-    
+
     // Generate payment dates
     while (currentPaymentDate <= endDate) {
       dates.push(new Date(currentPaymentDate));
@@ -476,11 +560,11 @@ function calculatePaymentDueDates(classData: any, userData: any, startDate: Date
     }
   } else if (paymentConfig.type === 'monthly') {
     const monthlyOption = paymentConfig.monthlyOption || 'first';
-    
+
     // Calculate the payment day for the requested month
     const year = startDate.getFullYear();
     const month = startDate.getMonth();
-    
+
     let paymentDate: Date;
     switch (monthlyOption) {
       case 'first':
@@ -495,19 +579,19 @@ function calculatePaymentDueDates(classData: any, userData: any, startDate: Date
       default:
         paymentDate = new Date(year, month, 1);
     }
-    
+
     // Add the payment date if it's within the range and after the payment start date
     if (paymentDate >= paymentStartDate && paymentDate <= endDate) {
       dates.push(paymentDate);
     }
-    
+
     // Check if we need to include the next month's payment date
     // This happens when the month spans into the next month
     if (endDate.getMonth() !== startDate.getMonth()) {
       const nextMonth = startDate.getMonth() + 1;
       const nextYear = startDate.getFullYear() + (nextMonth > 11 ? 1 : 0);
       const normalizedNextMonth = nextMonth % 12;
-      
+
       let nextPaymentDate: Date;
       switch (monthlyOption) {
         case 'first':
@@ -522,13 +606,13 @@ function calculatePaymentDueDates(classData: any, userData: any, startDate: Date
         default:
           nextPaymentDate = new Date(nextYear, normalizedNextMonth, 1);
       }
-      
+
       if (nextPaymentDate >= paymentStartDate && nextPaymentDate <= endDate) {
         dates.push(nextPaymentDate);
       }
     }
   }
-  
+
   return dates.sort((a, b) => a.getTime() - b.getTime());
 }
 
@@ -544,7 +628,7 @@ export const getClassMaterialsHttp = onRequest({
   corsHandler(request, response, async () => {
     try {
       const { month, year, userId, email, classId } = request.query;
-      
+
       // Validate required parameters
       if (!month || !year) {
         response.status(400).json({ error: 'Month and year are required' });
@@ -578,7 +662,7 @@ export const getClassMaterialsHttp = onRequest({
 
       // Query materials based on the provided parameters
       let materialsQuery: admin.firestore.Query = admin.firestore().collection('classMaterials');
-      
+
       if (classId) {
         // Filter by class ID
         logger.info('materials lookup by classId', { classId });
@@ -606,7 +690,7 @@ export const getClassMaterialsHttp = onRequest({
 
       // Get materials within the date range
       const materialsSnapshot = await materialsQuery.get();
-      
+
       if (materialsSnapshot.empty) {
         logger.info('no materials found for the given parameters');
         response.status(200).json({ materials: [] });
@@ -617,10 +701,10 @@ export const getClassMaterialsHttp = onRequest({
 
       // Filter materials by date and organize by class
       const materialsByClass: Record<string, any[]> = {};
-      
+
       for (const doc of materialsSnapshot.docs) {
         const materialData = doc.data();
-        
+
         // Check if the material date is within the requested month
         if (materialData.classDate) {
           const materialDate = materialData.classDate.toDate();
@@ -629,7 +713,7 @@ export const getClassMaterialsHttp = onRequest({
             if (!materialsByClass[materialData.classId]) {
               materialsByClass[materialData.classId] = [];
             }
-            
+
             materialsByClass[materialData.classId].push({
               ...materialData,
               classDate: materialData.classDate.toDate(),
@@ -640,7 +724,7 @@ export const getClassMaterialsHttp = onRequest({
         }
       }
 
-      response.status(200).json({ 
+      response.status(200).json({
         materials: materialsByClass,
         month: monthInt,
         year: yearInt
@@ -664,7 +748,7 @@ export const getCalendarDataHttp = onRequest({
   corsHandler(request, response, async () => {
     try {
       const { month, year, userId, email } = request.query;
-      
+
       // Validate required parameters
       if (!month || !year) {
         response.status(400).json({ error: 'Month and year are required' });
@@ -699,7 +783,7 @@ export const getCalendarDataHttp = onRequest({
       // Get user data for payment configuration
       let userData: any = null;
       let userEmail = null;
-      
+
       if (email) {
         userEmail = email as string;
         logger.info('users lookup by email', { email });
@@ -707,7 +791,7 @@ export const getCalendarDataHttp = onRequest({
           .where('email', '==', userEmail)
           .limit(1)
           .get();
-        
+
         if (!usersSnapshot.empty) {
           const userDoc = usersSnapshot.docs[0];
           userData = {
@@ -732,12 +816,12 @@ export const getCalendarDataHttp = onRequest({
         response.status(404).json({ error: 'User not found' });
         return;
       } else {
-        logger.info('user found for the given parameters', {userId: userData.id, email: userData.email});
+        logger.info('user found for the given parameters', { userId: userData.id, email: userData.email });
       }
 
       // Query classes based on user identifier - try both studentIds and studentEmails
       let classesQuery: admin.firestore.Query;
-      
+
       if (userEmail) {
         logger.info('classes lookup by studentEmail', { userEmail });
         classesQuery = admin.firestore().collection('classes')
@@ -750,40 +834,40 @@ export const getCalendarDataHttp = onRequest({
 
       const classesSnapshot = await classesQuery.get();
 
-      if(classesSnapshot.empty) {
+      if (classesSnapshot.empty) {
         logger.info('no classes found for the given parameters');
       } else {
         logger.info('number of classes found for the given parameters', { numClasses: classesSnapshot.size });
       }
-      
+
       // Process classes and map them to dates
       const classSchedule = [];
       const paymentDueDates = [];
       const classIds = [];
-      
+
       for (const doc of classesSnapshot.docs) {
         const classData = doc.data();
         const classId = doc.id;
         classIds.push(classId);
-        
+
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
           continue;
         }
-        
+
         // Skip classes that start after the requested month
         if (classData.startDate && classData.startDate.toDate() > endDate) {
           continue;
         }
 
         // Get the actual start date to use (either class start date or month start)
-        const effectiveStartDate = classData.startDate && classData.startDate.toDate() > startDate 
-          ? classData.startDate.toDate() 
+        const effectiveStartDate = classData.startDate && classData.startDate.toDate() > startDate
+          ? classData.startDate.toDate()
           : new Date(startDate);
-        
+
         // Get the actual end date to use (either class end date or month end)
-        const effectiveEndDate = classData.endDate && classData.endDate.toDate() < endDate 
-          ? classData.endDate.toDate() 
+        const effectiveEndDate = classData.endDate && classData.endDate.toDate() < endDate
+          ? classData.endDate.toDate()
           : new Date(endDate);
 
         // Calculate class dates based on recurrence pattern
@@ -870,30 +954,30 @@ export const getCalendarDataHttp = onRequest({
 
       // Query materials for these classes
       const materialsByClass: Record<string, any[]> = {};
-      
+
       if (classIds.length > 0) {
         // Split into chunks of 10 for Firestore "in" query limitation
         const classIdChunks = [];
         for (let i = 0; i < classIds.length; i += 10) {
           classIdChunks.push(classIds.slice(i, i + 10));
         }
-        
+
         for (const chunk of classIdChunks) {
           logger.info('materials lookup by classIds chunk', { classIds: chunk });
           const materialsQuery: admin.firestore.Query = admin.firestore().collection('classMaterials')
             .where('classId', 'in', chunk);
-          
+
           const materialsSnapshot = await materialsQuery.get();
 
-          if(materialsSnapshot.empty) {
+          if (materialsSnapshot.empty) {
             logger.info('no materials found for the given classIds chunk');
           } else {
             logger.info('number of materials found for the given classIds chunk', { numMaterials: materialsSnapshot.size });
           }
-          
+
           for (const doc of materialsSnapshot.docs) {
             const materialData = doc.data();
-            
+
             // Check if the material date is within the requested month
             if (materialData.classDate) {
               const materialDate = materialData.classDate.toDate();
@@ -902,7 +986,7 @@ export const getCalendarDataHttp = onRequest({
                 if (!materialsByClass[materialData.classId]) {
                   materialsByClass[materialData.classId] = [];
                 }
-                
+
                 materialsByClass[materialData.classId].push({
                   ...materialData,
                   id: doc.id,
@@ -918,18 +1002,18 @@ export const getCalendarDataHttp = onRequest({
 
       // Get completed payments for the month - check both userId as ID and email
       const completedPayments = [];
-      
+
       if (userEmail) {
         try {
           if (userEmail) {
 
-              // due to oddities with the persisted time, range from the last day of the previous month to the first day of the next month
-              const paymentStartDate = new Date(startDate);
-              paymentStartDate.setDate(0);
-              paymentStartDate.setHours(0, 0, 0, 0);
-              const paymentEndDate = new Date(endDate);
-              paymentEndDate.setDate(paymentEndDate.getDate() + 1);
-              paymentEndDate.setHours(0, 0, 0, 0);
+            // due to oddities with the persisted time, range from the last day of the previous month to the first day of the next month
+            const paymentStartDate = new Date(startDate);
+            paymentStartDate.setDate(0);
+            paymentStartDate.setHours(0, 0, 0, 0);
+            const paymentEndDate = new Date(endDate);
+            paymentEndDate.setDate(paymentEndDate.getDate() + 1);
+            paymentEndDate.setHours(0, 0, 0, 0);
             logger.info('payments lookup by userEmail', { userEmail, paymentStartDate, paymentEndDate });
             // Try both userId field formats
             const paymentsSnapshotByEmail = await admin.firestore().collection('payments')
@@ -938,16 +1022,16 @@ export const getCalendarDataHttp = onRequest({
               .where('dueDate', '<', paymentEndDate)
               .get();
 
-            if(paymentsSnapshotByEmail.empty) {
+            if (paymentsSnapshotByEmail.empty) {
               logger.info('no payments found for the given userEmail', { userEmail, paymentStartDate, paymentEndDate });
             } else {
               logger.info('number of payments found for the given userEmail', { userEmail, paymentStartDate, paymentEndDate, numPayments: paymentsSnapshotByEmail.size });
             }
-              
+
             // Process payments by email
             for (const doc of paymentsSnapshotByEmail.docs) {
               const paymentData = doc.data();
-              
+
               if (paymentData.dueDate) {
                 try {
                   completedPayments.push({
@@ -978,24 +1062,24 @@ export const getCalendarDataHttp = onRequest({
         birthdate: string;
         day: number;
       }> = [];
-      
+
       // Query all users to get birthdays
       logger.info('querying all users for birthdays');
       const usersSnapshot = await admin.firestore().collection('users').get();
 
-      if(usersSnapshot.empty) {
+      if (usersSnapshot.empty) {
         logger.error('no users found for the given parameters');
       } else {
         logger.info('number of users found for the given parameters', { numUsers: usersSnapshot.size });
       }
-      
+
       for (const doc of usersSnapshot.docs) {
         const userData = doc.data();
-        
+
         if (userData.birthdate) {
           // Birthdate format is MM-DD
           const [birthMonth, birthDay] = userData.birthdate.split('-').map(Number);
-          
+
           // Check if the birthday is in the requested month
           if (birthMonth === monthInt + 1) {
             birthdays.push({
@@ -1010,19 +1094,19 @@ export const getCalendarDataHttp = onRequest({
 
       // Create dailyClassMap - a map of date strings to classes for easy lookup
       const dailyClassMap: Record<string, any[]> = {};
-      
+
       // Process all classes and add them to the daily class map
       for (const classItem of classSchedule) {
         // Skip classes without dates
         if (!classItem.dates || !Array.isArray(classItem.dates)) continue;
-        
+
         // Add each class date to the daily map
         classItem.dates.forEach((date: Date) => {
           const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
           if (!dailyClassMap[dateString]) {
             dailyClassMap[dateString] = [];
           }
-          
+
           // Handle different schedule types
           if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules)) {
             // For multiple schedules, find the matching schedule for this day
@@ -1050,26 +1134,26 @@ export const getCalendarDataHttp = onRequest({
           }
         });
       }
-      
+
       // Sort classes in each day by start time
       Object.keys(dailyClassMap).forEach(dateStr => {
         dailyClassMap[dateStr].sort((a, b) => {
           // Parse time strings to compare
           const timeA = a.startTime ? a.startTime.replace(/[^0-9:]/g, '') : '00:00';
           const timeB = b.startTime ? b.startTime.replace(/[^0-9:]/g, '') : '00:00';
-          
+
           const [hoursA, minutesA] = timeA.split(':').map(Number);
           const [hoursB, minutesB] = timeB.split(':').map(Number);
-          
+
           // Convert to minutes for comparison
           const totalMinutesA = hoursA * 60 + (minutesA || 0);
           const totalMinutesB = hoursB * 60 + (minutesB || 0);
-          
+
           return totalMinutesA - totalMinutesB;
         });
       });
 
-      response.status(200).json({ 
+      response.status(200).json({
         classes: classSchedule,
         materials: materialsByClass,
         paymentDueDates: paymentDueDates.sort((a, b) => a.date.getTime() - b.date.getTime()),
@@ -1099,7 +1183,7 @@ export const getAllClassesForMonthHttp = onRequest({
   corsHandler(request, response, async () => {
     try {
       const { month, year, adminId } = request.query;
-      
+
       // Validate required parameters
       if (!month || !year) {
         response.status(400).json({ error: 'Month and year are required' });
@@ -1110,7 +1194,7 @@ export const getAllClassesForMonthHttp = onRequest({
       if (adminId) {
         logger.info('admin verification lookup', { adminId });
         const adminDoc = await admin.firestore().collection('users').doc(adminId as string).get();
-        
+
         if (!adminDoc.exists) {
           logger.error('admin not found for the given parameters');
           response.status(403).json({ error: 'Unauthorized. Admin not found.' });
@@ -1118,9 +1202,9 @@ export const getAllClassesForMonthHttp = onRequest({
         } else {
           logger.info('admin found for the given parameters', { adminId: adminDoc.id });
         }
-        
+
         const userData = adminDoc.data();
-        
+
         if (!userData?.isAdmin) {
           logger.error('admin access required');
           response.status(403).json({ error: 'Unauthorized. Admin access required.' });
@@ -1171,10 +1255,10 @@ export const getAllClassesForMonthHttp = onRequest({
       const usersSnapshot = await admin.firestore().collection('users')
         .where('teacher', '==', adminId as string)
         .get();
-      
+
       if (usersSnapshot.empty) {
         logger.info('no users found for the given parameters');
-        response.status(200).json({ 
+        response.status(200).json({
           classes: [],
           dailyClassMap: {},
           birthdays,
@@ -1188,7 +1272,7 @@ export const getAllClassesForMonthHttp = onRequest({
 
       const usersMap = new Map();
       const userEmails: string[] = [];
-      
+
       usersSnapshot.forEach(doc => {
         const userData = doc.data();
         usersMap.set(userData.email, {
@@ -1198,12 +1282,12 @@ export const getAllClassesForMonthHttp = onRequest({
           paymentConfig: userData.paymentConfig
         });
         userEmails.push(userData.email);
-        
+
         // Process birthdays
         if (userData.birthdate) {
           // Birthdate format is MM-DD
           const [birthMonth, birthDay] = userData.birthdate.split('-').map(Number);
-          
+
           // Check if the birthday is in the requested month
           if (birthMonth === monthInt + 1) {
             birthdays.push({
@@ -1221,7 +1305,7 @@ export const getAllClassesForMonthHttp = onRequest({
       // So we need to handle this in batches if there are more than 10 emails
       let classesSnapshot;
       const batchSize = 10;
-      
+
       if (userEmails.length <= batchSize) {
         // If we have 10 or fewer emails, we can use a single query
         logger.info('classes lookup by studentEmails (single batch)', { userEmails });
@@ -1235,24 +1319,24 @@ export const getAllClassesForMonthHttp = onRequest({
           const batch = userEmails.slice(i, i + batchSize);
           batches.push(batch);
         }
-        
+
         // Execute all batch queries
         logger.info('classes lookup by studentEmails (multiple batches)', { batches });
-        const batchQueries = batches.map(batch => 
+        const batchQueries = batches.map(batch =>
           admin.firestore().collection('classes')
             .where('studentEmails', 'array-contains-any', batch)
             .get()
         );
-        
+
         const batchResults = await Promise.all(batchQueries);
 
         const totalDocs = batchResults.reduce((sum, snapshot) => sum + snapshot.size, 0);
-        if(totalDocs === 0) {
+        if (totalDocs === 0) {
           logger.info('no classes found for the given parameters');
         } else {
           logger.info('number of classes found for the given parameters', { numClasses: totalDocs });
         }
-        
+
         // Combine results, avoiding duplicates
         const classesMap = new Map();
         batchResults.forEach(querySnapshot => {
@@ -1260,16 +1344,16 @@ export const getAllClassesForMonthHttp = onRequest({
             classesMap.set(doc.id, doc);
           });
         });
-        
+
         // Convert map back to array format similar to QuerySnapshot
         classesSnapshot = {
           docs: Array.from(classesMap.values()),
           empty: classesMap.size === 0
         };
       }
-      
+
       if (classesSnapshot.empty) {
-        response.status(200).json({ 
+        response.status(200).json({
           classes: [],
           dailyClassMap: {},
           birthdays,
@@ -1282,29 +1366,29 @@ export const getAllClassesForMonthHttp = onRequest({
       // Process classes and map them to dates
       const classSchedule = [];
       const dailyClassMap: Record<string, any[]> = {}; // Map of date strings to classes
-      
+
       for (const doc of classesSnapshot.docs) {
         const classData = doc.data();
         const classId = doc.id;
-        
+
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
           continue;
         }
-        
+
         // Skip classes that start after the requested month
         if (classData.startDate && classData.startDate.toDate() > endDate) {
           continue;
         }
 
         // Get the actual start date to use (either class start date or month start)
-        const effectiveStartDate = classData.startDate && classData.startDate.toDate() > startDate 
-          ? classData.startDate.toDate() 
+        const effectiveStartDate = classData.startDate && classData.startDate.toDate() > startDate
+          ? classData.startDate.toDate()
           : new Date(startDate);
-        
+
         // Get the actual end date to use (either class end date or month end)
-        const effectiveEndDate = classData.endDate && classData.endDate.toDate() < endDate 
-          ? classData.endDate.toDate() 
+        const effectiveEndDate = classData.endDate && classData.endDate.toDate() < endDate
+          ? classData.endDate.toDate()
           : new Date(endDate);
 
         // Calculate class dates based on recurrence pattern
@@ -1313,7 +1397,7 @@ export const getAllClassesForMonthHttp = onRequest({
           effectiveStartDate,
           effectiveEndDate
         );
-        
+
         if (classDates.length > 0) {
           // Get student details - only include students taught by this admin
           const relevantStudentEmails = classData.studentEmails.filter((email: string) => userEmails.includes(email));
@@ -1368,11 +1452,11 @@ export const getAllClassesForMonthHttp = onRequest({
         for (const date of classItem.dates) {
           const dateStr = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
           const dayOfWeek = date.getDay();
-          
+
           if (!dailyClassMap[dateStr]) {
             dailyClassMap[dateStr] = [];
           }
-          
+
           // Handle different schedule types
           if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules)) {
             // For multiple schedules, find the matching schedule for this day
@@ -1400,21 +1484,21 @@ export const getAllClassesForMonthHttp = onRequest({
           }
         }
       }
-      
+
       // Sort classes in each day by start time
       Object.keys(dailyClassMap).forEach(dateStr => {
         dailyClassMap[dateStr].sort((a, b) => {
           // Parse time strings to compare - handle edge cases cleanly
           const timeA = a.startTime ? a.startTime.replace(/[^0-9:]/g, '') : '00:00';
           const timeB = b.startTime ? b.startTime.replace(/[^0-9:]/g, '') : '00:00';
-          
+
           const [hoursA, minutesA] = timeA.split(':').map(Number);
           const [hoursB, minutesB] = timeB.split(':').map(Number);
-          
+
           // Convert to minutes for comparison
           const totalMinutesA = hoursA * 60 + (minutesA || 0);
           const totalMinutesB = hoursB * 60 + (minutesB || 0);
-          
+
           return totalMinutesA - totalMinutesB;
         });
       });
@@ -1422,7 +1506,7 @@ export const getAllClassesForMonthHttp = onRequest({
       // Extract user data for the frontend
       const usersArray = Array.from(usersMap.values());
 
-      response.status(200).json({ 
+      response.status(200).json({
         classes: classSchedule,
         dailyClassMap,
         birthdays,
@@ -1433,7 +1517,7 @@ export const getAllClassesForMonthHttp = onRequest({
     } catch (error) {
       // Error logging to Firebase only (not to browser)
       logger.error("Error in getAllClassesForMonth:", error);
-      
+
       if (error instanceof Error) {
         logger.error("Error details:", {
           name: error.name,
@@ -1441,7 +1525,7 @@ export const getAllClassesForMonthHttp = onRequest({
           stack: error.stack
         });
       }
-      
+
       response.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -1509,7 +1593,7 @@ export const completeSignupHttp = onCall({
           createdAt: currentData.createdAt,
           updatedAt: new Date().toISOString()
         });
-        
+
         // Delete the pending document
         batch.delete(pendingUserDoc.ref);
       } else {
