@@ -68,6 +68,24 @@ export function CalendarDay({
     });
   });
 
+  // New: Check if there are any completed payments for this day, even if not due by config
+  const hasHistoricCompletedPayment = !isPaymentDay && completedPayments.some(payment => {
+    // Check if payment.dueDate matches this calendar day
+    if (!payment.dueDate) return false;
+    let dueDateObj;
+    if (typeof payment.dueDate === 'object' && 'seconds' in payment.dueDate) {
+      dueDateObj = new Date(payment.dueDate.seconds * 1000);
+    } else if (Object.prototype.toString.call(payment.dueDate) === '[object Date]') {
+      dueDateObj = payment.dueDate as unknown as Date;
+    } else {
+      dueDateObj = new Date(payment.dueDate as any);
+    }
+    dueDateObj.setHours(0, 0, 0, 0);
+    const selectedDateStart = new Date(date);
+    selectedDateStart.setHours(0, 0, 0, 0);
+    return dueDateObj.getTime() === selectedDateStart.getTime();
+  });
+
   // Handle day click
   const handleDayClick = () => {
     if (onDayClick) {
@@ -175,10 +193,10 @@ export function CalendarDay({
           {hasClasses && (
             <div className="indicator class-indicator" title="Has classes" />
           )}
-          {shouldShowPaymentIndicators && (
+          {(shouldShowPaymentIndicators || hasHistoricCompletedPayment) && (
             <div 
               className={`indicator ${
-                allPaymentsCompleted ? 'payment-completed-indicator' :
+                allPaymentsCompleted || hasHistoricCompletedPayment ? 'payment-completed-indicator' :
                 isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'
               }`}
               title={

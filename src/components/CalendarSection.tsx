@@ -118,6 +118,32 @@ export const CalendarSection = ({
           users, 
           (date) => isDateInRelevantMonthRange(date, selectedDate)
         );
+        // Supplement dayPaymentsDue with any user/class that has a completed payment for this day, even if not due by config
+        const selectedDateStart = new Date(date);
+        selectedDateStart.setHours(0, 0, 0, 0);
+        const paymentsDueSet = new Set(dayPaymentsDue.map(({ user, classSession }) => `${user.email}__${classSession.id}`));
+        completedPayments.forEach(payment => {
+          if (!payment.dueDate) return;
+          let dueDateObj;
+          if (typeof payment.dueDate === 'object' && 'seconds' in payment.dueDate) {
+            dueDateObj = new Date(payment.dueDate.seconds * 1000);
+          } else if (Object.prototype.toString.call(payment.dueDate) === '[object Date]') {
+            dueDateObj = payment.dueDate;
+          } else {
+            dueDateObj = new Date(payment.dueDate);
+          }
+          dueDateObj.setHours(0, 0, 0, 0);
+          if (dueDateObj.getTime() !== selectedDateStart.getTime()) return;
+          const user = users.find(u => u.email === payment.userId);
+          const classSession = upcomingClasses.find(c => c.id === payment.classSessionId);
+          if (user && classSession) {
+            const key = `${user.email}__${classSession.id}`;
+            if (!paymentsDueSet.has(key)) {
+              dayPaymentsDue.push({ user, classSession });
+              paymentsDueSet.add(key);
+            }
+          }
+        });
         
         return (
           <CalendarDay
