@@ -14,6 +14,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { cache } from './cache';
+import { getFunctions } from 'firebase/functions';
+import { getAuth } from 'firebase/auth';
 
 // Collections that should never be cached under any circumstances
 const NEVER_CACHE_COLLECTIONS = new Set(['signupLinks']);
@@ -113,6 +115,69 @@ export const getAdminDocId = async (authUid: string): Promise<string | null> => 
   } catch (error) {
     logUserOp('Error getting admin document', { authUid, error });
     return null;
+  }
+};
+
+// Helper function to get the base URL for Firebase Functions
+/**
+ * Gets the base URL for Firebase Functions, handling both development and production environments.
+ * @returns string - The base URL for Firebase Functions
+ */
+export const getFunctionBaseUrl = () => {
+  const functions = getFunctions();
+  const isDevelopment = import.meta.env.MODE === 'development';
+  
+  return isDevelopment
+    ? `http://localhost:5001/${functions.app.options.projectId}/${functions.region}`
+    : `${functions.customDomain || `https://${functions.region}-${functions.app.options.projectId}.cloudfunctions.net`}`;
+};
+
+// Helper function to get the current user's ID token
+/**
+ * Gets the current user's ID token for authentication.
+ * @returns Promise<string> - The user's ID token
+ * @throws Error if no authenticated user is found
+ */
+export const getIdToken = async (): Promise<string> => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  
+  if (!user) {
+    throw new Error('No authenticated user');
+  }
+  
+  return user.getIdToken();
+};
+
+// Helper function to invalidate payment app tokens for admin users
+/**
+ * Invalidates payment app tokens by calling the signout HTTP function.
+ * This ensures that admin users are completely signed out from the payment app.
+ * @param idToken - The Firebase ID token for authentication
+ * @returns Promise<boolean> - True if tokens were successfully invalidated, false otherwise
+ */
+export const invalidatePaymentAppTokens = async (idToken: string): Promise<boolean> => {
+  try {
+    logUserOp('Invalidating payment app tokens');
+    const baseUrl = getFunctionBaseUrl();
+    const response = await fetch(`${baseUrl}/signoutHttpRequest`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      logUserOp('Successfully invalidated payment app tokens');
+      return true;
+    } else {
+      logUserOp('Failed to invalidate payment app tokens', { status: response.status });
+      return false;
+    }
+  } catch (error) {
+    logUserOp('Error invalidating payment app tokens', { error });
+    return false;
   }
 };
 

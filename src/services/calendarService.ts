@@ -1,7 +1,7 @@
-import { getFunctions } from 'firebase/functions';
 import { getAuth } from 'firebase/auth';
 import { getCachedCollection } from '../utils/firebaseUtils';
 import { where } from 'firebase/firestore';
+import { getFunctionBaseUrl, getIdToken } from '../utils/firebaseUtils';
 
 // Cache implementation
 interface CacheEntry<T> {
@@ -101,27 +101,7 @@ export const invalidateCalendarCache = (endpoint?: string, params?: Record<strin
   }
 };
 
-// Helper function to get the base URL for Firebase Functions
-const getFunctionBaseUrl = () => {
-  const functions = getFunctions();
-  const isDevelopment = import.meta.env.MODE === 'development';
-  
-  return isDevelopment
-    ? `http://localhost:5001/${functions.app.options.projectId}/${functions.region}`
-    : `${functions.customDomain || `https://${functions.region}-${functions.app.options.projectId}.cloudfunctions.net`}`;
-};
 
-// Helper function to get the current user's ID token
-const getIdToken = async (): Promise<string> => {
-  const auth = getAuth();
-  const user = auth.currentUser;
-  
-  if (!user) {
-    throw new Error('No authenticated user');
-  }
-  
-  return user.getIdToken();
-};
 
 /**
  * Fetches calendar data for a specific month and year for the current user

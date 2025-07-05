@@ -1,5 +1,5 @@
 import { createContext, useEffect, useState } from 'react';
-import { 
+import {
   User,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -15,7 +15,7 @@ import {
 import { auth, db } from '../config/firebase';
 import { doc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { updateCachedDocument, deleteCachedDocument, setCachedDocument } from '../utils/firebaseUtils';
+import { updateCachedDocument, deleteCachedDocument, setCachedDocument, invalidatePaymentAppTokens, getIdToken } from '../utils/firebaseUtils';
 import { functions } from '../config/firebase';
 import { httpsCallable } from 'firebase/functions';
 
@@ -48,11 +48,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let mounted = true;
     // Set persistence to local first
     auth.setPersistence(browserLocalPersistence)
-      .then(() => {        
+      .then(() => {
         // Only set up auth state listener after persistence is set
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
           if (!mounted || isProcessingAuth) return;
-          
+
           try {
             setIsProcessingAuth(true);
 
@@ -60,11 +60,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               // Check for pending signup data from Google sign-in
               const pendingToken = localStorage.getItem('pendingSignupToken');
               const pendingValidationStr = localStorage.getItem('pendingSignupValidation');
-              
+
               if (location.pathname === '/signup' && pendingToken && pendingValidationStr) {
                 try {
                   const pendingValidation = JSON.parse(pendingValidationStr);
-                  
+
                   // Verify the Google account email matches the invitation
                   if (user.email?.toLowerCase() !== pendingValidation.email.toLowerCase()) {
                     await signOut(auth);
@@ -101,7 +101,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
                       // Create new document with auth UID
                       await setCachedDocument('users', user.uid, newUserData);
-                      
+
                       // Delete the pending document
                       await deleteCachedDocument('users', pendingUserDoc.id);
                     } else {
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   return;
                 }
               }
-              
+
               if ((location.pathname === '/login' || location.pathname === '/') && !redirectProcessed) {
                 const usersRef = collection(db, 'users');
                 const q = query(
@@ -152,7 +152,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   where('email', '==', user.email?.toLowerCase()),
                   where('status', '==', 'active')
                 );
-                
+
                 try {
                   const querySnapshot = await getDocs(q);
 
@@ -195,10 +195,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signup = async (email: string, password: string, token: string) => {
     try {
       setLoading(true);
-      
+
       // Normalize email to lowercase
       const normalizedEmail = email.toLowerCase();
-      
+
       // Create the authentication user first to get the UID
       const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
       const user = userCredential.user;
@@ -241,12 +241,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
-      
+
       // Force account selection
       provider.setCustomParameters({
         prompt: 'select_account'
       });
-      
+
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
       if (signupData) {
@@ -281,7 +281,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         where('email', '==', userCredential.user.email?.toLowerCase()),
         where('status', '==', 'active')
       );
-      
+
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
@@ -297,17 +297,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
-    // Clear masquerade state from session storage
-    sessionStorage.removeItem('masqueradeUser');
-    await signOut(auth);
-    setCurrentUser(null);
+    try {
+      
+      if (currentUser) {
+        const idToken = await getIdToken();
+        await invalidatePaymentAppTokens(idToken);
+      }
+
+      // Clear masquerade state from session storage
+      sessionStorage.removeItem('masqueradeUser');
+
+      // Sign out from Firebase Auth
+      await signOut(auth);
+      setCurrentUser(null);
+
+      console.log('Logout completed successfully');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Even if there's an error, try to clear the current user state
+      setCurrentUser(null);
+      throw error;
+    }
   };
 
   const resetPassword = async (email: string) => {
     try {
       // Normalize email to lowercase
       const normalizedEmail = email.toLowerCase();
-      
+
       // Define actionCodeSettings with the URL to redirect after password reset
       const actionCodeSettings = {
         // Get the current URL's origin (protocol + domain) for the redirect
@@ -315,7 +332,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // The URL will be opened in the same window/tab
         handleCodeInApp: false
       };
-      
+
       await sendPasswordResetEmail(auth, normalizedEmail, actionCodeSettings);
     } catch (error) {
       console.error('Error sending password reset email:', error);

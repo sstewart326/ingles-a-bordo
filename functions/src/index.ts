@@ -1624,3 +1624,53 @@ export const completeSignupHttp = onCall({
     throw error;
   }
 });
+
+export const signoutHttpRequest = onRequest({
+  region: REGION,
+  cors: true
+}, async (request, response) => {
+  // Handle CORS
+  corsHandler(request, response, async () => {
+    try {
+      // Get the authorization header
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        response.status(401).json({ error: 'Unauthorized - No valid token provided' });
+        return;
+      }
+
+      // Extract the token
+      const idToken = authHeader.split('Bearer ')[1];
+      
+      // Verify the token
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const uid = decodedToken.uid;
+
+      logger.info('Starting signout process', { uid });
+
+      try {
+        // Get payment app instance
+        const paymentAppInstance = getPaymentApp();
+        
+        // Revoke all refresh tokens for the user in the payment app
+        await paymentAppInstance.auth().revokeRefreshTokens(uid);
+        
+        logger.info('Successfully revoked payment app refresh tokens', { uid });
+      } catch (paymentAppError) {
+        logger.error('Error revoking payment app tokens:', paymentAppError);
+        // Don't throw here - we still want to complete the signout even if payment app fails
+      }
+
+      // Log the signout event
+      logger.info('Successfully completed signout', { uid });
+      
+      response.status(200).json({ 
+        success: true, 
+        message: 'Successfully signed out and invalidated all tokens' 
+      });
+    } catch (error) {
+      logger.error('Error in signout:', error);
+      response.status(500).json({ error: 'Failed to sign out' });
+    }
+  });
+});
