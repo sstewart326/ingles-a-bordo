@@ -59,7 +59,8 @@ export const Header = () => {
       { name: t.home, href: '/dashboard', current: location.pathname === '/dashboard' },
       { name: t.manageUsers, href: '/admin/users', current: location.pathname === '/admin/users' },
       { name: t.manageSchedules, href: '/admin/schedule', current: location.pathname === '/admin/schedule' },
-      { name: t.classPlans, href: '/admin/class-plans', current: location.pathname === '/admin/class-plans' }
+      { name: t.classPlans, href: '/admin/class-plans', current: location.pathname === '/admin/class-plans' },
+      { name: t.paymentsDue, href: '/admin/payments', current: location.pathname === '/admin/payments' }
     ] : [
       { name: t.schedule, href: '/schedule', current: location.pathname === '/schedule' }
     ])

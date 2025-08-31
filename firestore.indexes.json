@@ -84,6 +84,15 @@
       ]
     },
     {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "classSessionId", "order": "ASCENDING" },
+        { "fieldPath": "month", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "homework",
       "queryScope": "COLLECTION",
       "fields": [

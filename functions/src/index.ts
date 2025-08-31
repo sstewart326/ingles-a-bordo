@@ -11,7 +11,7 @@ import { onRequest } from "firebase-functions/v2/https";
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
-import * as cors from 'cors';
+import { corsHandler, REGION } from "./functionsUtil";
 
 admin.initializeApp();
 
@@ -63,23 +63,6 @@ interface FirebaseAuthError extends Error {
 function isFirebaseAuthError(error: unknown): error is FirebaseAuthError {
   return error instanceof Error && 'code' in error;
 }
-
-// Remove the region parameter definition and use direct string
-const REGION = 'us-central1';
-
-// Create a CORS handler
-const corsHandler = cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost",
-    "https://app.inglesabordo.com",
-    "https://inglesabordo.com",
-    "https://pay.inglesabordo.com"
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-});
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
@@ -1674,3 +1657,5 @@ export const signoutHttpRequest = onRequest({
     }
   });
 });
+
+export * from './emailFunctions';

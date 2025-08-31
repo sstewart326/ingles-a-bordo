@@ -138,6 +138,21 @@ interface Translation {
   amount: string;
   goToPaymentApp: string;
 
+  // Admin Payments
+  paymentsDueDescription: string;
+  selectPaymentsToSendEmails: string;
+  selectAll: string;
+  deselectAll: string;
+  sendingEmails: string;
+  sendEmails: string;
+  noPaymentsDue: string;
+  noPaymentsDueDescription: string;
+  student: string;
+  paymentSelected: string;
+  paymentsSelected: string;
+  readyToSendEmails: string;
+  clearSelection: string;
+
   // Days of Week - Short Names
   sundayShort: string;
   mondayShort: string;
@@ -494,6 +509,21 @@ const translations: Record<Language, Translation> = {
     amount: 'Amount',
     goToPaymentApp: 'Go to Payment Portal',
 
+    // Admin Payments
+    paymentsDueDescription: 'View and manage payment emails for students',
+    selectPaymentsToSendEmails: 'Please select payments to send emails',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
+    sendingEmails: 'Sending...',
+    sendEmails: 'Send Emails',
+    noPaymentsDue: 'No payments due',
+    noPaymentsDueDescription: 'There are currently no payments due for email reminders',
+    student: 'student',
+    paymentSelected: 'payment selected',
+    paymentsSelected: 'payments selected',
+    readyToSendEmails: ' ready to send emails',
+    clearSelection: 'Clear Selection',
+
     // Days of Week - Short Names
     sundayShort: 'Sun',
     mondayShort: 'Mon',
@@ -847,6 +877,21 @@ const translations: Record<Language, Translation> = {
     noPaymentLink: 'Link de pagamento não disponível',
     amount: 'Valor',
     goToPaymentApp: 'Ir para Portal de Pagamento',
+
+    // Admin Payments
+    paymentsDueDescription: 'Visualize e gerencie emails de pagamento para alunos',
+    selectPaymentsToSendEmails: 'Por favor, selecione pagamentos para enviar emails',
+    selectAll: 'Selecionar Todos',
+    deselectAll: 'Desselecionar Todos',
+    sendingEmails: 'Enviando...',
+    sendEmails: 'Enviar Emails',
+    noPaymentsDue: 'Nenhum pagamento pendente',
+    noPaymentsDueDescription: 'Não há pagamentos pendentes para lembretes por email no momento',
+    student: 'aluno',
+    paymentSelected: 'pagamento selecionado',
+    paymentsSelected: 'pagamentos selecionados',
+    readyToSendEmails: ' prontos para enviar emails',
+    clearSelection: 'Limpar Seleção',
 
     // Days of Week - Short Names
     sundayShort: 'Dom',
