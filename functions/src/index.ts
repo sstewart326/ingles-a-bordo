@@ -1658,4 +1658,18 @@ export const signoutHttpRequest = onRequest({
   });
 });
 
+export const whatsappRedirect = onRequest({
+  region: REGION,
+  cors: true
+}, async (request, response) => {
+  try {
+    const text = request.query.text as string || request.body?.text as string || '';
+    const whatsappUrl = `https://wa.me/14707534900?text=${text}`;
+    response.redirect(302, whatsappUrl);
+  } catch (error) {
+    logger.error('Error in whatsappRedirect:', error);
+    response.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export * from './emailFunctions';
