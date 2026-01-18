@@ -1,0 +1,217 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      let userDocPath = /databases/(default)/documents/users/$(request.auth.uid);
+      return isAuthenticated() &&
+        firestore.exists(userDocPath) &&  // Check if document exists before getting it
+        firestore.get(userDocPath).data.isAdmin == true;
+    }
+
+    function hasAccessToMaterial(materialId) {
+      let material = firestore.get(/databases/(default)/documents/classMaterials/$(materialId));
+      return material != null && 
+        material.data.studentEmails != null && 
+        request.auth.token.email in material.data.studentEmails;
+    }
+    
+    function hasAccessToContract(classId) {
+      let classDoc = firestore.get(/databases/(default)/documents/classes/$(classId));
+      return classDoc != null && 
+        classDoc.data.studentEmails != null && 
+        request.auth.token.email in classDoc.data.studentEmails;
+    }
+
+    function hasAccessToHomework(homeworkId) {
+      // Temporarily allow access to any authenticated user with a valid homework reference
+      let homework = firestore.get(/databases/(default)/documents/homework/$(homeworkId));
+      return homework != null;
+    }
+
+    // Function to check file size for different types
+    function isValidSize() {
+      return request.resource.size <= 10 * 1024 * 1024; // Default 10MB limit
+    }
+    
+    function isValidDocumentSize() {
+      return request.resource.size <= 5 * 1024 * 1024; // 5MB for documents
+    }
+    
+    function isValidAudioSize() {
+      return request.resource.size <= 15 * 1024 * 1024; // 15MB for audio
+    }
+    
+    function isValidVideoSize() {
+      return request.resource.size <= 50 * 1024 * 1024; // 50MB for video
+    }
+
+    // Function to check file type for class materials
+    function isValidMaterialType() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/vnd.ms-powerpoint') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    }
+    
+    // Function to check file type for contracts (PDF only)
+    function isValidContractType() {
+      return request.resource.contentType.matches('application/pdf');
+    }
+    
+    // Function to check file type for homework documents
+    function isValidHomeworkDocumentType() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/vnd.ms-word') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+             request.resource.contentType.matches('application/vnd.ms-powerpoint') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.presentationml.presentation') ||
+             request.resource.contentType.matches('text/plain');
+    }
+    
+    // Function to check file type for homework audio
+    function isValidHomeworkAudioType() {
+      return request.resource.contentType.matches('audio/mpeg') ||
+             request.resource.contentType.matches('audio/wav') ||
+             request.resource.contentType.matches('audio/ogg') ||
+             request.resource.contentType.matches('audio/x-m4a');
+    }
+    
+    // Function to check file type for homework video
+    function isValidHomeworkVideoType() {
+      return request.resource.contentType.matches('video/mp4') ||
+             request.resource.contentType.matches('video/quicktime') ||
+             request.resource.contentType.matches('video/webm') ||
+             request.resource.contentType.matches('video/x-ms-wmv');
+    }
+    
+    // Function to check file type for profile pictures
+    function isValidProfilePictureType() {
+      return request.resource.contentType.matches('image/jpeg') ||
+             request.resource.contentType.matches('image/jpg') ||
+             request.resource.contentType.matches('image/png');
+    }
+    
+    // Function to check file size for profile pictures (2MB)
+    function isValidProfilePictureSize() {
+      return request.resource.size <= 2 * 1024 * 1024; // 2MB
+    }
+
+    // Rules for slides
+    match /slides/{materialId}/{fileName} {
+      // Allow read if user is authenticated and has access to the material
+      allow read: if isAuthenticated() && (isAdmin() || hasAccessToMaterial(materialId));
+      
+      // Allow write if user is admin and file meets requirements
+      allow write: if isAdmin() 
+                  && isValidSize() 
+                  && isValidMaterialType();
+      allow delete: if isAdmin()
+    }
+    
+    // Rules for contracts
+    match /contracts/{classId}/{fileName} {
+      // Allow read if user is authenticated and has access to the class or is admin
+      allow read: if isAuthenticated() && (isAdmin() || hasAccessToContract(classId));
+      
+      // Allow write if user is admin and file meets requirements
+      allow write: if isAdmin() 
+                  && isValidSize() 
+                  && isValidContractType();
+    }
+    
+    // Rules for homework documents
+    match /homework/{homeworkId}/document/{fileName} {
+      // Allow read if user is authenticated and has access to the homework or is admin
+      allow read: if isAuthenticated() && (isAdmin() || hasAccessToHomework(homeworkId));
+      
+      // Allow write if user is admin and file meets requirements
+      allow write: if isAdmin() 
+                  && isValidDocumentSize() 
+                  && isValidHomeworkDocumentType();
+    }
+    
+    // Rules for homework audio
+    match /homework/{homeworkId}/audio/{fileName} {
+      // Allow read if user is authenticated and has access to the homework or is admin
+      allow read: if isAuthenticated() && (isAdmin() || hasAccessToHomework(homeworkId));
+      
+      // Allow write if user is admin and file meets requirements
+      allow write: if isAdmin() 
+                  && isValidAudioSize() 
+                  && isValidHomeworkAudioType();
+    }
+    
+    // Rules for homework video
+    match /homework/{homeworkId}/video/{fileName} {
+      // Allow read if user is authenticated and has access to the homework or is admin
+      allow read: if isAuthenticated() && (isAdmin() || hasAccessToHomework(homeworkId));
+      
+      // Allow write if user is admin and file meets requirements
+      allow write: if isAdmin() 
+                  && isValidVideoSize() 
+                  && isValidHomeworkVideoType();
+    }
+    
+    // Rules for homework submissions - documents
+    match /submissions/{homeworkId}/{studentEmail}/document/{fileName} {
+      // Allow read to admin and the student who submitted it
+      allow read: if isAuthenticated() && 
+                  (isAdmin() || request.auth.token.email == studentEmail);
+      
+      // Allow write to the student who owns the submission
+      allow write: if isAuthenticated() && 
+                  request.auth.token.email == studentEmail && 
+                  isValidDocumentSize() && 
+                  isValidHomeworkDocumentType();
+    }
+    
+    // Rules for homework submissions - audio
+    match /submissions/{homeworkId}/{studentEmail}/audio/{fileName} {
+      // Allow read to admin and the student who submitted it
+      allow read: if isAuthenticated() && 
+                  (isAdmin() || request.auth.token.email == studentEmail);
+      
+      // Allow write to the student who owns the submission
+      allow write: if isAuthenticated() && 
+                  request.auth.token.email == studentEmail && 
+                  isValidAudioSize() && 
+                  isValidHomeworkAudioType();
+    }
+    
+    // Rules for homework submissions - video
+    match /submissions/{homeworkId}/{studentEmail}/video/{fileName} {
+      // Allow read to admin and the student who submitted it
+      allow read: if isAuthenticated() && 
+                  (isAdmin() || request.auth.token.email == studentEmail);
+      
+      // Allow write to the student who owns the submission
+      allow write: if isAuthenticated() && 
+                  request.auth.token.email == studentEmail && 
+                  isValidVideoSize() && 
+                  isValidHomeworkVideoType();
+    }
+    
+    // Rules for profile pictures
+    match /profilePictures/{userId}/{fileName} {
+      // Allow read if user is authenticated
+      allow read: if isAuthenticated();
+      
+      // Allow write/delete if user is writing to their own profile picture
+      allow write: if isAuthenticated() 
+                  && request.auth.uid == userId 
+                  && isValidProfilePictureSize() 
+                  && isValidProfilePictureType();
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Default deny for all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 

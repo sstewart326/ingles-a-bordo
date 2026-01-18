@@ -1,0 +1,215 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return isAuthenticated() && 
+             request.auth.uid != null &&
+             exists(userDocPath) &&  // Check if document exists before getting it
+             get(userDocPath).data.isAdmin == true;
+    }
+    
+    // Function to check if the user is a teacher of the class note
+    function isTeacherOfNote(noteData) {
+      return request.auth.uid == noteData.teacherId;
+    }
+    
+    // Function to check if the user is a student in the specified class
+    function isStudentInClass(classId) {
+      let classDocPath = /databases/$(database)/documents/classes/$(classId);
+      let classDoc = get(classDocPath);
+      
+      return isAuthenticated() && (
+        // Check if user's email is in studentEmails array
+        (classDoc.data.studentEmails != null && request.auth.token.email in classDoc.data.studentEmails)
+      );
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Allow reading user documents only when authenticated
+      allow read: if isAuthenticated();
+      
+      // Allow listing users only when authenticated
+      allow list: if isAuthenticated();
+      
+      // Allow updating users during signup and for own documents
+      allow update: if 
+        isAuthenticated() &&
+        (
+          // During signup: Allow updating from pending to active
+          (
+            resource.data.status == 'pending' &&
+            request.resource.data.status == 'active' &&
+            request.resource.data.email == resource.data.email &&
+            request.resource.data.email == request.auth.token.email
+          ) ||
+          // Allow users to update their own documents
+          resource.data.uid == request.auth.uid ||
+          // Allow admin updates
+          isAdmin()
+        );
+      
+      // Allow creating documents in two cases:
+      // 1. By admin users
+      // 2. During signup when creating a document with matching auth UID
+      allow create: if 
+        isAdmin() || 
+        (
+          isAuthenticated() && 
+          userId == request.auth.uid && 
+          request.resource.data.email == request.auth.token.email
+        );
+      
+      // Allow deleting by admin only
+      allow delete: if isAdmin();
+    }
+    
+    // Signup tokens collection
+    match /signupTokens/{tokenId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if 
+        isAuthenticated() &&
+        resource.data.used == false &&
+        resource.data.email == request.auth.token.email &&
+        request.resource.data.used == true &&
+        request.resource.data.email == resource.data.email;
+      allow delete: if isAdmin();
+    }
+
+    // Classes collection
+    match /classes/{classId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin() || 
+                    (request.auth != null && 
+                    resource.data.teacherId == request.auth.uid);
+    }
+
+    // Class Notes collection
+    match /classNotes/{noteId} {
+      // Students can only read notes for classes they are part of
+      allow read: if isAuthenticated() && ( 
+        isTeacherOfNote(resource.data) ||
+        isStudentInClass(resource.data.classId)
+      );
+      
+      // Only teachers who own the note or admins can create/update/delete
+      allow create: if isAuthenticated() && (
+        isTeacherOfNote(request.resource.data)
+      );
+      
+      allow update: if isAuthenticated() && (
+        isTeacherOfNote(resource.data)
+      );
+      
+      allow delete: if isAuthenticated() && (
+        isTeacherOfNote(resource.data)
+      );
+    }
+
+    // Homework collection
+    match /homework/{homeworkId} {
+      // Temporarily allow any authenticated user to read homework
+      // This bypasses the studentEmails check that's causing errors
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Homework submissions collection
+    match /homeworkSubmissions/{submissionId} {
+      // Simplify read permissions to avoid studentEmails checks
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.token.email == resource.data.studentEmail
+      );
+      
+      // Simplify create/update permissions
+      allow create, update: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.token.email == request.resource.data.studentEmail
+      );
+      
+      // Only admins can delete submissions
+      allow delete: if isAdmin();
+    }
+
+    // Class Materials collection
+    match /classMaterials/{materialId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.token.email == resource.data.studentEmail ||
+        (resource.data.studentEmails != null && request.auth.token.email in resource.data.studentEmails) ||
+        (resource.data.teacherId != null && request.auth.uid == resource.data.teacherId)
+      );
+      allow write: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Class Plans collection
+    match /classPlans/{planId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.token.email == resource.data.studentEmail
+      );
+      allow write: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Class Plan Templates collection
+    match /classPlanTemplates/{templateId} {
+      allow read: if isAuthenticated() && isAdmin();
+      allow write: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Payment rules
+    match /payments/{paymentId} {
+      // Payments can be read by the user they belong to (userId)
+      // or the teacher who created them (teacherId)
+      allow read: if request.auth != null && 
+                   (resource.data.userId == request.auth.uid || 
+                   resource.data.teacherId == request.auth.uid ||
+                   isAdmin());
+      
+      // Payments can be created by the teacher
+      allow create: if request.auth != null && 
+                     request.resource.data.teacherId == request.auth.uid;
+      
+      // Payments can be updated by the teacher who created them
+      allow update: if request.auth != null && 
+                     resource.data.teacherId == request.auth.uid;
+      
+      // Payments can be deleted by the teacher who created them
+      allow delete: if request.auth != null && 
+                     resource.data.teacherId == request.auth.uid;
+    }
+
+    // Payment Due Emails collection
+    match /paymentDueEmails/{emailId} {
+      // Only allow reading by admin (for monitoring purposes)
+      allow read: if isAdmin();
+      
+      // Allow creating payment due emails (typically by cloud functions)
+      // The document ID should follow the pattern: email_[hash]_[date]
+      allow create: if isAuthenticated() && 
+                     emailId.matches('email_[a-z0-9]+_[0-9]+') && // Ensure it has the expected format
+                     !exists(/databases/$(database)/documents/paymentDueEmails/$(emailId)); // Prevent duplicates
+      
+      // Allow updating only by admin
+      allow update: if isAdmin();
+      
+      // Allow deleting only by admin
+      allow delete: if isAdmin();
+    }
+
+    // Default rule - require admin for all other collections
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+} 
