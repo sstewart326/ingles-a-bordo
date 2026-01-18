@@ -45,7 +45,6 @@ export const Profile = () => {
   const t = useTranslation(language);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -218,7 +217,6 @@ export const Profile = () => {
       if (Object.keys(updates).length === 0) {
         logProfile('Profile update - No changes detected or no valid values to update, skipping update');
         setUpdateSuccessful(true);
-        setEditing(false);
         return;
       }
 
@@ -248,7 +246,6 @@ export const Profile = () => {
         }
 
         await fetchProfile();
-        setEditing(false);
         setNewPassword('');
         setConfirmPassword('');
         setUpdateSuccessful(true);
@@ -430,7 +427,10 @@ export const Profile = () => {
   }
 
   return (
-    <div className="flex-1 bg-white">
+    <div className="flex-1 relative min-h-screen bg-transparent" style={{
+      backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E")`,
+      backgroundAttachment: 'fixed'
+    }}>
       <div className="py-6 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="md:flex md:flex-col">
           <div className="mb-8">
@@ -462,352 +462,272 @@ export const Profile = () => {
                   </div>
                 )}
 
-                {!editing ? (
-                  <div className="space-y-6">
-                    {/* Profile Picture Display */}
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Profile Picture Upload Section */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t.profilePicture}
+                    </label>
                     <div className="flex items-center space-x-6">
-                      <div className="flex-shrink-0">
-                        {profile?.profilePictureUrl ? (
-                          <img
-                            src={profile.profilePictureUrl}
-                            alt="Profile"
-                            className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
-                            onError={(e) => {
-                              // Fallback to airplane window icon if image fails to load
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
+                      <div className="flex-shrink-0 relative group">
+                        {profilePicturePreview ? (
+                          <>
+                            <img
+                              src={profilePicturePreview}
+                              alt="Profile preview"
+                              className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
+                            />
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="absolute -top-1 -left-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
+                                title={t.changeProfilePicture}
+                              >
+                                <PencilIcon className="h-4 w-4 text-gray-700" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleDeletePicture}
+                                className="absolute -top-1 -right-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
+                                title={t.deleteProfilePicture}
+                              >
+                                <TrashIcon className="h-4 w-4 text-red-600" />
+                              </button>
+                            </div>
+                          </>
+                        ) : profile?.profilePictureUrl ? (
+                          <>
+                            <img
+                              src={profile.profilePictureUrl}
+                              alt="Profile"
+                              className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="absolute -top-1 -left-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
+                                title={t.changeProfilePicture}
+                              >
+                                <PencilIcon className="h-4 w-4 text-gray-700" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleDeletePicture}
+                                disabled={uploadingPicture}
+                                className="absolute -top-1 -right-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                                title={t.deleteProfilePicture}
+                              >
+                                <TrashIcon className="h-4 w-4 text-red-600" />
+                              </button>
+                            </div>
+                          </>
                         ) : (
                           <div className="h-24 w-24 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
                             <PhotoIcon className="h-12 w-12 text-gray-400" />
                           </div>
                         )}
                       </div>
-                      <div>
-                        <h4 className="text-lg font-medium text-gray-900">{t.profilePicture}</h4>
-                        <p className="text-sm text-gray-500">
-                          {profile?.profilePictureUrl ? t.changeProfilePicture : t.uploadProfilePicture}
-                        </p>
-                      </div>
-                    </div>
-
-                    <dl className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                      <div className="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                        <dt className="text-sm font-medium text-gray-500 truncate">{t.name}</dt>
-                        <dd className="mt-1 text-lg font-semibold text-gray-900">
-                          {profile?.name || 'Not set'}
-                        </dd>
-                      </div>
-                      <div className="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                        <dt className="text-sm font-medium text-gray-500 truncate">{t.email}</dt>
-                        <dd className="mt-1 text-lg font-semibold text-gray-900">
-                          {profile?.email}
-                        </dd>
-                      </div>
-                      <div className="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                        <dt className="text-sm font-medium text-gray-500 truncate">{t.language}</dt>
-                        <dd className="mt-1 text-lg font-semibold text-gray-900">
-                          {profile?.language === 'pt-BR' ? 'Português' : 'English'}
-                        </dd>
-                      </div>
-                    </dl>
-                    
-                    {/* Contracts Section */}
-                    {!profile?.isAdmin && (
-                      <div className="mt-8">
-                        <h4 className="text-lg font-medium text-gray-900 mb-4">Your Contracts</h4>
-                        {loadingContracts ? (
-                          <div className="flex items-center justify-center py-4">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                      <div className="flex-1 space-y-3">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                        />
+                        {!profile?.profilePictureUrl && !selectedFile && (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="group inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                            >
+                              <PhotoIcon className="h-4 w-4 text-gray-500 group-hover:text-indigo-600 transition-colors" />
+                              <span>{t.uploadProfilePicture}</span>
+                            </button>
                           </div>
-                        ) : memoizedContracts && memoizedContracts.length > 0 ? (
-                          <div className="bg-gray-50 shadow rounded-lg overflow-hidden">
-                            <ul className="divide-y divide-gray-200">
-                              {memoizedContracts.slice(0, 10).map((contract) => (
-                                <li key={contract.id} className="px-4 py-4">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <p className="text-sm font-medium text-gray-900">
-                                        {contract.courseType || 'Class'} Class
-                                      </p>
-                                      <p className="text-sm text-gray-500">
-                                        {contract.scheduleType === 'single' ? (
-                                          <>
-                                            {getDayName(contract.dayOfWeek)} at {contract.startTime || '00:00'} - {contract.endTime || '00:00'}
-                                          </>
-                                        ) : (
-                                          <>
-                                            Multiple days schedule
-                                          </>
-                                        )}
-                                      </p>
-                                    </div>
-                                    {contract.contractUrl && (
-                                      <a
-                                        href={contract.contractUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                      >
-                                        View Contract
-                                      </a>
-                                    )}
-                                  </div>
-                                </li>
-                              ))}
-                              {memoizedContracts.length > 10 && (
-                                <li className="px-4 py-2 text-center text-sm text-gray-500">
-                                  Showing 10 of {memoizedContracts.length} contracts
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">No contracts available.</p>
                         )}
-                      </div>
-                    )}
-                    
-                    <div className="mt-6">
-                      <button
-                        onClick={() => setEditing(true)}
-                        className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        {t.edit}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-6 max-w-lg">
-                    {/* Profile Picture Upload Section */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t.profilePicture}
-                      </label>
-                      <div className="flex items-center space-x-6">
-                        <div className="flex-shrink-0 relative group">
-                          {profilePicturePreview ? (
-                            <>
-                              <img
-                                src={profilePicturePreview}
-                                alt="Profile preview"
-                                className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
-                              />
-                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                                <button
-                                  type="button"
-                                  onClick={() => fileInputRef.current?.click()}
-                                  className="absolute -top-1 -left-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
-                                  title={t.changeProfilePicture}
-                                >
-                                  <PencilIcon className="h-4 w-4 text-gray-700" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleDeletePicture}
-                                  className="absolute -top-1 -right-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
-                                  title={t.cancel}
-                                >
-                                  <TrashIcon className="h-4 w-4 text-red-600" />
-                                </button>
+                        {selectedFile && (
+                          <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">{t.selectImage}</p>
+                                <p className="text-xs text-gray-500">
+                                  {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                                </p>
                               </div>
-                            </>
-                          ) : profile?.profilePictureUrl ? (
-                            <>
-                              <img
-                                src={profile.profilePictureUrl}
-                                alt="Profile"
-                                className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
-                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                                <button
-                                  type="button"
-                                  onClick={() => fileInputRef.current?.click()}
-                                  className="absolute -top-1 -left-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
-                                  title={t.changeProfilePicture}
-                                >
-                                  <PencilIcon className="h-4 w-4 text-gray-700" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleDeletePicture}
-                                  disabled={uploadingPicture}
-                                  className="absolute -top-1 -right-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                                  title={t.deleteProfilePicture}
-                                >
-                                  <TrashIcon className="h-4 w-4 text-red-600" />
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="h-24 w-24 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
-                              <PhotoIcon className="h-12 w-12 text-gray-400" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 space-y-3">
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/jpeg,image/jpg,image/png"
-                            onChange={handleFileSelect}
-                            className="hidden"
-                          />
-                          {!profile?.profilePictureUrl && !selectedFile && (
-                            <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="group inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                                onClick={handleUploadPicture}
+                                disabled={uploadingPicture}
+                                className="group inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <PhotoIcon className="h-4 w-4 text-gray-500 group-hover:text-indigo-600 transition-colors" />
-                                <span>{t.uploadProfilePicture}</span>
+                                {uploadingPicture ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+                                    <span>{t.saving}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckIcon className="h-3 w-3" />
+                                    <span>{t.save}</span>
+                                  </>
+                                )}
                               </button>
                             </div>
-                          )}
-                          {selectedFile && (
-                            <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-xs font-medium text-gray-700 mb-1">{t.selectImage}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={handleUploadPicture}
-                                  disabled={uploadingPicture}
-                                  className="group inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {uploadingPicture ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
-                                      <span>{t.saving}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CheckIcon className="h-3 w-3" />
-                                      <span>{t.save}</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </div>
+                  </div>
 
-                    <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                        {t.name}
-                      </label>
-                      <input
-                        type="text"
-                        name="name"
-                        id="name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    </div>
+                  <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                      {t.name}
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
 
-                    <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                        {t.email}
-                      </label>
-                      <input
-                        type="email"
-                        name="email"
-                        id="email"
-                        value={profile?.email}
-                        disabled
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-50"
-                      />
-                    </div>
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                      {t.email}
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      id="email"
+                      value={profile?.email}
+                      disabled
+                      className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-50"
+                    />
+                  </div>
 
-                    <div>
-                      <label htmlFor="language" className="block text-sm font-medium text-gray-700">
-                        {t.language}
-                      </label>
-                      <select
-                        id="language"
-                        name="language"
-                        value={selectedLanguage}
-                        onChange={(e) => setSelectedLanguage(e.target.value as Language)}
-                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                      >
-                        <option value="en">English</option>
-                        <option value="pt-BR">Português</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label htmlFor="language" className="block text-sm font-medium text-gray-700">
+                      {t.language}
+                    </label>
+                    <select
+                      id="language"
+                      name="language"
+                      value={selectedLanguage}
+                      onChange={(e) => setSelectedLanguage(e.target.value as Language)}
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    >
+                      <option value="en">English</option>
+                      <option value="pt-BR">Português</option>
+                    </select>
+                  </div>
 
-                    <div>
-                      <label htmlFor="new-password" className="block text-sm font-medium text-gray-700">
-                        {t.newPassword}
-                      </label>
-                      <input
-                        type="password"
-                        name="new-password"
-                        id="new-password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        disabled={isMasquerading}
-                        className={`mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md ${isMasquerading ? 'bg-gray-50' : ''}`}
-                      />
-                      {isMasquerading && (
-                        <p className="mt-1 text-xs text-gray-500">Password changes are disabled while impersonating a user.</p>
+                  <div>
+                    <label htmlFor="new-password" className="block text-sm font-medium text-gray-700">
+                      {t.newPassword}
+                    </label>
+                    <input
+                      type="password"
+                      name="new-password"
+                      id="new-password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={isMasquerading}
+                      className={`mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md ${isMasquerading ? 'bg-gray-50' : ''}`}
+                    />
+                    {isMasquerading && (
+                      <p className="mt-1 text-xs text-gray-500">Password changes are disabled while impersonating a user.</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">
+                      {t.confirmPassword}
+                    </label>
+                    <input
+                      type="password"
+                      name="confirm-password"
+                      id="confirm-password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={isMasquerading}
+                      className={`mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md ${isMasquerading ? 'bg-gray-50' : ''}`}
+                    />
+                  </div>
+
+                  {/* Contracts Section */}
+                  {!profile?.isAdmin && (
+                    <div className="mt-8 pt-6 border-t border-gray-200">
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">Your Contracts</h4>
+                      {loadingContracts ? (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                        </div>
+                      ) : memoizedContracts && memoizedContracts.length > 0 ? (
+                        <div className="bg-gray-50 shadow rounded-lg overflow-hidden">
+                          <ul className="divide-y divide-gray-200">
+                            {memoizedContracts.slice(0, 10).map((contract) => (
+                              <li key={contract.id} className="px-4 py-4">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {contract.courseType || 'Class'} Class
+                                    </p>
+                                    <p className="text-sm text-gray-500">
+                                      {contract.scheduleType === 'single' ? (
+                                        <>
+                                          {getDayName(contract.dayOfWeek)} at {contract.startTime || '00:00'} - {contract.endTime || '00:00'}
+                                        </>
+                                      ) : (
+                                        <>
+                                          Multiple days schedule
+                                        </>
+                                      )}
+                                    </p>
+                                  </div>
+                                  {contract.contractUrl && (
+                                    <a
+                                      href={contract.contractUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    >
+                                      View Contract
+                                    </a>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                            {memoizedContracts.length > 10 && (
+                              <li className="px-4 py-2 text-center text-sm text-gray-500">
+                                Showing 10 of {memoizedContracts.length} contracts
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No contracts available.</p>
                       )}
                     </div>
+                  )}
 
-                    <div>
-                      <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">
-                        {t.confirmPassword}
-                      </label>
-                      <input
-                        type="password"
-                        name="confirm-password"
-                        id="confirm-password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        disabled={isMasquerading}
-                        className={`mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md ${isMasquerading ? 'bg-gray-50' : ''}`}
-                      />
-                    </div>
-
-                    <div className="flex justify-end space-x-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditing(false);
-                          setNewPassword('');
-                          setConfirmPassword('');
-                          setName(profile?.name || '');
-                          setSelectedLanguage(profile?.language || 'en');
-                          setSelectedFile(null);
-                          setProfilePicturePreview(profile?.profilePictureUrl || null);
-                          // Reset file input to allow selecting the same file again
-                          if (fileInputRef.current) {
-                            fileInputRef.current.value = '';
-                          }
-                        }}
-                        className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        {t.cancel}
-                      </button>
-                      <button
-                        type="submit"
-                        className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        {t.save}
-                      </button>
-                    </div>
-                  </form>
-                )}
+                  <div className="flex justify-end pt-4">
+                    <button
+                      type="submit"
+                      className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      {t.save}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
