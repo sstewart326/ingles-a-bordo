@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { updatePassword } from 'firebase/auth';
 import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { useLanguage } from '../hooks/useLanguage';
@@ -6,6 +6,8 @@ import { useTranslation } from '../translations';
 import { Language } from '../contexts/LanguageContext';
 import { getCachedCollection, updateCachedDocument } from '../utils/firebaseUtils';
 import { where } from 'firebase/firestore';
+import { uploadProfilePicture, deleteProfilePicture, validateProfilePicture } from '../utils/profilePictureUtils';
+import { PhotoIcon, CheckIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 
 interface UserProfile {
   id: string;
@@ -17,6 +19,7 @@ interface UserProfile {
   isAdmin: boolean;
   uid: string;
   updatedAt: string;
+  profilePictureUrl?: string;
 }
 
 interface ClassContract {
@@ -52,6 +55,10 @@ export const Profile = () => {
   const [updateSuccessful, setUpdateSuccessful] = useState(false);
   const [contracts, setContracts] = useState<ClassContract[]>([]);
   const [loadingContracts, setLoadingContracts] = useState(false);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Memoize the filtered contracts to prevent unnecessary re-renders
   const memoizedContracts = useMemo(() => {
@@ -96,11 +103,13 @@ export const Profile = () => {
       setProfile(userDoc);
       setName(userDoc.name || '');
       setSelectedLanguage(userDoc.language || 'en');
+      setProfilePicturePreview(userDoc.profilePictureUrl || null);
       
       logProfile('State updated with profile data:', {
         profileSet: !!userDoc,
         nameSet: userDoc.name || '',
-        languageSet: userDoc.language || 'en'
+        languageSet: userDoc.language || 'en',
+        profilePictureUrl: userDoc.profilePictureUrl
       });
       
       setLoading(false);
@@ -280,6 +289,138 @@ export const Profile = () => {
     return days[dayOfWeek];
   };
 
+  // Handle profile picture file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validationError = validateProfilePicture(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setSelectedFile(file);
+    setError('');
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfilePicturePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle profile picture upload
+  const handleUploadPicture = async () => {
+    if (!currentUser || !selectedFile) return;
+
+    setUploadingPicture(true);
+    setError('');
+
+    try {
+      const userId = isMasquerading && masqueradingAs ? masqueradingAs.uid || masqueradingAs.id : currentUser.uid;
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+
+      // If there's an existing picture, delete it first (overwrite)
+      if (profile?.profilePictureUrl) {
+        try {
+          await deleteProfilePicture(userId, profile.profilePictureUrl);
+        } catch (deleteError) {
+          // Continue even if delete fails (might not exist)
+          logProfile('Error deleting old profile picture (may not exist):', deleteError);
+        }
+      }
+
+      // Upload new picture
+      const downloadUrl = await uploadProfilePicture(userId, selectedFile);
+
+      // Update Firestore
+      const users = await getCachedCollection<UserProfile>('users', [
+        where('uid', '==', userId)
+      ], { userId: currentUser.uid });
+
+      if (users && users.length > 0) {
+        await updateCachedDocument('users', users[0].id, { profilePictureUrl: downloadUrl }, { userId: currentUser.uid });
+      }
+
+      setSuccess(t.profilePictureUploaded);
+      setSelectedFile(null);
+      // Reset file input to allow selecting the same file again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      await fetchProfile();
+    } catch (error) {
+      logProfile('Error uploading profile picture:', error);
+      setError(t.profilePictureError);
+      if (error instanceof Error) {
+        setError(error.message || t.profilePictureError);
+      }
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
+
+  // Handle profile picture deletion
+  const handleDeletePicture = async () => {
+    if (!currentUser) return;
+
+    if (!window.confirm(t.confirmDeleteProfilePicture)) {
+      return;
+    }
+
+    setUploadingPicture(true);
+    setError('');
+
+    try {
+      const userId = isMasquerading && masqueradingAs ? masqueradingAs.uid || masqueradingAs.id : currentUser.uid;
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+
+      if (profile?.profilePictureUrl) {
+        await deleteProfilePicture(userId, profile.profilePictureUrl);
+
+        // Update Firestore
+        const users = await getCachedCollection<UserProfile>('users', [
+            where('uid', '==', userId)
+          ], { userId: currentUser.uid });
+
+        if (users && users.length > 0) {
+          await updateCachedDocument('users', users[0].id, { profilePictureUrl: null }, { userId: currentUser.uid });
+        }
+
+        setSuccess(t.profilePictureDeleted);
+        setProfilePicturePreview(null);
+        setSelectedFile(null);
+        // Reset file input to allow selecting the same file again
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        await fetchProfile();
+      } else {
+        setProfilePicturePreview(null);
+        setSelectedFile(null);
+        // Reset file input to allow selecting the same file again
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+
+    } catch (error) {
+      logProfile('Error deleting profile picture:', error);
+      setError(t.profilePictureError);
+      if (error instanceof Error) {
+        setError(error.message || t.profilePictureError);
+      }
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -323,6 +464,33 @@ export const Profile = () => {
 
                 {!editing ? (
                   <div className="space-y-6">
+                    {/* Profile Picture Display */}
+                    <div className="flex items-center space-x-6">
+                      <div className="flex-shrink-0">
+                        {profile?.profilePictureUrl ? (
+                          <img
+                            src={profile.profilePictureUrl}
+                            alt="Profile"
+                            className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
+                            onError={(e) => {
+                              // Fallback to airplane window icon if image fails to load
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="h-24 w-24 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
+                            <PhotoIcon className="h-12 w-12 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-medium text-gray-900">{t.profilePicture}</h4>
+                        <p className="text-sm text-gray-500">
+                          {profile?.profilePictureUrl ? t.changeProfilePicture : t.uploadProfilePicture}
+                        </p>
+                      </div>
+                    </div>
+
                     <dl className="grid grid-cols-1 gap-5 sm:grid-cols-3">
                       <div className="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
                         <dt className="text-sm font-medium text-gray-500 truncate">{t.name}</dt>
@@ -411,6 +579,129 @@ export const Profile = () => {
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-6 max-w-lg">
+                    {/* Profile Picture Upload Section */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t.profilePicture}
+                      </label>
+                      <div className="flex items-center space-x-6">
+                        <div className="flex-shrink-0 relative group">
+                          {profilePicturePreview ? (
+                            <>
+                              <img
+                                src={profilePicturePreview}
+                                alt="Profile preview"
+                                className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
+                              />
+                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  className="absolute -top-1 -left-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
+                                  title={t.changeProfilePicture}
+                                >
+                                  <PencilIcon className="h-4 w-4 text-gray-700" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleDeletePicture}
+                                  className="absolute -top-1 -right-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
+                                  title={t.cancel}
+                                >
+                                  <TrashIcon className="h-4 w-4 text-red-600" />
+                                </button>
+                              </div>
+                            </>
+                          ) : profile?.profilePictureUrl ? (
+                            <>
+                              <img
+                                src={profile.profilePictureUrl}
+                                alt="Profile"
+                                className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  className="absolute -top-1 -left-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto z-10"
+                                  title={t.changeProfilePicture}
+                                >
+                                  <PencilIcon className="h-4 w-4 text-gray-700" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleDeletePicture}
+                                  disabled={uploadingPicture}
+                                  className="absolute -top-1 -right-1 p-1.5 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-transform hover:scale-110 pointer-events-auto disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                                  title={t.deleteProfilePicture}
+                                >
+                                  <TrashIcon className="h-4 w-4 text-red-600" />
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="h-24 w-24 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
+                              <PhotoIcon className="h-12 w-12 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-3">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                          />
+                          {!profile?.profilePictureUrl && !selectedFile && (
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="group inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                              >
+                                <PhotoIcon className="h-4 w-4 text-gray-500 group-hover:text-indigo-600 transition-colors" />
+                                <span>{t.uploadProfilePicture}</span>
+                              </button>
+                            </div>
+                          )}
+                          {selectedFile && (
+                            <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-xs font-medium text-gray-700 mb-1">{t.selectImage}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleUploadPicture}
+                                  disabled={uploadingPicture}
+                                  className="group inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {uploadingPicture ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+                                      <span>{t.saving}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckIcon className="h-3 w-3" />
+                                      <span>{t.save}</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
                       <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                         {t.name}
@@ -497,6 +788,12 @@ export const Profile = () => {
                           setConfirmPassword('');
                           setName(profile?.name || '');
                           setSelectedLanguage(profile?.language || 'en');
+                          setSelectedFile(null);
+                          setProfilePicturePreview(profile?.profilePictureUrl || null);
+                          // Reset file input to allow selecting the same file again
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                          }
                         }}
                         className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >

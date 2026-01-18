@@ -128,6 +128,7 @@ export interface User {
   status?: 'active' | 'pending';
   createdAt: string | Date;
   birthdate?: string;  // Add birthdate to User interface
+  profilePictureUrl?: string;  // URL to the user's profile picture
   teacher?: string;  // ID of the admin who created this user
   paymentConfig?: {
     type: 'weekly' | 'monthly';

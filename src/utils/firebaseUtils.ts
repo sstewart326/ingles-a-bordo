@@ -34,6 +34,21 @@ const encodeCacheKey = (key: string): string => {
   return encodeURIComponent(key).replace(/[.#$/[\]]/g, '_');
 };
 
+// Function to serialize query constraints into a stable string for cache keys
+const serializeQueryConstraints = (constraints: QueryConstraint[]): string => {
+  if (!constraints || constraints.length === 0) {
+    return '';
+  }
+  
+  // Convert constraints to a stable string representation
+  // This is a simplified approach - in production you might want more robust serialization
+  return constraints.map(constraint => {
+    // Get the constraint's type and parameters
+    const constraintStr = constraint.toString();
+    return constraintStr;
+  }).join('|');
+};
+
 // Function to rehydrate timestamps in cached data
 const rehydrateTimestamps = (data: unknown): unknown => {
   if (!data) return data;
@@ -373,8 +388,10 @@ export const getCachedCollection = async <T = DocumentData>(
   queryConstraints: QueryConstraint[] = [],
   options: CacheOptions = {}
 ): Promise<T[]> => {
-  const cacheKey = encodeCacheKey(`${collectionPath}${options.userId || ''}`);
-  logQuery('Getting collection', { collectionPath, cacheKey });
+  // Include query constraints in the cache key to ensure different queries don't collide
+  const constraintsStr = serializeQueryConstraints(queryConstraints);
+  const cacheKey = encodeCacheKey(`${collectionPath}${options.userId || ''}${constraintsStr}`);
+  logQuery('Getting collection', { collectionPath, cacheKey, constraintsCount: queryConstraints.length });
 
   // Check if there's an in-flight request
   const existingRequest = inFlightRequests[cacheKey];

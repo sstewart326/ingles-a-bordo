@@ -21,6 +21,15 @@ interface Translation {
   emailNotEditable: string;
   amountPaid: string;
   amountDue: string;
+  profilePicture: string;
+  uploadProfilePicture: string;
+  deleteProfilePicture: string;
+  changeProfilePicture: string;
+  profilePictureUploaded: string;
+  profilePictureDeleted: string;
+  profilePictureError: string;
+  selectImage: string;
+  confirmDeleteProfilePicture: string;
 
   // Navigation
   dashboard: string;
@@ -392,6 +401,15 @@ const translations: Record<Language, Translation> = {
     emailNotEditable: 'Email cannot be edited. To change the email, the user must be deleted and recreated with the correct email.',
     amountPaid: 'Amount paid',
     amountDue: 'Amount due',
+    profilePicture: 'Profile Picture',
+    uploadProfilePicture: 'Upload Profile Picture',
+    deleteProfilePicture: 'Delete Profile Picture',
+    changeProfilePicture: 'Change Profile Picture',
+    profilePictureUploaded: 'Profile picture uploaded successfully',
+    profilePictureDeleted: 'Profile picture deleted successfully',
+    profilePictureError: 'Error uploading profile picture',
+    selectImage: 'Select Image',
+    confirmDeleteProfilePicture: 'Are you sure you want to delete your profile picture?',
 
     // Navigation
     dashboard: 'Dashboard',
@@ -761,6 +779,15 @@ const translations: Record<Language, Translation> = {
     emailNotEditable: 'O email não pode ser editado. Para alterar o email, o usuário deve ser excluído e recriado com o email correto.',
     amountPaid: 'Valor pago',
     amountDue: 'Valor a pagar',
+    profilePicture: 'Foto de Perfil',
+    uploadProfilePicture: 'Enviar Foto de Perfil',
+    deleteProfilePicture: 'Excluir Foto de Perfil',
+    changeProfilePicture: 'Alterar Foto de Perfil',
+    profilePictureUploaded: 'Foto de perfil enviada com sucesso',
+    profilePictureDeleted: 'Foto de perfil excluída com sucesso',
+    profilePictureError: 'Erro ao enviar foto de perfil',
+    selectImage: 'Selecionar Imagem',
+    confirmDeleteProfilePicture: 'Tem certeza que deseja excluir sua foto de perfil?',
 
     // Navigation
     dashboard: 'Painel',

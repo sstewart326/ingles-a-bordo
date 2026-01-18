@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Disclosure } from '@headlessui/react';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { useAdmin } from '../hooks/useAdmin';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import '../styles/header-enhancements.css';
 
 function classNames(...classes: string[]) {
@@ -22,6 +24,40 @@ export const Header = () => {
   
   // Add state to control dropdown visibility
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
+  
+  // Set up real-time listener for profile picture changes
+  useEffect(() => {
+    if (!currentUser) {
+      setProfilePictureUrl(null);
+      return;
+    }
+
+    // Create a real-time listener for the user's profile document
+    const q = query(
+      collection(db, 'users'),
+      where('uid', '==', currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const userData = snapshot.docs[0].data();
+          setProfilePictureUrl(userData.profilePictureUrl || null);
+        } else {
+          setProfilePictureUrl(null);
+        }
+      },
+      (error) => {
+        console.error('Error listening to profile picture changes:', error);
+        setProfilePictureUrl(null);
+      }
+    );
+
+    // Cleanup listener on unmount or when currentUser changes
+    return () => unsubscribe();
+  }, [currentUser]);
   
   // Toggle the profile menu
   const toggleProfileMenu = (e: React.MouseEvent) => {
@@ -122,8 +158,20 @@ export const Header = () => {
                     className="header-profile-button flex rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-color)] focus:ring-offset-0 bg-transparent"
                   >
                     <span className="sr-only">Open user menu</span>
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center text-black bg-[var(--brand-color)] border border-[var(--brand-color-medium)] hover:border-[var(--brand-color)] transition-all">
-                      {currentUser?.email?.charAt(0).toUpperCase()}
+                    <div className="h-8 w-8 rounded-full flex items-center justify-center text-black bg-[var(--brand-color)] border border-[var(--brand-color-medium)] hover:border-[var(--brand-color)] transition-all overflow-hidden">
+                      {profilePictureUrl ? (
+                        <img
+                          src={profilePictureUrl}
+                          alt="Profile"
+                          className="h-full w-full object-cover"
+                          onError={() => {
+                            // Fallback to user icon if image fails to load
+                            setProfilePictureUrl(null);
+                          }}
+                        />
+                      ) : (
+                        <UserCircleIcon className="h-6 w-6 text-black" />
+                      )}
                     </div>
                   </button>
                   
