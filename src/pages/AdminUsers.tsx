@@ -82,6 +82,8 @@ export const AdminUsers = () => {
   const [editingField, setEditingField] = useState<'name' | 'birthdate' | null>(null);
   const [updatingName, setUpdatingName] = useState(false);
   const [updatingBirthdate, setUpdatingBirthdate] = useState(false);
+  const [sortColumn, setSortColumn] = useState<'name' | 'status'>('status');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const navigate = useNavigate();
 
   const fetchUsers = useCallback(async () => {
@@ -475,6 +477,17 @@ export const AdminUsers = () => {
     }
   };
 
+  const handleSort = (column: 'name' | 'status') => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
   if (loading) {
     return <div className="text-center p-4">{t.loading}</div>;
   }
@@ -482,25 +495,32 @@ export const AdminUsers = () => {
   const allUsers = users
     .filter(user => !user.isAdmin) // Filter out admin users
     .sort((a, b) => {
-      // First sort by status (pending first)
-      if (a.status === 'pending' && b.status !== 'pending') return -1;
-      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      let comparison = 0;
 
-      // Then sort alphabetically by name
-      // Split names to get first and last names
-      const aParts = a.name.trim().split(' ');
-      const bParts = b.name.trim().split(' ');
+      if (sortColumn === 'status') {
+        // Sort by status
+        const statusOrder = { pending: 0, active: 1 };
+        comparison = statusOrder[a.status as keyof typeof statusOrder] - statusOrder[b.status as keyof typeof statusOrder];
+      } else if (sortColumn === 'name') {
+        // Sort alphabetically by name
+        // Split names to get first and last names
+        const aParts = a.name.trim().split(' ');
+        const bParts = b.name.trim().split(' ');
 
-      // Compare first names first
-      const aFirstName = aParts[0].toLowerCase();
-      const bFirstName = bParts[0].toLowerCase();
+        // Compare first names first
+        const aFirstName = aParts[0].toLowerCase();
+        const bFirstName = bParts[0].toLowerCase();
 
-      if (aFirstName !== bFirstName) {
-        return aFirstName.localeCompare(bFirstName);
+        if (aFirstName !== bFirstName) {
+          comparison = aFirstName.localeCompare(bFirstName);
+        } else {
+          // If first names are the same, compare full names
+          comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+        }
       }
 
-      // If first names are the same, compare full names
-      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      // Apply sort direction
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
 
   const renderMobileCard = (user: User) => (
@@ -990,8 +1010,29 @@ export const AdminUsers = () => {
                       <th scope="col" className={`${styles.table.header} w-20`}>
                         {/* Action buttons */}
                       </th>
-                      <th scope="col" className={`${styles.table.header} w-1/4`}>
-                        {t.name}
+                      <th 
+                        scope="col" 
+                        className={`${styles.table.header} w-1/4 cursor-pointer hover:bg-gray-100 select-none`}
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>{t.name}</span>
+                          {sortColumn === 'name' ? (
+                            sortDirection === 'asc' ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )
+                          ) : (
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
                       <th scope="col" className={`${styles.table.header} w-1/4`}>
                         {t.email}
@@ -999,8 +1040,29 @@ export const AdminUsers = () => {
                       <th scope="col" className={`${styles.table.header} w-1/6`}>
                         {t.birthdate}
                       </th>
-                      <th scope="col" className={`${styles.table.header} text-center w-1/6`}>
-                        {t.userStatus}
+                      <th 
+                        scope="col" 
+                        className={`${styles.table.header} text-center w-1/6 cursor-pointer hover:bg-gray-100 select-none`}
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>{t.userStatus}</span>
+                          {sortColumn === 'status' ? (
+                            sortDirection === 'asc' ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )
+                          ) : (
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
                     </tr>
                   </thead>

@@ -152,6 +152,8 @@ export const AdminSchedule = () => {
   const [currentStep, setCurrentStep] = useState<'schedule' | 'payment'>('schedule');
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [classToDelete, setClassToDelete] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<'dayTime' | 'students' | 'amount'>('dayTime');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const { currentUser } = useAuth();
   const { isAdmin } = useAdmin();
@@ -1201,31 +1203,66 @@ export const AdminSchedule = () => {
   };
 
   // Add sorting function before the return statement
+  const handleSort = (column: 'dayTime' | 'students' | 'amount') => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
   const getSortedClasses = () => {
     return [...classes].sort((a, b) => {
-      if (a.scheduleType === 'multiple' && b.scheduleType === 'multiple') {
-        // For multiple schedules, sort by the first schedule's day and time
-        const aSchedule = a.schedules[0];
-        const bSchedule = b.schedules[0];
-        if (!aSchedule || !bSchedule) return 0;
-        
-        if (aSchedule.dayOfWeek !== bSchedule.dayOfWeek) {
-          return aSchedule.dayOfWeek - bSchedule.dayOfWeek;
+      let comparison = 0;
+
+      if (sortColumn === 'dayTime') {
+        // Sort by day and time
+        if (a.scheduleType === 'multiple' && b.scheduleType === 'multiple') {
+          // For multiple schedules, sort by the first schedule's day and time
+          const aSchedule = a.schedules[0];
+          const bSchedule = b.schedules[0];
+          if (!aSchedule || !bSchedule) return 0;
+          
+          if (aSchedule.dayOfWeek !== bSchedule.dayOfWeek) {
+            comparison = aSchedule.dayOfWeek - bSchedule.dayOfWeek;
+          } else {
+            comparison = aSchedule.startTime.localeCompare(bSchedule.startTime);
+          }
+        } else if (a.scheduleType === 'multiple') {
+          // Multiple schedule classes come after single schedule
+          comparison = 1;
+        } else if (b.scheduleType === 'multiple') {
+          // Single schedule classes come before multiple schedule
+          comparison = -1;
+        } else {
+          // Both are single schedule
+          if (a.dayOfWeek !== b.dayOfWeek) {
+            comparison = a.dayOfWeek - b.dayOfWeek;
+          } else {
+            comparison = a.startTime.localeCompare(b.startTime);
+          }
         }
-        return aSchedule.startTime.localeCompare(bSchedule.startTime);
-      } else if (a.scheduleType === 'multiple') {
-        // Multiple schedule classes come after single schedule
-        return 1;
-      } else if (b.scheduleType === 'multiple') {
-        // Single schedule classes come before multiple schedule
-        return -1;
-      } else {
-        // Both are single schedule
-        if (a.dayOfWeek !== b.dayOfWeek) {
-          return a.dayOfWeek - b.dayOfWeek;
-        }
-        return a.startTime.localeCompare(b.startTime);
+      } else if (sortColumn === 'students') {
+        // Sort by first student's name alphabetically
+        const aFirstEmail = a.studentEmails[0] || '';
+        const bFirstEmail = b.studentEmails[0] || '';
+        const aStudent = users.find(u => u.email === aFirstEmail);
+        const bStudent = users.find(u => u.email === bFirstEmail);
+        const aName = aStudent?.name.toLowerCase() || aFirstEmail.toLowerCase();
+        const bName = bStudent?.name.toLowerCase() || bFirstEmail.toLowerCase();
+        comparison = aName.localeCompare(bName);
+      } else if (sortColumn === 'amount') {
+        // Sort by payment amount numerically
+        const aAmount = a.paymentConfig?.amount || 0;
+        const bAmount = b.paymentConfig?.amount || 0;
+        comparison = aAmount - bAmount;
       }
+
+      // Apply sort direction
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
   };
 
@@ -1944,20 +1981,83 @@ export const AdminSchedule = () => {
                       <th scope="col" className={`${styles.table.header} w-20`}>
                         {/* Empty header for actions */}
                       </th>
-                      <th scope="col" className={styles.table.header}>
-                        {t.dayAndTime}
+                      <th 
+                        scope="col" 
+                        className={`${styles.table.header} cursor-pointer hover:bg-gray-100 select-none`}
+                        onClick={() => handleSort('dayTime')}
+                      >
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <span>{t.dayAndTime}</span>
+                          {sortColumn === 'dayTime' ? (
+                            sortDirection === 'asc' ? (
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )
+                          ) : (
+                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
                       <th scope="col" className={styles.table.header}>
                         Frequency
                       </th>
-                      <th scope="col" className={styles.table.header}>
-                        {t.students}
+                      <th 
+                        scope="col" 
+                        className={`${styles.table.header} cursor-pointer hover:bg-gray-100 select-none`}
+                        onClick={() => handleSort('students')}
+                      >
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <span>{t.students}</span>
+                          {sortColumn === 'students' ? (
+                            sortDirection === 'asc' ? (
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )
+                          ) : (
+                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
                       <th scope="col" className={styles.table.header}>
                         Payment Type
                       </th>
-                      <th scope="col" className={styles.table.header}>
-                        Payment Amount
+                      <th 
+                        scope="col" 
+                        className={`${styles.table.header} cursor-pointer hover:bg-gray-100 select-none`}
+                        onClick={() => handleSort('amount')}
+                      >
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <span>Payment Amount</span>
+                          {sortColumn === 'amount' ? (
+                            sortDirection === 'asc' ? (
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )
+                          ) : (
+                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
                       <th scope="col" className={styles.table.header}>
                         Payment Day
@@ -2092,7 +2192,7 @@ export const AdminSchedule = () => {
                             </div>
                           )}
                         </td>
-                        <td className={styles.table.cell}>
+                        <td className={`${styles.table.cell} text-center`}>
                           {classItem.paymentConfig?.currency || 'USD'} {classItem.paymentConfig?.amount?.toFixed(2) || '0.00'}
                         </td>
                         <td className={styles.table.cell}>
