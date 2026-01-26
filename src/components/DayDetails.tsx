@@ -51,6 +51,7 @@ interface DayDetailsProps {
   completedPayments: Record<string, Payment[]>;
   paymentsPage: number;
   onPaymentsPageChange: (newPage: number) => void;
+  onExceptionCreated?: () => void;
 }
 
 interface PendingPaymentAction {
@@ -86,7 +87,8 @@ export const DayDetails = ({
   formatStudentNames,
   completedPayments,
   paymentsPage,
-  onPaymentsPageChange
+  onPaymentsPageChange,
+  onExceptionCreated
 }: DayDetailsProps) => {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -886,7 +888,7 @@ export const DayDetails = ({
       {selectedDayDetails.classes.length > 0 && (
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-4">
-            {t.class || 'Classes'}
+            {t.classes || 'Classes'}
           </h3>
           
           <ClassSection
@@ -924,6 +926,7 @@ export const DayDetails = ({
             selectedDate={selectedDayDetails.date}
             homeworkByClassId={homeworkByClassId}
             refreshHomework={refreshHomework}
+            onExceptionCreated={onExceptionCreated}
             noContainer={true}
             hideDateDisplay={true}
             t={{

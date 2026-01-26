@@ -78,6 +78,7 @@ export const Dashboard = () => {
     getClassesForDay,
     isDateInRelevantMonthRange,
     getMonthKey,
+    refreshCurrentMonth,
   } = useDashboardData();
 
   // Add state for completed payments
@@ -1156,6 +1157,53 @@ export const Dashboard = () => {
     }
   };
 
+  // Function to refresh calendar after exception is created
+  const handleExceptionCreated = useCallback(async () => {
+    if (!selectedDate) return;
+    
+    // Notify other pages (like AdminSchedule) that calendar data changed
+    window.dispatchEvent(new Event('calendar-invalidated'));
+    
+    // Refresh current month and next month to handle cross-month exceptions
+    // (e.g., reschedule from end of one month to start of next)
+    const currentMonth = selectedDate;
+    const nextMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1);
+    
+    // Refresh both months in parallel
+    const [updatedCurrentMonth, updatedNextMonth] = await Promise.all([
+      refreshCurrentMonth(currentMonth),
+      refreshCurrentMonth(nextMonth)
+    ]);
+    
+    // Combine the results
+    const updatedDailyClassMap = {
+      ...updatedCurrentMonth,
+      ...updatedNextMonth
+    };
+    
+    // If we have a selected day, refresh its details using the fresh data
+    if (selectedDayDetails && updatedDailyClassMap) {
+      const dateString = selectedDayDetails.date.toISOString().split('T')[0];
+      const classesForDay = updatedDailyClassMap[dateString] || [];
+      
+      // Process the classes to match the expected format
+      const processedClasses = classesForDay.map(classObj => ({
+        ...classObj,
+        studentEmails: classObj.studentEmails || 
+          (classObj.students && classObj.students.length > 0
+            ? classObj.students.map((student: any) =>
+                typeof student === 'string' ? student : student.email || '')
+                .filter((email: string) => email !== '')
+            : [])
+      }));
+      
+      setSelectedDayDetails({
+        ...selectedDayDetails,
+        classes: processedClasses
+      });
+    }
+  }, [refreshCurrentMonth, selectedDate, selectedDayDetails, setSelectedDayDetails]);
+
   // Function to refresh all homework data
   const refreshAllHomework = async () => {
     // Prevent duplicate fetches within 2 seconds
@@ -1443,6 +1491,7 @@ export const Dashboard = () => {
                 : 0
               }
               onPaymentsPageChange={handlePaymentsPageChange}
+              onExceptionCreated={handleExceptionCreated}
             />
           ) : (
             <div className="bg-white rounded-lg shadow p-6 text-center">

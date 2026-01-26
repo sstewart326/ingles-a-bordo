@@ -42,6 +42,7 @@ interface UseDashboardDataReturn extends DashboardData {
   getRelevantMonthKeys: (date: Date) => string[];
   getMonthKey: (date: Date, offset?: number) => string;
   invalidateCache: () => void;
+  refreshCurrentMonth: (date: Date) => Promise<Record<string, any[]> | undefined>;
 }
 
 export const useDashboardData = (): UseDashboardDataReturn => {
@@ -58,6 +59,11 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const [loadedMaterialMonths, setLoadedMaterialMonths] = useState<Set<string>>(new Set());
   const [selectedDayDetails, setSelectedDayDetails] = useState<DashboardData['selectedDayDetails']>(null);
   const [dailyClassMap, setDailyClassMap] = useState<Record<string, any[]>>({});
+
+  // Helper function to check if admin operations should proceed
+  const canPerformAdminOperations = useCallback((): boolean => {
+    return !!(currentUser && !adminLoading && isAdmin);
+  }, [currentUser, adminLoading, isAdmin]);
 
   // Utility functions
   const getMonthKey = (date: Date, offset: number = 0): string => {
@@ -140,7 +146,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
         let combinedDailyClassMap: Record<string, any[]> = { ...dailyClassMap };
 
         // Only attempt admin data fetching if user is confirmed to be an admin
-        if (!adminLoading && isAdmin) {
+        if (canPerformAdminOperations()) {
           try {
             for (const monthKey of newMonthsToLoad) {
               const [year, month] = monthKey.split('-').map(Number);
@@ -298,7 +304,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
-  }, [currentUser, adminLoading, isAdmin, classMaterials, loadedMaterialMonths, selectedDayDetails, loadedMonths, upcomingClasses, pastClasses, dailyClassMap]);
+  }, [currentUser, adminLoading, isAdmin, canPerformAdminOperations, classMaterials, loadedMaterialMonths, selectedDayDetails, loadedMonths, upcomingClasses, pastClasses, dailyClassMap]);
 
   const invalidateCache = useCallback(() => {
     // Invalidate the calendar cache to force a fresh fetch on the next request
@@ -307,6 +313,70 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     setLoadedMonths(new Set());
     setLoadedMaterialMonths(new Set());
   }, []);
+
+  // Direct refresh function that bypasses all the complex caching logic
+  const refreshCurrentMonth = useCallback(async (date: Date): Promise<Record<string, any[]> | undefined> => {
+    if (!canPerformAdminOperations()) return undefined;
+
+    try {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      
+      // Invalidate cache first
+      invalidateCalendarCache('getAllClassesForMonthHttp');
+      
+      // Fetch fresh data directly
+      const response = await getAllClassesForMonth(month, year, { bypassCache: true });
+      
+      if (response && response.dailyClassMap) {
+        // Replace the current month's data completely (don't merge with prev)
+        // This ensures cancelled classes are removed (server won't include those dates)
+        setDailyClassMap(prev => {
+          // Get all dates from the prev map that are NOT in the current month
+          const newMap: Record<string, any[]> = {};
+          const currentMonthStart = new Date(year, month, 1);
+          const currentMonthEnd = new Date(year, month + 1, 0);
+          
+          // Keep dates from other months
+          Object.keys(prev).forEach(dateKey => {
+            const dateObj = new Date(dateKey + 'T00:00:00');
+            if (dateObj < currentMonthStart || dateObj > currentMonthEnd) {
+              newMap[dateKey] = prev[dateKey];
+            }
+          });
+          
+          // Add all dates from the fresh server data for current month
+          Object.assign(newMap, response.dailyClassMap);
+          
+          return newMap;
+        });
+
+        // Update classes
+        if (response.classes && response.classes.length > 0) {
+          const transformedClasses = response.classes as ExtendedClassSession[];
+          
+          // Update class lists
+          updateClassList({
+            classes: transformedClasses.map(cls => ({
+              ...cls,
+              dates: cls.dates?.map(d => typeof d === 'string' ? d : d.toISOString())
+            })) as ClassSession[],
+            upcomingClasses,
+            pastClasses,
+            setUpcomingClasses: setUpcomingClasses as (classes: ClassSession[]) => void,
+            setPastClasses: setPastClasses as (classes: ClassSession[]) => void
+          });
+        }
+        
+        // Return the response's dailyClassMap directly (the fresh data from server)
+        return response.dailyClassMap;
+      }
+      return undefined;
+    } catch (error) {
+      console.error('Error refreshing current month:', error);
+      return undefined;
+    }
+  }, [canPerformAdminOperations, upcomingClasses, pastClasses, setUpcomingClasses, setPastClasses, setDailyClassMap]);
 
   return {
     // State
@@ -335,5 +405,6 @@ export const useDashboardData = (): UseDashboardDataReturn => {
     getRelevantMonthKeys,
     getMonthKey,
     invalidateCache,
+    refreshCurrentMonth,
   };
 }; 

@@ -16,12 +16,13 @@ import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
-import { formatLocalizedDate } from '../utils/dateUtils';
+import { formatLocalizedDate, parseDateStringInTimezone, formatTimeToAMPM } from '../utils/dateUtils';
 import { 
   fetchNotesByMonthTeacherAndClasses, 
   ClassNote, 
   findNoteForClassSession 
 } from '../utils/notesUtils';
+import { processDailyClassMapEntries } from '../utils/calendarDayUtils';
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
   dates: string[];
@@ -97,6 +98,7 @@ interface CalendarData {
   month: number;
   year: number;
   homework?: Record<string, Homework[]>;
+  dailyClassMap?: Record<string, any[]>;
 }
 
 // Add MaterialsModal component at the top level
@@ -268,34 +270,39 @@ export const Schedule = () => {
   }, [calendarData, loading]);
 
   const getClassesForDate = (date: Date): CalendarClass[] => {
-    if (!calendarData?.classes) return [];
+    if (!calendarData?.dailyClassMap) return [];
 
     const dateStr = formatDateForComparison(date);
 
-    // Get all classes for this date
-    const allClassesForDate = calendarData.classes.filter(classItem =>
-      classItem.dates.some(classDate => {
-        const classDateStr = classDate?.split('T')[0] || '';
-        return classDateStr === dateStr;
-      })
-    );
+    // Check if this date exists in dailyClassMap (which excludes cancelled dates)
+    if (!calendarData.dailyClassMap[dateStr]) {
+      // Date is not in dailyClassMap, which means it has no classes (or all are cancelled)
+      return [];
+    }
 
-    // Use a map to deduplicate classes based on their base class ID
-    const uniqueClasses = new Map<string, CalendarClass>();
-
-    allClassesForDate.forEach(classItem => {
-      const fullId = classItem.id;
-      // Extract the base ID (without any day suffix like -1, -2)
-      const baseId = fullId.split('-')[0];
-
-      // If we already have this base ID, keep the first instance
-      if (!uniqueClasses.has(baseId)) {
-        uniqueClasses.set(baseId, classItem);
-      }
-    });
-
-    // Return the deduplicated classes as an array
-    return Array.from(uniqueClasses.values());
+    const classesForDate = calendarData.dailyClassMap[dateStr];
+    
+    // Create a map of full class info for efficient lookup
+    // Support both exact classId match and baseId match (for classes with day suffixes)
+    const fullClassInfoMap = new Map<string, CalendarClass>();
+    if (calendarData.classes) {
+      calendarData.classes.forEach((c: CalendarClass) => {
+        const cId = c.id || '';
+        const baseId = cId.split('-')[0];
+        // Store by both exact ID and base ID for flexible lookup
+        fullClassInfoMap.set(cId, c);
+        if (baseId !== cId) {
+          // Only set baseId if it's not already set (prefer exact match)
+          if (!fullClassInfoMap.has(baseId)) {
+            fullClassInfoMap.set(baseId, c);
+          }
+        }
+      });
+    }
+    
+    // Use shared utility to process entries without deduplication
+    // This allows multiple entries for the same class (e.g., rescheduled + regular)
+    return processDailyClassMapEntries<CalendarClass>(classesForDate, fullClassInfoMap);
   };
 
   const isPaymentDueOnDate = (date: Date): boolean => {
@@ -395,26 +402,7 @@ export const Schedule = () => {
       // Set the _displayDate property required by findNoteForClassSession
       updatedClass._displayDate = new Date(date);
       
-      // Ensure startTime is defined before trying to match notes
-      // For classes with multiple schedules, find the matching schedule for this day
-      const dayOfWeek = date.getDay();
-      if (updatedClass.scheduleType === 'multiple' && Array.isArray(updatedClass.schedules)) {
-        const matchingSchedule = updatedClass.schedules.find(
-          (s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === dayOfWeek
-        );
-        
-        if (matchingSchedule) {
-          updatedClass.startTime = matchingSchedule.startTime;
-          updatedClass.endTime = matchingSchedule.endTime;
-          updatedClass.timezone = matchingSchedule.timezone || updatedClass.timezone;
-        }
-      }
-      
-      // If we still don't have a startTime, use the default one from the class
-      if (!updatedClass.startTime && updatedClass.schedules && updatedClass.schedules.length > 0) {
-        updatedClass.startTime = updatedClass.schedules[0].startTime;
-      }
-      
+      // dailyClassMap already provides startTime, endTime, and timezone - trust the backend data
       // Ensure we have a startTime before looking for matching notes
       if (updatedClass.startTime) {
         // Find matching note in the prefetched notes
@@ -744,29 +732,14 @@ export const Schedule = () => {
   const formatClassTime = (classSession: ClassSession): string => {
     if (!classSession) return '';
 
-    let startTime = classSession.startTime || '';
-    let endTime = classSession.endTime || '';
-    let timezone = classSession.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // dailyClassMap already provides startTime, endTime, and timezone - trust the backend data
+    const startTime = classSession.startTime || '';
+    const endTime = classSession.endTime || '';
+    const timezone = classSession.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     // Early validation of time strings
     if (!startTime || !endTime) {
       return '';
-    }
-
-    // For classes with multiple schedules, find the matching schedule for the day of week
-    if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules) && classSession.dayOfWeek !== undefined) {
-      const matchingSchedule = classSession.schedules.find(schedule =>
-        schedule.dayOfWeek === classSession.dayOfWeek
-      );
-
-      if (matchingSchedule) {
-        startTime = matchingSchedule.startTime;
-        endTime = matchingSchedule.endTime;
-        // Use schedule timezone if available
-        if (matchingSchedule.timezone) {
-          timezone = matchingSchedule.timezone;
-        }
-      }
     }
 
     // Get the user's local timezone
@@ -1305,26 +1278,31 @@ export const Schedule = () => {
                       return hwDateStr === dateStr;
                     });
 
-                    // Map the class to include required ClassSession properties
+                    // dailyClassMap already provides startTime, endTime, and timezone - trust the backend data
                     let updatedClass = { ...classItem };
-                    const currentDayOfWeek = selectedDayDetails.date.getDay();
-
-                    // If it's a multiple schedule class, find the right schedule for this day
-                    if (updatedClass.scheduleType === 'multiple' &&
-                      Array.isArray(updatedClass.schedules)) {
-
-                      const matchingSchedule = updatedClass.schedules.find(
-                        (s: { dayOfWeek: number; timezone?: string }) => s.dayOfWeek === currentDayOfWeek
-                      );
-
-                      if (matchingSchedule) {
-                        // Update the class details with the current day's schedule
-                        updatedClass = {
-                          ...updatedClass,
-                          startTime: matchingSchedule.startTime,
-                          endTime: matchingSchedule.endTime,
-                          timezone: matchingSchedule.timezone || updatedClass.timezone
-                        };
+                    
+                    // Check if this is a rescheduled class
+                    const isRescheduled = (updatedClass as any).isRescheduled || updatedClass.isRescheduledTo;
+                    const originalDate = (updatedClass as any).originalDate || updatedClass.originalDate;
+                    const originalStartTime = (updatedClass as any).originalStartTime || updatedClass.originalStartTime;
+                    const originalEndTime = (updatedClass as any).originalEndTime || updatedClass.originalEndTime;
+                    
+                    // Convert originalDate to Date if it's a string, using timezone-aware parsing
+                    let originalDateObj: Date | null = null;
+                    if (originalDate) {
+                      if (originalDate instanceof Date) {
+                        // Legacy: Date object (shouldn't happen with new backend, but handle for backward compatibility)
+                        originalDateObj = originalDate;
+                      } else if (typeof originalDate === 'string') {
+                        // Parse date string in the class's timezone to avoid timezone conversion issues
+                        try {
+                          const classTimezone = updatedClass.timezone || 'UTC';
+                          originalDateObj = parseDateStringInTimezone(originalDate, classTimezone);
+                        } catch (error) {
+                          console.error('Error parsing originalDate:', error, originalDate);
+                          // Fallback to simple parsing if helper fails
+                          originalDateObj = new Date(originalDate);
+                        }
                       }
                     }
 
@@ -1339,8 +1317,19 @@ export const Schedule = () => {
                       >
                         <div className="flex items-center gap-2 mb-4">
                           <div className="w-2 h-2 rounded-full bg-[#6366f1]" />
-                          <span className="text-sm font-medium text-[#1a1a1a]">{t.class}</span>
+                          <span className="text-sm font-medium text-[#1a1a1a]">
+                            {isRescheduled ? (t.exceptions?.rescheduledClass || 'Rescheduled Class') : t.class}
+                          </span>
                         </div>
+                        
+                        {isRescheduled && originalDateObj && !isNaN(originalDateObj.getTime()) && (
+                          <div className="text-xs text-[#6b7280] mb-3">
+                            {t.exceptions?.rescheduledFrom || 'Rescheduled from'}: {formatLocalizedDate(originalDateObj, language)}
+                            {originalStartTime && originalEndTime && (
+                              <span> at {formatTimeToAMPM(originalStartTime)} - {formatTimeToAMPM(originalEndTime)}</span>
+                            )}
+                          </div>
+                        )}
 
                         <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2">
                           <span className="text-sm font-medium text-[#4b5563]">{t.dayOfWeek}</span>

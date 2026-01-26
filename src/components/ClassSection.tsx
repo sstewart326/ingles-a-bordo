@@ -7,6 +7,10 @@ import { PencilIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
 import { UploadMaterialsForm } from './UploadMaterialsForm';
 import { HomeworkManager } from './HomeworkManager';
+import { ClassExceptionManager } from './ClassExceptionManager';
+import { useTranslation } from '../translations';
+import { useLanguage } from '../hooks/useLanguage';
+import { formatLocalizedDate, parseDateStringInTimezone, formatTimeToAMPM } from '../utils/dateUtils';
 
 interface ClassSectionProps {
   title: string;
@@ -41,6 +45,7 @@ interface ClassSectionProps {
   hideDateDisplay?: boolean;
   noContainer?: boolean;
   disableDateFiltering?: boolean;
+  onExceptionCreated?: () => void;
   t: {
     upcomingClasses: string;
     pastClasses: string;
@@ -95,8 +100,11 @@ export const ClassSection = ({
   refreshHomework,
   hideDateDisplay = false,
   noContainer = false, // Default to false to maintain backward compatibility
+  onExceptionCreated,
   t
 }: ClassSectionProps) => {
+  const { language } = useLanguage();
+  const translation = useTranslation(language);
   const [activeTooltips, setActiveTooltips] = useState<{[key: string]: boolean}>({});
   
   const toggleTooltip = (key: string) => {
@@ -237,6 +245,31 @@ export const ClassSection = ({
               // Get the date from the _displayDate property
               const date = (classSession as any)._displayDate || selectedDate || new Date();
               
+              // Check if this is a rescheduled class
+              const isRescheduled = (classSession as any).isRescheduled || classSession.isRescheduledTo;
+              const originalDate = (classSession as any).originalDate || classSession.originalDate;
+              const originalStartTime = (classSession as any).originalStartTime || classSession.originalStartTime;
+              const originalEndTime = (classSession as any).originalEndTime || classSession.originalEndTime;
+              
+              // Convert originalDate to Date if it's a string, using timezone-aware parsing
+              let originalDateObj: Date | null = null;
+              if (originalDate) {
+                if (originalDate instanceof Date) {
+                  // Legacy: Date object (shouldn't happen with new backend, but handle for backward compatibility)
+                  originalDateObj = originalDate;
+                } else if (typeof originalDate === 'string') {
+                  // Parse date string in the class's timezone to avoid timezone conversion issues
+                  try {
+                    const classTimezone = classSession.timezone || 'UTC';
+                    originalDateObj = parseDateStringInTimezone(originalDate, classTimezone);
+                  } catch (error) {
+                    console.error('Error parsing originalDate:', error, originalDate);
+                    // Fallback to simple parsing if helper fails
+                    originalDateObj = new Date(originalDate);
+                  }
+                }
+              }
+              
               return (
                 <div key={`${classSession.id}-${date.getTime ? date.getTime() : Date.now()}`} className={styles.card.container}>
                   <div className="flex justify-between items-start w-full">
@@ -244,6 +277,19 @@ export const ClassSection = ({
                       {!hideDateDisplay && (
                         <div className="text-sm font-bold text-black mb-2">
                           {formatClassDate(date)}
+                        </div>
+                      )}
+                      {isRescheduled && (
+                        <div className="text-sm font-semibold text-blue-600 mb-1">
+                          {translation.exceptions.rescheduledClass}
+                        </div>
+                      )}
+                      {isRescheduled && originalDateObj && !isNaN(originalDateObj.getTime()) && (
+                        <div className="text-xs text-gray-600 mt-1 mb-2">
+                          {translation.exceptions.rescheduledFrom}: {formatLocalizedDate(originalDateObj, language)}
+                          {originalStartTime && originalEndTime && (
+                            <span> at {formatTimeToAMPM(originalStartTime)} - {formatTimeToAMPM(originalEndTime)}</span>
+                          )}
                         </div>
                       )}
                       <div className={styles.card.title}>
@@ -538,6 +584,19 @@ export const ClassSection = ({
                         isAdmin={isAdmin}
                         onAddSuccess={refreshHomework}
                       />
+
+                      {/* Exception Management Section (Admin only) */}
+                      {isAdmin && (
+                        <ClassExceptionManager
+                          classId={classSession.id}
+                          classDate={date}
+                          isAdmin={isAdmin}
+                          timezone={classSession.timezone}
+                          defaultStartTime={classSession.startTime}
+                          defaultEndTime={classSession.endTime}
+                          onExceptionCreated={onExceptionCreated}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

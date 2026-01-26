@@ -104,6 +104,8 @@ export interface Class {
     type: 'weekly' | 'biweekly' | 'custom';
     every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks
   };
+  // Historical schedule versions for preserving schedule history
+  scheduleHistory?: ScheduleVersion[];
 }
 
 export interface ClassInfo {
@@ -178,4 +180,41 @@ export interface ClassSchedule {
   startTime: string;
   endTime: string;
   timezone: string;
+}
+
+/**
+ * Represents a historical version of a class schedule.
+ * Used for preserving schedule history when permanent changes are made.
+ */
+export interface ScheduleVersion {
+  version: number;            // Incrementing int (1, 2, 3, ...)
+  effectiveFrom: Date;        // When this schedule version starts
+  scheduleType: 'single' | 'multiple';
+  schedules: ClassSchedule[]; // The schedule(s) for this version
+  timezone: string;
+  frequency: {
+    type: 'weekly' | 'biweekly' | 'custom';
+    every: number;
+  };
+}
+
+/**
+ * Represents a one-off exception to a class schedule.
+ * Used for cancellations and reschedules.
+ */
+export interface ClassException {
+  id: string;
+  classId: string;
+  originalDate: string | null;  // YYYY-MM-DD format, null for reschedules without an original date
+  type: 'cancelled' | 'rescheduled';
+  originalStartTime: string;  // Original start time of the class
+  originalEndTime: string;  // Original end time of the class
+  // For rescheduled:
+  newDate?: string;  // YYYY-MM-DD format
+  newStartTime?: string;
+  newEndTime?: string;
+  reason?: string;
+  timezone: string;  // Timezone identifier (e.g., "America/New_York", "UTC")
+  createdAt: Date;
+  createdBy: string;
 } 

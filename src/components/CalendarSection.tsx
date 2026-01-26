@@ -31,31 +31,8 @@ export const CalendarSection = ({
 }: CalendarSectionProps) => {
   const { currentUser } = useAuth();
   const [completedPayments, setCompletedPayments] = useState<Payment[]>([]);
-  const previousClassMonthRef = useRef<string>('');
   const previousPaymentMonthRef = useRef<string>('');
-  const calendarClassesRef = useRef<Record<string, ClassSession[]>>({});
   const initialLoadDoneRef = useRef(false);
-
-  // Cache classes for each day to prevent recalculation
-  const getClassesForDayWithCache = useCallback((date: Date) => {
-    const dateKey = date.toISOString().split('T')[0];
-    if (!calendarClassesRef.current[dateKey]) {
-      calendarClassesRef.current[dateKey] = getClassesForDay(date.getDay(), date);
-    }
-    return calendarClassesRef.current[dateKey];
-  }, [getClassesForDay]);
-
-  // Clear class cache when month changes
-  useEffect(() => {
-    const currentMonth = selectedDate.getMonth();
-    const currentYear = selectedDate.getFullYear();
-    const monthKey = `${currentYear}-${currentMonth}`;
-    
-    if (previousClassMonthRef.current !== monthKey) {
-      previousClassMonthRef.current = monthKey;
-      calendarClassesRef.current = {};
-    }
-  }, [selectedDate]);
 
   // Fetch all payments for the visible month
   useEffect(() => {
@@ -95,15 +72,15 @@ export const CalendarSection = ({
   }, [selectedDate, currentUser?.uid, isLoading]);
 
   const handleDayClick = useCallback((date: Date) => {
-    const classes = getClassesForDayWithCache(date);
+    const classes = getClassesForDay(date.getDay(), date);
     const paymentsDue = getPaymentsDueForDay(
       date, 
       upcomingClasses, 
-      users, 
+      users,
       (date) => isDateInRelevantMonthRange(date, selectedDate)
     );
     onDayClick(date, classes, paymentsDue);
-  }, [getClassesForDayWithCache, upcomingClasses, users, isDateInRelevantMonthRange, onDayClick, selectedDate]);
+  }, [getClassesForDay, upcomingClasses, users, isDateInRelevantMonthRange, onDayClick, selectedDate]);
 
   return (
     <Calendar
@@ -149,7 +126,7 @@ export const CalendarSection = ({
           <CalendarDay
             date={date}
             isToday={isToday}
-            dayClasses={getClassesForDayWithCache(date)}
+            dayClasses={getClassesForDay(date.getDay(), date)}
             paymentsDue={dayPaymentsDue}
             isDateInRelevantMonthRange={isDateInRelevantMonthRange}
             completedPayments={completedPayments}

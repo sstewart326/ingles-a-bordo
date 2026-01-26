@@ -24,10 +24,86 @@ import { storage } from '../config/firebase';
 import { invalidateCalendarCache } from '../services/calendarService';
 import { PlusIcon, TrashIcon, PencilIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
-import { Class, SelectOption, User } from '../types/interfaces';
+import { Class, SelectOption, User, ScheduleVersion, ClassSchedule as ClassScheduleType } from '../types/interfaces';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { Tooltip } from '../components/Tooltip';
+
+/**
+ * Helper function to check if schedule-related fields have changed.
+ * Used to determine if we need to archive the old schedule.
+ */
+const hasScheduleChanged = (
+  originalClass: Class,
+  editedClass: any
+): boolean => {
+  // Check schedule type
+  if (originalClass.scheduleType !== editedClass.scheduleType) return true;
+  
+  // Check single schedule fields
+  if (originalClass.dayOfWeek !== editedClass.dayOfWeek) return true;
+  if (originalClass.startTime !== editedClass.startTime) return true;
+  if (originalClass.endTime !== editedClass.endTime) return true;
+  if (originalClass.timezone !== editedClass.timezone) return true;
+  
+  // Check frequency
+  const origFreq = originalClass.frequency || { type: 'weekly', every: 1 };
+  const editFreq = editedClass.frequency || { type: 'weekly', every: 1 };
+  if (origFreq.type !== editFreq.type || origFreq.every !== editFreq.every) return true;
+  
+  // Check multiple schedules
+  const origSchedules = originalClass.schedules || [];
+  const editSchedules = editedClass.schedules || [];
+  
+  if (origSchedules.length !== editSchedules.length) return true;
+  
+  // Compare each schedule
+  for (let i = 0; i < origSchedules.length; i++) {
+    const orig = origSchedules[i];
+    const edit = editSchedules[i];
+    if (!edit) return true;
+    if (orig.dayOfWeek !== edit.dayOfWeek) return true;
+    if (orig.startTime !== edit.startTime) return true;
+    if (orig.endTime !== edit.endTime) return true;
+    if ((orig.timezone || originalClass.timezone) !== (edit.timezone || editedClass.timezone)) return true;
+  }
+  
+  return false;
+};
+
+/**
+ * Creates a ScheduleVersion from class data.
+ * Used to archive the current schedule before updating.
+ */
+const createScheduleVersion = (
+  classData: Class,
+  effectiveFrom: Date,
+  version: number
+): ScheduleVersion => {
+  // Build schedules array
+  const schedules: ClassScheduleType[] = classData.scheduleType === 'multiple' && classData.schedules
+    ? classData.schedules.map(s => ({
+        dayOfWeek: s.dayOfWeek,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        timezone: s.timezone || classData.timezone,
+      }))
+    : [{
+        dayOfWeek: classData.dayOfWeek,
+        startTime: classData.startTime,
+        endTime: classData.endTime,
+        timezone: classData.timezone,
+      }];
+  
+  return {
+    version,
+    effectiveFrom,
+    scheduleType: classData.scheduleType || 'single',
+    schedules,
+    timezone: classData.timezone,
+    frequency: classData.frequency || { type: 'weekly', every: 1 },
+  };
+};
 
 type SelectStyles = StylesConfig<SelectOption, true>;
 
@@ -159,12 +235,10 @@ export const AdminSchedule = () => {
   const { isAdmin } = useAdmin();
 
   useEffect(() => {
-    let lastFetchTime = 0;
     
     const loadData = async () => {
       setLoading(true);
       try {
-        lastFetchTime = Date.now();
         logQuery('Initial data load');
         await fetchAllUsers();
         await fetchClasses();
@@ -176,16 +250,40 @@ export const AdminSchedule = () => {
       }
     };
 
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
-        const now = Date.now();
-        // Only refetch if we've been hidden for more than 5 minutes
-        if (now - lastFetchTime > 5 * 60 * 1000) {
-          logQuery('Refreshing data after visibility change');
-          loadData();
+        // Check if calendar was invalidated while we were away
+        const shouldRefresh = sessionStorage.getItem('calendar-invalidated');
+        if (shouldRefresh) {
+          logQuery('Refreshing data after calendar invalidation (bypassing cache)');
+          sessionStorage.removeItem('calendar-invalidated');
+          try {
+            await fetchAllUsers();
+            await fetchClasses(true); // Bypass cache to get fresh data
+          } catch (error) {
+            console.error('Error refreshing data:', error);
+          }
         }
       }
     };
+
+    // Listen for calendar invalidation events
+    const handleCalendarInvalidated = async () => {
+      logQuery('Calendar invalidated - refreshing classes immediately');
+      sessionStorage.setItem('calendar-invalidated', 'true');
+      try {
+        // Force a full refresh with cache bypass
+        setLoading(true);
+        await fetchAllUsers();
+        await fetchClasses(true);
+      } catch (error) {
+        console.error('Error refreshing after invalidation:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener('calendar-invalidated', handleCalendarInvalidated as EventListener);
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -195,18 +293,38 @@ export const AdminSchedule = () => {
 
     window.addEventListener('resize', handleResize);
 
+    // Check if we need to refresh due to calendar invalidation before initial load
+    const wasInvalidated = sessionStorage.getItem('calendar-invalidated');
+    if (wasInvalidated) {
+      sessionStorage.removeItem('calendar-invalidated');
+    }
+
     // Only load data if we have a current user
     if (currentUser?.uid) {
-      loadData();
+      // If calendar was invalidated, force bypass cache on initial load
+      if (wasInvalidated) {
+        setLoading(true);
+        Promise.all([fetchAllUsers(), fetchClasses(true)])
+          .catch((error) => {
+            console.error('Error loading data:', error);
+            toast.error('Failed to load data');
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      } else {
+        loadData();
+      }
     }
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('calendar-invalidated', handleCalendarInvalidated as EventListener);
     };
   }, [currentUser?.uid]); // Add currentUser?.uid as dependency
 
-  const fetchClasses = async () => {
+  const fetchClasses = async (bypassCache: boolean = false) => {
     if (!currentUser?.uid) {
       setClasses([]);
       return;
@@ -214,10 +332,11 @@ export const AdminSchedule = () => {
 
     try {
       if (isAdmin) {
-        logQuery('Querying classes as admin', { userId: currentUser.uid });
+        logQuery('Querying classes as admin', { userId: currentUser.uid, bypassCache });
         const classesData = await getCachedCollection<Class>('classes', [], { 
           userId: currentUser.uid,
-          includeIds: true
+          includeIds: true,
+          bypassCache
         });
         logQuery('Admin classes query result', { count: classesData.length });
         setClasses(classesData);
@@ -225,7 +344,8 @@ export const AdminSchedule = () => {
         // For teachers, first get their students
         logQuery('Fetching teacher users', { teacherAuthId: currentUser.uid });
         const students = await getTeacherUsers<User>(currentUser.uid, {
-          userId: currentUser.uid
+          userId: currentUser.uid,
+          bypassCache
         });
         logQuery('Teacher users query result', { count: students.length });
 
@@ -234,7 +354,8 @@ export const AdminSchedule = () => {
           const studentEmails = students.map(student => student.email);
           logQuery('Fetching classes for students', { studentCount: studentEmails.length });
           const classes = await getUsersClasses(studentEmails, {
-            userId: currentUser.uid
+            userId: currentUser.uid,
+            bypassCache
           });
           logQuery('Classes query result', { count: classes.length });
           setClasses(classes);
@@ -748,9 +869,37 @@ export const AdminSchedule = () => {
         updatedContractUrl = await getDownloadURL(storageRef);
       }
 
+      // Find the original class to check for schedule changes
+      const originalClass = classes.find(c => c.id === editingClass.id);
+      
+      // Check if schedule-related fields have changed
+      let scheduleHistory = editingClass.scheduleHistory || [];
+      
+      if (originalClass && hasScheduleChanged(originalClass, editingClass)) {
+        // Archive the current schedule before updating
+        // Get the effective date: use the original class's startDate or today
+        const effectiveFrom = originalClass.startDate?.toDate() || new Date();
+        
+        // Determine the next version number
+        const nextVersion = scheduleHistory.length + 1;
+        
+        // Create the schedule version from the original class data
+        const scheduleVersion = createScheduleVersion(originalClass, effectiveFrom, nextVersion);
+        
+        // Add to schedule history
+        scheduleHistory = [...scheduleHistory, scheduleVersion];
+        
+        logQuery('Schedule changed, archiving old schedule', { 
+          classId: editingClass.id, 
+          version: nextVersion,
+          effectiveFrom 
+        });
+      }
+
       const updatedClass = {
         ...editingClass,
         contractUrl: updatedContractUrl,
+        scheduleHistory, // Include updated schedule history
         startDate: Timestamp.fromDate(editingClass.startDate instanceof Date ? editingClass.startDate : editingClass.startDate.toDate()),
         endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate instanceof Date ? editingClass.endDate : editingClass.endDate.toDate()) : null,
         updatedAt: Timestamp.now()

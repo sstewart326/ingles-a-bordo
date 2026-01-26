@@ -251,4 +251,45 @@ export const formatLocalizedDate = (date: Date, language: string = 'en'): string
     console.error('Error formatting localized date:', error, date);
     return '';
   }
+};
+
+/**
+ * Parses a date string (YYYY-MM-DD) and creates a Date object that represents
+ * that date for display purposes. Since we're only displaying the date (not time),
+ * we create a Date object using local date components to avoid timezone conversion issues.
+ * 
+ * @param dateString - Date string in YYYY-MM-DD format
+ * @param timezone - Timezone identifier (e.g., "America/New_York") - kept for API consistency
+ * @returns Date object representing the date at local midnight
+ */
+export const parseDateStringInTimezone = (dateString: string, _timezone: string): Date => {
+  if (!dateString) {
+    throw new Error('Date string is required');
+  }
+  
+  // Check if it's a date-only string (YYYY-MM-DD) or a datetime string
+  if (dateString.includes('T') || (dateString.includes(' ') && dateString.includes(':'))) {
+    // It's a datetime string - parse it but log a warning
+    console.warn('parseDateStringInTimezone received a datetime string instead of date-only:', dateString);
+    // Try to extract just the date part
+    const datePart = dateString.split('T')[0].split(' ')[0];
+    if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = datePart.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    return new Date(dateString);
+  }
+  
+  // Parse YYYY-MM-DD
+  const [year, month, day] = dateString.split('-').map(Number);
+  
+  if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    throw new Error(`Invalid date string format: ${dateString}. Expected YYYY-MM-DD`);
+  }
+  
+  // Create a Date object using local date components
+  // This creates a date at local midnight, which when formatted will show the correct date
+  // The timezone parameter is kept for API consistency but we use local date components
+  // to avoid timezone conversion issues when displaying dates
+  return new Date(year, month - 1, day);
 }; 

@@ -58,6 +58,7 @@ interface Translation {
   friday: string;
   saturday: string;
   class: string;
+  classes: string;
   noClassesScheduled: string;
   students: string;
   pair: string;
@@ -377,6 +378,34 @@ interface Translation {
   yourHomework: string;
   fileDeleted: string;
   deleteFile: string;
+
+  // Class Exceptions
+  exceptions: {
+    cancelClass: string;
+    rescheduleClass: string;
+    cancelledClass: string;
+    rescheduledFrom: string;
+    rescheduledTo: string;
+    rescheduledClass: string;
+    reason: string;
+    enterReason: string;
+    newDateTime: string;
+    selectNewDate: string;
+    selectNewTime: string;
+    confirmCancel: string;
+    confirmReschedule: string;
+    classCancelled: string;
+    classRescheduled: string;
+    deleteException: string;
+    confirmDeleteException: string;
+    exceptionDeleted: string;
+    noExceptions: string;
+    manageExceptions: string;
+    originalDate: string;
+    newDate: string;
+    type: string;
+    modifyClass: string;
+  };
 }
 
 const translations: Record<Language, Translation> = {
@@ -438,6 +467,7 @@ const translations: Record<Language, Translation> = {
     friday: 'Friday',
     saturday: 'Saturday',
     class: 'Class',
+    classes: 'Classes',
     noClassesScheduled: 'No classes scheduled for this day',
     students: 'Students',
     pair: 'Pair Class',
@@ -757,6 +787,34 @@ const translations: Record<Language, Translation> = {
     yourHomework: 'Your Homework',
     fileDeleted: 'File deleted successfully',
     deleteFile: 'Delete File',
+
+    // Class Exceptions
+    exceptions: {
+      cancelClass: 'Cancel Class',
+      rescheduleClass: 'Reschedule Class',
+      cancelledClass: 'Cancelled',
+      rescheduledFrom: 'Rescheduled from',
+      rescheduledTo: 'Rescheduled to',
+      rescheduledClass: 'Rescheduled Class',
+      reason: 'Reason',
+      enterReason: 'Enter reason (optional)',
+      newDateTime: 'New Date & Time',
+      selectNewDate: 'Select new date',
+      selectNewTime: 'Select new time',
+      confirmCancel: 'Are you sure you want to cancel this class?',
+      confirmReschedule: 'Confirm reschedule',
+      classCancelled: 'Class cancelled successfully',
+      classRescheduled: 'Class rescheduled successfully',
+      deleteException: 'Delete Exception',
+      confirmDeleteException: 'Are you sure you want to delete this exception?',
+      exceptionDeleted: 'Exception deleted successfully',
+      noExceptions: 'No exceptions',
+      manageExceptions: 'Manage Exceptions',
+      originalDate: 'Original Date',
+      newDate: 'New Date',
+      type: 'Type',
+      modifyClass: 'Modify Class',
+    },
   },
   'pt-BR': {
     // Auth & Profile
@@ -816,6 +874,7 @@ const translations: Record<Language, Translation> = {
     friday: 'Sexta-feira',
     saturday: 'Sábado',
     class: 'Aula',
+    classes: 'Aulas',
     noClassesScheduled: 'Nenhuma aula agendada para este dia',
     students: 'Alunos',
     pair: 'Aula em Dupla',
@@ -1135,6 +1194,34 @@ const translations: Record<Language, Translation> = {
     yourHomework: 'Suas Lições',
     fileDeleted: 'Arquivo excluído com sucesso',
     deleteFile: 'Excluir Arquivo',
+
+    // Class Exceptions
+    exceptions: {
+      cancelClass: 'Cancelar Aula',
+      rescheduleClass: 'Reagendar Aula',
+      cancelledClass: 'Cancelada',
+      rescheduledFrom: 'Reagendada de',
+      rescheduledTo: 'Reagendada para',
+      rescheduledClass: 'Aula Reagendada',
+      reason: 'Motivo',
+      enterReason: 'Digite o motivo (opcional)',
+      newDateTime: 'Nova Data e Horário',
+      selectNewDate: 'Selecione a nova data',
+      selectNewTime: 'Selecione o novo horário',
+      confirmCancel: 'Tem certeza que deseja cancelar esta aula?',
+      confirmReschedule: 'Confirmar reagendamento',
+      classCancelled: 'Aula cancelada com sucesso',
+      classRescheduled: 'Aula reagendada com sucesso',
+      deleteException: 'Excluir Exceção',
+      confirmDeleteException: 'Tem certeza que deseja excluir esta exceção?',
+      exceptionDeleted: 'Exceção excluída com sucesso',
+      noExceptions: 'Sem exceções',
+      manageExceptions: 'Gerenciar Exceções',
+      originalDate: 'Data Original',
+      newDate: 'Nova Data',
+      type: 'Tipo',
+      modifyClass: 'Modificar Aula',
+    },
   }
 };
 

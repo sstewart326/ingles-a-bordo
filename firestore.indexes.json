@@ -1,6 +1,31 @@
 {
   "indexes": [
     {
+      "collectionGroup": "classExceptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "originalDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "classExceptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "newDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "classExceptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "originalDate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "classMaterials",
       "queryScope": "COLLECTION",
       "fields": [

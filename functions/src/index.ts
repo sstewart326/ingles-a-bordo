@@ -17,8 +17,6 @@ admin.initializeApp();
 
 // Helper function to get payment app credentials
 function getPaymentAppCredentials() {
-  logger.info('Getting payment app credentials...');
-  
   // Use environment variables (required for Firebase Functions v2)
   const payProjectId = process.env.PAY_PROJECT_ID;
   const payPrivateKey = process.env.PAY_PRIVATE_KEY;
@@ -29,7 +27,6 @@ function getPaymentAppCredentials() {
     throw new Error('Missing payment app credentials. Please set PAY_PROJECT_ID, PAY_PRIVATE_KEY, and PAY_CLIENT_EMAIL environment variables.');
   }
 
-  logger.info('Using environment variables for payment app credentials');
   return {
     projectId: payProjectId,
     privateKey: payPrivateKey.replace(/\\n/g, '\n'),
@@ -47,7 +44,6 @@ function getPaymentApp(): admin.app.App {
       paymentApp = admin.initializeApp({
         credential: admin.credential.cert(credentials),
       }, 'paymentApp');
-      logger.info('Payment app initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize payment app:', error);
       throw error;
@@ -154,7 +150,6 @@ export const checkUserExistsHttp = onRequest({
       }
 
       try {
-        logger.info('auth user lookup', { userId });
         await admin.auth().getUser(userId);
         response.status(200).json({ exists: true });
       } catch (error: unknown) {
@@ -178,6 +173,59 @@ interface Schedule {
   startTime: string;
   endTime: string;
   timezone: string;
+}
+
+/**
+ * Represents a historical version of a class schedule.
+ * Used for preserving schedule history when permanent changes are made.
+ */
+interface ScheduleVersion {
+  version: number;            // Incrementing int (1, 2, 3, ...)
+  effectiveFrom: Date;        // When this schedule version starts
+  scheduleType: 'single' | 'multiple';
+  schedules: Schedule[];      // The schedule(s) for this version
+  timezone: string;
+  frequency: {
+    type: 'weekly' | 'biweekly' | 'custom';
+    every: number;
+  };
+}
+
+/**
+ * Represents a one-off exception to a class schedule.
+ * Used for cancellations and reschedules.
+ */
+interface ClassException {
+  id: string;
+  classId: string;
+  originalDate: string | null;  // YYYY-MM-DD format, null for reschedules without an original date
+  type: 'cancelled' | 'rescheduled';
+  originalStartTime: string;  // Original start time of the class
+  originalEndTime: string;  // Original end time of the class
+  // For rescheduled:
+  newDate?: string;  // YYYY-MM-DD format
+  newStartTime?: string;
+  newEndTime?: string;
+  reason?: string;
+  timezone: string;  // Timezone identifier (e.g., "America/New_York", "UTC")
+  createdAt: Date;
+  createdBy: string;
+}
+
+/**
+ * Represents a calculated class date with optional exception metadata.
+ */
+interface CalculatedClassDate {
+  date: Date;
+  startTime?: string;
+  endTime?: string;
+  timezone?: string;
+  isCancelled?: boolean;
+  isRescheduled?: boolean;
+  originalDate?: string | null;  // For rescheduled classes, shows where it came from (YYYY-MM-DD format)
+  originalStartTime?: string;  // Original start time of the rescheduled class
+  originalEndTime?: string;  // Original end time of the rescheduled class
+  reason?: string;
 }
 
 interface ClassInfo {
@@ -204,6 +252,7 @@ interface ClassInfo {
     every: number;
   };
   paymentDueDates?: Date[];
+  scheduleHistory?: ScheduleVersion[];
 }
 
 /**
@@ -253,11 +302,9 @@ export const getClassScheduleHttp = onRequest({
       // Query classes based on user identifier
       let classesQuery: admin.firestore.Query;
       if (email) {
-        logger.info('users lookup by email', { email });
         classesQuery = admin.firestore().collection('classes')
           .where('studentEmails', 'array-contains', email);
       } else {
-        logger.info('user lookup by userId', { userId });
         classesQuery = admin.firestore().collection('classes')
           .where('studentIds', 'array-contains', userId);
       }
@@ -294,17 +341,19 @@ export const getClassScheduleHttp = onRequest({
       const classSchedule = [];
       const paymentDueDates = [];
 
-      for (const doc of classesSnapshot.docs) {
+      // Process classes with exception support
+      const classProcessingPromises = classesSnapshot.docs.map(async (doc) => {
         const classData = doc.data();
+        const classId = doc.id;
 
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
-          continue;
+          return null;
         }
 
         // Skip classes that start after the requested month
         if (classData.startDate && classData.startDate.toDate() > endDate) {
-          continue;
+          return null;
         }
 
         // Get the actual start date to use (either class start date or month start)
@@ -317,24 +366,32 @@ export const getClassScheduleHttp = onRequest({
           ? classData.endDate.toDate()
           : new Date(endDate);
 
-        // Calculate class dates based on recurrence pattern
-        const classDates = calculateClassDates(
+        // Calculate class dates with exception support
+        const calculatedDates = await calculateClassDatesWithExceptions(
           classData,
           effectiveStartDate,
-          effectiveEndDate
+          effectiveEndDate,
+          classId
         );
 
-        if (classDates.length > 0) {
-          // Calculate payment due dates
-          const paymentDates = calculatePaymentDueDates(
-            classData,
-            userData,
-            startDate,
-            endDate
-          );
+        if (calculatedDates.length === 0) {
+          return null;
+        }
 
-          classSchedule.push({
-            id: doc.id,
+        // Extract just the Date objects for backward compatibility
+        const classDates = calculatedDates.map(cd => cd.date);
+
+        // Calculate payment due dates
+        const paymentDates = calculatePaymentDueDates(
+          classData,
+          userData,
+          startDate,
+          endDate
+        );
+
+        return {
+          classInfo: {
+            id: classId,
             dayOfWeek: classData.dayOfWeek,
             daysOfWeek: classData.daysOfWeek,
             startTime: classData.startTime,
@@ -352,18 +409,27 @@ export const getClassScheduleHttp = onRequest({
               startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
             },
             dates: classDates,
+            calculatedDates, // Include full exception metadata
             paymentDueDates: paymentDates,
             timezone: classData.timezone || 'UTC',
             scheduleType: classData.scheduleType || 'single',
             schedules: classData.schedules || []
-          });
-
-          // Add payment dates to the overall list
-          paymentDueDates.push(...paymentDates.map(date => ({
+          },
+          paymentEntries: paymentDates.map(date => ({
             date,
             paymentLink: classData.paymentConfig?.paymentLink || null,
             amount: classData.paymentConfig?.amount || null
-          })));
+          }))
+        };
+      });
+
+      const processedResults = await Promise.all(classProcessingPromises);
+
+      // Process results
+      for (const result of processedResults) {
+        if (result) {
+          classSchedule.push(result.classInfo);
+          paymentDueDates.push(...result.paymentEntries);
         }
       }
 
@@ -379,6 +445,438 @@ export const getClassScheduleHttp = onRequest({
     }
   });
 });
+
+/**
+ * Fetches class exceptions for a date range from Firestore.
+ * Uses two parallel queries to catch all relevant exceptions:
+ * 1. Exceptions where originalDate is in range (cancellations, reschedules from this period)
+ * 2. Exceptions where newDate is in range (reschedules landing in this period)
+ */
+async function fetchClassExceptions(
+  classId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<ClassException[]> {
+  try {
+    const exceptionsRef = admin.firestore()
+      .collection('classes')
+      .doc(classId)
+      .collection('classExceptions');
+
+    // Convert dates to YYYY-MM-DD strings for querying
+    const startDateString = startDate.toISOString().split('T')[0];
+    const endDateString = endDate.toISOString().split('T')[0];
+
+    // Query 1: Exceptions where originalDate is in range
+    const byOriginalDateQuery = exceptionsRef
+      .where('originalDate', '>=', startDateString)
+      .where('originalDate', '<=', endDateString);
+
+    // Query 2: Exceptions where newDate is in range
+    const byNewDateQuery = exceptionsRef
+      .where('newDate', '>=', startDateString)
+      .where('newDate', '<=', endDateString);
+
+    // Run in parallel
+    const [byOriginalSnapshot, byNewSnapshot] = await Promise.all([
+      byOriginalDateQuery.get(),
+      byNewDateQuery.get(),
+    ]);
+
+    // Deduplicate by document ID (a reschedule within the same month appears in both)
+    const exceptionsMap = new Map<string, ClassException>();
+
+    const processDoc = (doc: admin.firestore.QueryDocumentSnapshot) => {
+      const data = doc.data();
+      const exception: ClassException = {
+        id: doc.id,
+        classId: data.classId,
+        originalDate: data.originalDate || null,
+        type: data.type,
+        originalStartTime: data.originalStartTime,
+        originalEndTime: data.originalEndTime,
+        newDate: data.newDate || undefined,
+        newStartTime: data.newStartTime,
+        newEndTime: data.newEndTime,
+        reason: data.reason,
+        timezone: data.timezone || 'UTC',
+        createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
+        createdBy: data.createdBy,
+      };
+      exceptionsMap.set(doc.id, exception);
+    };
+
+    byOriginalSnapshot.docs.forEach(processDoc);
+    byNewSnapshot.docs.forEach(processDoc);
+
+    return Array.from(exceptionsMap.values());
+  } catch (error) {
+    logger.error('Error fetching class exceptions:', { classId, error });
+    return []; // Return empty array on error to not break date calculation
+  }
+}
+
+/**
+ * Builds lookup maps from exceptions for efficient O(1) access during date iteration.
+ * Dates are already stored as YYYY-MM-DD strings, so we can use them directly as map keys.
+ */
+function buildExceptionMaps(exceptions: ClassException[]): {
+  byOriginalDate: Map<string, ClassException>;
+  byNewDate: Map<string, ClassException>;
+} {
+  const byOriginalDate = new Map<string, ClassException>();
+  const byNewDate = new Map<string, ClassException>();
+
+  for (const ex of exceptions) {
+    if (ex.originalDate) {
+      // originalDate is already a YYYY-MM-DD string
+      byOriginalDate.set(ex.originalDate, ex);
+    }
+    if (ex.newDate) {
+      // newDate is already a YYYY-MM-DD string
+      byNewDate.set(ex.newDate, ex);
+    }
+  }
+
+  return { byOriginalDate, byNewDate };
+}
+
+/**
+ * Gets the appropriate schedule version for a specific date.
+ * If the class has schedule history, finds the version that was effective on the given date.
+ * Otherwise, uses the current schedule fields.
+ * 
+ * Note: This function is prepared for future schedule versioning support.
+ * Uncomment when historical schedule display is needed.
+ *
+ * function getScheduleForDate(classData: any, date: Date): {
+ *   scheduleType: 'single' | 'multiple';
+ *   schedules: Schedule[];
+ *   dayOfWeek: number;
+ *   startTime: string;
+ *   endTime: string;
+ *   timezone: string;
+ *   frequency: { type: string; every: number };
+ * } | null {
+ *   // Check if class has schedule history
+ *   if (classData.scheduleHistory && Array.isArray(classData.scheduleHistory) && classData.scheduleHistory.length > 0) {
+ *     // Sort by effectiveFrom descending to find the most recent applicable version
+ *     const sortedHistory = [...classData.scheduleHistory].sort((a: any, b: any) => {
+ *       const dateA = a.effectiveFrom instanceof Date ? a.effectiveFrom : a.effectiveFrom.toDate();
+ *       const dateB = b.effectiveFrom instanceof Date ? b.effectiveFrom : b.effectiveFrom.toDate();
+ *       return dateB.getTime() - dateA.getTime();
+ *     });
+ *
+ *     // Find the version that was effective on the given date
+ *     for (const version of sortedHistory) {
+ *       const effectiveFrom = version.effectiveFrom instanceof Date 
+ *         ? version.effectiveFrom 
+ *         : version.effectiveFrom.toDate();
+ *       
+ *       if (date >= effectiveFrom) {
+ *         return {
+ *           scheduleType: version.scheduleType,
+ *           schedules: version.schedules,
+ *           dayOfWeek: version.schedules[0]?.dayOfWeek ?? classData.dayOfWeek,
+ *           startTime: version.schedules[0]?.startTime ?? classData.startTime,
+ *           endTime: version.schedules[0]?.endTime ?? classData.endTime,
+ *           timezone: version.timezone || classData.timezone,
+ *           frequency: version.frequency || classData.frequency || { type: 'weekly', every: 1 },
+ *         };
+ *       }
+ *     }
+ *   }
+ *
+ *   return {
+ *     scheduleType: classData.scheduleType || 'single',
+ *     schedules: classData.schedules || [{
+ *       dayOfWeek: classData.dayOfWeek,
+ *       startTime: classData.startTime,
+ *       endTime: classData.endTime,
+ *       timezone: classData.timezone,
+ *     }],
+ *     dayOfWeek: classData.dayOfWeek,
+ *     startTime: classData.startTime,
+ *     endTime: classData.endTime,
+ *     timezone: classData.timezone,
+ *     frequency: classData.frequency || { type: 'weekly', every: 1 },
+ *   };
+ * }
+ */
+
+/**
+ * Helper function to get the next day
+ */
+function nextDay(date: Date): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + 1);
+  return next;
+}
+
+/**
+ * Calculate class dates with schedule versioning and exception support.
+ * This is the enhanced version that handles:
+ * 1. Historical schedule versions
+ * 2. Class exceptions (cancellations, reschedules)
+ */
+async function calculateClassDatesWithExceptions(
+  classData: any,
+  startDate: Date,
+  endDate: Date,
+  classId: string
+): Promise<CalculatedClassDate[]> {
+  // Fetch exceptions for this class in the date range
+  const exceptions = await fetchClassExceptions(classId, startDate, endDate);
+  const { byOriginalDate, byNewDate } = buildExceptionMaps(exceptions);
+
+  const dates: CalculatedClassDate[] = [];
+  const processedDates = new Set<string>(); // Track to avoid duplicates
+
+  // First pass: Add rescheduled classes landing in this period
+  for (let date = new Date(startDate); date <= endDate; date = nextDay(date)) {
+    const dateKey = date.toISOString().split('T')[0];
+    const landingException = byNewDate.get(dateKey);
+
+      if (landingException && !processedDates.has(dateKey)) {
+        // Check if this rescheduled class has been subsequently cancelled
+        const cancellationException = byOriginalDate.get(dateKey);
+        
+        if (cancellationException?.type === 'cancelled') {
+          // The rescheduled class was cancelled - mark as cancelled
+          processedDates.add(dateKey);
+          dates.push({
+            date: new Date(date),
+            isCancelled: true,
+            reason: cancellationException.reason,
+          });
+        } else {
+          // Check if this rescheduled date has been rescheduled again
+          // If the newDate is the originalDate of another reschedule, skip this one
+          // BUT: if newDate === originalDate (same date reschedule), the same exception
+          // will appear in both maps, so we need to check if it's a different exception
+          const subsequentReschedule = byOriginalDate.get(dateKey);
+          if (subsequentReschedule?.type === 'rescheduled' && subsequentReschedule.id !== landingException.id) {
+            // This rescheduled class was rescheduled again by a DIFFERENT exception - skip it
+            // The subsequent reschedule will be handled in its own iteration
+            processedDates.add(dateKey);
+            continue;
+          }
+          
+          // Normal rescheduled class - add it
+          // This handles both: reschedules to different dates AND reschedules to same date (time-only changes)
+          processedDates.add(dateKey);
+          // Keep originalDate as string (YYYY-MM-DD) to avoid timezone conversion issues
+          dates.push({
+            date: new Date(date),
+            startTime: landingException.newStartTime,
+            endTime: landingException.newEndTime,
+            timezone: landingException.timezone,
+            isRescheduled: landingException.type === 'rescheduled',
+            originalDate: landingException.originalDate || null,
+            originalStartTime: landingException.originalStartTime,
+            originalEndTime: landingException.originalEndTime,
+            reason: landingException.reason,
+          });
+        }
+      }
+  }
+
+  // Second pass: Generate regular schedule dates, applying cancellations
+  const baseDates = calculateClassDates(classData, startDate, endDate);
+
+  for (const date of baseDates) {
+    const dateKey = date.toISOString().split('T')[0];
+
+    // Check for exceptions on this original date first
+    const exception = byOriginalDate.get(dateKey);
+    
+    // If this date was already processed as a landing date (rescheduled class landed here),
+    // but it's also a regular scheduled date for this class, we should include it as a regular class
+    // This handles the case where a class is rescheduled TO a date where the same class already has a regular occurrence
+    const wasProcessedAsLanding = processedDates.has(dateKey);
+    if (wasProcessedAsLanding) {
+      // Check if this date is also a regular scheduled date (no exception on this date)
+      if (!exception) {
+        // This date has a rescheduled class landing on it, but it's also a regular date for this class
+        // Add it as a regular class (both the rescheduled and regular will appear)
+        dates.push({ date });
+      }
+      continue;
+    }
+
+    if (exception?.type === 'cancelled') {
+      // Show cancelled class with cancelled flag
+      dates.push({
+        date,
+        isCancelled: true,
+        reason: exception.reason,
+      });
+      processedDates.add(dateKey);
+      continue;
+    }
+
+    if (exception?.type === 'rescheduled') {
+      // If newDate === originalDate, this is a time-only reschedule on the same date
+      // The first pass should have already added it with the new time, so we just skip here
+      // If newDate !== originalDate, skip the original date - only the newDate will appear on calendar
+      if (exception.newDate === dateKey) {
+        // Same date reschedule - first pass should have already added it with new time
+        // Just mark as processed and continue (don't add the regular schedule time)
+        processedDates.add(dateKey);
+      } else {
+        // Different date reschedule - skip the original date
+        processedDates.add(dateKey);
+      }
+      continue;
+    }
+
+    // Normal class - add if not already added
+    if (!processedDates.has(dateKey)) {
+      dates.push({ date });
+      processedDates.add(dateKey);
+    }
+  }
+
+  // Sort dates chronologically
+  return dates.sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+/**
+ * Build a dailyClassMap from a class schedule array
+ * Filters out cancelled dates and organizes classes by date
+ * @param classSchedule Array of class information with calculatedDates
+ * @returns Record mapping date strings (YYYY-MM-DD) to array of class entries
+ */
+function buildDailyClassMap(classSchedule: any[]): Record<string, any[]> {
+
+  const dailyClassMap: Record<string, any[]> = {};
+
+  // First, identify dates where rescheduled classes are landing, and which class they're from
+  const datesWithRescheduledClasses = new Map<string, string>(); // date -> classId
+  for (const classItem of classSchedule) {
+    const calculatedDates = (classItem as any).calculatedDates || 
+      (classItem.dates ? classItem.dates.map((d: Date) => ({ date: d })) : []);
+    for (const calcDate of calculatedDates) {
+      if (calcDate.isRescheduled) {
+        const dateString = calcDate.date.toISOString().split('T')[0];
+        datesWithRescheduledClasses.set(dateString, classItem.id);
+      }
+    }
+  }
+
+  // Process all classes and add them to the daily class map with exception support
+  for (const classItem of classSchedule) {
+    // Use calculatedDates if available for exception metadata, otherwise fall back to dates
+    const calculatedDates = (classItem as any).calculatedDates || 
+      (classItem.dates ? classItem.dates.map((d: Date) => ({ date: d })) : []);
+
+    // Add each class date to the daily map
+    for (const calcDate of calculatedDates) {
+      const date = calcDate.date;
+      const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      // Skip cancelled dates - UNLESS there's a rescheduled class from THIS SAME CLASS landing on this date
+      // In that case, we want to show both the regular class and the rescheduled class from the same class
+      // We only include cancelled classes if the rescheduled class landing on that date is from the same class
+      if (calcDate.isCancelled) {
+        const rescheduledClassId = datesWithRescheduledClasses.get(dateString);
+        if (rescheduledClassId === classItem.id) {
+          // There's a rescheduled class from THIS SAME CLASS on this date, so include this class as a regular class
+          // (don't treat it as cancelled for display purposes)
+          // Continue processing as a regular class (don't skip, don't mark as cancelled)
+        } else {
+          // No rescheduled class from this class on this date, skip the cancelled class
+          continue;
+        }
+      }
+
+      if (!dailyClassMap[dateString]) {
+        dailyClassMap[dateString] = [];
+      }
+
+      let classEntry: any;
+
+      // Handle different schedule types
+      if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules)) {
+        // For rescheduled classes, use their specified times even if no matching schedule
+        if (calcDate.isRescheduled) {
+          classEntry = {
+            id: classItem.id,
+            startTime: calcDate.startTime || classItem.startTime,
+            endTime: calcDate.endTime || classItem.endTime,
+            timezone: classItem.timezone,
+            courseType: classItem.courseType,
+            students: classItem.students || []
+          };
+        } else {
+          // For regular classes, find the matching schedule for this day
+          const matchingSchedule = classItem.schedules.find((schedule: any) => schedule.dayOfWeek === date.getDay());
+          if (matchingSchedule) {
+            classEntry = {
+              id: classItem.id,
+              startTime: calcDate.startTime || matchingSchedule.startTime,
+              endTime: calcDate.endTime || matchingSchedule.endTime,
+              timezone: matchingSchedule.timezone || classItem.timezone,
+              courseType: classItem.courseType,
+              students: classItem.students || []
+            };
+          }
+        }
+      } else {
+        // For single schedule
+        classEntry = {
+          id: classItem.id,
+          startTime: calcDate.startTime || classItem.startTime,
+          endTime: calcDate.endTime || classItem.endTime,
+          timezone: classItem.timezone,
+          courseType: classItem.courseType,
+          students: classItem.students || []
+        };
+      }
+
+      if (classEntry) {
+        // Add exception metadata if present (for rescheduled classes)
+        if (calcDate.isRescheduled) {
+          classEntry.isRescheduled = true;
+          classEntry.originalDate = calcDate.originalDate;
+          classEntry.originalStartTime = calcDate.originalStartTime;
+          classEntry.originalEndTime = calcDate.originalEndTime;
+          classEntry.reason = calcDate.reason;
+        }
+
+        dailyClassMap[dateString].push(classEntry);
+      }
+    }
+  }
+
+  // Sort classes in each day by start time
+  Object.keys(dailyClassMap).forEach(dateStr => {
+    dailyClassMap[dateStr].sort((a, b) => {
+      // Parse time strings to compare
+      const timeA = a.startTime || '00:00';
+      const timeB = b.startTime || '00:00';
+
+      // Convert to 24-hour format for comparison
+      const parseTime = (timeStr: string) => {
+        const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+        if (!match) return 0;
+        
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3]?.toUpperCase();
+
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+
+        return hours * 60 + minutes;
+      };
+
+      return parseTime(timeA) - parseTime(timeB);
+    });
+  });
+
+  return dailyClassMap;
+}
 
 /**
  * Calculate class dates based on recurrence pattern
@@ -648,15 +1146,12 @@ export const getClassMaterialsHttp = onRequest({
 
       if (classId) {
         // Filter by class ID
-        logger.info('materials lookup by classId', { classId });
         materialsQuery = materialsQuery.where('classId', '==', classId);
       } else if (email) {
         // Filter by student email
-        logger.info('materials lookup by studentEmail', { email });
         materialsQuery = materialsQuery.where('studentEmails', 'array-contains', email);
       } else if (userId) {
         // Get user email first
-        logger.info('user lookup for materials by userId', { userId });
         const userDoc = await admin.firestore().collection('users').doc(userId as string).get();
         if (!userDoc.exists) {
           response.status(404).json({ error: 'User not found' });
@@ -667,7 +1162,6 @@ export const getClassMaterialsHttp = onRequest({
           response.status(404).json({ error: 'User email not found' });
           return;
         }
-        logger.info('materials lookup by studentEmail', { userEmail });
         materialsQuery = materialsQuery.where('studentEmails', 'array-contains', userEmail);
       }
 
@@ -675,11 +1169,8 @@ export const getClassMaterialsHttp = onRequest({
       const materialsSnapshot = await materialsQuery.get();
 
       if (materialsSnapshot.empty) {
-        logger.info('no materials found for the given parameters');
         response.status(200).json({ materials: [] });
         return;
-      } else {
-        logger.info('number of materials found for the given parameters', { numMaterials: materialsSnapshot.size });
       }
 
       // Filter materials by date and organize by class
@@ -769,7 +1260,6 @@ export const getCalendarDataHttp = onRequest({
 
       if (email) {
         userEmail = email as string;
-        logger.info('users lookup by email', { email });
         const usersSnapshot = await admin.firestore().collection('users')
           .where('email', '==', userEmail)
           .limit(1)
@@ -783,7 +1273,6 @@ export const getCalendarDataHttp = onRequest({
           };
         }
       } else if (userId) {
-        logger.info('user lookup by userId', { userId });
         const userDoc = await admin.firestore().collection('users').doc(userId as string).get();
         if (userDoc.exists) {
           userData = {
@@ -795,52 +1284,41 @@ export const getCalendarDataHttp = onRequest({
       }
 
       if (!userData) {
-        logger.info('user not found for the given parameters');
         response.status(404).json({ error: 'User not found' });
         return;
-      } else {
-        logger.info('user found for the given parameters', { userId: userData.id, email: userData.email });
       }
 
       // Query classes based on user identifier - try both studentIds and studentEmails
       let classesQuery: admin.firestore.Query;
 
       if (userEmail) {
-        logger.info('classes lookup by studentEmail', { userEmail });
         classesQuery = admin.firestore().collection('classes')
           .where('studentEmails', 'array-contains', userEmail);
       } else {
-        logger.info('classes lookup by userId', { userId });
         classesQuery = admin.firestore().collection('classes')
           .where('studentIds', 'array-contains', userId);
       }
 
       const classesSnapshot = await classesQuery.get();
 
-      if (classesSnapshot.empty) {
-        logger.info('no classes found for the given parameters');
-      } else {
-        logger.info('number of classes found for the given parameters', { numClasses: classesSnapshot.size });
-      }
-
       // Process classes and map them to dates
       const classSchedule = [];
       const paymentDueDates = [];
       const classIds = [];
 
-      for (const doc of classesSnapshot.docs) {
+      // Process classes with exception support
+      const classProcessingPromises = classesSnapshot.docs.map(async (doc) => {
         const classData = doc.data();
         const classId = doc.id;
-        classIds.push(classId);
 
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
-          continue;
+          return { classId, classInfo: null, paymentEntries: [] };
         }
 
         // Skip classes that start after the requested month
         if (classData.startDate && classData.startDate.toDate() > endDate) {
-          continue;
+          return { classId, classInfo: null, paymentEntries: [] };
         }
 
         // Get the actual start date to use (either class start date or month start)
@@ -853,85 +1331,104 @@ export const getCalendarDataHttp = onRequest({
           ? classData.endDate.toDate()
           : new Date(endDate);
 
-        // Calculate class dates based on recurrence pattern
-        const classDates = calculateClassDates(
+        // Calculate class dates with exception support
+        const calculatedDates = await calculateClassDatesWithExceptions(
           classData,
           effectiveStartDate,
-          effectiveEndDate
+          effectiveEndDate,
+          classId
         );
 
-        if (classDates.length > 0) {
-          // Calculate payment due dates
-          const paymentDates = calculatePaymentDueDates(
-            classData,
-            userData,
-            startDate,
-            endDate
-          );
+        if (calculatedDates.length === 0) {
+          return { classId, classInfo: null, paymentEntries: [] };
+        }
 
-          // Create a base class object
-          const baseClassInfo: Partial<ClassInfo> = {
-            id: classId, // Add ID for tracking
+        // Extract just the Date objects for backward compatibility
+        const classDates = calculatedDates.map(cd => cd.date);
+
+        // Calculate payment due dates
+        const paymentDates = calculatePaymentDueDates(
+          classData,
+          userData,
+          startDate,
+          endDate
+        );
+
+        // Create a base class object
+        const baseClassInfo: Partial<ClassInfo> = {
+          id: classId, // Add ID for tracking
+          dayOfWeek: classData.dayOfWeek,
+          daysOfWeek: classData.daysOfWeek,
+          courseType: classData.courseType,
+          notes: classData.notes,
+          studentEmails: classData.studentEmails,
+          students: classData.students || classData.studentEmails.map((email: string) => ({ email })),
+          startDate: classData.startDate ? classData.startDate.toDate() : null,
+          endDate: classData.endDate ? classData.endDate.toDate() : null,
+          recurrencePattern: classData.recurrencePattern || 'weekly',
+          recurrenceInterval: classData.recurrenceInterval || 1,
+          paymentConfig: classData.paymentConfig || {
+            type: 'monthly',
+            monthlyOption: 'first',
+            startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+          },
+          dates: classDates,
+          timezone: classData.timezone,
+          scheduleType: classData.scheduleType || 'single'
+        };
+
+        // Create a class object that matches the ClassSession interface in the frontend
+        const classInfo: ClassInfo = {
+          ...baseClassInfo,
+          timezone: classData.timezone,
+          scheduleType: classData.scheduleType || 'single'
+        } as ClassInfo;
+
+        const singleClassInfo: ClassInfo & { calculatedDates?: CalculatedClassDate[] } = {
+          ...classInfo,
+          timezone: classData.timezone,
+          dates: classDates,
+          calculatedDates, // Include full exception metadata
+          paymentDueDates: calculatePaymentDueDates(
+            classData.paymentConfig,
+            classDates,
+            effectiveStartDate,
+            effectiveEndDate
+          ),
+          scheduleType: classData.scheduleType || 'single',
+          schedules: classData.schedules || []
+        };
+
+        // Build payment entries
+        const paymentEntries = paymentDates.map(date => ({
+          date,
+          user: {
+            name: userData.name,
+            email: userEmail
+          },
+          classSession: {
+            id: classId,
             dayOfWeek: classData.dayOfWeek,
-            daysOfWeek: classData.daysOfWeek,
+            startTime: classData.startTime,
+            endTime: classData.endTime,
             courseType: classData.courseType,
-            notes: classData.notes,
-            studentEmails: classData.studentEmails,
-            students: classData.students || classData.studentEmails.map((email: string) => ({ email })),
-            startDate: classData.startDate ? classData.startDate.toDate() : null,
-            endDate: classData.endDate ? classData.endDate.toDate() : null,
-            recurrencePattern: classData.recurrencePattern || 'weekly',
-            recurrenceInterval: classData.recurrenceInterval || 1,
-            paymentConfig: classData.paymentConfig || {
-              type: 'monthly',
-              monthlyOption: 'first',
-              startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-            },
-            dates: classDates,
-            timezone: classData.timezone,
-            scheduleType: classData.scheduleType || 'single'
-          };
+            paymentConfig: classData.paymentConfig
+          },
+          paymentLink: classData.paymentConfig?.paymentLink || null,
+          amount: classData.paymentConfig?.amount || null
+        }));
 
-          // Create a class object that matches the ClassSession interface in the frontend
-          const classInfo: ClassInfo = {
-            ...baseClassInfo,
-            timezone: classData.timezone,
-            scheduleType: classData.scheduleType || 'single'
-          } as ClassInfo;
+        return { classId, classInfo: singleClassInfo, paymentEntries };
+      });
 
-          const singleClassInfo: ClassInfo = {
-            ...classInfo,
-            timezone: classData.timezone,
-            dates: classDates,
-            paymentDueDates: calculatePaymentDueDates(
-              classData.paymentConfig,
-              classDates,
-              effectiveStartDate,
-              effectiveEndDate
-            ),
-            scheduleType: classData.scheduleType || 'single',
-            schedules: classData.schedules || []
-          };
-          classSchedule.push(singleClassInfo);
+      const processedResults = await Promise.all(classProcessingPromises);
 
-          // Add payment dates to the overall list
-          paymentDueDates.push(...paymentDates.map(date => ({
-            date,
-            user: {
-              name: userData.name,
-              email: userEmail
-            },
-            classSession: {
-              id: classId,
-              dayOfWeek: classData.dayOfWeek,
-              startTime: classData.startTime,
-              endTime: classData.endTime,
-              courseType: classData.courseType,
-              paymentConfig: classData.paymentConfig
-            },
-            paymentLink: classData.paymentConfig?.paymentLink || null,
-            amount: classData.paymentConfig?.amount || null
-          })));
+      // Process results
+      for (const result of processedResults) {
+        if (result.classInfo) {
+          classIds.push(result.classId);
+          classSchedule.push(result.classInfo);
+          paymentDueDates.push(...result.paymentEntries);
         }
       }
 
@@ -946,17 +1443,10 @@ export const getCalendarDataHttp = onRequest({
         }
 
         for (const chunk of classIdChunks) {
-          logger.info('materials lookup by classIds chunk', { classIds: chunk });
           const materialsQuery: admin.firestore.Query = admin.firestore().collection('classMaterials')
             .where('classId', 'in', chunk);
 
           const materialsSnapshot = await materialsQuery.get();
-
-          if (materialsSnapshot.empty) {
-            logger.info('no materials found for the given classIds chunk');
-          } else {
-            logger.info('number of materials found for the given classIds chunk', { numMaterials: materialsSnapshot.size });
-          }
 
           for (const doc of materialsSnapshot.docs) {
             const materialData = doc.data();
@@ -997,19 +1487,12 @@ export const getCalendarDataHttp = onRequest({
             const paymentEndDate = new Date(endDate);
             paymentEndDate.setDate(paymentEndDate.getDate() + 1);
             paymentEndDate.setHours(0, 0, 0, 0);
-            logger.info('payments lookup by userEmail', { userEmail, paymentStartDate, paymentEndDate });
             // Try both userId field formats
             const paymentsSnapshotByEmail = await admin.firestore().collection('payments')
               .where('userId', '==', userEmail)
               .where('dueDate', '>=', paymentStartDate)
               .where('dueDate', '<', paymentEndDate)
               .get();
-
-            if (paymentsSnapshotByEmail.empty) {
-              logger.info('no payments found for the given userEmail', { userEmail, paymentStartDate, paymentEndDate });
-            } else {
-              logger.info('number of payments found for the given userEmail', { userEmail, paymentStartDate, paymentEndDate, numPayments: paymentsSnapshotByEmail.size });
-            }
 
             // Process payments by email
             for (const doc of paymentsSnapshotByEmail.docs) {
@@ -1047,14 +1530,7 @@ export const getCalendarDataHttp = onRequest({
       }> = [];
 
       // Query all users to get birthdays
-      logger.info('querying all users for birthdays');
       const usersSnapshot = await admin.firestore().collection('users').get();
-
-      if (usersSnapshot.empty) {
-        logger.error('no users found for the given parameters');
-      } else {
-        logger.info('number of users found for the given parameters', { numUsers: usersSnapshot.size });
-      }
 
       for (const doc of usersSnapshot.docs) {
         const userData = doc.data();
@@ -1076,65 +1552,7 @@ export const getCalendarDataHttp = onRequest({
       }
 
       // Create dailyClassMap - a map of date strings to classes for easy lookup
-      const dailyClassMap: Record<string, any[]> = {};
-
-      // Process all classes and add them to the daily class map
-      for (const classItem of classSchedule) {
-        // Skip classes without dates
-        if (!classItem.dates || !Array.isArray(classItem.dates)) continue;
-
-        // Add each class date to the daily map
-        classItem.dates.forEach((date: Date) => {
-          const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
-          if (!dailyClassMap[dateString]) {
-            dailyClassMap[dateString] = [];
-          }
-
-          // Handle different schedule types
-          if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules)) {
-            // For multiple schedules, find the matching schedule for this day
-            const matchingSchedule = classItem.schedules.find(schedule => schedule.dayOfWeek === date.getDay());
-            if (matchingSchedule) {
-              dailyClassMap[dateString].push({
-                id: classItem.id,
-                startTime: matchingSchedule.startTime,
-                endTime: matchingSchedule.endTime,
-                timezone: matchingSchedule.timezone || classItem.timezone,
-                courseType: classItem.courseType,
-                students: classItem.students || []
-              });
-            }
-          } else {
-            // For single schedule
-            dailyClassMap[dateString].push({
-              id: classItem.id,
-              startTime: classItem.startTime,
-              endTime: classItem.endTime,
-              timezone: classItem.timezone,
-              courseType: classItem.courseType,
-              students: classItem.students || []
-            });
-          }
-        });
-      }
-
-      // Sort classes in each day by start time
-      Object.keys(dailyClassMap).forEach(dateStr => {
-        dailyClassMap[dateStr].sort((a, b) => {
-          // Parse time strings to compare
-          const timeA = a.startTime ? a.startTime.replace(/[^0-9:]/g, '') : '00:00';
-          const timeB = b.startTime ? b.startTime.replace(/[^0-9:]/g, '') : '00:00';
-
-          const [hoursA, minutesA] = timeA.split(':').map(Number);
-          const [hoursB, minutesB] = timeB.split(':').map(Number);
-
-          // Convert to minutes for comparison
-          const totalMinutesA = hoursA * 60 + (minutesA || 0);
-          const totalMinutesB = hoursB * 60 + (minutesB || 0);
-
-          return totalMinutesA - totalMinutesB;
-        });
-      });
+      const dailyClassMap = buildDailyClassMap(classSchedule);
 
       response.status(200).json({
         classes: classSchedule,
@@ -1175,15 +1593,12 @@ export const getAllClassesForMonthHttp = onRequest({
 
       // Verify admin status
       if (adminId) {
-        logger.info('admin verification lookup', { adminId });
         const adminDoc = await admin.firestore().collection('users').doc(adminId as string).get();
 
         if (!adminDoc.exists) {
           logger.error('admin not found for the given parameters');
           response.status(403).json({ error: 'Unauthorized. Admin not found.' });
           return;
-        } else {
-          logger.info('admin found for the given parameters', { adminId: adminDoc.id });
         }
 
         const userData = adminDoc.data();
@@ -1192,8 +1607,6 @@ export const getAllClassesForMonthHttp = onRequest({
           logger.error('admin access required');
           response.status(403).json({ error: 'Unauthorized. Admin access required.' });
           return;
-        } else {
-          logger.info('admin access granted');
         }
       } else {
         logger.error('admin ID required');
@@ -1234,13 +1647,11 @@ export const getAllClassesForMonthHttp = onRequest({
       }> = [];
 
       // Get users who have this admin as their teacher
-      logger.info('users lookup by teacher', { teacherId: adminId });
       const usersSnapshot = await admin.firestore().collection('users')
         .where('teacher', '==', adminId as string)
         .get();
 
       if (usersSnapshot.empty) {
-        logger.info('no users found for the given parameters');
         response.status(200).json({
           classes: [],
           dailyClassMap: {},
@@ -1249,8 +1660,6 @@ export const getAllClassesForMonthHttp = onRequest({
           year: yearInt
         });
         return;
-      } else {
-        logger.info('number of users found for the given parameters', { numUsers: usersSnapshot.size });
       }
 
       const usersMap = new Map();
@@ -1291,7 +1700,6 @@ export const getAllClassesForMonthHttp = onRequest({
 
       if (userEmails.length <= batchSize) {
         // If we have 10 or fewer emails, we can use a single query
-        logger.info('classes lookup by studentEmails (single batch)', { userEmails });
         classesSnapshot = await admin.firestore().collection('classes')
           .where('studentEmails', 'array-contains-any', userEmails)
           .get();
@@ -1304,7 +1712,6 @@ export const getAllClassesForMonthHttp = onRequest({
         }
 
         // Execute all batch queries
-        logger.info('classes lookup by studentEmails (multiple batches)', { batches });
         const batchQueries = batches.map(batch =>
           admin.firestore().collection('classes')
             .where('studentEmails', 'array-contains-any', batch)
@@ -1312,13 +1719,6 @@ export const getAllClassesForMonthHttp = onRequest({
         );
 
         const batchResults = await Promise.all(batchQueries);
-
-        const totalDocs = batchResults.reduce((sum, snapshot) => sum + snapshot.size, 0);
-        if (totalDocs === 0) {
-          logger.info('no classes found for the given parameters');
-        } else {
-          logger.info('number of classes found for the given parameters', { numClasses: totalDocs });
-        }
 
         // Combine results, avoiding duplicates
         const classesMap = new Map();
@@ -1334,7 +1734,6 @@ export const getAllClassesForMonthHttp = onRequest({
           empty: classesMap.size === 0
         };
       }
-
       if (classesSnapshot.empty) {
         response.status(200).json({
           classes: [],
@@ -1350,18 +1749,19 @@ export const getAllClassesForMonthHttp = onRequest({
       const classSchedule = [];
       const dailyClassMap: Record<string, any[]> = {}; // Map of date strings to classes
 
-      for (const doc of classesSnapshot.docs) {
+      // Process classes in parallel with exception support
+      const classProcessingPromises = classesSnapshot.docs.map(async (doc) => {
         const classData = doc.data();
         const classId = doc.id;
 
         // Skip classes that have ended before the requested month
         if (classData.endDate && classData.endDate.toDate() < startDate) {
-          continue;
+          return null;
         }
 
         // Skip classes that start after the requested month
         if (classData.startDate && classData.startDate.toDate() > endDate) {
-          continue;
+          return null;
         }
 
         // Get the actual start date to use (either class start date or month start)
@@ -1374,117 +1774,80 @@ export const getAllClassesForMonthHttp = onRequest({
           ? classData.endDate.toDate()
           : new Date(endDate);
 
-        // Calculate class dates based on recurrence pattern
-        const classDates = calculateClassDates(
+        // Calculate class dates with exception support
+        const calculatedDates = await calculateClassDatesWithExceptions(
           classData,
           effectiveStartDate,
-          effectiveEndDate
+          effectiveEndDate,
+          classId
         );
 
-        if (classDates.length > 0) {
-          // Get student details - only include students taught by this admin
-          const relevantStudentEmails = classData.studentEmails.filter((email: string) => userEmails.includes(email));
-          const students = relevantStudentEmails.map((email: string) => {
-            const user = usersMap.get(email);
-            return user || { email };
-          });
-
-          // Create a class object that matches the ClassSession interface in the frontend
-          const classInfo: ClassInfo = {
-            id: classId, // Add ID for single schedule classes
-            dayOfWeek: classData.dayOfWeek,
-            daysOfWeek: classData.daysOfWeek,
-            courseType: classData.courseType,
-            notes: classData.notes,
-            studentEmails: relevantStudentEmails,
-            students,
-            startDate: classData.startDate ? classData.startDate.toDate() : null,
-            endDate: classData.endDate ? classData.endDate.toDate() : null,
-            recurrencePattern: classData.recurrencePattern || 'weekly',
-            recurrenceInterval: classData.recurrenceInterval || 1,
-            paymentConfig: classData.paymentConfig || {
-              type: 'monthly',
-              monthlyOption: 'first',
-              startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-            },
-            dates: classDates,
-            timezone: classData.timezone,
-            scheduleType: classData.scheduleType || 'single'
-          };
-
-          const singleClassInfo: ClassInfo = {
-            ...classInfo,
-            timezone: classData.timezone,
-            dates: classDates,
-            paymentDueDates: calculatePaymentDueDates(
-              classData.paymentConfig,
-              classDates,
-              effectiveStartDate,
-              effectiveEndDate
-            ),
-            scheduleType: classData.scheduleType || 'single',
-            schedules: classData.schedules || []
-          };
-          classSchedule.push(singleClassInfo);
+        if (calculatedDates.length === 0) {
+          return null;
         }
-      }
 
-      // Process classes for the dailyClassMap
-      for (const classItem of classSchedule) {
-        // Process each date for the class
-        for (const date of classItem.dates) {
-          const dateStr = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-          const dayOfWeek = date.getDay();
+        // Extract just the Date objects for backward compatibility
+        const classDates = calculatedDates.map(cd => cd.date);
 
-          if (!dailyClassMap[dateStr]) {
-            dailyClassMap[dateStr] = [];
-          }
-
-          // Handle different schedule types
-          if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules)) {
-            // For multiple schedules, find the matching schedule for this day
-            const matchingSchedule = classItem.schedules.find((schedule: Schedule) => schedule.dayOfWeek === dayOfWeek);
-            if (matchingSchedule) {
-              dailyClassMap[dateStr].push({
-                id: classItem.id,
-                startTime: matchingSchedule.startTime,
-                endTime: matchingSchedule.endTime,
-                timezone: matchingSchedule.timezone || classItem.timezone,
-                courseType: classItem.courseType,
-                students: classItem.students
-              });
-            }
-          } else {
-            // For single schedule
-            dailyClassMap[dateStr].push({
-              id: classItem.id,
-              startTime: classItem.startTime,
-              endTime: classItem.endTime,
-              timezone: classItem.timezone,
-              courseType: classItem.courseType,
-              students: classItem.students
-            });
-          }
-        }
-      }
-
-      // Sort classes in each day by start time
-      Object.keys(dailyClassMap).forEach(dateStr => {
-        dailyClassMap[dateStr].sort((a, b) => {
-          // Parse time strings to compare - handle edge cases cleanly
-          const timeA = a.startTime ? a.startTime.replace(/[^0-9:]/g, '') : '00:00';
-          const timeB = b.startTime ? b.startTime.replace(/[^0-9:]/g, '') : '00:00';
-
-          const [hoursA, minutesA] = timeA.split(':').map(Number);
-          const [hoursB, minutesB] = timeB.split(':').map(Number);
-
-          // Convert to minutes for comparison
-          const totalMinutesA = hoursA * 60 + (minutesA || 0);
-          const totalMinutesB = hoursB * 60 + (minutesB || 0);
-
-          return totalMinutesA - totalMinutesB;
+        // Get student details - only include students taught by this admin
+        const relevantStudentEmails = classData.studentEmails.filter((email: string) => userEmails.includes(email));
+        const students = relevantStudentEmails.map((email: string) => {
+          const user = usersMap.get(email);
+          return user || { email };
         });
+
+        // Create a class object that matches the ClassSession interface in the frontend
+        const classInfo: ClassInfo = {
+          id: classId, // Add ID for single schedule classes
+          dayOfWeek: classData.dayOfWeek,
+          daysOfWeek: classData.daysOfWeek,
+          courseType: classData.courseType,
+          notes: classData.notes,
+          studentEmails: relevantStudentEmails,
+          students,
+          startDate: classData.startDate ? classData.startDate.toDate() : null,
+          endDate: classData.endDate ? classData.endDate.toDate() : null,
+          recurrencePattern: classData.recurrencePattern || 'weekly',
+          recurrenceInterval: classData.recurrenceInterval || 1,
+          paymentConfig: classData.paymentConfig || {
+            type: 'monthly',
+            monthlyOption: 'first',
+            startDate: classData.startDate ? classData.startDate.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+          },
+          dates: classDates,
+          timezone: classData.timezone,
+          scheduleType: classData.scheduleType || 'single'
+        };
+
+        const singleClassInfo: ClassInfo & { calculatedDates?: CalculatedClassDate[] } = {
+          ...classInfo,
+          timezone: classData.timezone,
+          dates: classDates,
+          calculatedDates, // Include full exception metadata
+          paymentDueDates: calculatePaymentDueDates(
+            classData.paymentConfig,
+            classDates,
+            effectiveStartDate,
+            effectiveEndDate
+          ),
+          scheduleType: classData.scheduleType || 'single',
+          schedules: classData.schedules || []
+        };
+        
+        return singleClassInfo;
       });
+
+      const processedClasses = await Promise.all(classProcessingPromises);
+      
+      // Filter out null results and add to classSchedule
+      for (const classInfo of processedClasses) {
+        if (classInfo) {
+          classSchedule.push(classInfo);
+        }
+      }
+
+      // Build dailyClassMap with exception support (cancelled dates filtered out)
+      Object.assign(dailyClassMap, buildDailyClassMap(classSchedule));
 
       // Extract user data for the frontend
       const usersArray = Array.from(usersMap.values());
@@ -1535,8 +1898,6 @@ export const completeSignupHttp = onCall({
       logger.error('Token UID does not match request UID', { tokenUid: request.auth.uid, requestUid: uid });
       throw new Error('Unauthorized - Token mismatch');
     }
-
-    logger.info('Starting signup completion', { email, uid });
 
     // Verify the signup token
     const tokenDoc = await admin.firestore().collection('signupTokens').doc(token).get();
@@ -1629,23 +1990,16 @@ export const signoutHttpRequest = onRequest({
       const decodedToken = await admin.auth().verifyIdToken(idToken);
       const uid = decodedToken.uid;
 
-      logger.info('Starting signout process', { uid });
-
       try {
         // Get payment app instance
         const paymentAppInstance = getPaymentApp();
         
         // Revoke all refresh tokens for the user in the payment app
         await paymentAppInstance.auth().revokeRefreshTokens(uid);
-        
-        logger.info('Successfully revoked payment app refresh tokens', { uid });
       } catch (paymentAppError) {
         logger.error('Error revoking payment app tokens:', paymentAppError);
         // Don't throw here - we still want to complete the signout even if payment app fails
       }
-
-      // Log the signout event
-      logger.info('Successfully completed signout', { uid });
       
       response.status(200).json({ 
         success: true, 

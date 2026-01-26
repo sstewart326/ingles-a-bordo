@@ -108,18 +108,6 @@ export const invalidateCalendarCache = (endpoint?: string, params?: Record<strin
  */
 export const getCalendarData = async (month: number, year: number): Promise<any> => {
   try {
-    // Check cache first
-    const cachedData = calendarCache.get('getCalendarDataHttp', { month, year });
-    if (cachedData) {
-      return cachedData;
-    }
-    
-    // Check if there's already an in-flight request for this data
-    const inFlightRequest = calendarCache.getInFlightRequest('getCalendarDataHttp', { month, year });
-    if (inFlightRequest) {
-      return inFlightRequest;
-    }
-    
     const baseUrl = getFunctionBaseUrl();
     const idToken = await getIdToken();
     const auth = getAuth();
@@ -161,6 +149,19 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
       userId = userDoc.id;
     }
     
+    // Check cache first (include userId in cache key to avoid cross-user cache hits)
+    const cachedData = calendarCache.get('getCalendarDataHttp', { month, year, userId });
+    if (cachedData !== null) {
+      return cachedData;
+    }
+    
+    // Check if there's already an in-flight request for this data
+    // This prevents duplicate API calls when components re-render or user navigates quickly
+    const inFlightRequest = calendarCache.getInFlightRequest('getCalendarDataHttp', { month, year, userId });
+    if (inFlightRequest) {
+      return inFlightRequest;
+    }
+    
     const url = `${baseUrl}/getCalendarDataHttp?month=${month}&year=${year}&userId=${userId}`;
     
     // Create the fetch promise
@@ -180,13 +181,13 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
       return response.json();
     })
     .then(data => {
-      // Store in cache
-      calendarCache.set('getCalendarDataHttp', { month, year }, data);
+      // Store in cache after successful fetch
+      calendarCache.set('getCalendarDataHttp', { month, year, userId }, data);
       return data;
     });
     
     // Register this as an in-flight request
-    calendarCache.setInFlightRequest('getCalendarDataHttp', { month, year }, fetchPromise);
+    calendarCache.setInFlightRequest('getCalendarDataHttp', { month, year, userId }, fetchPromise);
     
     return fetchPromise;
   } catch (error) {
@@ -200,20 +201,6 @@ export const getCalendarData = async (month: number, year: number): Promise<any>
  */
 export const getAllClassesForMonth = async (month: number, year: number, options: { bypassCache?: boolean } = {}): Promise<any> => {
   try {
-    // Check cache first if not bypassing
-    if (!options.bypassCache) {
-      const cachedData = calendarCache.get('getAllClassesForMonthHttp', { month, year });
-      if (cachedData) {
-        return cachedData;
-      }
-      
-      // Check if there's already an in-flight request for this data
-      const inFlightRequest = calendarCache.getInFlightRequest('getAllClassesForMonthHttp', { month, year });
-      if (inFlightRequest) {
-        return inFlightRequest;
-      }
-    }
-    
     const baseUrl = getFunctionBaseUrl();
     const idToken = await getIdToken();
     const auth = getAuth();
@@ -221,6 +208,21 @@ export const getAllClassesForMonth = async (month: number, year: number, options
     
     if (!user) {
       throw new Error('No authenticated user');
+    }
+    
+    // Check cache first (include adminId in cache key to avoid cross-user cache hits)
+    if (!options.bypassCache) {
+      const cachedData = calendarCache.get('getAllClassesForMonthHttp', { month, year, adminId: user.uid });
+      if (cachedData !== null) {
+        return cachedData;
+      }
+      
+      // Check if there's already an in-flight request for this data
+      // This prevents duplicate API calls when components re-render
+      const inFlightRequest = calendarCache.getInFlightRequest('getAllClassesForMonthHttp', { month, year, adminId: user.uid });
+      if (inFlightRequest) {
+        return inFlightRequest;
+      }
     }
     
     const url = `${baseUrl}/getAllClassesForMonthHttp?month=${month}&year=${year}&adminId=${user.uid}`;
@@ -242,16 +244,16 @@ export const getAllClassesForMonth = async (month: number, year: number, options
       return response.json();
     })
     .then(data => {
-      // Store in cache if not bypassing
+      // Store in cache after successful fetch if not bypassing
       if (!options.bypassCache) {
-        calendarCache.set('getAllClassesForMonthHttp', { month, year }, data);
+        calendarCache.set('getAllClassesForMonthHttp', { month, year, adminId: user.uid }, data);
       }
       return data;
     });
     
-    // Register this as an in-flight request if not bypassing cache
+    // Register this as an in-flight request if not bypassing
     if (!options.bypassCache) {
-      calendarCache.setInFlightRequest('getAllClassesForMonthHttp', { month, year }, fetchPromise);
+      calendarCache.setInFlightRequest('getAllClassesForMonthHttp', { month, year, adminId: user.uid }, fetchPromise);
     }
     
     return fetchPromise;

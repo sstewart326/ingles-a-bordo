@@ -2,7 +2,8 @@ import React from 'react';
 import { ClassSession } from '../utils/scheduleUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { FaFileAlt, FaBook, FaCommentAlt } from 'react-icons/fa';
+import { FaFileAlt, FaBook, FaCommentAlt, FaBan } from 'react-icons/fa';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { User } from '../types/interfaces';
 export interface ScheduleCalendarDayProps<T extends ClassSession> {
@@ -80,6 +81,25 @@ export function ScheduleCalendarDay<T extends ClassSession>({
       return homeworkFeedbackInfo.has(key) && homeworkFeedbackInfo.get(key) === true;
     });
   }, [classes, date, homeworkFeedbackInfo]);
+
+  // Check for exception classes
+  const hasCancelledClasses = React.useMemo(() => {
+    return classes.some(classItem => classItem.isCancelled);
+  }, [classes]);
+
+  const hasRescheduledClasses = React.useMemo(() => {
+    return classes.some(classItem => classItem.isRescheduledTo);
+  }, [classes]);
+
+
+  // Filter out cancelled classes for display counts (but keep them for visual indication)
+  const activeClasses = React.useMemo(() => {
+    return classes.filter(c => !c.isCancelled);
+  }, [classes]);
+
+  const cancelledClasses = React.useMemo(() => {
+    return classes.filter(c => c.isCancelled);
+  }, [classes]);
 
   // Get total homework count for this day
   const getTotalHomeworkCount = (): number => {
@@ -224,8 +244,14 @@ export function ScheduleCalendarDay<T extends ClassSession>({
     <div className="h-full flex flex-col" onClick={handleDayClick}>
       {/* Indicators */}
       <div className="calendar-day-indicators">
-        {classes.length > 0 && (
+        {activeClasses.length > 0 && (
           <div key="class-indicator" className="indicator class-indicator" title="Has classes" />
+        )}
+        {hasCancelledClasses && (
+          <div key="cancelled-indicator" className="indicator cancelled-indicator" title={t.exceptions?.cancelledClass || 'Cancelled class'} />
+        )}
+        {hasRescheduledClasses && (
+          <div key="rescheduled-indicator" className="indicator rescheduled-indicator" title="Rescheduled class" />
         )}
         {isPaymentDay && (
           <div
@@ -269,16 +295,17 @@ export function ScheduleCalendarDay<T extends ClassSession>({
       {/* Class count and payment pills */}
       <div className="class-details">
         <div className="flex flex-col items-center gap-2">
-          {classes.length > 0 && (
+          {/* Active classes pill */}
+          {activeClasses.length > 0 && (
             <div
               key="class-count-pill"
-              className="calendar-pill class-count-pill"
+              className={`calendar-pill class-count-pill ${hasRescheduledClasses ? 'rescheduled' : ''}`}
               onClick={handleClassCountClick}
             >
-              {classes.length === 1 
+              {activeClasses.length === 1 
                 ? (() => {
                     // Get the start and end times, considering multiple schedules
-                    let classItem = classes[0];
+                    let classItem = activeClasses[0];
                     let startTime = classItem.startTime;
                     let endTime = classItem.endTime;
                     let timezone = classItem.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -302,13 +329,33 @@ export function ScheduleCalendarDay<T extends ClassSession>({
                     // Don't show source time in the pill to save space
                     return formatTimeWithTimezones(startTime, endTime, timezone, userTimezone, date, false);
                   })()
-                : `${classes.length} ${t.class}`
+                : `${activeClasses.length} ${t.class}`
               }
               {hasMaterials && (
                 <span className="material-icon text-white">
                   <FaFileAlt className="inline-block w-3 h-3" />
                 </span>
               )}
+              {hasRescheduledClasses && (
+                <span className="ml-1" title={t.exceptions?.rescheduledFrom || 'Rescheduled'}>
+                  <ArrowPathIcon className="inline-block w-3 h-3" />
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Cancelled classes pill */}
+          {cancelledClasses.length > 0 && (
+            <div
+              key="cancelled-class-pill"
+              className="calendar-pill cancelled-class-pill"
+              onClick={handleClassCountClick}
+              title={t.exceptions?.cancelledClass || 'Cancelled'}
+            >
+              <span className="line-through opacity-70">
+                {cancelledClasses.length === 1 ? formatSingleClassTime(cancelledClasses[0]) : `${cancelledClasses.length} ${t.class}`}
+              </span>
+              <FaBan className="inline-block w-3 h-3 ml-1 text-red-400" />
             </div>
           )}
 

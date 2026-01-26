@@ -64,6 +64,16 @@ export interface ClassSession {
   };
   studentNames?: string[];    // Add studentNames as an optional property
   _displayDate?: Date;        // Add _displayDate for display purposes
+  
+  // Exception-related fields (populated by cloud functions)
+  isCancelled?: boolean;       // This class occurrence is cancelled
+  isRescheduledTo?: boolean;   // This is a rescheduled class (new date)
+  isRescheduledFrom?: boolean; // Original date was rescheduled away
+  originalDate?: Date | string; // For rescheduled: the original date
+  originalStartTime?: string; // Original start time of the rescheduled class
+  originalEndTime?: string;   // Original end time of the rescheduled class
+  rescheduledTo?: Date | string; // For rescheduled from: the new date
+  reason?: string;             // Reason for exception
 }
 
 // ClassWithStudents is now just an alias since we've updated the base interface

@@ -157,6 +157,16 @@
   background-color: #22c55e;
 }
 
+/* Exception Indicators */
+.calendar-day-indicators .cancelled-indicator {
+  background-color: #ef4444; /* red-500 */
+}
+
+.calendar-day-indicators .rescheduled-indicator {
+  background-color: #f59e0b; /* amber-500 */
+}
+
+
 /* Day Number */
 .calendar-day .date-number {
   text-align: center;
@@ -337,6 +347,26 @@
 .homework-pill.has-feedback:hover {
   background-color: #7c3aed; /* purple-600 */
 }
+
+/* Cancelled Class Pill */
+.cancelled-class-pill {
+  background-color: #9ca3af; /* gray-400 */
+  opacity: 0.8;
+}
+
+.cancelled-class-pill:hover {
+  background-color: #6b7280; /* gray-500 */
+}
+
+/* Rescheduled Class Indicator on Class Pill */
+.class-count-pill.rescheduled {
+  background-color: #8b5cf6; /* purple-500 - indicates this is a rescheduled class */
+}
+
+.class-count-pill.rescheduled:hover {
+  background-color: #7c3aed; /* purple-600 */
+}
+
 
 .feedback-icon {
   margin-left: 4px;
