@@ -571,7 +571,13 @@ function ContentCard({
           <TrashIcon className="h-4 w-4" />
         </button>
       </div>
-      <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+      <div
+        className={`aspect-video flex items-center justify-center overflow-hidden ${
+          item.type === 'text'
+            ? 'bg-gradient-to-br from-[var(--brand-color-light)] to-gray-100'
+            : 'bg-gray-100'
+        }`}
+      >
         {item.type === 'youtube' && item.videoId && (
           <img
             src={getYouTubeThumbnailUrl(item.videoId)}
@@ -587,7 +593,7 @@ function ContentCard({
           />
         )}
         {item.type === 'text' && (
-          <DocumentTextIcon className="h-12 w-12 text-gray-400" />
+          <DocumentTextIcon className="h-20 w-20 text-[var(--header-bg)]" />
         )}
       </div>
       <div className="p-3">
@@ -597,6 +603,11 @@ function ContentCard({
         <h3 className="font-medium text-gray-900 mt-0.5 line-clamp-2">{item.title}</h3>
         {item.description && (
           <p className="text-sm text-gray-600 mt-1 line-clamp-2">{item.description}</p>
+        )}
+        {item.type === 'text' && item.body != null && (
+          <div className="mt-2 text-sm text-gray-700 whitespace-pre-wrap overflow-y-auto max-h-32 border border-gray-100 rounded-md bg-gray-50/50 px-2 py-2">
+            {item.body}
+          </div>
         )}
       </div>
     </div>

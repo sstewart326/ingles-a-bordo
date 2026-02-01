@@ -7,7 +7,6 @@ import { getContentLibraryPageForStudent, getYouTubeThumbnailUrl } from '../util
 import { getCachedCollection } from '../utils/firebaseUtils';
 import { where } from 'firebase/firestore';
 import { ContentLibraryItem, User } from '../types/interfaces';
-import Modal from '../components/Modal';
 import toast from 'react-hot-toast';
 import {
   FilmIcon,
@@ -32,7 +31,6 @@ export default function MyContent() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [viewModalItem, setViewModalItem] = useState<ContentLibraryItem | null>(null);
 
   const fetchFirstPage = useCallback(async () => {
     if (!currentUser?.uid || !teacherId) return;
@@ -113,9 +111,7 @@ export default function MyContent() {
       window.open(item.imageUrl, '_blank', 'noopener,noreferrer');
       return;
     }
-    if (item.type === 'text') {
-      setViewModalItem(item);
-    }
+    // Text content is shown on the card; no modal
   };
 
   return (
@@ -166,18 +162,6 @@ export default function MyContent() {
           </>
         )}
       </div>
-
-      {viewModalItem && viewModalItem.type === 'text' && (
-        <Modal isOpen={!!viewModalItem} onClose={() => setViewModalItem(null)}>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2 pr-8">{viewModalItem.title}</h2>
-          {viewModalItem.description && (
-            <p className="text-sm text-gray-600 mb-4">{viewModalItem.description}</p>
-          )}
-          <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
-            {viewModalItem.body || ''}
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }
@@ -202,12 +186,17 @@ function StudentContentCard({
 
   const canView =
     (item.type === 'youtube' && (item.videoId || item.videoUrl)) ||
-    (item.type === 'image' && item.imageUrl) ||
-    item.type === 'text';
+    (item.type === 'image' && item.imageUrl);
 
   return (
     <div className="relative rounded-xl overflow-hidden bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-[var(--brand-color-medium)] transition-all duration-200 flex flex-col">
-      <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+      <div
+        className={`aspect-video flex items-center justify-center overflow-hidden ${
+          item.type === 'text'
+            ? 'bg-gradient-to-br from-[var(--brand-color-light)] to-gray-100'
+            : 'bg-gray-100'
+        }`}
+      >
         {item.type === 'youtube' && item.videoId && (
           <img
             src={getYouTubeThumbnailUrl(item.videoId)}
@@ -223,10 +212,10 @@ function StudentContentCard({
           />
         )}
         {item.type === 'text' && (
-          <DocumentTextIcon className="h-12 w-12 text-gray-400" />
+          <DocumentTextIcon className="h-20 w-20 text-[var(--header-bg)]" />
         )}
       </div>
-      <div className="p-3 flex-1 flex flex-col">
+      <div className="p-3 flex-1 flex flex-col min-h-0">
         <span className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
           {item.type === 'youtube' && <FilmIcon className="h-3.5 w-3.5" />}
           {item.type === 'text' && <DocumentTextIcon className="h-3.5 w-3.5" />}
@@ -234,8 +223,19 @@ function StudentContentCard({
           {typeLabel}
         </span>
         <h3 className="font-medium text-gray-900 mt-0.5 line-clamp-2">{item.title}</h3>
-        {item.description && (
-          <p className="text-sm text-gray-600 mt-1 line-clamp-2 flex-1">{item.description}</p>
+        {item.type === 'text' ? (
+          <>
+            {item.description && (
+              <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+            )}
+            <div className="mt-2 text-sm text-gray-700 whitespace-pre-wrap overflow-y-auto max-h-48 flex-1 min-h-0 border border-gray-100 rounded-md bg-gray-50/50 px-2 py-2">
+              {item.body || ''}
+            </div>
+          </>
+        ) : (
+          item.description && (
+            <p className="text-sm text-gray-600 mt-1 line-clamp-2 flex-1">{item.description}</p>
+          )
         )}
         {canView && (
           <button
