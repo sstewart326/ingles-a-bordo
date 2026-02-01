@@ -41,10 +41,16 @@ interface Translation {
   manageSchedules: string;
   manageMaterials: string;
   contentLibrary: string;
+  myContent: string;
   classPlans: string;
   
   // Content Library
   contentLibraryTitle: string;
+  myContentTitle: string;
+  myContentIntro: string;
+  myContentEmpty: string;
+  myContentEmptyDesc: string;
+  myContentView: string;
   addContent: string;
   contentLibraryEmpty: string;
   contentLibraryEmptyDesc: string;
@@ -468,8 +474,14 @@ const translations: Record<Language, Translation> = {
     manageSchedules: 'Classes',
     manageMaterials: 'Manage Materials',
     contentLibrary: 'Content Library',
+    myContent: 'My Content',
     classPlans: 'Study Plans',
     contentLibraryTitle: 'Content Library',
+    myContentTitle: 'My Content',
+    myContentIntro: 'Content your teacher has shared with you.',
+    myContentEmpty: 'Nothing shared yet',
+    myContentEmptyDesc: 'Your teacher will add content here for you.',
+    myContentView: 'View',
     addContent: 'Add content',
     contentLibraryEmpty: 'No content yet',
     contentLibraryEmptyDesc: 'Add videos, text, images, or links for your students to view.',
@@ -891,8 +903,14 @@ const translations: Record<Language, Translation> = {
     manageSchedules: 'Aulas',
     manageMaterials: 'Gerenciar Materiais',
     contentLibrary: 'Biblioteca de Conteúdo',
+    myContent: 'Meu Conteúdo',
     classPlans: 'Planos de Aula',
     contentLibraryTitle: 'Biblioteca de Conteúdo',
+    myContentTitle: 'Meu Conteúdo',
+    myContentIntro: 'Conteúdo que seu professor compartilhou com você.',
+    myContentEmpty: 'Nada compartilhado ainda',
+    myContentEmptyDesc: 'Seu professor adicionará conteúdo aqui para você.',
+    myContentView: 'Ver',
     addContent: 'Adicionar conteúdo',
     contentLibraryEmpty: 'Nenhum conteúdo ainda',
     contentLibraryEmptyDesc: 'Adicione vídeos, texto, imagens ou links para seus alunos visualizarem.',

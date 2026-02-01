@@ -176,8 +176,15 @@ service cloud.firestore {
     }
 
     // Content Library collection (teacher-uploaded content for students)
+    // Students can read items from their teacher where item is for all students or lists them
+    function canStudentReadContentLibraryItem(itemData) {
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userDocPath) &&
+             get(userDocPath).data.teacher == itemData.teacherId &&
+             (itemData.studentIds.size() == 0 || request.auth.uid in itemData.studentIds);
+    }
     match /contentLibrary/{itemId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.teacherId == request.auth.uid);
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.teacherId == request.auth.uid || canStudentReadContentLibraryItem(resource.data));
       allow create: if isAuthenticated() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
     }

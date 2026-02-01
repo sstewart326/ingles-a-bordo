@@ -20,6 +20,7 @@ import { AdminPayments } from './pages/AdminPayments';
 const ClassMaterials = lazy(() => import('./pages/ClassMaterials'));
 const AdminMaterials = lazy(() => import('./pages/AdminMaterials'));
 const AdminContentLibrary = lazy(() => import('./pages/AdminContentLibrary'));
+const MyContent = lazy(() => import('./pages/MyContent'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -83,6 +84,20 @@ export const AppRoutes = () => {
               <main className="flex-1">
                 <Suspense fallback={<LoadingSpinner />}>
                   <ClassMaterials />
+                </Suspense>
+              </main>
+              <Footer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-content"
+          element={
+            <ProtectedRoute>
+              <Header />
+              <main className="flex-1">
+                <Suspense fallback={<LoadingSpinner />}>
+                  <MyContent />
                 </Suspense>
               </main>
               <Footer />

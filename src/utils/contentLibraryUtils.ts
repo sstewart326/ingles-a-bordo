@@ -14,6 +14,7 @@ import {
   Timestamp,
   DocumentSnapshot,
   startAfter,
+  DocumentData,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { ContentLibraryItem, ContentLibraryItemType } from '../types/interfaces';
@@ -103,6 +104,73 @@ export async function getContentLibraryPage(
   return { items, lastDoc, hasMore };
 }
 
+const OVER_FETCH_CAP = 50;
+
+function docToContentLibraryItem(d: DocumentSnapshot): ContentLibraryItem {
+  const data = d.data();
+  if (!data) throw new Error('Missing document data');
+  return {
+    id: d.id,
+    teacherId: data.teacherId,
+    type: data.type as ContentLibraryItemType,
+    title: data.title,
+    description: data.description,
+    studentIds: data.studentIds ?? [],
+    videoId: data.videoId,
+    videoUrl: data.videoUrl,
+    body: data.body,
+    imageUrl: data.imageUrl,
+    imagePath: data.imagePath,
+    order: data.order,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+  } as ContentLibraryItem;
+}
+
+/**
+ * Fetches a page of content library items visible to a student (cursor-based pagination).
+ * Items are from the student's teacher; visible if studentIds is empty or contains studentId.
+ * Over-fetches then filters client-side since Firestore cannot query "empty or array-contains".
+ */
+export async function getContentLibraryPageForStudent(
+  teacherId: string,
+  studentId: string,
+  pageSize: number = DEFAULT_PAGE_SIZE,
+  startAfterDoc: DocumentSnapshot | null = null
+): Promise<PaginatedContentLibraryResult> {
+  const overFetchLimit = Math.min(pageSize * 3, OVER_FETCH_CAP);
+  const colRef = collection(db, COLLECTION_PATH);
+  const constraints = [
+    where('teacherId', '==', teacherId),
+    orderBy('createdAt', 'desc'),
+    limit(overFetchLimit),
+  ];
+  const q = startAfterDoc
+    ? query(colRef, ...constraints, startAfter(startAfterDoc))
+    : query(colRef, ...constraints);
+
+  const snapshot = await getDocs(q);
+  const docs = snapshot.docs;
+
+  const filtered: { doc: DocumentSnapshot; item: ContentLibraryItem }[] = [];
+  for (const d of docs) {
+    const data = d.data();
+    const studentIds: string[] = data?.studentIds ?? [];
+    const visible = studentIds.length === 0 || studentIds.includes(studentId);
+    if (visible) {
+      filtered.push({ doc: d, item: docToContentLibraryItem(d) });
+      if (filtered.length >= pageSize) break;
+    }
+  }
+
+  const pagePairs = filtered.slice(0, pageSize);
+  const items = pagePairs.map((p) => p.item);
+  const lastDoc = pagePairs.length > 0 ? pagePairs[pagePairs.length - 1].doc : null;
+  const hasMore = filtered.length > pageSize || docs.length >= overFetchLimit;
+
+  return { items, lastDoc, hasMore };
+}
+
 /**
  * Creates a new content library item.
  */
@@ -139,7 +207,7 @@ export async function updateContentLibraryItem(
   }
   const payload = { ...updates, updatedAt: Timestamp.now() };
   const clean = stripNullUndefined(payload as Record<string, unknown>);
-  await updateDoc(docRef, clean);
+  await updateDoc(docRef, clean as DocumentData);
 }
 
 /**
