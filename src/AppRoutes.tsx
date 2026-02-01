@@ -19,6 +19,7 @@ import { AdminPayments } from './pages/AdminPayments';
 // Lazy load components that use Firebase Storage
 const ClassMaterials = lazy(() => import('./pages/ClassMaterials'));
 const AdminMaterials = lazy(() => import('./pages/AdminMaterials'));
+const AdminContentLibrary = lazy(() => import('./pages/AdminContentLibrary'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -122,6 +123,20 @@ export const AppRoutes = () => {
               <main className="flex-1">
                 <Suspense fallback={<LoadingSpinner />}>
                   <AdminMaterials />
+                </Suspense>
+              </main>
+              <Footer />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/content-library"
+          element={
+            <AdminRoute>
+              <Header />
+              <main className="flex-1">
+                <Suspense fallback={<LoadingSpinner />}>
+                  <AdminContentLibrary />
                 </Suspense>
               </main>
               <Footer />

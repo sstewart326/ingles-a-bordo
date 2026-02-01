@@ -101,6 +101,32 @@ service firebase.storage {
       return request.resource.size <= 2 * 1024 * 1024; // 2MB
     }
 
+    // Function to check file type for content library images
+    function isValidContentLibraryImageType() {
+      return request.resource.contentType.matches('image/jpeg') ||
+             request.resource.contentType.matches('image/png') ||
+             request.resource.contentType.matches('image/gif') ||
+             request.resource.contentType.matches('image/webp');
+    }
+
+    // Function to check file size for content library (5MB)
+    function isValidContentLibrarySize() {
+      return request.resource.size <= 5 * 1024 * 1024; // 5MB
+    }
+
+    // Rules for content library (admin-only, per-teacher folder)
+    match /contentLibrary/{userId}/{fileName} {
+      // Allow read if user is admin and accessing their own folder
+      allow read: if isAuthenticated() && isAdmin() && request.auth.uid == userId;
+
+      // Allow write/delete if user is admin and writing to their own folder
+      allow write: if isAdmin()
+                  && request.auth.uid == userId
+                  && isValidContentLibrarySize()
+                  && isValidContentLibraryImageType();
+      allow delete: if isAdmin() && request.auth.uid == userId;
+    }
+
     // Rules for slides
     match /slides/{materialId}/{fileName} {
       // Allow read if user is authenticated and has access to the material

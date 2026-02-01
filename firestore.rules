@@ -175,6 +175,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Content Library collection (teacher-uploaded content for students)
+    match /contentLibrary/{itemId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.teacherId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
+    }
+
     // Payment rules
     match /payments/{paymentId} {
       // Payments can be read by the user they belong to (userId)

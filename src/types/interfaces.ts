@@ -41,6 +41,28 @@ export interface ClassMaterial {
   month: string; // The month in YYYY-MM format for efficient querying
 }
 
+/** Content Library: teacher-uploaded content (YouTube, text, image) for students to view */
+export type ContentLibraryItemType = 'youtube' | 'text' | 'image';
+
+export interface ContentLibraryItem {
+  id: string;
+  teacherId: string;
+  type: ContentLibraryItemType;
+  title: string;
+  description?: string;
+  /** Empty = all students; non-empty = only those student UIDs */
+  studentIds: string[];
+  videoId?: string;
+  videoUrl?: string;
+  body?: string;
+  imageUrl?: string;
+  /** Storage path for image (used for delete); set when uploading */
+  imagePath?: string;
+  order?: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 // New interface for homework assignments
 export interface Homework {
   id: string;

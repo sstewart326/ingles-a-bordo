@@ -40,8 +40,26 @@ interface Translation {
   manageUsers: string;
   manageSchedules: string;
   manageMaterials: string;
+  contentLibrary: string;
   classPlans: string;
   
+  // Content Library
+  contentLibraryTitle: string;
+  addContent: string;
+  contentLibraryEmpty: string;
+  contentLibraryEmptyDesc: string;
+  contentLibraryAudience: string;
+  allStudents: string;
+  deleteContentConfirm: string;
+  typeVideo: string;
+  typeText: string;
+  typeImage: string;
+  loadMore: string;
+  youtubeUrlPlaceholder: string;
+  titleLabel: string;
+  descriptionLabel: string;
+  audienceLabel: string;
+
   // Dashboard
   quickActions: string;
   manageScheduleDesc: string;
@@ -449,7 +467,23 @@ const translations: Record<Language, Translation> = {
     manageUsers: 'Users',
     manageSchedules: 'Classes',
     manageMaterials: 'Manage Materials',
+    contentLibrary: 'Content Library',
     classPlans: 'Study Plans',
+    contentLibraryTitle: 'Content Library',
+    addContent: 'Add content',
+    contentLibraryEmpty: 'No content yet',
+    contentLibraryEmptyDesc: 'Add videos, text, images, or links for your students to view.',
+    contentLibraryAudience: 'Audience',
+    allStudents: 'All students',
+    deleteContentConfirm: 'Delete this item?',
+    typeVideo: 'Video',
+    typeText: 'Text',
+    typeImage: 'Image',
+    loadMore: 'Load more',
+    youtubeUrlPlaceholder: 'Paste YouTube URL',
+    titleLabel: 'Title',
+    descriptionLabel: 'Description',
+    audienceLabel: 'Who can see this',
     
     // Dashboard
     quickActions: 'Quick Actions',
@@ -856,7 +890,23 @@ const translations: Record<Language, Translation> = {
     manageUsers: 'Usuários',
     manageSchedules: 'Aulas',
     manageMaterials: 'Gerenciar Materiais',
+    contentLibrary: 'Biblioteca de Conteúdo',
     classPlans: 'Planos de Aula',
+    contentLibraryTitle: 'Biblioteca de Conteúdo',
+    addContent: 'Adicionar conteúdo',
+    contentLibraryEmpty: 'Nenhum conteúdo ainda',
+    contentLibraryEmptyDesc: 'Adicione vídeos, texto, imagens ou links para seus alunos visualizarem.',
+    contentLibraryAudience: 'Público',
+    allStudents: 'Todos os alunos',
+    deleteContentConfirm: 'Excluir este item?',
+    typeVideo: 'Vídeo',
+    typeText: 'Texto',
+    typeImage: 'Imagem',
+    loadMore: 'Carregar mais',
+    youtubeUrlPlaceholder: 'Cole a URL do YouTube',
+    titleLabel: 'Título',
+    descriptionLabel: 'Descrição',
+    audienceLabel: 'Quem pode ver',
     
     // Dashboard
     quickActions: 'Ações Rápidas',

@@ -92,6 +92,23 @@ const shouldCache = (collectionPath: string, options: CacheOptions = {}): boolea
   return true;
 };
 
+/**
+ * Removes null and undefined from an object (shallow). Firestore does not accept null
+ * in document data; undefined can also cause issues. Use before addDoc, setDoc, updateDoc.
+ */
+export const stripNullUndefined = <T extends Record<string, unknown>>(
+  obj: T
+): Record<string, unknown> => {
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    if (value !== null && value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+};
+
 // Helper function to log Firebase queries in non-production environments
 export const logQuery = (operation: string, details?: any) => {
   if (process.env.NODE_ENV !== 'production') {
@@ -500,7 +517,8 @@ export const setCachedDocument = async <T = DocumentData>(
   options: CacheOptions = {}
 ): Promise<void> => {
   const docRef = doc(db, collectionPath, docId);
-  await setDoc(docRef, data, { merge: true });
+  const clean = stripNullUndefined(data as Record<string, unknown>);
+  await setDoc(docRef, clean, { merge: true });
   
   if (shouldCache(collectionPath, options)) {
     const cacheKey = encodeCacheKey(`${collectionPath}/${docId}${options.userId || ''}`);
@@ -517,7 +535,8 @@ export const updateCachedDocument = async <T = DocumentData>(
   options: CacheOptions = {}
 ): Promise<void> => {
   const docRef = doc(db, collectionPath, docId);
-  await updateDoc(docRef, data as DocumentData);
+  const clean = stripNullUndefined(data as Record<string, unknown>);
+  await updateDoc(docRef, clean as DocumentData);
   
   if (shouldCache(collectionPath, options)) {
     const cacheKey = encodeCacheKey(`${collectionPath}/${docId}${options.userId || ''}`);
