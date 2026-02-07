@@ -1805,6 +1805,7 @@ export const AdminSchedule = () => {
                               return {
                                 ...prev,
                                 paymentConfig: {
+                                  ...prev.paymentConfig,
                                   type,
                                   startDate: adjustedDateStr,
                                   monthlyOption: monthlyOption,
@@ -1816,6 +1817,7 @@ export const AdminSchedule = () => {
                             return {
                               ...prev,
                               paymentConfig: {
+                                ...prev.paymentConfig,
                                 type,
                                 startDate: prev.paymentConfig.startDate,
                                 ...(type === 'weekly' 
