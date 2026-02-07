@@ -666,7 +666,7 @@ export const Profile = () => {
                   {/* Contracts Section */}
                   {!profile?.isAdmin && (
                     <div className="mt-8 pt-6 border-t border-gray-200">
-                      <h4 className="text-lg font-medium text-gray-900 mb-4">Your Contracts</h4>
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">{t.yourContracts}</h4>
                       {loadingContracts ? (
                         <div className="flex items-center justify-center py-4">
                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>

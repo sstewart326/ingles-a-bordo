@@ -30,6 +30,7 @@ interface Translation {
   profilePictureError: string;
   selectImage: string;
   confirmDeleteProfilePicture: string;
+  yourContracts: string;
 
   // Navigation
   dashboard: string;
@@ -463,6 +464,7 @@ const translations: Record<Language, Translation> = {
     profilePictureError: 'Error uploading profile picture',
     selectImage: 'Select Image',
     confirmDeleteProfilePicture: 'Are you sure you want to delete your profile picture?',
+    yourContracts: 'Your Contracts',
 
     // Navigation
     dashboard: 'Dashboard',
@@ -892,6 +894,7 @@ const translations: Record<Language, Translation> = {
     profilePictureError: 'Erro ao enviar foto de perfil',
     selectImage: 'Selecionar Imagem',
     confirmDeleteProfilePicture: 'Tem certeza que deseja excluir sua foto de perfil?',
+    yourContracts: 'Seus Contratos',
 
     // Navigation
     dashboard: 'Painel',
