@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
+import { Language } from '../contexts/LanguageContext';
 import { useTranslation } from '../translations';
 import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { styles, classNames } from '../styles/styleUtils';
@@ -25,6 +26,7 @@ import {
   DocumentTextIcon,
   PhotoIcon,
 } from '@heroicons/react/24/outline';
+import { ContentLibraryViewButton } from '../components/ContentLibraryViewButton';
 import type { DocumentSnapshot } from 'firebase/firestore';
 
 const PAGE_SIZE = 12;
@@ -306,6 +308,7 @@ export default function AdminContentLibrary() {
                   key={item.id}
                   item={item}
                   t={t}
+                  language={language}
                   onEdit={() => openEditModal(item)}
                   onDelete={() => setDeleteConfirmId(item.id)}
                   getYouTubeThumbnailUrl={getYouTubeThumbnailUrl}
@@ -534,12 +537,14 @@ export default function AdminContentLibrary() {
 function ContentCard({
   item,
   t,
+  language,
   onEdit,
   onDelete,
   getYouTubeThumbnailUrl,
 }: {
   item: ContentLibraryItem;
   t: ReturnType<typeof useTranslation>;
+  language: Language;
   onEdit: () => void;
   onDelete: () => void;
   getYouTubeThumbnailUrl: (id: string) => string;
@@ -609,6 +614,7 @@ function ContentCard({
             {item.body}
           </div>
         )}
+        <ContentLibraryViewButton item={item} language={language} />
       </div>
     </div>
   );

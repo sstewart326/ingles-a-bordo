@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
+import { Language } from '../contexts/LanguageContext';
 import { useTranslation } from '../translations';
 import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { styles, classNames } from '../styles/styleUtils';
@@ -12,9 +13,8 @@ import {
   FilmIcon,
   DocumentTextIcon,
   PhotoIcon,
-  PlayIcon,
-  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
+import { ContentLibraryViewButton } from '../components/ContentLibraryViewButton';
 import type { DocumentSnapshot } from 'firebase/firestore';
 
 const PAGE_SIZE = 12;
@@ -102,18 +102,6 @@ export default function MyContent() {
     }
   }, [teacherResolved, teacherId, fetchFirstPage]);
 
-  const handleView = (item: ContentLibraryItem) => {
-    if (item.type === 'youtube' && item.videoUrl) {
-      window.open(item.videoUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    if (item.type === 'image' && item.imageUrl) {
-      window.open(item.imageUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    // Text content is shown on the card; no modal
-  };
-
   return (
     <div className="flex-1 min-h-0">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -142,7 +130,7 @@ export default function MyContent() {
                   key={item.id}
                   item={item}
                   t={t}
-                  onView={() => handleView(item)}
+                  language={language}
                   getYouTubeThumbnailUrl={getYouTubeThumbnailUrl}
                 />
               ))}
@@ -169,12 +157,12 @@ export default function MyContent() {
 function StudentContentCard({
   item,
   t,
-  onView,
+  language,
   getYouTubeThumbnailUrl,
 }: {
   item: ContentLibraryItem;
   t: ReturnType<typeof useTranslation>;
-  onView: () => void;
+  language: Language;
   getYouTubeThumbnailUrl: (id: string) => string;
 }) {
   const typeLabel =
@@ -183,10 +171,6 @@ function StudentContentCard({
       : item.type === 'text'
         ? t.typeText
         : t.typeImage;
-
-  const canView =
-    (item.type === 'youtube' && (item.videoId || item.videoUrl)) ||
-    (item.type === 'image' && item.imageUrl);
 
   return (
     <div className="relative rounded-xl overflow-hidden bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-[var(--brand-color-medium)] transition-all duration-200 flex flex-col">
@@ -237,20 +221,7 @@ function StudentContentCard({
             <p className="text-sm text-gray-600 mt-1 line-clamp-2 flex-1">{item.description}</p>
           )
         )}
-        {canView && (
-          <button
-            type="button"
-            onClick={onView}
-            className="mt-3 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-[var(--header-bg)] text-white hover:bg-[var(--header-hover)] transition-colors w-full"
-          >
-            {item.type === 'youtube' ? (
-              <PlayIcon className="h-4 w-4" />
-            ) : (
-              <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-            )}
-            {t.myContentView}
-          </button>
-        )}
+        <ContentLibraryViewButton item={item} language={language} />
       </div>
     </div>
   );
