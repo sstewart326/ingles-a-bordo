@@ -27,6 +27,7 @@ import {
   PhotoIcon,
 } from '@heroicons/react/24/outline';
 import { ContentLibraryViewButton } from '../components/ContentLibraryViewButton';
+import ContentLibraryCommentsSection from '../components/ContentLibraryComments';
 import type { DocumentSnapshot } from 'firebase/firestore';
 
 const PAGE_SIZE = 12;
@@ -312,6 +313,27 @@ export default function AdminContentLibrary() {
                   onEdit={() => openEditModal(item)}
                   onDelete={() => setDeleteConfirmId(item.id)}
                   getYouTubeThumbnailUrl={getYouTubeThumbnailUrl}
+                  contentLibraryAuthors={{
+                    ...(currentUser?.uid
+                      ? {
+                          [currentUser.uid]: {
+                            name: currentUser.displayName ?? currentUser.email ?? 'Teacher',
+                            profilePictureUrl: currentUser.photoURL ?? null,
+                          },
+                        }
+                      : {}),
+                    ...Object.fromEntries(
+                      students
+                        .filter((s) => s.uid)
+                        .map((s) => [
+                          s.uid!,
+                          { name: s.name || s.email, profilePictureUrl: s.profilePictureUrl ?? null },
+                        ])
+                    ),
+                  }}
+                  currentUserId={currentUser?.uid ?? ''}
+                  currentUserName={currentUser?.displayName ?? currentUser?.email ?? ''}
+                  isTeacher={true}
                 />
               ))}
             </div>
@@ -541,6 +563,10 @@ function ContentCard({
   onEdit,
   onDelete,
   getYouTubeThumbnailUrl,
+  contentLibraryAuthors,
+  currentUserId,
+  currentUserName,
+  isTeacher,
 }: {
   item: ContentLibraryItem;
   t: ReturnType<typeof useTranslation>;
@@ -548,6 +574,10 @@ function ContentCard({
   onEdit: () => void;
   onDelete: () => void;
   getYouTubeThumbnailUrl: (id: string) => string;
+  contentLibraryAuthors: Record<string, { name: string; profilePictureUrl?: string | null }>;
+  currentUserId: string;
+  currentUserName: string;
+  isTeacher: boolean;
 }) {
   const typeLabel =
     item.type === 'youtube'
@@ -615,6 +645,13 @@ function ContentCard({
           </div>
         )}
         <ContentLibraryViewButton item={item} language={language} />
+        <ContentLibraryCommentsSection
+          itemId={item.id}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
+          isTeacher={isTeacher}
+          authors={contentLibraryAuthors}
+        />
       </div>
     </div>
   );

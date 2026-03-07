@@ -66,6 +66,15 @@ interface Translation {
   titleLabel: string;
   descriptionLabel: string;
   audienceLabel: string;
+  contentLibraryComments: string;
+  comments: string;
+  addComment: string;
+  reply: string;
+  commentPlaceholder: string;
+  noComments: string;
+  commentEdited: string;
+  commentDeleted: string;
+  you: string;
 
   // Dashboard
   quickActions: string;
@@ -498,7 +507,16 @@ const translations: Record<Language, Translation> = {
     titleLabel: 'Title',
     descriptionLabel: 'Description',
     audienceLabel: 'Who can see this',
-    
+    contentLibraryComments: 'Comments',
+    comments: 'Comments',
+    addComment: 'Add comment',
+    reply: 'Reply',
+    commentPlaceholder: 'Write a comment…',
+    noComments: 'No comments yet',
+    commentEdited: 'Edited',
+    commentDeleted: '[Deleted]',
+    you: 'You',
+
     // Dashboard
     quickActions: 'Quick Actions',
     manageScheduleDesc: 'Create or edit class sessions',
@@ -928,6 +946,15 @@ const translations: Record<Language, Translation> = {
     titleLabel: 'Título',
     descriptionLabel: 'Descrição',
     audienceLabel: 'Quem pode ver',
+    contentLibraryComments: 'Comentários',
+    comments: 'Comentários',
+    addComment: 'Adicionar comentário',
+    reply: 'Responder',
+    commentPlaceholder: 'Escreva um comentário…',
+    noComments: 'Nenhum comentário ainda',
+    commentEdited: 'Editado',
+    commentDeleted: '[Excluído]',
+    you: 'Você',
     
     // Dashboard
     quickActions: 'Ações Rápidas',

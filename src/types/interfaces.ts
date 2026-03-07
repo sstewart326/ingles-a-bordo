@@ -63,6 +63,34 @@ export interface ContentLibraryItem {
   updatedAt: Timestamp;
 }
 
+/** Content library comment. Visibility = content item visibility (teacher + students who can see item). */
+export interface ContentLibraryComment {
+  id: string;
+  authorId: string;
+  authorIsTeacher: boolean;
+  content: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  parentCommentId?: string;
+  /** When true, comment was soft-deleted (e.g. has replies); show as [Deleted], keep replies. Default false when missing from Firestore. */
+  deleted: boolean;
+}
+
+/** Resolved comment for display: content may come from latest version if edited. */
+export interface ContentLibraryCommentResolved extends ContentLibraryComment {
+  /** Resolved content (original or latest version). */
+  content: string;
+  hasEdits: boolean;
+}
+
+/** Single version of a comment (edit history). Comment doc is never updated; edits add new version docs. */
+export interface ContentLibraryCommentVersion {
+  id: string;
+  content: string;
+  createdAt: Timestamp;
+  updatedBy?: string;
+}
+
 // New interface for homework assignments
 export interface Homework {
   id: string;

@@ -15,6 +15,7 @@ import {
   PhotoIcon,
 } from '@heroicons/react/24/outline';
 import { ContentLibraryViewButton } from '../components/ContentLibraryViewButton';
+import ContentLibraryCommentsSection from '../components/ContentLibraryComments';
 import type { DocumentSnapshot } from 'firebase/firestore';
 
 const PAGE_SIZE = 12;
@@ -26,6 +27,8 @@ export default function MyContent() {
 
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [teacherResolved, setTeacherResolved] = useState(false);
+  const [userData, setUserData] = useState<User | null>(null);
+  const [teacherUser, setTeacherUser] = useState<User | null>(null);
   const [items, setItems] = useState<ContentLibraryItem[]>([]);
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -76,9 +79,10 @@ export default function MyContent() {
       }
       try {
         const users = await getCachedCollection<User>('users', [where('uid', '==', currentUser.uid)], { userId: currentUser.uid });
-        const userData = users?.[0] ?? null;
+        const data = users?.[0] ?? null;
         if (!cancelled) {
-          setTeacherId(userData?.teacher ?? null);
+          setUserData(data);
+          setTeacherId(data?.teacher ?? null);
           setTeacherResolved(true);
         }
       } catch (e) {
@@ -101,6 +105,24 @@ export default function MyContent() {
       setLoading(false);
     }
   }, [teacherResolved, teacherId, fetchFirstPage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!teacherId) {
+      setTeacherUser(null);
+      return;
+    }
+    getCachedCollection<User>('users', [where('uid', '==', teacherId)], { userId: teacherId })
+      .then((users) => {
+        if (!cancelled) setTeacherUser(users?.[0] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setTeacherUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [teacherId]);
 
   return (
     <div className="flex-1 min-h-0">
@@ -132,6 +154,27 @@ export default function MyContent() {
                   t={t}
                   language={language}
                   getYouTubeThumbnailUrl={getYouTubeThumbnailUrl}
+                  contentLibraryAuthors={{
+                    ...(currentUser?.uid
+                      ? {
+                          [currentUser.uid]: {
+                            name: userData?.name ?? currentUser?.email ?? '',
+                            profilePictureUrl: userData?.profilePictureUrl ?? null,
+                          },
+                        }
+                      : {}),
+                    ...(teacherId && teacherUser
+                      ? {
+                          [teacherId]: {
+                            name: teacherUser.name || teacherUser.email || 'Teacher',
+                            profilePictureUrl: teacherUser.profilePictureUrl ?? null,
+                          },
+                        }
+                      : {}),
+                  }}
+                  currentUserId={currentUser?.uid ?? ''}
+                  currentUserName={userData?.name ?? currentUser?.email ?? ''}
+                  isTeacher={false}
                 />
               ))}
             </div>
@@ -159,11 +202,19 @@ function StudentContentCard({
   t,
   language,
   getYouTubeThumbnailUrl,
+  contentLibraryAuthors,
+  currentUserId,
+  currentUserName,
+  isTeacher,
 }: {
   item: ContentLibraryItem;
   t: ReturnType<typeof useTranslation>;
   language: Language;
   getYouTubeThumbnailUrl: (id: string) => string;
+  contentLibraryAuthors: Record<string, { name: string; profilePictureUrl?: string | null }>;
+  currentUserId: string;
+  currentUserName: string;
+  isTeacher: boolean;
 }) {
   const typeLabel =
     item.type === 'youtube'
@@ -221,7 +272,16 @@ function StudentContentCard({
             <p className="text-sm text-gray-600 mt-1 line-clamp-2 flex-1">{item.description}</p>
           )
         )}
-        <ContentLibraryViewButton item={item} language={language} />
+        <div className="mt-3 flex gap-2">
+          <ContentLibraryViewButton item={item} language={language} />
+        </div>
+        <ContentLibraryCommentsSection
+          itemId={item.id}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
+          isTeacher={isTeacher}
+          authors={contentLibraryAuthors}
+        />
       </div>
     </div>
   );
