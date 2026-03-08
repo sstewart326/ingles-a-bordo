@@ -209,6 +209,7 @@ export const Schedule = () => {
     isPaymentSoon: boolean;
   } | null>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
+  const prevVisibleMonthRef = useRef<string | null>(null);
   const { currentUser, isMasquerading, masqueradingAs } = useAuthWithMasquerade();
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -268,6 +269,21 @@ export const Schedule = () => {
       hasInitializedDayDetailsRef.current = true;
     }
   }, [calendarData, loading]);
+
+  // When the user scrolls to a different month, open day details for the first day of that month
+  useEffect(() => {
+    const visibleMonthKey = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}`;
+    const prevKey = prevVisibleMonthRef.current;
+    prevVisibleMonthRef.current = visibleMonthKey;
+    if (prevKey !== null && prevKey !== visibleMonthKey) {
+      const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const isPaymentDay = isPaymentDueOnDate(firstDayOfMonth);
+      const daysUntilPayment = isPaymentDay ?
+        Math.ceil((firstDayOfMonth.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+      handleDayClick(firstDayOfMonth, isPaymentDay, isPaymentSoon, false);
+    }
+  }, [selectedDate]);
 
   const getClassesForDate = (date: Date): CalendarClass[] => {
     if (!calendarData?.dailyClassMap) return [];

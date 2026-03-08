@@ -58,6 +58,7 @@ export const Dashboard = () => {
   const t = useTranslation(language);
   const detailsRef = useRef<HTMLDivElement>(null);
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
+  const prevVisibleMonthRef = useRef<string | null>(null);
 
   const {
     upcomingClasses,
@@ -495,6 +496,19 @@ export const Dashboard = () => {
     };
   }, [isMobileView]);
 
+  // When the user scrolls to a different month, open day details for the first day of that month
+  useEffect(() => {
+    const visibleMonthKey = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}`;
+    const prevKey = prevVisibleMonthRef.current;
+    prevVisibleMonthRef.current = visibleMonthKey;
+    if (prevKey !== null && prevKey !== visibleMonthKey) {
+      const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const classesForFirstDay = getClassesForDay(firstDayOfMonth.getDay(), firstDayOfMonth);
+      const paymentsDueForFirstDay = getPaymentsDueForDay(firstDayOfMonth, upcomingClasses, users, isDateInRelevantMonthRange);
+      handleDayClickInternal(firstDayOfMonth, classesForFirstDay, paymentsDueForFirstDay, false);
+    }
+  }, [selectedDate, getClassesForDay, upcomingClasses, users, isDateInRelevantMonthRange, handleDayClickInternal]);
+
   const handleMonthChange = async (newDate: Date) => {
     setSelectedDate(newDate);
     setIsLoadingCalendarData(true);
@@ -529,6 +543,7 @@ export const Dashboard = () => {
           }
         }
       }
+
     } finally {
       isFetchingRef.current = false;
       setIsLoadingCalendarData(false);
