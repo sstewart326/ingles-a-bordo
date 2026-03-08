@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useLanguage } from '../hooks/useLanguage';
@@ -13,7 +13,11 @@ import {
   calculateEndTime, 
   convert24HourTo12Hour 
 } from '../utils/timeUtils';
-import { XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { getAttendanceForClassDate, setAbsences, toClassDateString } from '../utils/attendanceUtils';
+import { getCachedCollection } from '../utils/firebaseUtils';
+import { where } from 'firebase/firestore';
+import { User } from '../types/interfaces';
+import { XMarkIcon, ArrowPathIcon, UserMinusIcon } from '@heroicons/react/24/outline';
 import Modal from './Modal';
 import { styles } from '../styles/styleUtils';
 import toast from 'react-hot-toast';
@@ -25,6 +29,8 @@ interface ClassExceptionManagerProps {
   timezone: string;
   defaultStartTime?: string;
   defaultEndTime?: string;
+  studentIds?: string[];
+  studentEmails?: string[];
   onExceptionCreated?: () => void;
 }
 
@@ -39,6 +45,8 @@ export const ClassExceptionManager: React.FC<ClassExceptionManagerProps> = ({
   timezone,
   defaultStartTime = '09:00',
   defaultEndTime = '10:00',
+  studentIds = [],
+  studentEmails = [],
   onExceptionCreated
 }) => {
   const { language } = useLanguage();
@@ -70,6 +78,12 @@ export const ClassExceptionManager: React.FC<ClassExceptionManagerProps> = ({
   // Modal states
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [attendanceAbsentIds, setAttendanceAbsentIds] = useState<string[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
+  const [resolvedStudentIds, setResolvedStudentIds] = useState<string[]>([]);
+  const [resolvedStudentEmails, setResolvedStudentEmails] = useState<string[]>([]);
 
   // Form states - using Date objects for dates, 12-hour format strings for times
   const [cancelReason, setCancelReason] = useState('');
@@ -81,6 +95,65 @@ export const ClassExceptionManager: React.FC<ClassExceptionManagerProps> = ({
   // Loading states
   const [isCancelling, setIsCancelling] = useState(false);
   const [isRescheduling, setIsRescheduling] = useState(false);
+
+  // When Mark absent modal opens: resolve emails to UIDs via users collection, then load attendance
+  useEffect(() => {
+    if (!showAttendanceModal || !currentUser) return;
+    const classDateStr = toClassDateString(classDate);
+    setAttendanceLoading(true);
+    const hasIds = studentIds.length > 0 && studentIds.length === studentEmails.length;
+    const loadData = async () => {
+      let ids = studentIds;
+      const emails = studentEmails;
+      if (!hasIds && emails.length > 0) {
+        try {
+          const emailToUid = new Map<string, string>();
+          const batchSize = 10;
+          for (let i = 0; i < emails.length; i += batchSize) {
+            const chunk = emails.slice(i, i + batchSize);
+            const users = await getCachedCollection<User>('users', [where('email', 'in', chunk)], { bypassCache: true });
+            users.forEach((u) => {
+              const email = u.email ?? '';
+              if (!email) return;
+              const uid = u.uid ?? u.id;
+              if (uid) emailToUid.set(email.toLowerCase(), uid);
+            });
+          }
+          ids = emails.map((e) => emailToUid.get(e.toLowerCase()) ?? '');
+        } catch (_) {
+          ids = [];
+        }
+      }
+      setResolvedStudentIds(ids);
+      setResolvedStudentEmails(emails);
+      const att = await getAttendanceForClassDate(classId, classDateStr);
+      setAttendanceAbsentIds(att?.absentStudentIds ?? []);
+    };
+    loadData().finally(() => setAttendanceLoading(false));
+  }, [showAttendanceModal, classId, classDate, currentUser, studentIds, studentEmails]);
+
+  const handleToggleAbsent = (studentId: string, currentlyAbsent: boolean) => {
+    if (!currentUser || !studentId) return;
+    const next = currentlyAbsent
+      ? attendanceAbsentIds.filter((id) => id !== studentId)
+      : [...attendanceAbsentIds, studentId];
+    setAttendanceAbsentIds(next);
+  };
+
+  const handleSubmitAttendance = async () => {
+    if (!currentUser) return;
+    setAttendanceSaving(true);
+    const classDateStr = toClassDateString(classDate);
+    try {
+      await setAbsences(classId, classDateStr, attendanceAbsentIds, currentUser.uid);
+      toast.success(t.success);
+      setShowAttendanceModal(false);
+    } catch {
+      toast.error(t.error || 'Failed to save attendance');
+    } finally {
+      setAttendanceSaving(false);
+    }
+  };
 
   // Don't show if not admin
   if (!isAdmin) return null;
@@ -184,6 +257,17 @@ export const ClassExceptionManager: React.FC<ClassExceptionManagerProps> = ({
           <ArrowPathIcon className="h-4 w-4 mr-1 text-amber-500" />
           {t.exceptions.rescheduleClass}
         </button>
+
+        {/* Mark absent - show when class has students */}
+        {studentEmails.length > 0 && (
+          <button
+            onClick={() => setShowAttendanceModal(true)}
+            className="flex items-center px-2.5 py-1 text-sm bg-white text-gray-600 rounded-md hover:bg-gray-50 transition-colors border border-gray-200"
+          >
+            <UserMinusIcon className="h-4 w-4 mr-1 text-gray-500" />
+            {t.markAbsent || 'Mark absent'}
+          </button>
+        )}
       </div>
 
       {/* Cancel Modal */}
@@ -330,6 +414,65 @@ export const ClassExceptionManager: React.FC<ClassExceptionManagerProps> = ({
               className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 disabled:opacity-50"
             >
               {isRescheduling ? t.loading : t.exceptions.rescheduleClass}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Mark absent Modal */}
+      <Modal isOpen={showAttendanceModal} onClose={() => setShowAttendanceModal(false)}>
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center text-gray-700">
+            <UserMinusIcon className="h-5 w-5 mr-2" />
+            {t.markAbsent || 'Mark absent'}
+          </h3>
+          <div className="text-sm text-gray-600 mb-4">
+            {t.date}: {classDate.toLocaleDateString(language === 'pt-BR' ? 'pt-BR' : 'en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })}
+          </div>
+          {attendanceLoading ? (
+            <p className="text-sm text-gray-500">{t.loading}</p>
+          ) : resolvedStudentIds.length > 0 ? (
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {resolvedStudentIds.map((id, i) => {
+                const email = resolvedStudentEmails[i] ?? '';
+                const isAbsent = attendanceAbsentIds.includes(id);
+                return (
+                  <label key={id || `student-${i}`} className="inline-flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAbsent}
+                      disabled={attendanceSaving || !id}
+                      onChange={() => handleToggleAbsent(id, isAbsent)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className={isAbsent ? 'text-red-600' : ''}>{email || id}</span>
+                    {isAbsent && <span className="text-xs text-gray-500">({t.absent || 'Absent'})</span>}
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">{t.loading || 'Student list could not be loaded.'}</p>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={() => setShowAttendanceModal(false)}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              disabled={attendanceSaving}
+            >
+              {t.cancel}
+            </button>
+            <button
+              onClick={handleSubmitAttendance}
+              disabled={attendanceSaving}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {attendanceSaving ? t.saving : t.save}
             </button>
           </div>
         </div>

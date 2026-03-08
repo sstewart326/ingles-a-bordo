@@ -15,6 +15,7 @@ import { AdminUsers } from './pages/AdminUsers';
 import { AdminSchedule } from './pages/AdminSchedule';
 import { AdminClassPlans } from './pages/AdminClassPlans';
 import { AdminPayments } from './pages/AdminPayments';
+import { AdminAttendance } from './pages/AdminAttendance';
 
 // Lazy load components that use Firebase Storage
 const ClassMaterials = lazy(() => import('./pages/ClassMaterials'));
@@ -177,6 +178,18 @@ export const AppRoutes = () => {
               <Header />
               <main className="flex-1">
                 <AdminPayments />
+              </main>
+              <Footer />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/attendance"
+          element={
+            <AdminRoute>
+              <Header />
+              <main className="flex-1">
+                <AdminAttendance />
               </main>
               <Footer />
             </AdminRoute>

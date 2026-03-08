@@ -97,7 +97,8 @@ export const Header = () => {
       { name: t.manageSchedules, href: '/admin/schedule', current: location.pathname === '/admin/schedule' },
       { name: t.contentLibrary, href: '/admin/content-library', current: location.pathname === '/admin/content-library' },
       { name: t.classPlans, href: '/admin/class-plans', current: location.pathname === '/admin/class-plans' },
-      { name: t.paymentsDue, href: '/admin/payments', current: location.pathname === '/admin/payments' }
+      { name: t.paymentsDue, href: '/admin/payments', current: location.pathname === '/admin/payments' },
+      { name: t.attendance, href: '/admin/attendance', current: location.pathname === '/admin/attendance' }
     ] : [
       { name: t.schedule, href: '/schedule', current: location.pathname === '/schedule' },
       { name: t.myContent, href: '/my-content', current: location.pathname === '/my-content' }

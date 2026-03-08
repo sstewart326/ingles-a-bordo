@@ -249,6 +249,18 @@ export interface ScheduleVersion {
 }
 
 /**
+ * Attendance record for a single class session.
+ * Stored at classes/{classId}/attendance/{classDate} (classDate = YYYY-MM-DD).
+ * Only absences are stored; students not in absentStudentIds are considered present.
+ */
+export interface ClassAttendance {
+  absentStudentIds: string[];
+  teacherId: string;
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
+}
+
+/**
  * Represents a one-off exception to a class schedule.
  * Used for cancellations and reschedules.
  */

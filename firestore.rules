@@ -96,6 +96,11 @@ service cloud.firestore {
         // Only admins (teachers) can manage exceptions
         allow create, update, delete: if isAdmin();
       }
+
+      // Attendance subcollection: one doc per session date (doc ID = YYYY-MM-DD)
+      match /attendance/{classDate} {
+        allow read, create, update, delete: if isAdmin();
+      }
     }
 
     // Class Notes collection

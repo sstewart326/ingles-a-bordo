@@ -298,7 +298,7 @@ export const ClassSection = ({
                       <div className={styles.card.subtitle}>
                         {formatClassTime(classSession)}
                       </div>
-                      
+
                       {/* Notes section */}
                       <div className="mt-4 w-full">
                         <div className={styles.card.label}>
@@ -594,6 +594,8 @@ export const ClassSection = ({
                           timezone={classSession.timezone}
                           defaultStartTime={classSession.startTime}
                           defaultEndTime={classSession.endTime}
+                          studentIds={classSession.studentIds ?? []}
+                          studentEmails={classSession.studentEmails ?? []}
                           onExceptionCreated={onExceptionCreated}
                         />
                       )}

@@ -44,7 +44,8 @@ interface Translation {
   contentLibrary: string;
   myContent: string;
   classPlans: string;
-  
+  attendance: string;
+
   // Content Library
   contentLibraryTitle: string;
   myContentTitle: string;
@@ -110,7 +111,25 @@ interface Translation {
   noDetailsAvailable: string;
   nothingScheduledForThisDay: string;
   days: string;
-  
+  markAbsent: string;
+  absent: string;
+  attendanceTitle: string;
+  attendanceDescription: string;
+  attended: string;
+  missed: string;
+  focusStudents: string;
+  last7Days: string;
+  last30Days: string;
+  last90Days: string;
+  dateRangeAll: string;
+  sessionsCount: string;
+  attendancePercent: string;
+  studentsWithAbsences: string;
+  atRisk: string;
+  attendanceEmptyState: string;
+  attendanceEmptyCta: string;
+  onlyStudentsWithAbsences: string;
+
   // Schedule
   courseSchedule: string;
   scheduleDescription: string;
@@ -487,6 +506,7 @@ const translations: Record<Language, Translation> = {
     contentLibrary: 'Content Library',
     myContent: 'My Content',
     classPlans: 'Study Plans',
+    attendance: 'Attendance',
     contentLibraryTitle: 'Content Library',
     myContentTitle: 'My Content',
     myContentIntro: 'Content your teacher has shared with you.',
@@ -551,6 +571,24 @@ const translations: Record<Language, Translation> = {
     noDetailsAvailable: 'No details available',
     nothingScheduledForThisDay: 'There is nothing scheduled for this day.',
     days: 'Days',
+    markAbsent: 'Mark absent',
+    absent: 'Absent',
+    attendanceTitle: 'Attendance',
+    attendanceDescription: 'See who attended each session.',
+    attended: 'Attended',
+    missed: 'Missed',
+    focusStudents: 'Focus on students',
+    last7Days: 'Last 7 days',
+    last30Days: 'Last 30 days',
+    last90Days: 'Last 90 days',
+    dateRangeAll: 'All',
+    sessionsCount: 'Sessions',
+    attendancePercent: 'Attendance %',
+    studentsWithAbsences: 'Students with absences',
+    atRisk: 'At risk',
+    attendanceEmptyState: 'No attendance in this range. Mark absences on the Dashboard for class sessions.',
+    attendanceEmptyCta: 'Mark absences on the Dashboard',
+    onlyStudentsWithAbsences: 'Only students with at least one absence',
     
     // Schedule
     courseSchedule: 'Course Schedule',
@@ -573,7 +611,7 @@ const translations: Record<Language, Translation> = {
     classMaterialsTitle: 'Class Materials Management',
     selectMonthLabel: 'Select Month',
     selectDateLabel: 'Select Date',
-    selectClass: 'Select Class on',
+    selectClass: 'Select Class',
     uploadMaterials: 'Upload Materials',
     addLinkPlaceholder: 'Add a link to learning materials',
     uploading: 'Uploading...',
@@ -926,6 +964,7 @@ const translations: Record<Language, Translation> = {
     contentLibrary: 'Biblioteca de Conteúdo',
     myContent: 'Meu Conteúdo',
     classPlans: 'Planos de Aula',
+    attendance: 'Presença',
     contentLibraryTitle: 'Biblioteca de Conteúdo',
     myContentTitle: 'Meu Conteúdo',
     myContentIntro: 'Conteúdo que seu professor compartilhou com você.',
@@ -990,6 +1029,24 @@ const translations: Record<Language, Translation> = {
     noDetailsAvailable: 'Nenhum detalhe disponível',
     nothingScheduledForThisDay: 'Não há nada agendado para este dia.',
     days: 'Dias',
+    markAbsent: 'Marcar ausente',
+    absent: 'Ausente',
+    attendanceTitle: 'Presença',
+    attendanceDescription: 'Veja quem esteve presente em cada aula.',
+    attended: 'Presente',
+    missed: 'Faltou',
+    focusStudents: 'Focar em alunos',
+    last7Days: 'Últimos 7 dias',
+    last30Days: 'Últimos 30 dias',
+    last90Days: 'Últimos 90 dias',
+    dateRangeAll: 'Tudo',
+    sessionsCount: 'Aulas',
+    attendancePercent: 'Presença %',
+    studentsWithAbsences: 'Alunos com faltas',
+    atRisk: 'Em risco',
+    attendanceEmptyState: 'Nenhuma presença neste período. Marque as faltas no Painel para cada aula.',
+    attendanceEmptyCta: 'Marcar faltas no Painel',
+    onlyStudentsWithAbsences: 'Só alunos com pelo menos uma falta',
     
     // Schedule
     courseSchedule: 'Agenda de Aulas',
@@ -1012,7 +1069,7 @@ const translations: Record<Language, Translation> = {
     classMaterialsTitle: 'Gerenciamento de Materiais de Aula',
     selectMonthLabel: 'Selecionar Mês',
     selectDateLabel: 'Selecionar Data',
-    selectClass: 'Selecionar Aula em',
+    selectClass: 'Selecionar Aula',
     uploadMaterials: 'Carregar Materiais',
     addLinkPlaceholder: 'Adicionar um link para materiais de aprendizado',
     uploading: 'Carregando...',
