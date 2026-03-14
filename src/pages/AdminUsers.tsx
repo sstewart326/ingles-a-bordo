@@ -17,10 +17,10 @@ import {
 } from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { PencilIcon, InformationCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, InformationCircleIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 import Modal from '../components/Modal';
-import { User } from '../types/interfaces';
+import { User, PinnedLink } from '../types/interfaces';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip } from '../components/Tooltip';
 
@@ -31,6 +31,7 @@ interface NewUser {
   isAdmin: boolean;
   birthdate?: string;  // Optional birthdate field
   teacher?: string;  // ID of the admin who created this user
+  pinnedLinks?: PinnedLink[];
   paymentConfig?: {
     type: 'weekly' | 'monthly';
     weeklyInterval?: number;
@@ -73,7 +74,8 @@ export const AdminUsers = () => {
     isTeacher: false,
     isAdmin: false,
     birthdate: '',  // Initialize birthdate field
-    teacher: undefined  // Initialize teacher field
+    teacher: undefined,  // Initialize teacher field
+    pinnedLinks: []
   });
   const [recentSignupLinks, setRecentSignupLinks] = useState<{ [email: string]: SignupLinkData }>({});
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -82,6 +84,9 @@ export const AdminUsers = () => {
   const [editingField, setEditingField] = useState<'name' | 'birthdate' | null>(null);
   const [updatingName, setUpdatingName] = useState(false);
   const [updatingBirthdate, setUpdatingBirthdate] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; birthdate: string; pinnedLinks: PinnedLink[] }>({ name: '', birthdate: '', pinnedLinks: [] });
+  const [savingEditUser, setSavingEditUser] = useState(false);
   const [sortColumn, setSortColumn] = useState<'name' | 'status'>('status');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const navigate = useNavigate();
@@ -359,6 +364,13 @@ export const AdminUsers = () => {
         newUserData.teacher = currentUser.uid;
       }
 
+      const pinnedLinks: PinnedLink[] = (newUser.pinnedLinks || [])
+        .filter((item) => (item?.url || '').trim() !== '')
+        .map((item) => ({ url: (item.url || '').trim(), ...((item.title || '').trim() ? { title: (item.title || '').trim() } : {}) }));
+      if (pinnedLinks.length > 0) {
+        newUserData.pinnedLinks = pinnedLinks;
+      }
+
       // Use setCachedDocument to properly handle caching
       await setCachedDocument('users', tempId, newUserData, { userId: currentUser?.uid });
 
@@ -375,7 +387,8 @@ export const AdminUsers = () => {
         isTeacher: false,
         isAdmin: false,
         birthdate: '',  // Reset birthdate field
-        teacher: undefined  // Reset teacher field
+        teacher: undefined,  // Reset teacher field
+        pinnedLinks: []
       }); // Reset form
 
       // Close the modal
@@ -474,6 +487,52 @@ export const AdminUsers = () => {
     } finally {
       // Set loading state back to false
       setUpdatingBirthdate(false);
+    }
+  };
+
+  const handleOpenEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditForm({
+      name: user.name,
+      birthdate: user.birthdate || '',
+      pinnedLinks: user.pinnedLinks || []
+    });
+  };
+
+  const handleSaveEditUser = async () => {
+    if (!editingUser || !currentUser) return;
+    if (!editForm.name.trim()) {
+      toast.error(t.pleaseEnterName);
+      return;
+    }
+    setSavingEditUser(true);
+    try {
+      const pinnedLinks: PinnedLink[] = (editForm.pinnedLinks || [])
+        .filter((item) => (item?.url || '').trim() !== '')
+        .map((item) => ({ url: (item.url || '').trim(), ...((item.title || '').trim() ? { title: (item.title || '').trim() } : {}) }));
+      const updateData: Partial<User> & { updatedAt?: string } = {
+        name: editForm.name.trim(),
+        updatedAt: new Date().toISOString()
+      };
+      if (editForm.birthdate.trim() !== '') {
+        updateData.birthdate = editForm.birthdate.trim();
+      } else {
+        (updateData as Record<string, unknown>).birthdate = null;
+      }
+      if (pinnedLinks.length > 0) {
+        updateData.pinnedLinks = pinnedLinks;
+      } else {
+        updateData.pinnedLinks = [];
+      }
+      await updateCachedDocument('users', editingUser.id, updateData, { userId: currentUser.uid });
+      await fetchUsers();
+      setEditingUser(null);
+      toast.success(t.nameUpdated);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast.error(t.failedToUpdateName);
+    } finally {
+      setSavingEditUser(false);
     }
   };
 
@@ -746,6 +805,17 @@ export const AdminUsers = () => {
       </div>
 
       <div className="flex justify-end gap-2 mt-4">
+        <div className="relative">
+          <Tooltip text={t.edit} width="w-16">
+            <button
+              onClick={() => handleOpenEditUser(user)}
+              className="p-1.5 text-indigo-600 hover:text-indigo-800 rounded-full hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 relative group/button"
+            >
+              <PencilIcon className="h-4 w-4" />
+              <span className="sr-only">{t.edit}</span>
+            </button>
+          </Tooltip>
+        </div>
         {user.status === 'active' ? (
           <>
             {!user.isAdmin && (
@@ -969,6 +1039,65 @@ export const AdminUsers = () => {
                       {t.adminAccount}
                     </label>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t.admin.schedule.pinnedLinksOptional}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">{t.admin.schedule.pinnedLinksDescription}</p>
+                    <div className="space-y-3">
+                      {(newUser.pinnedLinks || []).map((item: PinnedLink, index: number) => (
+                        <div key={index} className="flex flex-col gap-2 p-2 border border-gray-200 rounded-md bg-gray-50">
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="url"
+                              value={item?.url ?? ''}
+                              onChange={(e) => setNewUser(prev => ({
+                                ...prev,
+                                pinnedLinks: (prev.pinnedLinks || []).map((p: PinnedLink, i: number) =>
+                                  i === index ? { ...p, url: e.target.value } : p
+                                )
+                              }))}
+                              placeholder={t.admin.schedule.pinnedLinkPlaceholder}
+                              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setNewUser(prev => ({
+                                ...prev,
+                                pinnedLinks: (prev.pinnedLinks || []).filter((_: PinnedLink, i: number) => i !== index)
+                              }))}
+                              className="p-1.5 text-red-600 hover:text-red-800 rounded shrink-0"
+                              aria-label={t.delete}
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={item?.title ?? ''}
+                            onChange={(e) => setNewUser(prev => ({
+                              ...prev,
+                              pinnedLinks: (prev.pinnedLinks || []).map((p: PinnedLink, i: number) =>
+                                i === index ? { ...p, title: e.target.value } : p
+                              )
+                            }))}
+                            placeholder={t.admin.schedule.pinnedLinkTitleLabel}
+                            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          />
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setNewUser(prev => ({
+                          ...prev,
+                          pinnedLinks: [...(prev.pinnedLinks || []), { url: '', title: '' }]
+                        }))}
+                        className="py-1 px-2 text-sm inline-flex items-center rounded border border-indigo-600 bg-white text-indigo-600 hover:bg-indigo-50"
+                      >
+                        <PlusIcon className="h-3.5 w-3.5 mr-1" /> {t.admin.schedule.addLink}
+                      </button>
+                    </div>
+                  </div>
                   <div className="pt-3">
                     <button
                       type="submit"
@@ -978,6 +1107,110 @@ export const AdminUsers = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+            </Modal>
+            <Modal isOpen={editingUser !== null} onClose={() => setEditingUser(null)}>
+              <div className="w-96">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className={styles.headings.h2}>{t.edit} {t.activeUser}</h2>
+                </div>
+                {editingUser && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">{t.name}</label>
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">{t.birthdate} <span className="text-gray-500">({t.optional})</span></label>
+                      <input
+                        type="text"
+                        value={editForm.birthdate}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, birthdate: e.target.value }))}
+                        placeholder={t.birthdateFormat}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">{t.admin.schedule.pinnedLinksOptional}</label>
+                      <p className="text-xs text-gray-500 mb-2">{t.admin.schedule.pinnedLinksDescription}</p>
+                      <div className="space-y-3">
+                        {(editForm.pinnedLinks || []).map((item: PinnedLink, index: number) => (
+                          <div key={index} className="flex flex-col gap-2 p-2 border border-gray-200 rounded-md bg-gray-50">
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="url"
+                                value={item?.url ?? ''}
+                                onChange={(e) => setEditForm(prev => ({
+                                  ...prev,
+                                  pinnedLinks: (prev.pinnedLinks || []).map((p: PinnedLink, i: number) =>
+                                    i === index ? { ...p, url: e.target.value } : p
+                                  )
+                                }))}
+                                placeholder={t.admin.schedule.pinnedLinkPlaceholder}
+                                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setEditForm(prev => ({
+                                  ...prev,
+                                  pinnedLinks: (prev.pinnedLinks || []).filter((_: PinnedLink, i: number) => i !== index)
+                                }))}
+                                className="p-1.5 text-red-600 hover:text-red-800 rounded shrink-0"
+                                aria-label={t.delete}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={item?.title ?? ''}
+                              onChange={(e) => setEditForm(prev => ({
+                                ...prev,
+                                pinnedLinks: (prev.pinnedLinks || []).map((p: PinnedLink, i: number) =>
+                                  i === index ? { ...p, title: e.target.value } : p
+                                )
+                              }))}
+                              placeholder={t.admin.schedule.pinnedLinkTitleLabel}
+                              className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            />
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setEditForm(prev => ({
+                            ...prev,
+                            pinnedLinks: [...(prev.pinnedLinks || []), { url: '', title: '' }]
+                          }))}
+                          className="py-1 px-2 text-sm inline-flex items-center rounded border border-indigo-600 bg-white text-indigo-600 hover:bg-indigo-50"
+                        >
+                          <PlusIcon className="h-3.5 w-3.5 mr-1" /> {t.admin.schedule.addLink}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="pt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveEditUser}
+                        disabled={savingEditUser}
+                        className={`${styles.buttons.primary} flex-1`}
+                      >
+                        {savingEditUser ? t.loading : t.save}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingUser(null)}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                      >
+                        {t.cancel}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </Modal>
           </div>
@@ -1071,6 +1304,19 @@ export const AdminUsers = () => {
                       <tr key={user.id} className="group hover:bg-gray-50">
                         <td className={`${styles.table.cell} w-20 relative`}>
                           <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <div className="relative">
+                              <button
+                                onClick={() => handleOpenEditUser(user)}
+                                className="p-1.5 text-indigo-600 hover:text-indigo-800 rounded-full hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 relative group/button"
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                                <span className="sr-only">{t.edit}</span>
+                                <span className="absolute bottom-full left-0 mb-1 px-3 py-2 w-16 bg-gray-800 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover/button:opacity-100 group-hover/button:visible transition-all duration-200 z-[100] pointer-events-none whitespace-nowrap">
+                                  {t.edit}
+                                  <span className="absolute w-2 h-2 bg-gray-800 transform rotate-45 left-4 -bottom-1"></span>
+                                </span>
+                              </button>
+                            </div>
                             {user.status === 'active' ? (
                               <>
                                 {!user.isAdmin && (

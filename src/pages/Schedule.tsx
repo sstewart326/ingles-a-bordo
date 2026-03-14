@@ -74,6 +74,11 @@ interface Birthday {
   day: number;
 }
 
+interface PinnedLinkItem {
+  url: string;
+  title?: string;
+}
+
 interface UserData {
   id: string;
   createdAt: string;
@@ -86,6 +91,7 @@ interface UserData {
   email: string;
   status: string;
   updatedAt: string;
+  pinnedLinks?: PinnedLinkItem[];
 }
 
 interface CalendarData {
@@ -1084,6 +1090,36 @@ export const Schedule = () => {
             </p>
           </div>
         </div>
+
+        {(() => {
+          const pinnedLinks: PinnedLinkItem[] = (calendarData?.userData?.pinnedLinks || []).filter(
+            (item) => (item?.url || '').trim() !== ''
+          );
+          if (pinnedLinks.length === 0) return null;
+          return (
+            <div className="mt-6 mb-4">
+              <h2 className={styles.headings.h2}>{t.usefulLinksForYou}</h2>
+              <ul className="mt-2 space-y-1 list-none">
+                {pinnedLinks.map((item: PinnedLinkItem, index: number) => {
+                  const href = item.url.startsWith('http') ? item.url : `https://${item.url}`;
+                  const displayText = item.title && item.title.trim() ? item.title.trim() : (item.url.length > 60 ? `${item.url.slice(0, 60)}…` : item.url);
+                  return (
+                    <li key={`${item.url}-${index}`}>
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:text-indigo-800 underline break-all"
+                      >
+                        {displayText}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })()}
 
         {/* New responsive layout container */}
         <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">

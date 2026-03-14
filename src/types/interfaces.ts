@@ -121,6 +121,12 @@ export interface HomeworkSubmission {
   grade?: string;
 }
 
+/** A link pinned to a user; optional title is shown instead of the URL when set. */
+export interface PinnedLink {
+  url: string;
+  title?: string;
+}
+
 export interface PaymentConfig {
   type: 'weekly' | 'monthly';
   weeklyInterval?: number;  // for weekly payments, number of weeks
@@ -189,6 +195,7 @@ export interface User {
     startDate: string;
     paymentLink?: string;
   };
+  pinnedLinks?: PinnedLink[];  // Links shown to this user on their schedule (optional title displays instead of URL)
 }
 
 export interface MonthYear {

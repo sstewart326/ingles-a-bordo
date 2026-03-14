@@ -308,8 +308,17 @@ interface Translation {
         classDeleted: string;
       };
       confirmDelete: string;
+      pinnedLinks: string;
+      pinnedLinksOptional: string;
+      pinnedLinksDescription: string;
+      addLink: string;
+      pinnedLinkPlaceholder: string;
+      pinnedLinkTitleLabel: string;
     };
   };
+
+  linksPinnedByTeacher: string;
+  usefulLinksForYou: string;
 
   // Timezones
   timezones: {
@@ -606,6 +615,8 @@ const translations: Record<Language, Translation> = {
     privateNotesInfo: 'Private notes will not be shared with students',
     selectDayToViewDetails: 'Select a day to view class details',
     availableClassDates: 'Available class dates',
+    linksPinnedByTeacher: 'Links pinned by your teacher',
+    usefulLinksForYou: 'Useful links for you',
     
     // Class Materials
     classMaterialsTitle: 'Class Materials Management',
@@ -767,7 +778,13 @@ const translations: Record<Language, Translation> = {
           classCreated: 'Class created successfully',
           classDeleted: 'Class deleted successfully'
         },
-        confirmDelete: 'Are you sure you want to delete this class?'
+        confirmDelete: 'Are you sure you want to delete this class?',
+        pinnedLinks: 'Pinned links',
+        pinnedLinksOptional: 'Pinned links (optional)',
+        pinnedLinksDescription: 'Links shown to students above their schedule.',
+        addLink: 'Add link',
+        pinnedLinkPlaceholder: 'https://...',
+        pinnedLinkTitleLabel: 'Title (optional)'
       }
     },
 
@@ -1064,6 +1081,8 @@ const translations: Record<Language, Translation> = {
     privateNotesInfo: 'Observações privadas não serão compartilhadas com os alunos',
     selectDayToViewDetails: 'Selecione um dia para ver os detalhes da aula',
     availableClassDates: 'Datas de aula disponíveis',
+    linksPinnedByTeacher: 'Links fixados pelo seu professor',
+    usefulLinksForYou: 'Links úteis para você',
     
     // Class Materials
     classMaterialsTitle: 'Gerenciamento de Materiais de Aula',
@@ -1225,7 +1244,13 @@ const translations: Record<Language, Translation> = {
           classCreated: 'Aula criada com sucesso',
           classDeleted: 'Aula excluída com sucesso'
         },
-        confirmDelete: 'Tem certeza que deseja excluir esta aula?'
+        confirmDelete: 'Tem certeza que deseja excluir esta aula?',
+        pinnedLinks: 'Links fixados',
+        pinnedLinksOptional: 'Links fixados (opcional)',
+        pinnedLinksDescription: 'Links exibidos aos alunos acima da agenda.',
+        addLink: 'Adicionar link',
+        pinnedLinkPlaceholder: 'https://...',
+        pinnedLinkTitleLabel: 'Título (opcional)'
       }
     },
 
