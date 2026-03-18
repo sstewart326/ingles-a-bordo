@@ -258,19 +258,8 @@ function StudentContentCard({
           {typeLabel}
         </span>
         <h3 className="font-medium text-gray-900 mt-0.5 line-clamp-2">{item.title}</h3>
-        {item.type === 'text' ? (
-          <>
-            {item.description && (
-              <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-            )}
-            <div className="mt-2 text-sm text-gray-700 whitespace-pre-wrap overflow-y-auto max-h-48 flex-1 min-h-0 border border-gray-100 rounded-md bg-gray-50/50 px-2 py-2">
-              {item.body || ''}
-            </div>
-          </>
-        ) : (
-          item.description && (
-            <p className="text-sm text-gray-600 mt-1 line-clamp-2 flex-1">{item.description}</p>
-          )
+        {item.description && (
+          <p className="text-sm text-gray-600 mt-1 line-clamp-2 flex-1">{item.description}</p>
         )}
         <div className="mt-3 flex gap-2">
           <ContentLibraryViewButton item={item} language={language} />

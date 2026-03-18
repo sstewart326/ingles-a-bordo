@@ -55,7 +55,6 @@ export default function AdminContentLibrary() {
   const [formStudentIds, setFormStudentIds] = useState<string[]>([]);
   const [formAllStudents, setFormAllStudents] = useState(true);
   const [formVideoUrl, setFormVideoUrl] = useState('');
-  const [formBody, setFormBody] = useState('');
   const [formImageFile, setFormImageFile] = useState<File | null>(null);
   const [formImagePreviewUrl, setFormImagePreviewUrl] = useState<string | null>(null);
 
@@ -131,7 +130,6 @@ export default function AdminContentLibrary() {
     setFormStudentIds([]);
     setFormAllStudents(true);
     setFormVideoUrl('');
-    setFormBody('');
     setFormImageFile(null);
     setFormImagePreviewUrl(null);
     setModalOpen(true);
@@ -145,7 +143,6 @@ export default function AdminContentLibrary() {
     setFormStudentIds(item.studentIds ?? []);
     setFormAllStudents((item.studentIds ?? []).length === 0);
     setFormVideoUrl(item.videoUrl ?? '');
-    setFormBody(item.body ?? '');
     setFormImageFile(null);
     setFormImagePreviewUrl(item.imageUrl ?? null);
     setModalOpen(true);
@@ -181,10 +178,6 @@ export default function AdminContentLibrary() {
         return false;
       }
     }
-    if (formType === 'text' && !formBody.trim()) {
-      toast.error('Please enter some text');
-      return false;
-    }
     if (formType === 'image') {
       if (!editingItem && !formImageFile) {
         toast.error('Please select an image');
@@ -211,7 +204,6 @@ export default function AdminContentLibrary() {
           updates.videoId = videoId ?? undefined;
           updates.videoUrl = formVideoUrl.trim() || undefined;
         }
-        if (formType === 'text') updates.body = formBody.trim();
         if (formType === 'image' && formImageFile) {
           const result = await uploadContentLibraryImage(formImageFile, currentUser.uid);
           updates.imageUrl = result.imageUrl;
@@ -243,7 +235,6 @@ export default function AdminContentLibrary() {
             videoId: parseYouTubeVideoId(formVideoUrl) ?? undefined,
             videoUrl: formVideoUrl.trim() || undefined,
           }),
-          ...(formType === 'text' && { body: formBody.trim() }),
           ...(formType === 'image' && { imageUrl, imagePath }),
         };
         await createContentLibraryItem(currentUser.uid, item);
@@ -473,21 +464,6 @@ export default function AdminContentLibrary() {
             </div>
           )}
 
-          {formType === 'text' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.typeText} *
-              </label>
-              <textarea
-                value={formBody}
-                onChange={(e) => setFormBody(e.target.value)}
-                rows={5}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
-                placeholder={t.typeText}
-              />
-            </div>
-          )}
-
           {formType === 'image' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -638,11 +614,6 @@ function ContentCard({
         <h3 className="font-medium text-gray-900 mt-0.5 line-clamp-2">{item.title}</h3>
         {item.description && (
           <p className="text-sm text-gray-600 mt-1 line-clamp-2">{item.description}</p>
-        )}
-        {item.type === 'text' && item.body != null && (
-          <div className="mt-2 text-sm text-gray-700 whitespace-pre-wrap overflow-y-auto max-h-32 border border-gray-100 rounded-md bg-gray-50/50 px-2 py-2">
-            {item.body}
-          </div>
         )}
         <ContentLibraryViewButton item={item} language={language} />
         <ContentLibraryCommentsSection

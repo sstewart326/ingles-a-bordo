@@ -54,7 +54,6 @@ export interface ContentLibraryItem {
   studentIds: string[];
   videoId?: string;
   videoUrl?: string;
-  body?: string;
   imageUrl?: string;
   /** Storage path for image (used for delete); set when uploading */
   imagePath?: string;
