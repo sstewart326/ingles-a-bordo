@@ -127,44 +127,58 @@ function docToContentLibraryItem(d: DocumentSnapshot): ContentLibraryItem {
 
 /**
  * Fetches a page of content library items visible to a student (cursor-based pagination).
- * Items are from the student's teacher; visible if studentIds is empty or contains studentId.
- * Over-fetches then filters client-side since Firestore cannot query "empty or array-contains".
+ * Items are from the student's teacher; visible if `studentIds` is empty or contains `studentDocId`.
+ * Firestore cannot express "empty OR array-contains" as a single query, so we run both queries and merge.
  */
 export async function getContentLibraryPageForStudent(
   teacherId: string,
-  studentId: string,
+  studentDocId: string,
   pageSize: number = DEFAULT_PAGE_SIZE,
   startAfterDoc: DocumentSnapshot | null = null
 ): Promise<PaginatedContentLibraryResult> {
   const overFetchLimit = Math.min(pageSize * 3, OVER_FETCH_CAP);
   const colRef = collection(db, COLLECTION_PATH);
-  const constraints = [
-    where('teacherId', '==', teacherId),
-    orderBy('createdAt', 'desc'),
-    limit(overFetchLimit),
+
+  const baseFilters = [where('teacherId', '==', teacherId)];
+  const orderBys = [orderBy('createdAt', 'desc')];
+
+  const buildQuery = (extraConstraints: ReturnType<typeof where>[]) => {
+    const filters = [...baseFilters, ...extraConstraints];
+    return startAfterDoc
+      ? query(colRef, ...filters, ...orderBys, startAfter(startAfterDoc), limit(overFetchLimit))
+      : query(colRef, ...filters, ...orderBys, limit(overFetchLimit));
+  };
+
+  const qEmpty = buildQuery([where('studentIds', '==', [])]);
+  const qStudent = buildQuery([where('studentIds', 'array-contains', studentDocId)]);
+
+  const [emptySnapshot, studentSnapshot] = await Promise.all([getDocs(qEmpty), getDocs(qStudent)]);
+
+  const combined = [
+    ...emptySnapshot.docs.map((d) => ({ doc: d, item: docToContentLibraryItem(d) })),
+    ...studentSnapshot.docs.map((d) => ({ doc: d, item: docToContentLibraryItem(d) })),
   ];
-  const q = startAfterDoc
-    ? query(colRef, ...constraints, startAfter(startAfterDoc))
-    : query(colRef, ...constraints);
 
-  const snapshot = await getDocs(q);
-  const docs = snapshot.docs;
+  // Safety: ensure we only keep items that are actually visible for this student.
+  const visiblePairs = combined.filter(({ item }) => (
+    item.studentIds.length === 0 || item.studentIds.includes(studentDocId)
+  ));
 
-  const filtered: { doc: DocumentSnapshot; item: ContentLibraryItem }[] = [];
-  for (const d of docs) {
-    const data = d.data();
-    const studentIds: string[] = data?.studentIds ?? [];
-    const visible = studentIds.length === 0 || studentIds.includes(studentId);
-    if (visible) {
-      filtered.push({ doc: d, item: docToContentLibraryItem(d) });
-      if (filtered.length >= pageSize) break;
-    }
-  }
+  visiblePairs.sort((a, b) => {
+    const tA = a.item.createdAt?.toMillis?.() ?? 0;
+    const tB = b.item.createdAt?.toMillis?.() ?? 0;
+    if (tA !== tB) return tB - tA;
+    return b.doc.id.localeCompare(a.doc.id); // desc doc id tie-breaker
+  });
 
-  const pagePairs = filtered.slice(0, pageSize);
+  const pagePairs = visiblePairs.slice(0, pageSize);
   const items = pagePairs.map((p) => p.item);
   const lastDoc = pagePairs.length > 0 ? pagePairs[pagePairs.length - 1].doc : null;
-  const hasMore = filtered.length > pageSize || docs.length >= overFetchLimit;
+
+  const hasMore =
+    visiblePairs.length > pageSize ||
+    emptySnapshot.docs.length >= overFetchLimit ||
+    studentSnapshot.docs.length >= overFetchLimit;
 
   return { items, lastDoc, hasMore };
 }

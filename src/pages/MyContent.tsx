@@ -36,10 +36,10 @@ export default function MyContent() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchFirstPage = useCallback(async () => {
-    if (!currentUser?.uid || !teacherId) return;
+    if (!currentUser?.uid || !teacherId || !userData?.id) return;
     setLoading(true);
     try {
-      const result = await getContentLibraryPageForStudent(teacherId, currentUser.uid, PAGE_SIZE, null);
+      const result = await getContentLibraryPageForStudent(teacherId, userData.id, PAGE_SIZE, null);
       setItems(result.items);
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
@@ -51,13 +51,13 @@ export default function MyContent() {
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.uid, teacherId, t.failedToLoad]);
+  }, [currentUser?.uid, teacherId, userData?.id, t.failedToLoad]);
 
   const fetchMore = useCallback(async () => {
-    if (!currentUser?.uid || !teacherId || !lastDoc || loadingMore) return;
+    if (!currentUser?.uid || !teacherId || !lastDoc || loadingMore || !userData?.id) return;
     setLoadingMore(true);
     try {
-      const result = await getContentLibraryPageForStudent(teacherId, currentUser.uid, PAGE_SIZE, lastDoc);
+      const result = await getContentLibraryPageForStudent(teacherId, userData.id, PAGE_SIZE, lastDoc);
       setItems((prev) => [...prev, ...result.items]);
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
@@ -66,7 +66,7 @@ export default function MyContent() {
     } finally {
       setLoadingMore(false);
     }
-  }, [currentUser?.uid, teacherId, lastDoc, loadingMore, t.failedToLoad]);
+  }, [currentUser?.uid, teacherId, lastDoc, loadingMore, userData?.id, t.failedToLoad]);
 
   useEffect(() => {
     let cancelled = false;
