@@ -105,7 +105,7 @@ service firebase.storage {
     
     // Function to check file size for profile pictures (2MB)
     function isValidProfilePictureSize() {
-      return request.resource.size <= 2 * 1024 * 1024; // 2MB
+      return request.resource.size <= 5 * 1024 * 1024; // 2MB
     }
 
     // Function to check file type for content library images
