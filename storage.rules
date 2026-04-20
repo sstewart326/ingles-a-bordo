@@ -8,10 +8,17 @@ service firebase.storage {
     }
 
     function isAdmin() {
-      let userDocPath = /databases/(default)/documents/users/$(request.auth.uid);
-      return isAuthenticated() &&
-        firestore.exists(userDocPath) &&  // Check if document exists before getting it
-        firestore.get(userDocPath).data.isAdmin == true;
+      return isAuthenticated() && request.auth.token.isAdmin == true;
+    }
+
+    function teacherUid() {
+      return request.auth.token.teacher;
+    }
+
+    function contentLibraryStudentOfTeacher(teacherUserId) {
+      // A student can read from this folder if their teacher claim matches the folder owner's auth UID.
+      let teacherDoc = firestore.get(/databases/(default)/documents/users/$(teacherUserId));
+      return teacherDoc != null && teacherDoc.data.uid == teacherUid();
     }
 
     function hasAccessToMaterial(materialId) {
@@ -114,12 +121,15 @@ service firebase.storage {
       return request.resource.size <= 5 * 1024 * 1024; // 5MB
     }
 
-    // Rules for content library (admin-only, per-teacher folder)
+    // Rules for content library (admin-only writes, teacher+students read)
     match /contentLibrary/{userId}/{fileName} {
-      // Allow read if user is admin and accessing their own folder
-      allow read: if isAuthenticated() && isAdmin() && request.auth.uid == userId;
+      // Admins can read their own folder; students can read if their teacher owns this folder.
+      allow read: if isAuthenticated() && (
+        (isAdmin() && request.auth.token.id == userId) ||
+        contentLibraryStudentOfTeacher(userId)
+      );
 
-      // Allow write/delete if user is admin and writing to their own folder
+      // Only the admin who owns the folder can write/delete.
       allow write: if isAdmin()
                   && request.auth.uid == userId
                   && isValidContentLibrarySize()

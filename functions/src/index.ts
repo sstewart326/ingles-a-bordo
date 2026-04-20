@@ -9,6 +9,7 @@
 
 import { onRequest } from "firebase-functions/v2/https";
 import { onCall } from "firebase-functions/v2/https";
+import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import { corsHandler, REGION } from "./functionsUtil";
@@ -1957,6 +1958,15 @@ export const completeSignupHttp = onCall({
 
       // Commit the batch
       await batch.commit();
+
+      // Set custom claims immediately so the client's forced token refresh
+      // picks them up without any race window against the onDocumentWritten trigger.
+      await admin.auth().setCustomUserClaims(uid, {
+        teacher: currentData.teacher ?? null,
+        isAdmin: currentData.isAdmin === true,
+        id: currentData.id ?? null
+      });
+
       logger.info('Successfully completed signup', { email, uid });
       return { success: true };
     } catch (error) {
@@ -1968,6 +1978,22 @@ export const completeSignupHttp = onCall({
     throw error;
   }
 });
+
+export const syncUserClaims = onDocumentWritten(
+  { document: "users/{userId}", region: REGION },
+  async (event) => {
+    const data = event.data?.after?.data();
+    if (!data?.uid) return; // doc deleted or no auth uid
+
+    await admin.auth().setCustomUserClaims(data.uid, {
+      teacher: data.teacher ?? null,
+      isAdmin: data.isAdmin === true,
+      id: data.id
+    });
+
+    logger.info('Synced custom claims', { uid: data.uid, isAdmin: data.isAdmin === true, hasTeacher: !!data.teacher });
+  }
+);
 
 export const signoutHttpRequest = onRequest({
   region: REGION,
@@ -2024,6 +2050,52 @@ export const whatsappRedirect = onRequest({
     logger.error('Error in whatsappRedirect:', error);
     response.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// One-time backfill: sets custom claims on all existing active users.
+// Call once as an admin, then this export can be removed.
+export const backfillUserClaims = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) {
+    throw new Error('Unauthorized');
+  }
+
+  // Verify the caller is an admin.
+  const callerDoc = await admin.firestore()
+    .collection('users')
+    .where('uid', '==', request.auth.uid)
+    .limit(1)
+    .get();
+
+  if (callerDoc.empty || callerDoc.docs[0].data().isAdmin !== true) {
+    throw new Error('Forbidden: admin only');
+  }
+
+  const usersSnapshot = await admin.firestore().collection('users').get();
+  const results: { uid: string; status: string }[] = [];
+
+  for (const doc of usersSnapshot.docs) {
+    const data = doc.data();
+    if (!data.uid) {
+      results.push({ uid: doc.id, status: 'skipped (no uid field)' });
+      continue;
+    }
+
+    try {
+      await admin.auth().setCustomUserClaims(data.uid, {
+        teacher: data.teacher ?? null,
+        isAdmin: data.isAdmin === true,
+        id: data.id ?? null
+      });
+      results.push({ uid: data.uid, status: 'ok' });
+    } catch (err) {
+      logger.error('backfillUserClaims failed', err);
+      const message = err instanceof Error ? err.message : String(err);
+      results.push({ uid: data.uid, status: `error: ${message}` });
+    }
+  }
+
+  logger.info('backfillUserClaims complete', { count: results.length, results });
+  return { results };
 });
 
 export * from './emailFunctions';

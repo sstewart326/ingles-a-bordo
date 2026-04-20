@@ -6,11 +6,11 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return isAuthenticated() && 
-             request.auth.uid != null &&
-             exists(userDocPath) &&  // Check if document exists before getting it
-             get(userDocPath).data.isAdmin == true;
+      return isAuthenticated() && request.auth.token.isAdmin == true;
+    }
+
+    function teacherUid() {
+      return request.auth.token.teacher;
     }
     
     // Function to check if the user is a teacher of the class note
@@ -180,33 +180,43 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Content Library collection (teacher-uploaded content for students)
-    // Students can read items from their teacher where item is for all students or lists them
-    function canStudentReadContentLibraryItem(itemData) {
-      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return exists(userDocPath) &&
-             get(userDocPath).data.teacher == itemData.teacherId &&
-             (itemData.studentIds.size() == 0 || request.auth.uid in itemData.studentIds);
+    function contentIsForUser(itemData) {
+      // Admins see all their own content; students see content from their teacher
+      // where they are either specifically listed or the item has no student restrictions.
+      return isAdmin() || (
+        itemData.teacherId == teacherUid() &&
+        (itemData.studentIds.size() == 0 || request.auth.token.id in itemData.studentIds)
+      );
     }
-    function canReadContentLibraryItem(itemId) {
-      let itemData = get(/databases/$(database)/documents/contentLibrary/$(itemId)).data;
-      return isAuthenticated() && (itemData.teacherId == request.auth.uid || canStudentReadContentLibraryItem(itemData));
-    }
+
     match /contentLibrary/{itemId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.teacherId == request.auth.uid || canStudentReadContentLibraryItem(resource.data));
+      allow read: if isAuthenticated() && contentIsForUser(resource.data);
       allow create: if isAuthenticated() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
 
       match /comments/{commentId} {
-        allow read: if canReadContentLibraryItem(itemId);
-        allow create: if canReadContentLibraryItem(itemId) && request.resource.data.authorId == request.auth.uid;
-        allow update, delete: if canReadContentLibraryItem(itemId) && (resource.data.authorId == request.auth.uid || get(/databases/$(database)/documents/contentLibrary/$(itemId)).data.teacherId == request.auth.uid);
+        allow read: if isAuthenticated() && contentIsForUser(
+          get(/databases/$(database)/documents/contentLibrary/$(itemId)).data
+        );
+        allow create: if isAuthenticated() && (
+          isAdmin() || teacherUid() != null
+        ) && request.resource.data.authorId == request.auth.uid;
+        allow update: if isAuthenticated() && (
+          isAdmin() || resource.data.authorId == request.auth.uid
+        );
+        allow delete: if isAuthenticated() && (
+          isAdmin() || resource.data.authorId == request.auth.uid
+        );
 
         match /versions/{versionId} {
-          allow read: if canReadContentLibraryItem(itemId);
-          allow create: if canReadContentLibraryItem(itemId) && (get(/databases/$(database)/documents/contentLibrary/$(itemId)/comments/$(commentId)).data.authorId == request.auth.uid || get(/databases/$(database)/documents/contentLibrary/$(itemId)).data.teacherId == request.auth.uid);
+          allow read: if isAuthenticated() && contentIsForUser(
+            get(/databases/$(database)/documents/contentLibrary/$(itemId)).data
+          );
+          allow create: if isAuthenticated() && (
+            isAdmin() || resource.data.authorId == request.auth.uid
+          );
           allow update: if false;
-          allow delete: if canReadContentLibraryItem(itemId) && get(/databases/$(database)/documents/contentLibrary/$(itemId)).data.teacherId == request.auth.uid;
+          allow delete: if isAdmin();
         }
       }
     }

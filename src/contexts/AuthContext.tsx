@@ -217,6 +217,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           throw new Error((result.data as any).error || 'Failed to complete signup');
         }
 
+        // Force token refresh so custom claims set by completeSignupHttp are available.
+        await user.getIdToken(/* forceRefresh */ true);
+
         // Set the current user and navigate to dashboard
         setCurrentUser(user);
         navigate('/dashboard');
@@ -259,6 +262,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return null;
       } else {
         const result = await signInWithPopup(auth, provider);
+        // Force token refresh so custom claims are current for the new session.
+        await result.user.getIdToken(/* forceRefresh */ true);
         return result;
       }
     } catch (error) {
@@ -288,6 +293,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await signOut(auth);
         throw new Error('No active user found');
       } else {
+        // Force token refresh so custom claims (teacher, isAdmin) are current.
+        await userCredential.user.getIdToken(/* forceRefresh */ true);
         setCurrentUser(userCredential.user);
         navigate('/dashboard');
       }
