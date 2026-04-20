@@ -1,6 +1,6 @@
 import { Language } from '../contexts/LanguageContext';
 
-interface Translation {
+export interface Translation {
   // Auth & Profile
   login: string;
   signup: string;
@@ -147,6 +147,8 @@ interface Translation {
   privateNotesInfo: string;
   selectDayToViewDetails: string;
   availableClassDates: string;
+  /** Fallback label when a slide URL cannot be parsed to a file name (modal buttons) */
+  scheduleMaterialFileFallback: string;
   
   // Class Materials
   classMaterialsTitle: string;
@@ -616,6 +618,7 @@ const translations: Record<Language, Translation> = {
     privateNotes: 'Private notes',
     privateNotesInfo: 'Private notes will not be shared with students',
     selectDayToViewDetails: 'Select a day to view class details',
+    scheduleMaterialFileFallback: 'Document',
     availableClassDates: 'Available class dates',
     linksPinnedByTeacher: 'Links pinned by your teacher',
     usefulLinksForYou: 'Useful links for you',
@@ -1083,6 +1086,7 @@ const translations: Record<Language, Translation> = {
     privateNotes: 'Observações privadas',
     privateNotesInfo: 'Observações privadas não serão compartilhadas com os alunos',
     selectDayToViewDetails: 'Selecione um dia para ver os detalhes da aula',
+    scheduleMaterialFileFallback: 'Documento',
     availableClassDates: 'Datas de aula disponíveis',
     linksPinnedByTeacher: 'Links fixados pelo seu professor',
     usefulLinksForYou: 'Links úteis para você',

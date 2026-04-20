@@ -23,6 +23,11 @@ import {
   findNoteForClassSession 
 } from '../utils/notesUtils';
 import { processDailyClassMapEntries } from '../utils/calendarDayUtils';
+import {
+  mergeClassMaterialsForDate,
+  getSlideDisplayNameFromUrl,
+} from '../utils/scheduleClassMaterialsUtils';
+import type { Translation } from '../translations';
 // Define types for the calendar data from the server
 interface CalendarClass extends ClassSession {
   dates: string[];
@@ -112,12 +117,14 @@ const MaterialsModal = ({
   isOpen,
   onClose,
   material,
-  loading
+  loading,
+  t,
 }: {
   isOpen: boolean;
   onClose: () => void;
   material: CalendarMaterial | null;
   loading: boolean;
+  t: Translation;
 }) => {
   if (!isOpen) return null;
 
@@ -142,7 +149,7 @@ const MaterialsModal = ({
 
           <div className="sm:flex sm:items-start">
             <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
-              <h3 className={styles.headings.h3}>Class Materials</h3>
+              <h3 className={styles.headings.h3}>{t.classMaterials}</h3>
 
               {loading ? (
                 <div className="flex justify-center items-center py-8">
@@ -153,25 +160,29 @@ const MaterialsModal = ({
                   {/* Slides */}
                   {material.slides && material.slides.length > 0 && (
                     <div>
-                      {material.slides.map((slide, index) => (
-                        <a
-                          key={index}
-                          href={slide}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mr-2 mb-2"
-                        >
-                          <FaFilePdf className="mr-2" />
-                          Document {index + 1}
-                        </a>
-                      ))}
+                      {material.slides.map((slide) => {
+                        const label =
+                          getSlideDisplayNameFromUrl(slide) || t.scheduleMaterialFileFallback;
+                        return (
+                          <a
+                            key={slide}
+                            href={slide}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mr-2 mb-2"
+                          >
+                            <FaFilePdf className="mr-2 shrink-0" />
+                            <span className="text-left break-all">{label}</span>
+                          </a>
+                        );
+                      })}
                     </div>
                   )}
 
                   {/* Links */}
                   {material.links && material.links.length > 0 && (
                     <div className="mt-6">
-                      <h4 className="text-lg font-medium mb-2">Useful Links</h4>
+                      <h4 className="text-lg font-medium mb-2">{t.usefulLinks}</h4>
                       <ul className="space-y-2">
                         {material.links.map((link, index) => (
                           <li key={index}>
@@ -386,14 +397,22 @@ export const Schedule = () => {
     try {
       const dateStr = formatDateForComparison(date);
 
-      // Find material for this specific class and date
-      const material = calendarData.materials[classId].find(m => {
-        const materialDateStr = m.classDate?.split('T')[0] || '';
-        return materialDateStr === dateStr;
-      });
+      const merged = mergeClassMaterialsForDate(
+        calendarData.materials[classId],
+        dateStr
+      );
 
-      if (material) {
-        setSelectedMaterial(material);
+      if (merged && (merged.slides.length > 0 || merged.links.length > 0)) {
+        setSelectedMaterial({
+          id: 'merged',
+          classId,
+          slides: merged.slides,
+          links: merged.links,
+          classDate: dateStr,
+          studentEmails: [],
+          createdAt: '',
+          updatedAt: '',
+        });
         setIsModalOpen(true);
       } else {
         setSelectedMaterial(null);
@@ -517,18 +536,15 @@ export const Schedule = () => {
         const dateStr = formatDateForComparison(date);
         const key = `${classItem.id}_${dateStr}`;
 
-        if (calendarData.materials[classItem.id]) {
-          const material = calendarData.materials[classItem.id].find(m => {
-            const materialDateStr = m.classDate?.split('T')[0] || '';
-            return materialDateStr === dateStr;
+        const merged = mergeClassMaterialsForDate(
+          calendarData.materials[classItem.id],
+          dateStr
+        );
+        if (merged && (merged.slides.length > 0 || merged.links.length > 0)) {
+          materialsInfo.set(key, {
+            hasSlides: merged.slides.length > 0,
+            hasLinks: merged.links.length > 0,
           });
-
-          if (material) {
-            materialsInfo.set(key, {
-              hasSlides: Array.isArray(material.slides) && material.slides.length > 0,
-              hasLinks: Array.isArray(material.links) && material.links.length > 0
-            });
-          }
         }
       });
     }
@@ -1308,18 +1324,22 @@ export const Schedule = () => {
                       });
                     }
 
-                    // Get material info for display
-                    let materialInfo = { hasSlides: false, hasLinks: false };
+                    // Get material info for display (merge rows so multiple uploads same day all show)
+                    let materialInfo: {
+                      hasSlides: boolean;
+                      hasLinks: boolean;
+                      slideCount: number;
+                    } = { hasSlides: false, hasLinks: false, slideCount: 0 };
                     if (hasMaterials && calendarData?.materials) {
-                      const material = calendarData.materials[id].find(m => {
-                        const materialDateStr = m.classDate?.split('T')[0] || '';
-                        return materialDateStr === dateStr;
-                      });
-
-                      if (material) {
+                      const merged = mergeClassMaterialsForDate(
+                        calendarData.materials[id],
+                        dateStr
+                      );
+                      if (merged) {
                         materialInfo = {
-                          hasSlides: Array.isArray(material.slides) && material.slides.length > 0,
-                          hasLinks: Array.isArray(material.links) && material.links.length > 0
+                          hasSlides: merged.slides.length > 0,
+                          hasLinks: merged.links.length > 0,
+                          slideCount: merged.slides.length,
                         };
                       }
                     }
@@ -1413,11 +1433,20 @@ export const Schedule = () => {
                         )}
 
                         {hasMaterials && (
-                          <div className="mt-4 pt-4 border-t border-[#e5e7eb] flex gap-2">
+                          <div
+                            className="mt-4 pt-4 border-t border-[#e5e7eb] flex gap-2"
+                            title={t.classMaterials}
+                          >
                             {materialInfo.hasSlides && (
-                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-[#e0e7ff] text-[#4f46e5]">
-                                <FaFileAlt className="w-3 h-3 mr-1" />
-                                Doc
+                              <span
+                                className="inline-flex items-center max-w-full px-2 py-1 rounded text-xs font-medium bg-[#e0e7ff] text-[#4f46e5]"
+                              >
+                                <FaFileAlt className="w-3 h-3 mr-1 shrink-0" />
+                                <span className="truncate">
+                                  {materialInfo.slideCount > 1
+                                    ? `${t.classMaterials} (${materialInfo.slideCount})`
+                                    : t.classMaterials}
+                                </span>
                               </span>
                             )}
                             {materialInfo.hasLinks && (
@@ -1473,6 +1502,7 @@ export const Schedule = () => {
           }}
           material={selectedMaterial}
           loading={loadingMaterial}
+          t={t}
         />
       </div>
     </div>
