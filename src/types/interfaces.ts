@@ -66,6 +66,10 @@ export interface ContentLibraryItem {
 export interface ContentLibraryComment {
   id: string;
   authorId: string;
+  /** Display name at post time (persisted so readers do not need a user lookup). */
+  authorName?: string;
+  /** Profile image URL at post time (Storage path is publicly readable). */
+  authorProfilePictureUrl?: string;
   authorIsTeacher: boolean;
   content: string;
   createdAt: Timestamp;

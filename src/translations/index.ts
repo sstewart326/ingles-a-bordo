@@ -75,6 +75,7 @@ interface Translation {
   noComments: string;
   commentEdited: string;
   commentDeleted: string;
+  commentAuthorUnknown: string;
   you: string;
 
   // Dashboard
@@ -544,6 +545,7 @@ const translations: Record<Language, Translation> = {
     noComments: 'No comments yet',
     commentEdited: 'Edited',
     commentDeleted: '[Deleted]',
+    commentAuthorUnknown: 'Unknown user',
     you: 'You',
 
     // Dashboard
@@ -1010,6 +1012,7 @@ const translations: Record<Language, Translation> = {
     noComments: 'Nenhum comentário ainda',
     commentEdited: 'Editado',
     commentDeleted: '[Excluído]',
+    commentAuthorUnknown: 'Usuário desconhecido',
     you: 'Você',
     
     // Dashboard

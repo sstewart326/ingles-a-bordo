@@ -48,6 +48,11 @@ export async function getCommentsForItem(
     return {
       id: d.id,
       authorId: data.authorId,
+      authorName: typeof data.authorName === 'string' ? data.authorName : undefined,
+      authorProfilePictureUrl:
+        typeof data.authorProfilePictureUrl === 'string'
+          ? data.authorProfilePictureUrl
+          : undefined,
       authorIsTeacher: data.authorIsTeacher,
       content: data.content,
       createdAt: data.createdAt,
@@ -97,6 +102,9 @@ export async function getCommentsForItem(
 
 export interface CreateContentLibraryCommentPayload {
   authorId: string;
+  authorName: string;
+  /** Optional; omitted when empty. Must be a URL the client can load (e.g. Storage download URL). */
+  authorProfilePictureUrl?: string | null;
   authorIsTeacher: boolean;
   content: string;
   parentCommentId?: string;
@@ -117,6 +125,7 @@ export async function createContentLibraryComment(
   const now = Timestamp.now();
   const data: Record<string, unknown> = {
     authorId: payload.authorId,
+    authorName: payload.authorName.trim(),
     authorIsTeacher: payload.authorIsTeacher,
     content: payload.content,
     createdAt: now,
@@ -124,6 +133,10 @@ export async function createContentLibraryComment(
   };
   if (payload.parentCommentId) {
     data.parentCommentId = payload.parentCommentId;
+  }
+  const pic = payload.authorProfilePictureUrl?.trim();
+  if (pic) {
+    data.authorProfilePictureUrl = pic;
   }
   const clean = stripNullUndefined(data);
   const commentsRef = collection(db, CONTENT_LIBRARY_PATH, itemId, COMMENTS_SUBCOLLECTION);

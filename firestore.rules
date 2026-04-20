@@ -195,9 +195,7 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && resource.data.teacherId == request.auth.uid;
 
       match /comments/{commentId} {
-        allow read: if isAuthenticated() && contentIsForUser(
-          get(/databases/$(database)/documents/contentLibrary/$(itemId)).data
-        );
+        allow read: if isAuthenticated();
         allow create: if isAuthenticated() && (
           isAdmin() || teacherUid() != null
         ) && request.resource.data.authorId == request.auth.uid;

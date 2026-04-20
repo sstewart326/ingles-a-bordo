@@ -268,6 +268,10 @@ function StudentContentCard({
           itemId={item.id}
           currentUserId={currentUserId}
           currentUserName={currentUserName}
+          currentUserProfilePictureUrl={
+            contentLibraryAuthors[currentUserId]?.profilePictureUrl ??
+            null
+          }
           isTeacher={isTeacher}
           authors={contentLibraryAuthors}
         />

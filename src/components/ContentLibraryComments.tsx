@@ -44,6 +44,8 @@ interface ContentLibraryCommentsSectionProps {
   itemId: string;
   currentUserId: string;
   currentUserName: string;
+  /** Used for legacy comments and the composer’s avatar when not stored on the comment. */
+  currentUserProfilePictureUrl?: string | null;
   isTeacher: boolean;
   authors: Record<string, AuthorInfo>;
 }
@@ -52,6 +54,7 @@ export default function ContentLibraryCommentsSection({
   itemId,
   currentUserId,
   currentUserName,
+  currentUserProfilePictureUrl = null,
   isTeacher,
   authors,
 }: ContentLibraryCommentsSectionProps) {
@@ -103,12 +106,29 @@ export default function ContentLibraryCommentsSection({
     }
   }, [expanded, itemId, fetchComments]);
 
-  const getAuthorDisplay = (authorId: string): AuthorInfo => {
-    return (
-      authors[authorId] ?? {
-        name: authorId === currentUserId ? currentUserName : t.you,
-      }
-    );
+  const getAuthorDisplay = (comment: ContentLibraryCommentResolved): AuthorInfo => {
+    const fromMap = authors[comment.authorId];
+    const picFromDoc = comment.authorProfilePictureUrl?.trim() || null;
+    const mapPic = fromMap?.profilePictureUrl ?? null;
+    const resolvedPic = picFromDoc || mapPic || null;
+    const nameFromDoc = comment.authorName?.trim();
+    if (nameFromDoc) {
+      return {
+        name: nameFromDoc,
+        profilePictureUrl: resolvedPic,
+      };
+    }
+    if (fromMap) return fromMap;
+    if (comment.authorId === currentUserId) {
+      return {
+        name: currentUserName,
+        profilePictureUrl: picFromDoc || mapPic || currentUserProfilePictureUrl || null,
+      };
+    }
+    return {
+      name: t.commentAuthorUnknown,
+      profilePictureUrl: picFromDoc || mapPic || null,
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -119,6 +139,8 @@ export default function ContentLibraryCommentsSection({
     try {
       await createContentLibraryComment(itemId, {
         authorId: currentUserId,
+        authorName: currentUserName,
+        authorProfilePictureUrl: currentUserProfilePictureUrl ?? undefined,
         authorIsTeacher: isTeacher,
         content: text,
         parentCommentId: replyingTo?.id,
@@ -175,6 +197,84 @@ export default function ContentLibraryCommentsSection({
     {}
   );
 
+  /** Renders a comment and all nested replies (any depth). */
+  const CommentWithReplies = ({
+    comment: node,
+  }: {
+    comment: ContentLibraryCommentResolved;
+  }) => {
+    const childReplies = repliesByParent[node.id] ?? [];
+    const author = getAuthorDisplay(node);
+    const isEditingNode = editingComment?.id === node.id;
+    return (
+      <>
+        {isEditingNode ? (
+          <div className="flex gap-2 items-start">
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[60px]"
+              disabled={submitting}
+            />
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={handleEditSave}
+                disabled={submitting || !editText.trim()}
+                className="px-2 py-1 text-sm font-medium text-white bg-[var(--header-bg)] hover:bg-[var(--header-hover)] disabled:opacity-50 rounded"
+              >
+                {t.save}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingComment(null);
+                  setEditText('');
+                }}
+                className="px-2 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                {t.cancel}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <CommentRow
+            comment={node}
+            authorName={author.name}
+            authorProfileUrl={author.profilePictureUrl}
+            currentUserId={currentUserId}
+            onReply={node.deleted ? undefined : () => setReplyingTo(node)}
+            onEdit={
+              node.deleted
+                ? undefined
+                : node.authorId === currentUserId || isTeacher
+                  ? () => {
+                      setEditingComment(node);
+                      setEditText(node.content);
+                    }
+                  : undefined
+            }
+            onDelete={
+              node.deleted
+                ? undefined
+                : node.authorId === currentUserId || isTeacher
+                  ? () => handleDelete(node.id)
+                  : undefined
+            }
+            deleting={deletingId === node.id}
+            formatDate={formatCommentDate}
+            t={t}
+          />
+        )}
+        {childReplies.map((child) => (
+          <div key={child.id} className="ml-8 mt-2 pl-3 border-l-2 border-gray-200">
+            <CommentWithReplies comment={child} />
+          </div>
+        ))}
+      </>
+    );
+  };
+
   return (
     <div className="border-t border-gray-200 mt-3 pt-3">
       <button
@@ -203,139 +303,11 @@ export default function ContentLibraryCommentsSection({
           {topLevel.length === 0 ? (
             <p className="text-gray-500 text-sm">{t.noComments}</p>
           ) : (
-            topLevel.map((comment) => {
-              const author = getAuthorDisplay(comment.authorId);
-              const replies = repliesByParent[comment.id] ?? [];
-              const isEditing = editingComment?.id === comment.id;
-              return (
+            topLevel.map((comment) => (
                 <div key={comment.id} className="border-b border-gray-100 pb-2 last:border-0">
-                  {isEditing ? (
-                    <div className="flex gap-2 items-start">
-                      <textarea
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[60px]"
-                        disabled={submitting}
-                      />
-                      <div className="flex flex-col gap-1">
-                        <button
-                          type="button"
-                          onClick={handleEditSave}
-                          disabled={submitting || !editText.trim()}
-                          className="px-2 py-1 text-sm font-medium text-white bg-[var(--header-bg)] hover:bg-[var(--header-hover)] disabled:opacity-50 rounded"
-                        >
-                          {t.save}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingComment(null);
-                            setEditText('');
-                          }}
-                          className="px-2 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
-                        >
-                          {t.cancel}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <CommentRow
-                      comment={comment}
-                      authorName={author.name}
-                      authorProfileUrl={author.profilePictureUrl}
-                      currentUserId={currentUserId}
-                      onReply={comment.deleted ? undefined : () => setReplyingTo(comment)}
-                      onEdit={
-                        comment.deleted
-                          ? undefined
-                          : comment.authorId === currentUserId || isTeacher
-                            ? () => {
-                                setEditingComment(comment);
-                                setEditText(comment.content);
-                              }
-                            : undefined
-                      }
-                      onDelete={
-                        comment.deleted
-                          ? undefined
-                          : comment.authorId === currentUserId || isTeacher
-                            ? () => handleDelete(comment.id)
-                            : undefined
-                      }
-                      deleting={deletingId === comment.id}
-                      formatDate={formatCommentDate}
-                      t={t}
-                    />
-                  )}
-                  {replies.map((reply) => {
-                    const replyAuthor = getAuthorDisplay(reply.authorId);
-                    const isEditingReply = editingComment?.id === reply.id;
-                    return (
-                      <div key={reply.id} className="ml-8 mt-2 pl-3 border-l-2 border-gray-200">
-                        {isEditingReply ? (
-                          <div className="flex gap-2 items-start">
-                            <textarea
-                              value={editText}
-                              onChange={(e) => setEditText(e.target.value)}
-                              className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[60px]"
-                              disabled={submitting}
-                            />
-                            <div className="flex flex-col gap-1">
-                              <button
-                                type="button"
-                                onClick={handleEditSave}
-                                disabled={submitting || !editText.trim()}
-                                className="px-2 py-1 text-sm font-medium text-white bg-[var(--header-bg)] disabled:opacity-50 rounded"
-                              >
-                                {t.save}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingComment(null);
-                                  setEditText('');
-                                }}
-                                className="px-2 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded"
-                              >
-                                {t.cancel}
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <CommentRow
-                            comment={reply}
-                            authorName={replyAuthor.name}
-                            authorProfileUrl={replyAuthor.profilePictureUrl}
-                            currentUserId={currentUserId}
-                            onReply={() => setReplyingTo(reply)}
-                            onEdit={
-                              reply.deleted
-                                ? undefined
-                                : reply.authorId === currentUserId || isTeacher
-                                  ? () => {
-                                      setEditingComment(reply);
-                                      setEditText(reply.content);
-                                    }
-                                  : undefined
-                            }
-                            onDelete={
-                              reply.deleted
-                                ? undefined
-                                : reply.authorId === currentUserId || isTeacher
-                                  ? () => handleDelete(reply.id)
-                                  : undefined
-                            }
-                            deleting={deletingId === reply.id}
-                            formatDate={formatCommentDate}
-                            t={t}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+                  <CommentWithReplies comment={comment} />
                 </div>
-              );
-            })
+              ))
             )}
             </div>
           )}
@@ -344,7 +316,7 @@ export default function ContentLibraryCommentsSection({
             {replyingTo && (
               <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 rounded px-2 py-1">
                 <span>
-                  {t.reply} → {getAuthorDisplay(replyingTo.authorId).name}
+                  {t.reply} → {getAuthorDisplay(replyingTo).name}
                 </span>
                 <button
                   type="button"
