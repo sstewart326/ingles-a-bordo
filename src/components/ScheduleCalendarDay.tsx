@@ -19,6 +19,11 @@ export interface ScheduleCalendarDayProps<T extends ClassSession> {
   onHomeworkPillClick?: (e: React.MouseEvent, date: Date) => void;
   homeworkFeedbackInfo?: Map<string, boolean>; // Map of classId_date to boolean indicating if feedback exists
   paymentStatus?: { isCompleted: boolean; completedAt?: string };
+  /** Students/users with a birthday on this calendar day (same month as API payload). */
+  scheduleBirthdays?: { name: string }[];
+  onBirthdayPillClick?: (e: React.MouseEvent, date: Date) => void;
+  /** When true, birthday pill shows N Birthday(s); when false, a single friendly string (students). */
+  isScheduleAdmin: boolean;
 }
 
 export function ScheduleCalendarDay<T extends ClassSession>({
@@ -33,7 +38,10 @@ export function ScheduleCalendarDay<T extends ClassSession>({
   homeworkInfo,
   onHomeworkPillClick,
   homeworkFeedbackInfo,
-  paymentStatus
+  paymentStatus,
+  scheduleBirthdays = [],
+  onBirthdayPillClick,
+  isScheduleAdmin
 }: ScheduleCalendarDayProps<T>) {
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -90,6 +98,8 @@ export function ScheduleCalendarDay<T extends ClassSession>({
   const hasRescheduledClasses = React.useMemo(() => {
     return classes.some(classItem => classItem.isRescheduledTo);
   }, [classes]);
+
+  const hasBirthdays = scheduleBirthdays.length > 0;
 
 
   // Filter out cancelled classes for display counts (but keep them for visual indication)
@@ -166,6 +176,11 @@ export function ScheduleCalendarDay<T extends ClassSession>({
     return days[dayOfWeek];
   };
   
+  const createBirthdayTooltip = (): string => {
+    if (!hasBirthdays) return '';
+    return scheduleBirthdays.map((b) => b.name).join('\n\n');
+  };
+
   // Create tooltip text for payment pill
   const createPaymentTooltip = (): string => {
     if (!Array.isArray(paymentsDue) || !paymentsDue.length) return '';
@@ -274,6 +289,19 @@ export function ScheduleCalendarDay<T extends ClassSession>({
         )}
         {hasHomeworkFeedback && (
           <div key="feedback-indicator" className="indicator feedback-indicator" title="Has feedback from teacher" />
+        )}
+        {hasBirthdays && (
+          <div
+            key="birthday-indicator"
+            className="indicator birthday-indicator"
+            title={
+              isScheduleAdmin
+                ? `${scheduleBirthdays.length} ${scheduleBirthdays.length === 1 ? t.birthday : t.birthdays}`
+                : createBirthdayTooltip() || t.happyBirthdayCalendarPill
+            }
+          >
+            🎂
+          </div>
         )}
       </div>
 
@@ -390,6 +418,26 @@ export function ScheduleCalendarDay<T extends ClassSession>({
                 <span className="feedback-icon text-white ml-1">
                   <FaCommentAlt className="inline-block w-3 h-3" />
                 </span>
+              )}
+            </div>
+          )}
+
+          {hasBirthdays && (
+            <div
+              key="birthday-pill"
+              className="calendar-pill birthday-pill"
+              onClick={(e) => {
+                e.stopPropagation();
+                onBirthdayPillClick?.(e, date);
+              }}
+              title={createBirthdayTooltip()}
+            >
+              {isScheduleAdmin ? (
+                <>
+                  {scheduleBirthdays.length} {scheduleBirthdays.length === 1 ? t.birthday : t.birthdays}
+                </>
+              ) : (
+                t.happyBirthdayCalendarPill
               )}
             </div>
           )}

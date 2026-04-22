@@ -4,6 +4,7 @@ import { AdminProvider } from './contexts/AdminContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { MasqueradeProvider } from './contexts/MasqueradeContext';
 import { AppRoutes } from './AppRoutes';
+import { BirthdayCelebration } from './components/BirthdayCelebration';
 import { Toaster } from 'react-hot-toast';
 import './styles/globals.css';
 import './App.css';
@@ -18,6 +19,7 @@ function App() {
               <div className="background-clouds">
                 <img src={new URL('./clouds.png', import.meta.url).href} alt="" />
               </div>
+              <BirthdayCelebration />
               <AppRoutes />
               <Toaster position="top-right" />
             </LanguageProvider>

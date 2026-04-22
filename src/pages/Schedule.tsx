@@ -13,6 +13,7 @@ import { ClassSession } from '../utils/scheduleUtils';
 import { getHomeworkForClass, getHomeworkSubmissions, subscribeToHomeworkChanges, clearHomeworkCache } from '../utils/homeworkUtils';
 import { Homework, HomeworkSubmission } from '../types/interfaces';
 import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
+import { BirthdayScheduleBanner } from '../components/BirthdayScheduleBanner';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
@@ -610,6 +611,16 @@ export const Schedule = () => {
       }
     });
 
+    const inViewedMonth =
+      calendarData != null &&
+      date.getMonth() === calendarData.month &&
+      date.getFullYear() === calendarData.year;
+    const scheduleBirthdays: { name: string }[] = inViewedMonth
+      ? (calendarData.birthdays || [])
+          .filter((b) => b.day === date.getDate())
+          .map((b) => ({ name: b.name }))
+      : [];
+
     // Map the calendar classes to include required ClassSession properties
     const mappedClasses = processedClasses.map(classItem => ({
       ...classItem,
@@ -650,6 +661,9 @@ export const Schedule = () => {
         homeworkFeedbackInfo={homeworkFeedbackInfo}
         onHomeworkPillClick={handleHomeworkPillClick}
         paymentStatus={paymentStatus}
+        scheduleBirthdays={scheduleBirthdays}
+        onBirthdayPillClick={handleClassCountClick}
+        isScheduleAdmin={calendarData?.userData?.isAdmin === true}
       />
     );
   };
@@ -1106,6 +1120,13 @@ export const Schedule = () => {
             </p>
           </div>
         </div>
+
+        {calendarData?.userData && (
+          <BirthdayScheduleBanner
+            birthdate={calendarData.userData.birthdate}
+            displayName={calendarData.userData.name || currentUser?.email?.split('@')[0] || ''}
+          />
+        )}
 
         {(() => {
           const pinnedLinks: PinnedLinkItem[] = (calendarData?.userData?.pinnedLinks || []).filter(

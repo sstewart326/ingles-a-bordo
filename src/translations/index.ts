@@ -18,6 +18,11 @@ export interface Translation {
   birthdateFormat: string;
   birthday: string;
   birthdays: string;
+  happyBirthdayGreeting: string;
+  happyBirthdayGeneric: string;
+  happyBirthdaySubtext: string;
+  happyBirthdayCalendarPill: string;
+  birthdayClose: string;
   emailNotEditable: string;
   amountPaid: string;
   amountDue: string;
@@ -492,6 +497,11 @@ const translations: Record<Language, Translation> = {
     birthdateFormat: 'MM-DD',
     birthday: 'Birthday',
     birthdays: 'Birthdays',
+    happyBirthdayGreeting: 'Happy birthday, {name}!',
+    happyBirthdayGeneric: 'Happy birthday!',
+    happyBirthdaySubtext: 'Wishing you a wonderful day.',
+    happyBirthdayCalendarPill: 'Happy Birthday!',
+    birthdayClose: 'Close',
     emailNotEditable: 'Email cannot be edited. To change the email, the user must be deleted and recreated with the correct email.',
     amountPaid: 'Amount paid',
     amountDue: 'Amount due',
@@ -960,6 +970,11 @@ const translations: Record<Language, Translation> = {
     birthdateFormat: 'MM-DD',
     birthday: 'Aniversário',
     birthdays: 'Aniversários',
+    happyBirthdayGreeting: 'Feliz aniversário, {name}!',
+    happyBirthdayGeneric: 'Feliz aniversário!',
+    happyBirthdaySubtext: 'Desejamos um dia maravilhoso para você.',
+    happyBirthdayCalendarPill: 'Feliz aniversário!',
+    birthdayClose: 'Fechar',
     emailNotEditable: 'O email não pode ser editado. Para alterar o email, o usuário deve ser excluído e recriado com o email correto.',
     amountPaid: 'Valor pago',
     amountDue: 'Valor a pagar',
