@@ -57,6 +57,36 @@ const logUserOp = (message: string, data?: any) => {
   }
 };
 
+/** MM-DD; null means reject. Inserts the hyphen only when typing the 2nd month digit or pasting MM, not when deleting "MM-" → "MM" (so the month can be edited). */
+function formatBirthdateMMDDInput(value: string, previous: string): string | null {
+  if (value === '') return '';
+  if (!/^[\d-]*$/.test(value)) return null;
+
+  let formattedValue = value;
+  if (value.length === 2 && !value.includes('-')) {
+    const shouldInsertHyphen =
+      previous.length === 1 ||
+      (previous.length === 0 && /^\d{2}$/.test(value));
+    if (shouldInsertHyphen) {
+      formattedValue = value + '-';
+    }
+  }
+
+  if (formattedValue.length > 5) return null;
+
+  if (formattedValue.includes('-')) {
+    const [month, day] = formattedValue.split('-');
+    const monthNum = month === '' ? NaN : parseInt(month, 10);
+    if (!Number.isNaN(monthNum) && (monthNum < 1 || monthNum > 12)) return null;
+    if (day !== undefined && day !== '') {
+      const dayNum = parseInt(day, 10);
+      if (Number.isNaN(dayNum) || dayNum < 1 || dayNum > 31) return null;
+    }
+  }
+
+  return formattedValue;
+}
+
 export const AdminUsers = () => {
   const { currentUser } = useAuth() as { currentUser: ExtendedUser | null };
   const { isAdmin } = useAdmin();
@@ -632,35 +662,10 @@ export const AdminUsers = () => {
                   value={editingBirthdate}
                   onChange={(e) => {
                     const value = e.target.value;
-                    // Allow empty value for optional field
-                    if (value === '') {
-                      setEditingBirthdate('');
-                      return;
-                    }
-
-                    // Only allow digits and hyphen
-                    if (!/^[\d-]*$/.test(value)) return;
-
-                    // Auto-add hyphen after MM
-                    let formattedValue = value;
-                    if (value.length === 2 && !value.includes('-')) {
-                      formattedValue = value + '-';
-                    }
-
-                    // Limit to MM-DD format
-                    if (formattedValue.length > 5) return;
-
-                    // Validate month and day
-                    if (formattedValue.includes('-')) {
-                      const [month, day] = formattedValue.split('-');
-                      const monthNum = parseInt(month);
-                      const dayNum = parseInt(day);
-
-                      if (monthNum < 1 || monthNum > 12) return;
-                      if (dayNum < 1 || dayNum > 31) return;
-                    }
-
-                    setEditingBirthdate(formattedValue);
+                    setEditingBirthdate((prev) => {
+                      const next = formatBirthdateMMDDInput(value, prev);
+                      return next === null ? prev : next;
+                    });
                   }}
                   className="px-2 py-1 border border-gray-300 rounded text-sm"
                   placeholder={t.birthdateFormat}
@@ -967,32 +972,10 @@ export const AdminUsers = () => {
                       value={newUser.birthdate}
                       onChange={(e) => {
                         const value = e.target.value;
-                        // Allow empty value for optional field
-                        if (value === '') {
-                          setNewUser(prev => ({ ...prev, birthdate: value }));
-                          return;
-                        }
-
-                        // Auto-add hyphen after MM
-                        let formattedValue = value;
-                        if (value.length === 2 && !value.includes('-')) {
-                          formattedValue = value + '-';
-                        }
-
-                        // Limit to MM-DD format
-                        if (formattedValue.length > 5) return;
-
-                        // Validate month and day
-                        if (formattedValue.includes('-')) {
-                          const [month, day] = formattedValue.split('-');
-                          const monthNum = parseInt(month);
-                          const dayNum = parseInt(day);
-
-                          if (monthNum < 1 || monthNum > 12) return;
-                          if (dayNum < 1 || dayNum > 31) return;
-                        }
-
-                        setNewUser(prev => ({ ...prev, birthdate: formattedValue }));
+                        setNewUser((prev) => {
+                          const next = formatBirthdateMMDDInput(value, prev.birthdate ?? '');
+                          return next === null ? prev : { ...prev, birthdate: next };
+                        });
                       }}
                       placeholder={t.birthdateFormat}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
@@ -1497,35 +1480,10 @@ export const AdminUsers = () => {
                                 value={editingBirthdate}
                                 onChange={(e) => {
                                   const value = e.target.value;
-                                  // Allow empty value for optional field
-                                  if (value === '') {
-                                    setEditingBirthdate('');
-                                    return;
-                                  }
-
-                                  // Only allow digits and hyphen
-                                  if (!/^[\d-]*$/.test(value)) return;
-
-                                  // Auto-add hyphen after MM
-                                  let formattedValue = value;
-                                  if (value.length === 2 && !value.includes('-')) {
-                                    formattedValue = value + '-';
-                                  }
-
-                                  // Limit to MM-DD format
-                                  if (formattedValue.length > 5) return;
-
-                                  // Validate month and day
-                                  if (formattedValue.includes('-')) {
-                                    const [month, day] = formattedValue.split('-');
-                                    const monthNum = parseInt(month);
-                                    const dayNum = parseInt(day);
-
-                                    if (monthNum < 1 || monthNum > 12) return;
-                                    if (dayNum < 1 || dayNum > 31) return;
-                                  }
-
-                                  setEditingBirthdate(formattedValue);
+                                  setEditingBirthdate((prev) => {
+                                    const next = formatBirthdateMMDDInput(value, prev);
+                                    return next === null ? prev : next;
+                                  });
                                 }}
                                 className="px-2 py-1 border border-gray-300 rounded text-sm"
                                 placeholder={t.birthdateFormat}
