@@ -1522,34 +1522,48 @@ export const getCalendarDataHttp = onRequest({
         }
       }
 
-      // Get birthdays for the month
+      // Birthdays for the month: never scan the whole `users` collection.
+      // — Students: only their own birthday.
+      // — Teachers: their students (where `teacher` == this user's auth uid) and their own.
       const birthdays: Array<{
+        userId: string;
         name: string;
         email: string;
         birthdate: string;
         day: number;
       }> = [];
 
-      // Query all users to get birthdays
-      const usersSnapshot = await admin.firestore().collection('users').get();
+      const addBirthdayIfInMonth = (
+        firestoreUserId: string,
+        u: { name?: string; email?: string; birthdate?: string }
+      ) => {
+        if (!u.birthdate) return;
+        // Birthdate format is MM-DD
+        const [birthMonth, birthDay] = u.birthdate.split('-').map(Number);
+        if (Number.isNaN(birthMonth) || Number.isNaN(birthDay)) return;
+        if (birthMonth === monthInt + 1) {
+          birthdays.push({
+            userId: firestoreUserId,
+            name: u.name ?? '',
+            email: u.email ?? '',
+            birthdate: u.birthdate,
+            day: birthDay
+          });
+        }
+      };
 
-      for (const doc of usersSnapshot.docs) {
-        const userData = doc.data();
-
-        if (userData.birthdate) {
-          // Birthdate format is MM-DD
-          const [birthMonth, birthDay] = userData.birthdate.split('-').map(Number);
-
-          // Check if the birthday is in the requested month
-          if (birthMonth === monthInt + 1) {
-            birthdays.push({
-              name: userData.name,
-              email: userData.email,
-              birthdate: userData.birthdate,
-              day: birthDay
-            });
+      if (userData.isAdmin === true) {
+        if (userData.uid) {
+          const studentsSnapshot = await admin.firestore().collection('users')
+            .where('teacher', '==', userData.uid)
+            .get();
+          for (const doc of studentsSnapshot.docs) {
+            addBirthdayIfInMonth(doc.id, doc.data());
           }
         }
+        addBirthdayIfInMonth(userData.id, userData);
+      } else {
+        addBirthdayIfInMonth(userData.id, userData);
       }
 
       // Create dailyClassMap - a map of date strings to classes for easy lookup

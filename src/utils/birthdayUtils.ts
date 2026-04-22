@@ -15,6 +15,19 @@ export function isBirthdayToday(
   return now.getMonth() + 1 === month && now.getDate() === day;
 }
 
+/** Normalize API/cached values that may be string or number. */
+export function isSameCalendarDay(
+  dayFromPayload: string | number | undefined,
+  date: Date
+): boolean {
+  if (dayFromPayload === undefined || dayFromPayload === null || dayFromPayload === '') {
+    return false;
+  }
+  const d = typeof dayFromPayload === 'string' ? parseInt(dayFromPayload, 10) : dayFromPayload;
+  if (Number.isNaN(d)) return false;
+  return d === date.getDate();
+}
+
 export function getLocalYyyyMmDd(now: Date = new Date()): string {
   const y = now.getFullYear();
   const m = (now.getMonth() + 1).toString().padStart(2, '0');

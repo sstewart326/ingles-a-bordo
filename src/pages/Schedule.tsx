@@ -14,6 +14,7 @@ import { getHomeworkForClass, getHomeworkSubmissions, subscribeToHomeworkChanges
 import { Homework, HomeworkSubmission } from '../types/interfaces';
 import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 import { BirthdayScheduleBanner } from '../components/BirthdayScheduleBanner';
+import { isSameCalendarDay } from '../utils/birthdayUtils';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
@@ -611,13 +612,19 @@ export const Schedule = () => {
       }
     });
 
-    const inViewedMonth =
+    // Pills use API `birthdays` for the *fetched* month. Align to `selectedDate` (not a stale
+    // `calendarData` month) and coerce `day` — JSON/cache may use strings.
+    const dataMatchesViewedMonth =
       calendarData != null &&
-      date.getMonth() === calendarData.month &&
-      date.getFullYear() === calendarData.year;
-    const scheduleBirthdays: { name: string }[] = inViewedMonth
+      Number(calendarData.month) === selectedDate.getMonth() &&
+      Number(calendarData.year) === selectedDate.getFullYear();
+    const inThisMonth =
+      dataMatchesViewedMonth &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear();
+    const scheduleBirthdays: { name: string }[] = inThisMonth
       ? (calendarData.birthdays || [])
-          .filter((b) => b.day === date.getDate())
+          .filter((b) => isSameCalendarDay(b.day, date))
           .map((b) => ({ name: b.name }))
       : [];
 
