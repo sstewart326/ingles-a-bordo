@@ -3,6 +3,42 @@
  * and deriving display names from Firebase Storage download URLs.
  */
 
+import { getBaseClassId, ClassSession } from './scheduleUtils';
+import { ClassMaterial } from '../types/interfaces';
+
+/** Returns true if the material belongs to the given calendar date (midnight comparison). */
+export function isMaterialForDate(material: ClassMaterial, date: Date): boolean {
+  if (!material.classDate) return true; // no date = legacy; show everywhere
+  const md = material.classDate instanceof Date ? material.classDate : new Date(material.classDate);
+  return (
+    md.getFullYear() === date.getFullYear() &&
+    md.getMonth() === date.getMonth() &&
+    md.getDate() === date.getDate()
+  );
+}
+
+/**
+ * Class materials for a row on the schedule: same base class as the session, and
+ * either whole-class (no / empty studentEmails) or at least one targeted student
+ * in this session. Matches getStudentClassMaterials semantics for per-student docs.
+ */
+export function filterMaterialsForClassSession(
+  materials: ClassMaterial[] | undefined,
+  classSession: ClassSession
+): ClassMaterial[] {
+  if (!materials?.length) return [];
+  const rowBase = getBaseClassId(classSession.id);
+  const sessionEmails = classSession.studentEmails || [];
+
+  return materials.filter((m) => {
+    if (!m.classId) return false;
+    if (getBaseClassId(m.classId) !== rowBase) return false;
+    const targets = m.studentEmails;
+    if (!targets || targets.length === 0) return true;
+    return targets.some((email) => sessionEmails.includes(email));
+  });
+}
+
 export interface MaterialWithSlidesAndLinks {
   classDate?: string;
   slides?: string[];

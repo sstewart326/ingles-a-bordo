@@ -1,5 +1,6 @@
 import { ClassSession, getBaseClassId } from './scheduleUtils';
 import { getClassMaterials } from './classMaterialsUtils';
+import { filterMaterialsForClassSession } from './scheduleClassMaterialsUtils';
 import toast from 'react-hot-toast';
 import { ClassMaterial } from '../types/interfaces';
 
@@ -324,6 +325,23 @@ export const fetchMaterialsForClasses = async ({
   // Sort materials by date for each class
   Object.keys(allMaterialsByClassId).forEach(classId => {
     allMaterialsByClassId[classId].sort((a, b) => b.classDate.getTime() - a.classDate.getTime());
+  });
+
+  const findSessionForClass = (classId: string): ClassSession | undefined =>
+    classes.find(c => c.id === classId) ||
+    state.upcomingClasses.find(c => c.id === classId) ||
+    state.pastClasses.find(c => c.id === classId) ||
+    (selectedDayDetails &&
+      selectedDayDetails.classes.find((c: ClassSession) => c.id === classId));
+
+  Object.keys(allMaterialsByClassId).forEach(classId => {
+    const session = findSessionForClass(classId);
+    if (session) {
+      allMaterialsByClassId[classId] = filterMaterialsForClassSession(
+        allMaterialsByClassId[classId],
+        session
+      );
+    }
   });
   
   // Update the classMaterials state with all materials

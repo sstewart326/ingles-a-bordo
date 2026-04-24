@@ -11,6 +11,7 @@ import { ClassExceptionManager } from './ClassExceptionManager';
 import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
 import { formatLocalizedDate, parseDateStringInTimezone, formatTimeToAMPM } from '../utils/dateUtils';
+import { filterMaterialsForClassSession, isMaterialForDate } from '../utils/scheduleClassMaterialsUtils';
 
 interface ClassSectionProps {
   title: string;
@@ -453,48 +454,23 @@ export const ClassSection = ({
                               (classSession.materials && classSession.materials.length > 0)) ? (
                               <div className="space-y-2">
                                 {(() => {
-                                  // First get materials from either source
-                                  const materialsFromClass = classSession.materials || [];
-                                  const materialsFromMap = classMaterials[classSession.id] || [];
-                                  // For performance, use a Set to track already added material IDs
-                                  const addedMaterialIds = new Set<string>();
+                                  // Merge materials from both sources, deduplicating by id
+                                  const seenIds = new Set<string>();
                                   const allMaterials: ClassMaterial[] = [];
-                                  
-                                  // First add materials from the class (higher priority)
-                                  materialsFromClass.forEach(material => {
-                                    if (material.id) {
-                                      addedMaterialIds.add(material.id);
+                                  for (const m of [
+                                    ...(classSession.materials || []),
+                                    ...(classMaterials[classSession.id] || [])
+                                  ]) {
+                                    if (!m.id || !seenIds.has(m.id)) {
+                                      if (m.id) seenIds.add(m.id);
+                                      allMaterials.push(m);
                                     }
-                                    allMaterials.push(material);
-                                  });
-                                  
-                                  // Then add materials from the map if not already added
-                                  materialsFromMap.forEach(material => {
-                                    if (!material.id || !addedMaterialIds.has(material.id)) {
-                                      allMaterials.push(material);
-                                    }
-                                  });
-                                  
-                                  // Filter by date - create a function to avoid repeating this logic
-                                  const isForCurrentDate = (material: ClassMaterial): boolean => {
-                                    // If the material has no date, show it on all dates (legacy support)
-                                    if (!material.classDate) return true;
-                                    
-                                    // Compare dates at midnight for consistency
-                                    const materialDate = material.classDate instanceof Date 
-                                      ? material.classDate 
-                                      : new Date(material.classDate);
-                                    
-                                    const materialDay = new Date(materialDate.getFullYear(), materialDate.getMonth(), materialDate.getDate());
-                                    const displayDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-                                    
-                                    // When disableDateFiltering is enabled in DayDetails view, we actually 
-                                    // DO want to filter by the specific day that's selected
-                                    // This ensures materials for each day are shown correctly
-                                    return materialDay.getTime() === displayDay.getTime();
-                                  };
-                                  
-                                  return allMaterials.filter(isForCurrentDate);
+                                  }
+
+                                  return filterMaterialsForClassSession(
+                                    allMaterials.filter(m => isMaterialForDate(m, date)),
+                                    classSession
+                                  );
                                 })().map((material, index) => (
                                   <div key={`material-${index}`} className="flex flex-col space-y-2">
                                     {material.slides && material.slides.length > 0 && (
