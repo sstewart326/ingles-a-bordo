@@ -141,7 +141,7 @@ export const UploadMaterialsForm: React.FC<UploadMaterialsFormProps> = ({
         </label>
         <input
           type="file"
-          accept=".pdf,.ppt,.pptx"
+          accept=".pdf,.ppt,.pptx,.doc,.docx"
           onChange={handleSlideChange}
           className="block w-full text-sm text-gray-500
             file:mr-4 file:py-2 file:px-4

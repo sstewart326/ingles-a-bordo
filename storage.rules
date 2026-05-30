@@ -62,6 +62,7 @@ service firebase.storage {
     function isValidMaterialType() {
       return request.resource.contentType.matches('application/pdf') ||
              request.resource.contentType.matches('application/vnd.ms-powerpoint') ||
+             request.resource.contentType.matches('application/msword') ||
              request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.presentationml.presentation');
     }
     

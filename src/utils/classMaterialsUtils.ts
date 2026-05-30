@@ -25,6 +25,7 @@ const MAX_FILE_SIZE_MB = 10; // Maximum file size in megabytes
 const ALLOWED_FILE_TYPES = [
   'application/pdf',
   'application/vnd.ms-powerpoint',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 ];
 
@@ -81,7 +82,7 @@ export const validateFile = (file: File): string | null => {
 
   // Check file type
   if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-    return `File type "${file.type}" is not allowed. Allowed types are: PDF and PowerPoint files`;
+    return `File type "${file.type}" is not allowed. Allowed types are: PDF, MS Docs, and PowerPoint files`;
   }
 
   return null;
