@@ -11,9 +11,10 @@ import { useTranslation } from '../translations';
 import { getCalendarData, invalidateCalendarCache } from '../services/calendarService';
 import { ClassSession } from '../utils/scheduleUtils';
 import { getHomeworkForClass, getHomeworkSubmissions, subscribeToHomeworkChanges, clearHomeworkCache } from '../utils/homeworkUtils';
-import { Homework, HomeworkSubmission } from '../types/interfaces';
+import { Homework, HomeworkSubmission, type PinnedLink } from '../types/interfaces';
 import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 import { BirthdayScheduleBanner } from '../components/BirthdayScheduleBanner';
+import { SchedulePinnedLinks } from '../components/SchedulePinnedLinks';
 import { isSameCalendarDay } from '../utils/birthdayUtils';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
@@ -81,11 +82,6 @@ interface Birthday {
   day: number;
 }
 
-interface PinnedLinkItem {
-  url: string;
-  title?: string;
-}
-
 interface UserData {
   id: string;
   createdAt: string;
@@ -98,7 +94,7 @@ interface UserData {
   email: string;
   status: string;
   updatedAt: string;
-  pinnedLinks?: PinnedLinkItem[];
+  pinnedLinks?: PinnedLink[];
 }
 
 interface CalendarData {
@@ -1135,35 +1131,9 @@ export const Schedule = () => {
           />
         )}
 
-        {(() => {
-          const pinnedLinks: PinnedLinkItem[] = (calendarData?.userData?.pinnedLinks || []).filter(
-            (item) => (item?.url || '').trim() !== ''
-          );
-          if (pinnedLinks.length === 0) return null;
-          return (
-            <div className="mt-6 mb-4">
-              <h2 className={styles.headings.h2}>{t.usefulLinksForYou}</h2>
-              <ul className="mt-2 space-y-1 list-none">
-                {pinnedLinks.map((item: PinnedLinkItem, index: number) => {
-                  const href = item.url.startsWith('http') ? item.url : `https://${item.url}`;
-                  const displayText = item.title && item.title.trim() ? item.title.trim() : (item.url.length > 60 ? `${item.url.slice(0, 60)}…` : item.url);
-                  return (
-                    <li key={`${item.url}-${index}`}>
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-indigo-600 hover:text-indigo-800 underline break-all"
-                      >
-                        {displayText}
-                      </a>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })()}
+        {calendarData?.userData?.pinnedLinks && (
+          <SchedulePinnedLinks links={calendarData.userData.pinnedLinks} />
+        )}
 
         {/* New responsive layout container */}
         <div className="mt-8 lg:grid lg:grid-cols-[2fr,1fr] lg:gap-8">

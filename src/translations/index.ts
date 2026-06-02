@@ -327,6 +327,7 @@ export interface Translation {
 
   linksPinnedByTeacher: string;
   usefulLinksForYou: string;
+  opensInNewTab: string;
 
   // Timezones
   timezones: {
@@ -632,6 +633,7 @@ const translations: Record<Language, Translation> = {
     availableClassDates: 'Available class dates',
     linksPinnedByTeacher: 'Links pinned by your teacher',
     usefulLinksForYou: 'Useful links for you',
+    opensInNewTab: 'opens in new tab',
     
     // Class Materials
     classMaterialsTitle: 'Class Materials Management',
@@ -1105,6 +1107,7 @@ const translations: Record<Language, Translation> = {
     availableClassDates: 'Datas de aula disponíveis',
     linksPinnedByTeacher: 'Links fixados pelo seu professor',
     usefulLinksForYou: 'Links úteis para você',
+    opensInNewTab: 'abre em nova aba',
     
     // Class Materials
     classMaterialsTitle: 'Gerenciamento de Materiais de Aula',
