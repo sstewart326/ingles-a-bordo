@@ -126,7 +126,7 @@ service firebase.storage {
     match /contentLibrary/{userId}/{fileName} {
       // Admins can read their own folder; students can read if their teacher owns this folder.
       allow read: if isAuthenticated() && (
-        (isAdmin() && request.auth.token.id == userId) ||
+        (isAdmin() && request.auth.token.user_id == userId) ||
         contentLibraryStudentOfTeacher(userId)
       );
 
