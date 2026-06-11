@@ -21,7 +21,7 @@ import { ClassMaterial } from '../types/interfaces';
 import { logQuery } from './firebaseUtils';
 
 const COLLECTION_PATH = 'classMaterials';
-const MAX_FILE_SIZE_MB = 10; // Maximum file size in megabytes
+const MAX_FILE_SIZE_MB = 200; // Maximum file size in megabytes
 const ALLOWED_FILE_TYPES = [
   'application/pdf',
   'application/vnd.ms-powerpoint',

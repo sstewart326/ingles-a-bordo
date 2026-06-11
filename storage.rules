@@ -43,7 +43,7 @@ service firebase.storage {
 
     // Function to check file size for different types
     function isValidSize() {
-      return request.resource.size <= 10 * 1024 * 1024; // Default 10MB limit
+      return request.resource.size <= 200 * 1024 * 1024; // Default 200MB limit
     }
     
     function isValidDocumentSize() {
