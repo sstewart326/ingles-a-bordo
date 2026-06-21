@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthWithMasquerade } from '../hooks/useAuthWithMasquerade';
 import { Calendar } from '../components/Calendar';
 import { ScheduleCalendarDay } from '../components/ScheduleCalendarDay';
@@ -14,6 +14,7 @@ import { getHomeworkForClass, getHomeworkSubmissions, subscribeToHomeworkChanges
 import { Homework, HomeworkSubmission, type PinnedLink } from '../types/interfaces';
 import ScheduleHomeworkView from '../components/ScheduleHomeworkView';
 import { BirthdayScheduleBanner } from '../components/BirthdayScheduleBanner';
+import { PaymentDueBanner } from '../components/PaymentDueBanner';
 import { SchedulePinnedLinks } from '../components/SchedulePinnedLinks';
 import { isSameCalendarDay } from '../utils/birthdayUtils';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
@@ -26,7 +27,7 @@ import {
   findNoteForClassSession 
 } from '../utils/notesUtils';
 import { processDailyClassMapEntries } from '../utils/calendarDayUtils';
-import { isPaymentDueSoon } from '../utils/paymentUtils';
+import { getUrgentUnpaidPayments, isPaymentUrgent, getPaymentUrgency } from '../utils/paymentUtils';
 import {
   mergeClassMaterialsForDate,
   getSlideDisplayNameFromUrl,
@@ -265,7 +266,7 @@ export const Schedule = () => {
 
       const isPaymentDay = isPaymentDueOnDate(today);
 
-      const isPaymentSoon = isPaymentDay && isPaymentDueSoon(today);
+      const isPaymentSoon = isPaymentDay && isPaymentUrgent(today);
 
       // Update the day details
       setSelectedDate(today);
@@ -291,7 +292,7 @@ export const Schedule = () => {
     if (prevKey !== null && prevKey !== visibleMonthKey) {
       const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
       const isPaymentDay = isPaymentDueOnDate(firstDayOfMonth);
-      const isPaymentSoon = isPaymentDay && isPaymentDueSoon(firstDayOfMonth);
+      const isPaymentSoon = isPaymentDay && isPaymentUrgent(firstDayOfMonth);
       handleDayClick(firstDayOfMonth, isPaymentDay, isPaymentSoon, false);
     }
   }, [selectedDate]);
@@ -483,7 +484,7 @@ export const Schedule = () => {
     const isPaymentDay = isPaymentDueOnDate(date);
     const paymentStatus = getPaymentStatus(date);
 
-    const isPaymentSoon = isPaymentDay && !paymentStatus.isCompleted && isPaymentDueSoon(date);
+    const isPaymentSoon = isPaymentDay && !paymentStatus.isCompleted && isPaymentUrgent(date);
 
     // For each class, ensure we get the correct schedule for this specific date
     const processedClasses = dayClasses.map(classItem => {
@@ -676,7 +677,7 @@ export const Schedule = () => {
     
     // Get day details
     const isPaymentDay = isPaymentDueOnDate(date);
-    const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
+    const isPaymentSoon = isPaymentDay && isPaymentUrgent(date);
     
     // Set the day details first
     handleDayClick(date, isPaymentDay, isPaymentSoon, true);
@@ -691,7 +692,7 @@ export const Schedule = () => {
     e.stopPropagation();
     setSelectedDate(date);
     const isPaymentDay = isPaymentDueOnDate(date);
-    const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
+    const isPaymentSoon = isPaymentDay && isPaymentUrgent(date);
 
     handleDayClick(date, isPaymentDay, isPaymentSoon, true);
   };
@@ -701,7 +702,7 @@ export const Schedule = () => {
     e.stopPropagation();
     setSelectedDate(date);
     const isPaymentDay = isPaymentDueOnDate(date);
-    const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
+    const isPaymentSoon = isPaymentDay && isPaymentUrgent(date);
 
     handleDayClick(date, isPaymentDay, isPaymentSoon, true);
   };
@@ -1086,6 +1087,15 @@ export const Schedule = () => {
     };
   }, []);
 
+  const urgentPayments = useMemo(() => {
+    if (!calendarData?.paymentDueDates) return [];
+    return getUrgentUnpaidPayments(
+      calendarData.paymentDueDates,
+      calendarData.completedPayments ?? [],
+      calendarData.classes ?? []
+    );
+  }, [calendarData]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1112,6 +1122,17 @@ export const Schedule = () => {
           <BirthdayScheduleBanner
             birthdate={calendarData.userData.birthdate}
             displayName={calendarData.userData.name || currentUser?.email?.split('@')[0] || ''}
+          />
+        )}
+
+        {calendarData && (
+          <PaymentDueBanner
+            urgentPayments={urgentPayments}
+            onJumpToDate={(date) => {
+              const isPaymentDay = isPaymentDueOnDate(date);
+              const isPaymentSoon = isPaymentDay && isPaymentUrgent(date);
+              handleDayClick(date, isPaymentDay, isPaymentSoon, true);
+            }}
           />
         )}
 
@@ -1176,7 +1197,7 @@ export const Schedule = () => {
                 setSelectedDate(date);
 
                 const isPaymentDay = isPaymentDueOnDate(date);
-                const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
+                const isPaymentSoon = isPaymentDay && isPaymentUrgent(date);
 
                 handleDayClick(date, isPaymentDay, isPaymentSoon, true);
               }}
@@ -1199,29 +1220,44 @@ export const Schedule = () => {
                 </h2>
 
                 {selectedDayDetails.isPaymentDay && (
-                  <div className={`flex flex-col p-3 rounded-lg mb-4 ${getPaymentStatus(selectedDayDetails.date).isCompleted
-                    ? 'bg-[#f0fdf4]'  // Light green background for completed payments
-                    : 'bg-[#fffbeb]'  // Original yellow background for pending payments
-                    }`}>
+                  <div className={`flex flex-col p-3 rounded-lg mb-4 ${
+                    getPaymentStatus(selectedDayDetails.date).isCompleted
+                      ? 'bg-[#f0fdf4]'
+                      : selectedDayDetails.isPaymentSoon
+                        ? 'bg-[#fef2f2]'
+                        : 'bg-[#fffbeb]'
+                  }`}>
                     <div className="flex items-center gap-2">
-                      <div className={`${getPaymentStatus(selectedDayDetails.date).isCompleted
-                        ? 'bg-[#22c55e]'
-                        : selectedDayDetails.isPaymentSoon
-                          ? 'bg-[#ef4444]'
-                          : 'bg-[#f59e0b]'
-                        }`} />
+                      <div className={`w-2 h-2 rounded-full ${
+                        getPaymentStatus(selectedDayDetails.date).isCompleted
+                          ? 'bg-[#22c55e]'
+                          : selectedDayDetails.isPaymentSoon
+                            ? 'bg-[#ef4444]'
+                            : 'bg-[#f59e0b]'
+                      }`} />
                       <div>
-                        <span className={`text-sm font-medium ${getPaymentStatus(selectedDayDetails.date).isCompleted
-                          ? 'text-[#22c55e]'
-                          : 'text-[#f59e0b]'
-                          }`}>
+                        <span className={`text-sm font-medium ${
+                          getPaymentStatus(selectedDayDetails.date).isCompleted
+                            ? 'text-[#22c55e]'
+                            : selectedDayDetails.isPaymentSoon
+                              ? 'text-[#ef4444]'
+                              : 'text-[#f59e0b]'
+                        }`}>
                           {getPaymentStatus(selectedDayDetails.date).isCompleted
                             ? t.paymentCompleted
                             : t.paymentDue}
                         </span>
-                        {selectedDayDetails.isPaymentSoon && !getPaymentStatus(selectedDayDetails.date).isCompleted && (
-                          <span className="text-xs ml-2 text-[#ef4444]">Due soon</span>
-                        )}
+                        {selectedDayDetails.isPaymentSoon && !getPaymentStatus(selectedDayDetails.date).isCompleted && (() => {
+                          const urgency = getPaymentUrgency(selectedDayDetails.date);
+                          const statusLabel =
+                            urgency === 'overdue' ? t.paymentStatusOverdue
+                            : urgency === 'dueToday' ? t.paymentStatusDueToday
+                            : urgency === 'dueSoon' ? t.paymentStatusDueSoon
+                            : null;
+                          return statusLabel ? (
+                            <span className="text-xs ml-2 text-[#ef4444]">{statusLabel}</span>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
 

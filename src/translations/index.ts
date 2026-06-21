@@ -208,6 +208,14 @@ export interface Translation {
   noPaymentLink: string;
   amount: string;
   goToPaymentApp: string;
+  paymentDueBannerOverdue: string;
+  paymentDueBannerDueToday: string;
+  paymentDueBannerDueSoon: string;
+  paymentDueBannerViewDetails: string;
+  paymentDueBannerPayNow: string;
+  paymentStatusOverdue: string;
+  paymentStatusDueToday: string;
+  paymentStatusDueSoon: string;
 
   // Admin Payments
   paymentsDueDescription: string;
@@ -688,6 +696,14 @@ const translations: Record<Language, Translation> = {
     noPaymentLink: 'No payment link available',
     amount: 'Amount',
     goToPaymentApp: 'Go to Payment Portal',
+    paymentDueBannerOverdue: 'Your payment is overdue',
+    paymentDueBannerDueToday: 'Your payment is due today',
+    paymentDueBannerDueSoon: 'Your payment is due in {days} days',
+    paymentDueBannerViewDetails: 'View details',
+    paymentDueBannerPayNow: 'Pay now',
+    paymentStatusOverdue: 'Overdue',
+    paymentStatusDueToday: 'Due today',
+    paymentStatusDueSoon: 'Due soon',
 
     // Admin Payments
     paymentsDueDescription: 'View and manage payment emails for students',
@@ -1162,6 +1178,14 @@ const translations: Record<Language, Translation> = {
     noPaymentLink: 'Link de pagamento não disponível',
     amount: 'Valor',
     goToPaymentApp: 'Ir para Portal de Pagamento',
+    paymentDueBannerOverdue: 'Seu pagamento está atrasado',
+    paymentDueBannerDueToday: 'Seu pagamento vence hoje',
+    paymentDueBannerDueSoon: 'Seu pagamento vence em {days} dias',
+    paymentDueBannerViewDetails: 'Ver detalhes',
+    paymentDueBannerPayNow: 'Pagar agora',
+    paymentStatusOverdue: 'Atrasado',
+    paymentStatusDueToday: 'Vence hoje',
+    paymentStatusDueSoon: 'Vence em breve',
 
     // Admin Payments
     paymentsDueDescription: 'Visualize e gerencie emails de pagamento para alunos',

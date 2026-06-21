@@ -3,7 +3,7 @@ import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
 import React, { useRef } from 'react';
 import { CalendarDayProps } from '../types/interfaces';
-import { isPaymentDueSoon } from '../utils/paymentUtils';
+import { isPaymentUrgent, getPaymentStatusHint } from '../utils/paymentUtils';
 
 export const CalendarDay = ({
   date,
@@ -16,7 +16,7 @@ export const CalendarDay = ({
   const { language } = useLanguage();
   const t = useTranslation(language);
   const isPaymentDay = paymentsDue.length > 0;
-  const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
+  const isPaymentSoon = isPaymentDay && isPaymentUrgent(date);
 
   return (
     <div className="h-full flex flex-col">
@@ -28,7 +28,7 @@ export const CalendarDay = ({
         {isPaymentDay && (
           <div 
             className={`indicator ${isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'}`}
-            title={isPaymentSoon ? 'Payment due soon' : 'Payment due'}
+            title={getPaymentStatusHint(date, t)}
           />
         )}
       </div>

@@ -3,6 +3,91 @@ import { getBaseClassId } from './scheduleUtils';
 import { User } from '../types/interfaces';
 import { toDate } from './scheduleUtils';
 
+export type PaymentUrgency = 'overdue' | 'dueToday' | 'dueSoon';
+
+export interface UrgentPayment {
+  dueDate: Date;
+  urgency: PaymentUrgency;
+  daysUntil: number;
+  paymentLink: string | null;
+  classSessionId: string;
+  amount?: number;
+  currency?: string;
+}
+
+interface CalendarPaymentDueDate {
+  date: string;
+  paymentLink: string | null;
+  classSession: { id: string };
+}
+
+interface CalendarCompletedPayment {
+  dueDate: string;
+  amount?: number;
+  currency?: string;
+}
+
+interface CalendarClassWithPayment {
+  id: string;
+  paymentConfig?: {
+    amount?: number;
+    currency?: string;
+  };
+}
+
+const urgencyRank: Record<PaymentUrgency, number> = {
+  overdue: 0,
+  dueToday: 1,
+  dueSoon: 2,
+};
+
+export const getPaymentUrgency = (dueDate: Date): PaymentUrgency => {
+  const daysUntil = getDaysUntilPayment(dueDate);
+  if (daysUntil < 0) return 'overdue';
+  if (daysUntil === 0) return 'dueToday';
+  return 'dueSoon';
+};
+
+export const getUrgentUnpaidPayments = (
+  paymentDueDates: CalendarPaymentDueDate[],
+  completedPayments: CalendarCompletedPayment[],
+  classes: CalendarClassWithPayment[]
+): UrgentPayment[] => {
+  const urgent: UrgentPayment[] = [];
+
+  for (const paymentDue of paymentDueDates) {
+    const dueDateStr = paymentDue.date?.split('T')[0] || '';
+    if (!dueDateStr) continue;
+
+    const isCompleted = completedPayments.some(payment => {
+      const paymentDueDateStr = payment.dueDate?.split('T')[0] || '';
+      return paymentDueDateStr === dueDateStr;
+    });
+    if (isCompleted) continue;
+
+    const dueDate = new Date(dueDateStr + 'T00:00:00');
+    if (!isPaymentUrgent(dueDate)) continue;
+
+    const associatedClass = classes.find(cls => cls.id === paymentDue.classSession.id);
+
+    urgent.push({
+      dueDate,
+      urgency: getPaymentUrgency(dueDate),
+      daysUntil: getDaysUntilPayment(dueDate),
+      paymentLink: paymentDue.paymentLink,
+      classSessionId: paymentDue.classSession.id,
+      amount: associatedClass?.paymentConfig?.amount,
+      currency: associatedClass?.paymentConfig?.currency,
+    });
+  }
+
+  return urgent.sort((a, b) => {
+    const rankDiff = urgencyRank[a.urgency] - urgencyRank[b.urgency];
+    if (rankDiff !== 0) return rankDiff;
+    return a.dueDate.getTime() - b.dueDate.getTime();
+  });
+};
+
 // Define the PaymentDue interface locally
 interface PaymentDue {
   user: User;
@@ -122,8 +207,44 @@ export const getDaysUntilPayment = (dueDate: Date): number => {
   return Math.ceil((dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 };
 
+export const isPaymentOverdue = (dueDate: Date): boolean => {
+  return getDaysUntilPayment(dueDate) < 0;
+};
+
+export const isPaymentDueToday = (dueDate: Date): boolean => {
+  return getDaysUntilPayment(dueDate) === 0;
+};
+
+/** Unpaid payment due in 1–3 days (not overdue, not today). */
 export const isPaymentDueSoon = (dueDate: Date): boolean => {
+  const days = getDaysUntilPayment(dueDate);
+  return days > 0 && days <= 3;
+};
+
+/** Overdue, due today, or due within 3 days — used for urgent styling and banner visibility. */
+export const isPaymentUrgent = (dueDate: Date): boolean => {
   return getDaysUntilPayment(dueDate) <= 3;
+};
+
+type PaymentStatusLabels = {
+  paymentDue: string;
+  paymentStatusOverdue: string;
+  paymentStatusDueToday: string;
+  paymentStatusDueSoon: string;
+};
+
+export const getPaymentStatusHint = (dueDate: Date, labels: PaymentStatusLabels): string => {
+  if (!isPaymentUrgent(dueDate)) return labels.paymentDue;
+  switch (getPaymentUrgency(dueDate)) {
+    case 'overdue':
+      return labels.paymentStatusOverdue;
+    case 'dueToday':
+      return labels.paymentStatusDueToday;
+    case 'dueSoon':
+      return labels.paymentStatusDueSoon;
+    default:
+      return labels.paymentDue;
+  }
 };
 
 export const getPaymentsDueForDay = (

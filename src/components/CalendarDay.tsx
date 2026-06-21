@@ -2,7 +2,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { CalendarDayProps } from '../types/interfaces';
 import { convertTimeToTimezone } from '../utils/dateUtils';
-import { isPaymentDueSoon } from '../utils/paymentUtils';
+import { isPaymentUrgent, getPaymentStatusHint } from '../utils/paymentUtils';
 
 export function CalendarDay({
   date,
@@ -19,7 +19,6 @@ export function CalendarDay({
   const t = useTranslation(language);
   
   const isPaymentDay = paymentsDue.length > 0;
-  const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
 
   // Check for birthdays
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -66,6 +65,8 @@ export function CalendarDay({
       return true;
     });
   });
+
+  const isPaymentSoon = isPaymentDay && !allPaymentsCompleted && isPaymentUrgent(date);
 
   // New: Check if there are any completed payments for this day, even if not due by config
   const hasHistoricCompletedPayment = !isPaymentDay && completedPayments.some(payment => {
@@ -199,8 +200,9 @@ export function CalendarDay({
                 isPaymentSoon ? 'payment-soon-indicator' : 'payment-indicator'
               }`}
               title={
-                allPaymentsCompleted ? t.allPaymentsCompleted :
-                isPaymentSoon ? 'Payment due soon' : 'Payment due'
+                allPaymentsCompleted
+                  ? t.allPaymentsCompleted
+                  : getPaymentStatusHint(date, t)
               }
             />
           )}

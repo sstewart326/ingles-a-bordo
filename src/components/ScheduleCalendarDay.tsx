@@ -5,7 +5,7 @@ import { useTranslation } from '../translations';
 import { FaFileAlt, FaBook, FaCommentAlt, FaBan } from 'react-icons/fa';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
-import { isPaymentDueSoon } from '../utils/paymentUtils';
+import { isPaymentUrgent, getPaymentStatusHint } from '../utils/paymentUtils';
 import { User } from '../types/interfaces';
 export interface ScheduleCalendarDayProps<T extends ClassSession> {
   date: Date;
@@ -49,7 +49,7 @@ export function ScheduleCalendarDay<T extends ClassSession>({
   
   // Determine if it's a payment day and if payment is soon
   const isPaymentDay = Array.isArray(paymentsDue) ? paymentsDue.length > 0 : !!paymentsDue;
-  const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
+  const isPaymentSoon = isPaymentDay && !paymentStatus?.isCompleted && isPaymentUrgent(date);
 
   // Check if any class on this day has materials
   const hasMaterials = React.useMemo(() => {
@@ -277,7 +277,11 @@ export function ScheduleCalendarDay<T extends ClassSession>({
                 ? 'payment-soon-indicator'
                 : 'payment-indicator'
             }`}
-            title={paymentStatus?.isCompleted ? 'Payment completed' : isPaymentSoon ? 'Payment due soon' : 'Payment due'}
+            title={
+              paymentStatus?.isCompleted
+                ? t.paymentCompleted
+                : getPaymentStatusHint(date, t)
+            }
           />
         )}
         {hasMaterials && (

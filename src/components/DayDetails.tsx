@@ -11,7 +11,7 @@ import { ClassSection } from './ClassSection';
 import { User } from '../types/interfaces';
 import { formatDateWithShortDay } from '../utils/dateUtils';
 import { useAuth } from '../hooks/useAuth';
-import { isPaymentDueSoon } from '../utils/paymentUtils';
+import { isPaymentUrgent } from '../utils/paymentUtils';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -691,7 +691,7 @@ export const DayDetails = ({
               });
               
               const completed = !!payment;
-              const isPaymentSoon = !completed && isPaymentDueSoon(selectedDayDetails.date);
+              const isPaymentSoon = !completed && isPaymentUrgent(selectedDayDetails.date);
               return (
                 <div
                   key={`${user.email}-${classSession.id}`}
