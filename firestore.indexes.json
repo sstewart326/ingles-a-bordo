@@ -126,6 +126,14 @@
       ]
     },
     {
+      "collectionGroup": "homeworkSubmissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "homeworkId", "order": "ASCENDING" },
+        { "fieldPath": "submittedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "contentLibrary",
       "queryScope": "COLLECTION",
       "fields": [
