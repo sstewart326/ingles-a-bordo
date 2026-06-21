@@ -26,6 +26,7 @@ import {
   findNoteForClassSession 
 } from '../utils/notesUtils';
 import { processDailyClassMapEntries } from '../utils/calendarDayUtils';
+import { isPaymentDueSoon } from '../utils/paymentUtils';
 import {
   mergeClassMaterialsForDate,
   getSlideDisplayNameFromUrl,
@@ -264,10 +265,7 @@ export const Schedule = () => {
 
       const isPaymentDay = isPaymentDueOnDate(today);
 
-      // Calculate if payment is soon (within 3 days)
-      const daysUntilPayment = isPaymentDay ?
-        Math.ceil((today.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-      const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+      const isPaymentSoon = isPaymentDay && isPaymentDueSoon(today);
 
       // Update the day details
       setSelectedDate(today);
@@ -293,9 +291,7 @@ export const Schedule = () => {
     if (prevKey !== null && prevKey !== visibleMonthKey) {
       const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
       const isPaymentDay = isPaymentDueOnDate(firstDayOfMonth);
-      const daysUntilPayment = isPaymentDay ?
-        Math.ceil((firstDayOfMonth.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-      const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+      const isPaymentSoon = isPaymentDay && isPaymentDueSoon(firstDayOfMonth);
       handleDayClick(firstDayOfMonth, isPaymentDay, isPaymentSoon, false);
     }
   }, [selectedDate]);
@@ -487,10 +483,7 @@ export const Schedule = () => {
     const isPaymentDay = isPaymentDueOnDate(date);
     const paymentStatus = getPaymentStatus(date);
 
-    // Calculate if payment is soon (within 3 days)
-    const daysUntilPayment = isPaymentDay && !paymentStatus.isCompleted ?
-      Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-    const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+    const isPaymentSoon = isPaymentDay && !paymentStatus.isCompleted && isPaymentDueSoon(date);
 
     // For each class, ensure we get the correct schedule for this specific date
     const processedClasses = dayClasses.map(classItem => {
@@ -683,8 +676,7 @@ export const Schedule = () => {
     
     // Get day details
     const isPaymentDay = isPaymentDueOnDate(date);
-    const isPaymentSoon = isPaymentDay ? 
-      Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 3 : false;
+    const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
     
     // Set the day details first
     handleDayClick(date, isPaymentDay, isPaymentSoon, true);
@@ -699,11 +691,7 @@ export const Schedule = () => {
     e.stopPropagation();
     setSelectedDate(date);
     const isPaymentDay = isPaymentDueOnDate(date);
-
-    // Calculate if payment is soon (within 3 days)
-    const daysUntilPayment = isPaymentDay ?
-      Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-    const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+    const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
 
     handleDayClick(date, isPaymentDay, isPaymentSoon, true);
   };
@@ -713,11 +701,7 @@ export const Schedule = () => {
     e.stopPropagation();
     setSelectedDate(date);
     const isPaymentDay = isPaymentDueOnDate(date);
-
-    // Calculate if payment is soon (within 3 days)
-    const daysUntilPayment = isPaymentDay ?
-      Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-    const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+    const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
 
     handleDayClick(date, isPaymentDay, isPaymentSoon, true);
   };
@@ -1192,10 +1176,7 @@ export const Schedule = () => {
                 setSelectedDate(date);
 
                 const isPaymentDay = isPaymentDueOnDate(date);
-
-                const daysUntilPayment = isPaymentDay ?
-                  Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-                const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+                const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
 
                 handleDayClick(date, isPaymentDay, isPaymentSoon, true);
               }}

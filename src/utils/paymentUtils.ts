@@ -118,6 +118,14 @@ export const getNextPaymentDates = (paymentConfig: User['paymentConfig'], classS
   return dates;
 };
 
+export const getDaysUntilPayment = (dueDate: Date): number => {
+  return Math.ceil((dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+};
+
+export const isPaymentDueSoon = (dueDate: Date): boolean => {
+  return getDaysUntilPayment(dueDate) <= 3;
+};
+
 export const getPaymentsDueForDay = (
   date: Date,
   upcomingClasses: ClassSession[],

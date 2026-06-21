@@ -3,6 +3,7 @@ import { useTranslation } from '../translations';
 import { useLanguage } from '../hooks/useLanguage';
 import React, { useRef } from 'react';
 import { CalendarDayProps } from '../types/interfaces';
+import { isPaymentDueSoon } from '../utils/paymentUtils';
 
 export const CalendarDay = ({
   date,
@@ -15,9 +16,7 @@ export const CalendarDay = ({
   const { language } = useLanguage();
   const t = useTranslation(language);
   const isPaymentDay = paymentsDue.length > 0;
-  const daysUntilPayment = isPaymentDay ? 
-    Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-  const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+  const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
 
   return (
     <div className="h-full flex flex-col">

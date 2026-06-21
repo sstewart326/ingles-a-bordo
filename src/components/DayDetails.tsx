@@ -11,6 +11,7 @@ import { ClassSection } from './ClassSection';
 import { User } from '../types/interfaces';
 import { formatDateWithShortDay } from '../utils/dateUtils';
 import { useAuth } from '../hooks/useAuth';
+import { isPaymentDueSoon } from '../utils/paymentUtils';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -690,11 +691,16 @@ export const DayDetails = ({
               });
               
               const completed = !!payment;
+              const isPaymentSoon = !completed && isPaymentDueSoon(selectedDayDetails.date);
               return (
                 <div
                   key={`${user.email}-${classSession.id}`}
                   className={`rounded-lg border ${
-                    completed ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+                    completed
+                      ? 'bg-green-50 border-green-200'
+                      : isPaymentSoon
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-yellow-50 border-yellow-200'
                   }`}
                 >
                   {completed ? (
@@ -715,7 +721,11 @@ export const DayDetails = ({
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center text-yellow-600 bg-yellow-100 px-4 py-2 rounded-t-lg border-b border-yellow-200">
+                    <div className={`flex items-center px-4 py-2 rounded-t-lg border-b ${
+                      isPaymentSoon
+                        ? 'text-red-600 bg-red-100 border-red-200'
+                        : 'text-yellow-600 bg-yellow-100 border-yellow-200'
+                    }`}>
                       <div className="flex items-center">
                         <span className="text-sm font-bold">{t.paymentDue}</span>
                       </div>
@@ -842,15 +852,23 @@ export const DayDetails = ({
                     </div>
                   </div>
                   {!completed ? (
-                    <div className="px-6 py-3 border-t border-yellow-200 bg-yellow-50">
+                    <div className={`px-6 py-3 border-t ${
+                      isPaymentSoon ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'
+                    }`}>
                       <button
                         onClick={() => handleMarkPaymentCompleted(user.email, classSession)}
                         disabled={loadingPaymentComplete[`${user.email}-${classSession.id}`]}
-                        className="w-full bg-yellow-100 text-yellow-700 hover:bg-yellow-200 py-2 rounded-md text-sm font-medium transition-colors border border-yellow-300 flex items-center justify-center"
+                        className={`w-full py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center ${
+                          isPaymentSoon
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-300'
+                            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300'
+                        }`}
                       >
                         {loadingPaymentComplete[`${user.email}-${classSession.id}`] ? (
                           <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-700 mr-2"></div>
+                            <div className={`animate-spin rounded-full h-4 w-4 border-b-2 mr-2 ${
+                              isPaymentSoon ? 'border-red-700' : 'border-yellow-700'
+                            }`}></div>
                             {t.processing}
                           </>
                         ) : (

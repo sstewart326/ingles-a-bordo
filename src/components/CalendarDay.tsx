@@ -2,6 +2,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { CalendarDayProps } from '../types/interfaces';
 import { convertTimeToTimezone } from '../utils/dateUtils';
+import { isPaymentDueSoon } from '../utils/paymentUtils';
 
 export function CalendarDay({
   date,
@@ -18,9 +19,7 @@ export function CalendarDay({
   const t = useTranslation(language);
   
   const isPaymentDay = paymentsDue.length > 0;
-  const daysUntilPayment = isPaymentDay ? 
-    Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-  const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+  const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
 
   // Check for birthdays
   const month = (date.getMonth() + 1).toString().padStart(2, '0');

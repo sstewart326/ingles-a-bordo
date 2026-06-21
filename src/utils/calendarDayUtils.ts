@@ -1,6 +1,7 @@
 import { ClassSession, sortClassesByTime } from './scheduleUtils';
 import { MouseEvent } from 'react';
 import { User } from '../types/interfaces';
+import { isPaymentDueSoon } from './paymentUtils';
 
 interface CalendarDayState {
   classTimeModal: {
@@ -38,9 +39,7 @@ export const renderCalendarDay = ({
   users
 }: RenderCalendarDayParams) => {
   const isPaymentDay = paymentsDue.length > 0;
-  const daysUntilPayment = isPaymentDay ? 
-    Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-  const isPaymentSoon = daysUntilPayment !== null && daysUntilPayment <= 3 && daysUntilPayment >= 0;
+  const isPaymentSoon = isPaymentDay && isPaymentDueSoon(date);
 
   // Check for birthdays
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
