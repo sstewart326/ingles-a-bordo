@@ -3,6 +3,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { formatLocalizedDate } from '../utils/dateUtils';
 import { PaymentUrgency, UrgentPayment } from '../utils/paymentUtils';
+import { buildPaymentLinkUrl } from '../utils/paymentLinkUtils';
 
 interface PaymentDueBannerProps {
   urgentPayments: UrgentPayment[];
@@ -92,7 +93,11 @@ function PaymentDueBannerItem({
       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pl-2">
         {payment.paymentLink && (
           <a
-            href={payment.paymentLink}
+            href={buildPaymentLinkUrl(payment.paymentLink, {
+              userEmail: payment.userEmail,
+              classId: payment.classSessionId,
+              dueDate: payment.dueDate,
+            })}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"

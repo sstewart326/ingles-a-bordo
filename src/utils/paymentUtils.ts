@@ -11,6 +11,7 @@ export interface UrgentPayment {
   daysUntil: number;
   paymentLink: string | null;
   classSessionId: string;
+  userEmail: string;
   amount?: number;
   currency?: string;
 }
@@ -19,6 +20,7 @@ interface CalendarPaymentDueDate {
   date: string;
   paymentLink: string | null;
   classSession: { id: string };
+  user?: { email: string };
 }
 
 interface CalendarCompletedPayment {
@@ -51,7 +53,8 @@ export const getPaymentUrgency = (dueDate: Date): PaymentUrgency => {
 export const getUrgentUnpaidPayments = (
   paymentDueDates: CalendarPaymentDueDate[],
   completedPayments: CalendarCompletedPayment[],
-  classes: CalendarClassWithPayment[]
+  classes: CalendarClassWithPayment[],
+  fallbackUserEmail?: string
 ): UrgentPayment[] => {
   const urgent: UrgentPayment[] = [];
 
@@ -70,12 +73,16 @@ export const getUrgentUnpaidPayments = (
 
     const associatedClass = classes.find(cls => cls.id === paymentDue.classSession.id);
 
+    const userEmail = paymentDue.user?.email || fallbackUserEmail;
+    if (!userEmail) continue;
+
     urgent.push({
       dueDate,
       urgency: getPaymentUrgency(dueDate),
       daysUntil: getDaysUntilPayment(dueDate),
       paymentLink: paymentDue.paymentLink,
       classSessionId: paymentDue.classSession.id,
+      userEmail,
       amount: associatedClass?.paymentConfig?.amount,
       currency: associatedClass?.paymentConfig?.currency,
     });

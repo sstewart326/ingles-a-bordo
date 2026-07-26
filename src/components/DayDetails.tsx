@@ -12,6 +12,7 @@ import { User } from '../types/interfaces';
 import { formatDateWithShortDay } from '../utils/dateUtils';
 import { useAuth } from '../hooks/useAuth';
 import { isPaymentUrgent } from '../utils/paymentUtils';
+import { buildPaymentLinkUrl } from '../utils/paymentLinkUtils';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -489,7 +490,7 @@ export const DayDetails = ({
   }, [selectedDayDetails]);
 
   // Replace the nested useState and useEffect in the JSX with a function that uses the component-level state
-  const renderPaymentLink = (classSession: ClassSession) => {
+  const renderPaymentLink = (classSession: ClassSession, userEmail?: string) => {
     // Find the most up-to-date class session
     let updatedClassSession = classSession;
     
@@ -524,10 +525,17 @@ export const DayDetails = ({
     
     // Display the payment link if available
     if (paymentLink) {
+      const href = userEmail && selectedDayDetails
+        ? buildPaymentLinkUrl(paymentLink, {
+            userEmail,
+            classId: updatedClassSession.id,
+            dueDate: selectedDayDetails.date,
+          })
+        : paymentLink;
       return (
         <div className="flex items-center">
           <a 
-            href={paymentLink} 
+            href={href} 
             target="_blank" 
             rel="noopener noreferrer"
             className="text-blue-600 hover:text-blue-800 flex items-center"
@@ -843,7 +851,7 @@ export const DayDetails = ({
                               </div>
                             ) : (
                               <div className="flex items-center">
-                                {renderPaymentLink(classSession)}
+                                {renderPaymentLink(classSession, user.email)}
                               </div>
                             )}
                           </div>

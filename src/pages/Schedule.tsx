@@ -28,6 +28,7 @@ import {
 } from '../utils/notesUtils';
 import { processDailyClassMapEntries } from '../utils/calendarDayUtils';
 import { getUrgentUnpaidPayments, isPaymentUrgent, getPaymentUrgency } from '../utils/paymentUtils';
+import { buildPaymentLinkUrl } from '../utils/paymentLinkUtils';
 import {
   mergeClassMaterialsForDate,
   getSlideDisplayNameFromUrl,
@@ -60,6 +61,9 @@ interface PaymentDueDate {
   paymentLink: string | null;
   classSession: {
     id: string;
+  };
+  user?: {
+    email: string;
   };
 }
 
@@ -1092,9 +1096,10 @@ export const Schedule = () => {
     return getUrgentUnpaidPayments(
       calendarData.paymentDueDates,
       calendarData.completedPayments ?? [],
-      calendarData.classes ?? []
+      calendarData.classes ?? [],
+      calendarData.userData?.email || currentUser?.email || undefined
     );
-  }, [calendarData]);
+  }, [calendarData, currentUser?.email]);
 
   if (loading) {
     return (
@@ -1304,10 +1309,20 @@ export const Schedule = () => {
                               const selectedDateStr = formatDateForComparison(selectedDayDetails.date);
                               return paymentDateStr === selectedDateStr && payment.paymentLink;
                             })
-                            .map((payment, index) => (
+                            .map((payment, index) => {
+                              const dueDate = new Date((payment.date?.split('T')[0] || '') + 'T00:00:00');
+                              const userEmail = payment.user?.email || calendarData.userData?.email || currentUser?.email || '';
+                              const paymentUrl = payment.paymentLink && userEmail
+                                ? buildPaymentLinkUrl(payment.paymentLink, {
+                                    userEmail,
+                                    classId: payment.classSession.id,
+                                    dueDate,
+                                  })
+                                : payment.paymentLink || '#';
+                              return (
                               <a
                                 key={index}
-                                href={payment.paymentLink || '#'}
+                                href={paymentUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-blue-600 hover:text-blue-800 flex items-center text-sm"
@@ -1317,7 +1332,8 @@ export const Schedule = () => {
                                 </svg>
                                 {t.paymentLink || 'Payment Link'}
                               </a>
-                            ))
+                            );
+                            })
                           }
                         </div>
                       )}

@@ -7,12 +7,21 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
+import { resolve } from 'path';
+import { config as loadEnv } from 'dotenv';
+
+// Firebase emulator only auto-loads functions/.env — also load project-root .env.development (shared with Vite)
+if (process.env.FUNCTIONS_EMULATOR === 'true') {
+  loadEnv({ path: resolve(__dirname, '../../.env.development'), override: true });
+}
+
 import { onRequest } from "firebase-functions/v2/https";
 import { onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import { corsHandler, REGION } from "./functionsUtil";
+import { registerPaymentFromStripeData } from "./paymentRegistration";
 
 admin.initializeApp();
 
@@ -2110,6 +2119,41 @@ export const backfillUserClaims = onCall({ region: REGION }, async (request) => 
 
   logger.info('backfillUserClaims complete', { count: results.length, results });
   return { results };
+});
+
+export const registerPaymentFromStripe = onRequest({
+  region: REGION,
+  cors: true
+}, async (request, response) => {
+  corsHandler(request, response, async () => {
+    if (request.method !== 'POST') {
+      response.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    const registerSecret = process.env.REGISTER_PAYMENT_SECRET;
+    if (!registerSecret) {
+      logger.error('REGISTER_PAYMENT_SECRET is not configured');
+      response.status(500).json({ error: 'Payment registration not configured' });
+      return;
+    }
+
+    const authHeader = request.headers.authorization;
+    if (!authHeader || authHeader !== `Bearer ${registerSecret}`) {
+      response.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    try {
+      const result = await registerPaymentFromStripeData(request.body);
+      response.status(200).json(result);
+    } catch (error) {
+      logger.error('registerPaymentFromStripe error:', error);
+      const message = error instanceof Error ? error.message : 'Internal server error';
+      const status = message.includes('not found') || message.includes('required') ? 400 : 500;
+      response.status(status).json({ error: message });
+    }
+  });
 });
 
 export * from './emailFunctions';
