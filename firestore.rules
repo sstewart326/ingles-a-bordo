@@ -241,6 +241,34 @@ service cloud.firestore {
                      resource.data.teacherId == request.auth.uid;
     }
 
+    // Onboarding checklists (teacher-owned template + version history)
+    match /onboardingChecklists/{teacherId} {
+      allow read: if isAdmin() && request.auth.uid == teacherId;
+      allow create, update: if isAdmin()
+        && request.auth.uid == teacherId
+        && request.resource.data.teacherId == request.auth.uid;
+      allow delete: if isAdmin() && request.auth.uid == teacherId;
+
+      match /versions/{versionId} {
+        allow read: if isAdmin() && request.auth.uid == teacherId;
+        allow create: if isAdmin() && request.auth.uid == teacherId;
+        allow update, delete: if false;
+      }
+    }
+
+    // Per-student onboarding checklist progress
+    match /onboardingChecklistProgress/{progressId} {
+      allow read: if isAdmin()
+        && resource.data.teacherId == request.auth.uid;
+      allow create: if isAdmin()
+        && request.resource.data.teacherId == request.auth.uid;
+      allow update: if isAdmin()
+        && resource.data.teacherId == request.auth.uid
+        && request.resource.data.teacherId == request.auth.uid;
+      allow delete: if isAdmin()
+        && resource.data.teacherId == request.auth.uid;
+    }
+
     // Payment Due Emails collection
     match /paymentDueEmails/{emailId} {
       // Only allow reading by admin (for monitoring purposes)

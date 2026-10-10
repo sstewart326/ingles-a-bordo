@@ -17,12 +17,19 @@ import {
 } from '../utils/firebaseUtils';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
-import { PencilIcon, InformationCircleIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
+import {
+  PencilIcon,
+  InformationCircleIcon,
+  TrashIcon,
+  PlusIcon,
+} from '@heroicons/react/24/outline';
 import { styles } from '../styles/styleUtils';
 import Modal from '../components/Modal';
 import { User, PinnedLink } from '../types/interfaces';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip } from '../components/Tooltip';
+import { OnboardingChecklistEditorButton } from '../components/OnboardingChecklistEditorButton';
+import { StudentOnboardingChecklistButton } from '../components/StudentOnboardingChecklistButton';
 
 interface NewUser {
   email: string;
@@ -821,6 +828,13 @@ export const AdminUsers = () => {
             </button>
           </Tooltip>
         </div>
+        {currentUser?.uid && (
+          <StudentOnboardingChecklistButton
+            teacherId={currentUser.uid}
+            student={user}
+            tooltipStyle="tooltip"
+          />
+        )}
         {user.status === 'active' ? (
           <>
             {!user.isAdmin && (
@@ -925,8 +939,15 @@ export const AdminUsers = () => {
   return (
     <div className="flex-1">
       <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 gap-3 flex-wrap">
           <h1 className={styles.headings.h1}>{t.manageUsers}</h1>
+          <div className="flex items-center gap-2">
+            {currentUser?.uid && (
+              <OnboardingChecklistEditorButton
+                teacherId={currentUser.uid}
+                teacherEmail={currentUser.email}
+              />
+            )}
           <div className="relative">
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -1197,6 +1218,7 @@ export const AdminUsers = () => {
               </div>
             </Modal>
           </div>
+          </div>
         </div>
 
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
@@ -1223,7 +1245,7 @@ export const AdminUsers = () => {
                 <table className="min-w-full divide-y divide-gray-200 table-fixed">
                   <thead className="bg-gray-50 sticky top-0 z-20 shadow-sm">
                     <tr>
-                      <th scope="col" className={`${styles.table.header} w-20`}>
+                      <th scope="col" className={`${styles.table.header} w-28`}>
                         {/* Action buttons */}
                       </th>
                       <th 
@@ -1300,6 +1322,13 @@ export const AdminUsers = () => {
                                 </span>
                               </button>
                             </div>
+                            {currentUser?.uid && (
+                              <StudentOnboardingChecklistButton
+                                teacherId={currentUser.uid}
+                                student={user}
+                                tooltipStyle="inline"
+                              />
+                            )}
                             {user.status === 'active' ? (
                               <>
                                 {!user.isAdmin && (

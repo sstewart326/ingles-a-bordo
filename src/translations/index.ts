@@ -211,6 +211,21 @@ export interface Translation {
   pleaseSelectPaymentDay: string;
   paymentStartDate: string;
   addNewUser: string;
+  onboardingChecklist: string;
+  editOnboardingChecklist: string;
+  onboardingChecklistEmpty: string;
+  onboardingChecklistEmptyDesc: string;
+  onboardingChecklistItemPlaceholder: string;
+  addChecklistItem: string;
+  saveChecklist: string;
+  checklistSaved: string;
+  failedToSaveChecklist: string;
+  failedToLoadChecklist: string;
+  studentOnboardingChecklist: string;
+  checklistProgress: string;
+  useLatestOnboardingChecklist: string;
+  useLatestOnboardingChecklistInfo: string;
+  noChecklistCreatedYet: string;
   generateSignupLink: string;
   paymentDue: string;
   weeklyPayment: string;
@@ -711,6 +726,21 @@ const translations: Record<Language, Translation> = {
     pleaseSelectPaymentDay: 'Please select payment day',
     paymentStartDate: 'Payment Start Date',
     addNewUser: 'Add New User',
+    onboardingChecklist: 'Edit onboarding checklist',
+    editOnboardingChecklist: 'Edit onboarding checklist',
+    onboardingChecklistEmpty: 'No checklist yet',
+    onboardingChecklistEmptyDesc: 'Add items below and save to create the first version of your onboarding checklist.',
+    onboardingChecklistItemPlaceholder: 'Checklist item',
+    addChecklistItem: 'Add item',
+    saveChecklist: 'Save checklist',
+    checklistSaved: 'Onboarding checklist saved',
+    failedToSaveChecklist: 'Failed to save checklist',
+    failedToLoadChecklist: 'Failed to load checklist',
+    studentOnboardingChecklist: 'Onboarding checklist',
+    checklistProgress: '{checked} of {total}',
+    useLatestOnboardingChecklist: 'Use latest',
+    useLatestOnboardingChecklistInfo: 'Switch this student to the latest checklist.',
+    noChecklistCreatedYet: 'Create an onboarding checklist first using the button at the top of this page.',
     generateSignupLink: 'Generate Signup Link',
     paymentDue: 'Payment Due',
     weeklyPayment: 'Weekly Payment',
@@ -1205,6 +1235,21 @@ const translations: Record<Language, Translation> = {
     pleaseSelectPaymentDay: 'Por favor, selecione o dia de pagamento',
     paymentStartDate: 'Data de Início do Pagamento',
     addNewUser: 'Adicionar Novo Usuário',
+    onboardingChecklist: 'Editar checklist de integração',
+    editOnboardingChecklist: 'Editar checklist de integração',
+    onboardingChecklistEmpty: 'Nenhum checklist ainda',
+    onboardingChecklistEmptyDesc: 'Adicione itens abaixo e salve para criar a primeira versão do checklist de integração.',
+    onboardingChecklistItemPlaceholder: 'Item do checklist',
+    addChecklistItem: 'Adicionar item',
+    saveChecklist: 'Salvar checklist',
+    checklistSaved: 'Checklist de integração salvo',
+    failedToSaveChecklist: 'Falha ao salvar o checklist',
+    failedToLoadChecklist: 'Falha ao carregar o checklist',
+    studentOnboardingChecklist: 'Checklist de integração',
+    checklistProgress: '{checked} de {total}',
+    useLatestOnboardingChecklist: 'Usar mais recente',
+    useLatestOnboardingChecklistInfo: 'Muda este aluno para o checklist mais recente.',
+    noChecklistCreatedYet: 'Crie um checklist de integração primeiro usando o botão no topo desta página.',
     generateSignupLink: 'Gerar Link de Cadastro',
     paymentDue: 'Pagamento Pendente',
     weeklyPayment: 'Pagamento Semanal',

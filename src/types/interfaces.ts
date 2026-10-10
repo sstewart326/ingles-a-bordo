@@ -256,6 +256,37 @@ export interface ScheduleVersion {
   };
 }
 
+/** Flat item in a teacher's universal onboarding checklist. */
+export interface OnboardingChecklistItem {
+  id: string;
+  label: string;
+}
+
+/** Meta doc at onboardingChecklists/{teacherId}. */
+export interface OnboardingChecklistMeta {
+  teacherId: string;
+  latestVersion: number;
+  updatedAt: Timestamp | Date;
+}
+
+/** Immutable snapshot at onboardingChecklists/{teacherId}/versions/{version}. */
+export interface OnboardingChecklistVersion {
+  version: number;
+  items: OnboardingChecklistItem[];
+  createdAt: Timestamp | Date;
+  createdBy: string;
+}
+
+/** Per-student checked state at onboardingChecklistProgress/{teacherId}_{studentId}. */
+export interface OnboardingChecklistProgress {
+  teacherId: string;
+  studentId: string;
+  studentEmail: string;
+  checklistVersion: number;
+  checkedItemIds: string[];
+  updatedAt: Timestamp | Date;
+}
+
 /**
  * Attendance record for a single class session.
  * Stored at classes/{classId}/attendance/{classDate} (classDate = YYYY-MM-DD).
