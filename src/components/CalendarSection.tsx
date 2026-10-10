@@ -133,8 +133,6 @@ export const CalendarSection = ({
             isLoading={isLoading}
             users={users}
             onDayClick={handleDayClick}
-            onClassCountClick={(_) => handleDayClick(date)}
-            onPaymentPillClick={(_) => handleDayClick(date)}
           />
         );
       }}

@@ -141,6 +141,10 @@
   line-height: 1;
 }
 
+.calendar-day-indicators .holiday-indicator {
+  background-color: #0d9488;
+}
+
 .calendar-day-indicators .material-indicator {
   background-color: #4f46e5;
 }
@@ -201,6 +205,15 @@
 
 .birthday-pill:hover {
   background-color: #db2777;
+}
+
+/* Holiday Pill */
+.holiday-pill {
+  background-color: #0d9488;
+}
+
+.holiday-pill:hover {
+  background-color: #0f766e;
 }
 
 /* Class Details */
@@ -373,51 +386,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.time-slots-container {
-  height: 100%;
-  min-height: inherit;
-  position: relative;
-}
-
-/* Time Pills in Modal */
-.time-pill {
-  background-color: #6366f1;
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  margin-bottom: 0.25rem;
-}
-
-.time-pill:last-child {
-  margin-bottom: 0;
-}
-
-.time-slots {
-  height: 100%;
-  min-height: inherit;
-  position: relative;
-}
-
-.time-slot {
-  position: absolute;
-  left: 0;
-  right: 0;
-  padding: 2px 4px;
-  border-radius: 4px;
-  background-color: #6366f1;
-  color: white;
-  font-size: 0.7rem;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.time-slot.more {
-  background-color: #818cf8;
 }
 
 /* Selected Day Details */

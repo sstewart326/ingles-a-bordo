@@ -23,6 +23,18 @@ export interface Translation {
   happyBirthdaySubtext: string;
   happyBirthdayCalendarPill: string;
   birthdayClose: string;
+  holiday: string;
+  holidays: string;
+  holidayNewYearsDay: string;
+  holidayMartinLutherKingJrDay: string;
+  holidayPresidentsDay: string;
+  holidayMemorialDay: string;
+  holidayJuneteenth: string;
+  holidayIndependenceDay: string;
+  holidayLaborDay: string;
+  holidayVeteransDay: string;
+  holidayThanksgiving: string;
+  holidayChristmasDay: string;
   emailNotEditable: string;
   amountPaid: string;
   amountDue: string;
@@ -511,6 +523,18 @@ const translations: Record<Language, Translation> = {
     happyBirthdaySubtext: 'Wishing you a wonderful day!',
     happyBirthdayCalendarPill: 'Happy Birthday!',
     birthdayClose: 'Close',
+    holiday: 'Holiday',
+    holidays: 'Holidays',
+    holidayNewYearsDay: "New Year's Day",
+    holidayMartinLutherKingJrDay: 'Martin Luther King Jr. Day',
+    holidayPresidentsDay: "Presidents' Day",
+    holidayMemorialDay: 'Memorial Day',
+    holidayJuneteenth: 'Juneteenth',
+    holidayIndependenceDay: 'Independence Day',
+    holidayLaborDay: 'Labor Day',
+    holidayVeteransDay: 'Veterans Day',
+    holidayThanksgiving: 'Thanksgiving',
+    holidayChristmasDay: 'Christmas Day',
     emailNotEditable: 'Email cannot be edited. To change the email, the user must be deleted and recreated with the correct email.',
     amountPaid: 'Amount paid',
     amountDue: 'Amount due',
@@ -993,6 +1017,18 @@ const translations: Record<Language, Translation> = {
     happyBirthdaySubtext: 'Desejamos um dia maravilhoso para você!',
     happyBirthdayCalendarPill: 'Feliz aniversário!',
     birthdayClose: 'Fechar',
+    holiday: 'Feriado',
+    holidays: 'Feriados',
+    holidayNewYearsDay: 'Ano Novo',
+    holidayMartinLutherKingJrDay: 'Dia de Martin Luther King Jr.',
+    holidayPresidentsDay: 'Dia dos Presidentes',
+    holidayMemorialDay: 'Dia da Memória',
+    holidayJuneteenth: 'Juneteenth',
+    holidayIndependenceDay: 'Dia da Independência',
+    holidayLaborDay: 'Dia do Trabalho',
+    holidayVeteransDay: 'Dia dos Veteranos',
+    holidayThanksgiving: 'Ação de Graças',
+    holidayChristmasDay: 'Natal',
     emailNotEditable: 'O email não pode ser editado. Para alterar o email, o usuário deve ser excluído e recriado com o email correto.',
     amountPaid: 'Valor pago',
     amountDue: 'Valor a pagar',

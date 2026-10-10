@@ -3,6 +3,7 @@ import { useTranslation } from '../translations';
 import { CalendarDayProps } from '../types/interfaces';
 import { convertTimeToTimezone } from '../utils/dateUtils';
 import { isPaymentUrgent, getPaymentStatusHint } from '../utils/paymentUtils';
+import { getHolidayOnDate } from '../utils/holidayUtils';
 
 export function CalendarDay({
   date,
@@ -26,6 +27,8 @@ export function CalendarDay({
   const dateString = `${month}-${day}`;
   const birthdays = users.filter(user => user.birthdate === dateString);
   const hasBirthdays = birthdays.length > 0;
+  const holiday = getHolidayOnDate(date);
+  const holidayName = holiday ? t[holiday.nameKey] : null;
 
   // Check if all payments for this day are completed
   const allPaymentsCompleted = isPaymentDay && paymentsDue.every(({ user, classSession }) => {
@@ -211,6 +214,9 @@ export function CalendarDay({
               🎂
             </div>
           )}
+          {holidayName && (
+            <div className="indicator holiday-indicator" title={holidayName} />
+          )}
         </div>
 
         <div className={`date-number ${isToday ? 'text-[#6366f1]' : ''} ${
@@ -298,6 +304,16 @@ export function CalendarDay({
               title={createBirthdayTooltip()}
             >
               {birthdays.length} {birthdays.length === 1 ? t.birthday : t.birthdays}
+            </div>
+          )}
+
+          {holidayName && (
+            <div
+              className="calendar-pill holiday-pill"
+              onClick={handlePillClick}
+              title={holidayName}
+            >
+              {holidayName}
             </div>
           )}
         </div>

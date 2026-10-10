@@ -17,6 +17,7 @@ import { BirthdayScheduleBanner } from '../components/BirthdayScheduleBanner';
 import { PaymentDueBanner } from '../components/PaymentDueBanner';
 import { SchedulePinnedLinks } from '../components/SchedulePinnedLinks';
 import { isSameCalendarDay } from '../utils/birthdayUtils';
+import { getHolidayOnDate } from '../utils/holidayUtils';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { formatDateForComparison } from '../utils/dateUtils';
 import { formatDateWithShortDay } from '../utils/dateUtils';
@@ -1223,6 +1224,22 @@ export const Schedule = () => {
                     day: 'numeric'
                   })}
                 </h2>
+
+                {(() => {
+                  const holiday = getHolidayOnDate(selectedDayDetails.date);
+                  if (!holiday) return null;
+                  const holidayName = t[holiday.nameKey];
+                  return (
+                    <div className="flex flex-col p-3 rounded-lg mb-4 bg-teal-50">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-teal-600" />
+                        <span className="text-sm font-medium text-teal-800">
+                          {holidayName}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {selectedDayDetails.isPaymentDay && (
                   <div className={`flex flex-col p-3 rounded-lg mb-4 ${

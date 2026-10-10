@@ -13,6 +13,7 @@ import { formatDateWithShortDay } from '../utils/dateUtils';
 import { useAuth } from '../hooks/useAuth';
 import { isPaymentUrgent } from '../utils/paymentUtils';
 import { buildPaymentLinkUrl } from '../utils/paymentLinkUtils';
+import { getHolidayOnDate } from '../utils/holidayUtils';
 
 interface DayDetailsProps {
   selectedDayDetails: {
@@ -616,6 +617,9 @@ export const DayDetails = ({
     );
   }
 
+  const holiday = getHolidayOnDate(selectedDayDetails.date);
+  const holidayName = holiday ? t[holiday.nameKey] : null;
+
   return (
     <div id="day-details-section" className="bg-white rounded-lg p-6 w-full shadow-md border border-gray-200" style={{ maxWidth: '100%', overflowX: 'hidden' }} ref={detailsContainerRef}>
       <h2 className="text-xl font-semibold mb-6">
@@ -630,12 +634,26 @@ export const DayDetails = ({
       {/* No content message */}
       {selectedDayDetails.classes.length === 0 && 
        (!selectedDayDetails.birthdays || selectedDayDetails.birthdays.length === 0) && 
-       selectedDayDetails.paymentsDue.length === 0 && (
+       selectedDayDetails.paymentsDue.length === 0 &&
+       !holidayName && (
         <div className="flex flex-col items-center justify-center py-8 text-gray-500">
           <div className="text-lg mb-2">{t.noDetailsAvailable || 'No details available'}</div>
           <p className="text-center text-sm">
             {t.nothingScheduledForThisDay || 'There are no classes, birthdays, or payments scheduled for this day.'}
           </p>
+        </div>
+      )}
+
+      {/* Holiday Section */}
+      {holidayName && (
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-4 flex items-center">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-600 mr-2" aria-hidden="true" />
+            {t.holiday || 'Holiday'}
+          </h3>
+          <div className="space-y-2 ml-6">
+            <h4 className="text-lg font-semibold text-teal-700">{holidayName}</h4>
+          </div>
         </div>
       )}
 

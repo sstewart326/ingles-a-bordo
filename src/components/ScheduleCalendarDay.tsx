@@ -6,6 +6,7 @@ import { FaFileAlt, FaBook, FaCommentAlt, FaBan } from 'react-icons/fa';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
 import { isPaymentUrgent, getPaymentStatusHint } from '../utils/paymentUtils';
+import { getHolidayOnDate } from '../utils/holidayUtils';
 import { User } from '../types/interfaces';
 export interface ScheduleCalendarDayProps<T extends ClassSession> {
   date: Date;
@@ -99,6 +100,8 @@ export function ScheduleCalendarDay<T extends ClassSession>({
   }, [classes]);
 
   const hasBirthdays = scheduleBirthdays.length > 0;
+  const holiday = getHolidayOnDate(date);
+  const holidayName = holiday ? t[holiday.nameKey] : null;
 
 
   // Filter out cancelled classes for display counts (but keep them for visual indication)
@@ -306,6 +309,13 @@ export function ScheduleCalendarDay<T extends ClassSession>({
             🎂
           </div>
         )}
+        {holidayName && (
+          <div
+            key="holiday-indicator"
+            className="indicator holiday-indicator"
+            title={holidayName}
+          />
+        )}
       </div>
 
       {/* Date */}
@@ -442,6 +452,20 @@ export function ScheduleCalendarDay<T extends ClassSession>({
               ) : (
                 t.happyBirthdayCalendarPill
               )}
+            </div>
+          )}
+
+          {holidayName && (
+            <div
+              key="holiday-pill"
+              className="calendar-pill holiday-pill"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClassCountClick?.(e, date);
+              }}
+              title={holidayName}
+            >
+              {holidayName}
             </div>
           )}
         </div>

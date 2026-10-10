@@ -13,8 +13,6 @@ export interface CalendarDayProps {
   isToday: boolean;
   dayClasses: ClassSession[];
   paymentsDue: { user: User; classSession: ClassSession }[];
-  onClassCountClick: (e: React.MouseEvent, date: Date, dayClasses: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
-  onPaymentPillClick: (e: React.MouseEvent, date: Date, dayClasses: ClassSession[], paymentsDue: { user: User; classSession: ClassSession }[]) => void;
   onDayClick?: (date: Date, classes: ClassSession[]) => void;
   completedPayments?: Payment[];
   isLoading?: boolean;

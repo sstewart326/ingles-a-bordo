@@ -558,66 +558,6 @@ nav.header-nav .header-dropdown a[data-headlessui-state="active"] {
   min-height: 60px;
 }
 
-.time-slots-container {
-  height: 100%;
-  min-height: inherit;
-  position: relative;
-}
-
-.time-slots {
-  height: 100%;
-  min-height: inherit;
-  position: relative;
-}
-
-.time-slot {
-  position: absolute;
-  left: 0;
-  right: 0;
-  padding: 2px 4px;
-  border-radius: 4px;
-  background-color: #6366f1;
-  color: white;
-  font-size: 0.7rem;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.time-slot.more {
-  background-color: #818cf8;
-}
-
-.time-markers {
-  font-variant-numeric: tabular-nums;
-  z-index: 10;
-  text-align: right;
-  padding-right: 2px;
-  background: linear-gradient(to right, white 50%, transparent);
-}
-
-.time-markers span {
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.calendar-class-item {
-  padding: 0 2px;
-  transition: all 0.2s ease;
-}
-
-.calendar-class-item:hover {
-  background-color: rgba(99, 102, 241, 0.1);
-}
-
-.calendar-class-item span {
-  display: inline-block;
-  line-height: 1;
-}
-
 @media (min-width: 1024px) {
   .calendar-day {
     aspect-ratio: 0.85;
