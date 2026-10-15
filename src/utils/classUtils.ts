@@ -69,9 +69,21 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       return false;
     })
     .map(c => {
-      // Preserve materials from existing classes
-      const existingClass = existingUpcomingClassesMap.get(c.id);
-      return existingClass ? { ...c, materials: existingClass.materials } : c;
+      // Preserve materials and accumulate versioned paymentDueDates from existing classes
+      const existingClass = existingUpcomingClassesMap.get(c.id) as ExtendedClassSession | undefined;
+      if (!existingClass) return c;
+      const mergedPaymentDueDates = [
+        ...(existingClass.paymentDueDates || []),
+        ...((c as ExtendedClassSession).paymentDueDates || []),
+      ];
+      const seen = new Set<string>();
+      const paymentDueDates = mergedPaymentDueDates.filter((d) => {
+        const key = d instanceof Date ? d.toISOString() : String(d);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return { ...c, materials: existingClass.materials, paymentDueDates };
     })
     .sort((a, b) => {
       const extendedA = a as ExtendedClassSession;
@@ -123,9 +135,21 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       return false;
     })
     .map(c => {
-      // Preserve materials from existing classes
-      const existingClass = existingPastClassesMap.get(c.id);
-      return existingClass ? { ...c, materials: existingClass.materials } : c;
+      // Preserve materials and accumulate versioned paymentDueDates from existing classes
+      const existingClass = existingPastClassesMap.get(c.id) as ExtendedClassSession | undefined;
+      if (!existingClass) return c;
+      const mergedPaymentDueDates = [
+        ...(existingClass.paymentDueDates || []),
+        ...((c as ExtendedClassSession).paymentDueDates || []),
+      ];
+      const seen = new Set<string>();
+      const paymentDueDates = mergedPaymentDueDates.filter((d) => {
+        const key = d instanceof Date ? d.toISOString() : String(d);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return { ...c, materials: existingClass.materials, paymentDueDates };
     })
     .sort((a, b) => {
       const extendedA = a as ExtendedClassSession;

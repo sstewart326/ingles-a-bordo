@@ -167,6 +167,42 @@ export const useDashboardData = (): UseDashboardDataReturn => {
 
             // Only update admin-specific state if we successfully fetched admin data
             if (transformedClasses.length > 0) {
+              // Merge duplicate class ids across months and accumulate versioned paymentDueDates
+              const classMap = new Map<string, ExtendedClassSession>();
+              for (const cls of transformedClasses) {
+                const existing = classMap.get(cls.id);
+                if (!existing) {
+                  classMap.set(cls.id, {
+                    ...cls,
+                    paymentDueDates: [...(cls.paymentDueDates || [])],
+                  });
+                  continue;
+                }
+                const mergedPaymentDueDates = [
+                  ...(existing.paymentDueDates || []),
+                  ...(cls.paymentDueDates || []),
+                ];
+                const seenDue = new Set<string>();
+                const paymentDueDates = mergedPaymentDueDates.filter((d) => {
+                  const key = d instanceof Date ? d.toISOString() : String(d);
+                  if (seenDue.has(key)) return false;
+                  seenDue.add(key);
+                  return true;
+                });
+                const mergedDates = [
+                  ...(existing.dates || []),
+                  ...(cls.dates || []),
+                ].map((d) => (d instanceof Date ? d.toISOString() : d));
+                classMap.set(cls.id, {
+                  ...existing,
+                  ...cls,
+                  paymentConfig: cls.paymentConfig || existing.paymentConfig,
+                  paymentDueDates,
+                  dates: mergedDates,
+                });
+              }
+              transformedClasses = Array.from(classMap.values());
+
               setDailyClassMap(combinedDailyClassMap);
               userDocs = Array.from(new Map(userDocs.map(user => [user.email, user])).values());
             }
@@ -247,19 +283,38 @@ export const useDashboardData = (): UseDashboardDataReturn => {
             return Array.from(emailMap.values());
           });
 
-          // Only update upcoming/past classes on initial load
+          // Initial load: replace class lists. Later month loads: merge versioned paymentDueDates.
           if (isInitialLoad) {
-            // Update class lists using the updateClassList function
             updateClassList({
               classes: transformedClasses.map(cls => ({
                 ...cls,
                 dates: cls.dates?.map(d => typeof d === 'string' ? d : d.toISOString())
               })) as ClassSession[],
-              upcomingClasses: [],  // Start with empty arrays on initial load
+              upcomingClasses: [],
               pastClasses: [],
               setUpcomingClasses: setUpcomingClasses as (classes: ClassSession[]) => void,
               setPastClasses: setPastClasses as (classes: ClassSession[]) => void
             });
+          } else {
+            const mergePaymentDueDates = (prev: ExtendedClassSession[]) =>
+              prev.map((existing) => {
+                const incoming = transformedClasses.find((c) => c.id === existing.id);
+                if (!incoming?.paymentDueDates?.length) return existing;
+                const merged = [
+                  ...(existing.paymentDueDates || []),
+                  ...incoming.paymentDueDates,
+                ];
+                const seen = new Set<string>();
+                const paymentDueDates = merged.filter((d) => {
+                  const key = d instanceof Date ? d.toISOString() : String(d);
+                  if (seen.has(key)) return false;
+                  seen.add(key);
+                  return true;
+                });
+                return { ...existing, paymentDueDates };
+              });
+            setUpcomingClasses(mergePaymentDueDates);
+            setPastClasses(mergePaymentDueDates);
           }
 
           // Update loaded months - add new months to the existing set

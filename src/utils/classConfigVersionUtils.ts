@@ -5,15 +5,15 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Class, ClassSchedule, ClassScheduleVersionDoc } from '../types/interfaces';
+import { Class, ClassConfigVersionDoc, ClassSchedule, PaymentConfig } from '../types/interfaces';
 
 /**
- * Builds a schedule snapshot from the current class fields (prior schedule to archive).
+ * Builds a config snapshot from the current class fields (prior config to archive).
  */
-export const buildScheduleVersionSnapshot = (
+export const buildConfigVersionSnapshot = (
   classData: Class,
   createdAt: Timestamp
-): Omit<ClassScheduleVersionDoc, 'id'> => {
+): Omit<ClassConfigVersionDoc, 'id'> => {
   const schedules: ClassSchedule[] =
     classData.scheduleType === 'multiple' && classData.schedules
       ? classData.schedules.map((s) => ({
@@ -31,6 +31,14 @@ export const buildScheduleVersionSnapshot = (
           },
         ];
 
+  const paymentConfig: PaymentConfig = classData.paymentConfig
+    ? { ...classData.paymentConfig }
+    : {
+        type: 'monthly',
+        monthlyOption: 'first',
+        startDate: new Date().toISOString().split('T')[0],
+      };
+
   return {
     createdAt,
     scheduleType: classData.scheduleType || 'single',
@@ -40,22 +48,26 @@ export const buildScheduleVersionSnapshot = (
     endTime: classData.endTime,
     timezone: classData.timezone,
     frequency: classData.frequency || { type: 'weekly', every: 1 },
+    paymentConfig,
   };
 };
 
 /**
- * Archives the prior schedule into classes/{classId}/versions/{versionId}.
- * createdAt on the version is when that schedule became effective.
+ * Archives the prior config into classes/{classId}/versions/{versionId}.
+ * createdAt on the version is when that config became effective.
  */
-export const archiveClassScheduleVersion = async (
+export const archiveClassConfigVersion = async (
   classId: string,
   classData: Class
 ): Promise<string> => {
   const effectiveFrom =
-    classData.scheduleEffectiveFrom || classData.createdAt || Timestamp.now();
+    classData.configEffectiveFrom ||
+    classData.startDate ||
+    classData.createdAt ||
+    Timestamp.now();
 
   const versionId = Date.now().toString();
-  const snapshot = buildScheduleVersionSnapshot(classData, effectiveFrom);
+  const snapshot = buildConfigVersionSnapshot(classData, effectiveFrom);
   const versionRef = doc(collection(db, 'classes', classId, 'versions'), versionId);
 
   await setDoc(versionRef, snapshot);

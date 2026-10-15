@@ -254,6 +254,44 @@ export const getPaymentStatusHint = (dueDate: Date, labels: PaymentStatusLabels)
   }
 };
 
+const normalizePaymentDueDate = (value: string | Date): Date | null => {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+};
+
+/**
+ * Prefer server-computed paymentDueDates (version-aware) when present.
+ * Falls back to live paymentConfig only for classes that have no server dues.
+ */
+const getPaymentDatesForClassOnMonth = (
+  classSession: ClassSession,
+  selectedDate: Date
+): Date[] => {
+  if (Array.isArray(classSession.paymentDueDates) && classSession.paymentDueDates.length > 0) {
+    return classSession.paymentDueDates
+      .map(normalizePaymentDueDate)
+      .filter((d): d is Date => {
+        if (!d) return false;
+        return (
+          d.getFullYear() === selectedDate.getFullYear() &&
+          d.getMonth() === selectedDate.getMonth()
+        );
+      });
+  }
+
+  if (!classSession.paymentConfig) {
+    return [];
+  }
+
+  return getNextPaymentDates(classSession.paymentConfig, classSession, selectedDate);
+};
+
 export const getPaymentsDueForDay = (
   date: Date,
   upcomingClasses: ClassSession[],
@@ -271,53 +309,44 @@ export const getPaymentsDueForDay = (
   const processedStudentClassPairs = new Set<string>();
   
   upcomingClasses.forEach(classSession => {
-    // Get the payment config directly from the class session
     const paymentConfig = classSession.paymentConfig;
+    const paymentDates = getPaymentDatesForClassOnMonth(classSession, date);
 
-    if (paymentConfig) {
-      // Use the class session as is for getNextPaymentDates since it already has the correct Timestamp types
-      const paymentDates = getNextPaymentDates(paymentConfig, classSession, date);
-
-      const isPaymentDue = paymentDates.some(paymentDate => 
-        paymentDate.getFullYear() === date.getFullYear() &&
-        paymentDate.getMonth() === date.getMonth() &&
-        paymentDate.getDate() === date.getDate()
-      );
-      
-      if (isPaymentDue) {
-
-        // Add one entry per student, but only if we haven't processed this student-class pair yet
-        classSession.studentEmails.forEach(email => {
-          const baseClassId = getBaseClassId(classSession.id);
-          const studentClassKey = `${email}-${baseClassId}`;
-          
-          if (!processedStudentClassPairs.has(studentClassKey)) {
-            const user = users.find(u => u.email === email);
-            if (user) {
-              // Create a copy of the class session with the correct payment config
-              const classSessionWithConfig: ClassSession = {
-                ...classSession,
-                paymentConfig: paymentConfig
+    const isPaymentDue = paymentDates.some(paymentDate => 
+      paymentDate.getFullYear() === date.getFullYear() &&
+      paymentDate.getMonth() === date.getMonth() &&
+      paymentDate.getDate() === date.getDate()
+    );
+    
+    if (isPaymentDue) {
+      // Add one entry per student, but only if we haven't processed this student-class pair yet
+      classSession.studentEmails.forEach(email => {
+        const baseClassId = getBaseClassId(classSession.id);
+        const studentClassKey = `${email}-${baseClassId}`;
+        
+        if (!processedStudentClassPairs.has(studentClassKey)) {
+          const user = users.find(u => u.email === email);
+          if (user) {
+            const classSessionWithConfig: ClassSession = {
+              ...classSession,
+              paymentConfig: paymentConfig
+            };
+            
+            let classSessionWithSchedules = classSessionWithConfig;
+            
+            if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules)) {
+              const sortedSchedules = [...classSession.schedules].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+              classSessionWithSchedules = {
+                ...classSessionWithSchedules,
+                schedules: sortedSchedules
               };
-              
-              let classSessionWithSchedules = classSessionWithConfig;
-              
-              // For multiple schedule classes, ensure all schedules are included
-              if (classSession.scheduleType === 'multiple' && Array.isArray(classSession.schedules)) {
-                // Sort schedules by day of week for consistent display
-                const sortedSchedules = [...classSession.schedules].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-                classSessionWithSchedules = {
-                  ...classSessionWithSchedules,
-                  schedules: sortedSchedules
-                };
-              }
-              
-              paymentsDue.push({ user, classSession: classSessionWithSchedules });
-              processedStudentClassPairs.add(studentClassKey);
             }
+            
+            paymentsDue.push({ user, classSession: classSessionWithSchedules });
+            processedStudentClassPairs.add(studentClassKey);
           }
-        });
-      }
+        }
+      });
     }
   });
   

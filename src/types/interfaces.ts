@@ -161,8 +161,8 @@ export interface Class {
     type: 'weekly' | 'biweekly' | 'custom';
     every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks
   };
-  /** When the current live schedule became effective. Defaults to createdAt when unset. */
-  scheduleEffectiveFrom?: Timestamp;
+  /** When the current live config (schedule/frequency/payment) became effective. Defaults to createdAt when unset. */
+  configEffectiveFrom?: Timestamp;
 }
 
 export interface ClassInfo {
@@ -241,10 +241,10 @@ export interface ClassSchedule {
 }
 
 /**
- * Frozen schedule snapshot stored at classes/{classId}/versions/{versionId}.
- * createdAt is when that schedule became effective.
+ * Frozen config snapshot stored at classes/{classId}/versions/{versionId}.
+ * createdAt is when that config became effective.
  */
-export interface ClassScheduleVersionDoc {
+export interface ClassConfigVersionDoc {
   id: string;
   createdAt: Timestamp;
   scheduleType: 'single' | 'multiple';
@@ -257,6 +257,7 @@ export interface ClassScheduleVersionDoc {
     type: 'weekly' | 'biweekly' | 'custom';
     every: number;
   };
+  paymentConfig: PaymentConfig;
 }
 
 /** Flat item in a teacher's universal onboarding checklist. */

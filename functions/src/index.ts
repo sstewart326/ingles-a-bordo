@@ -186,10 +186,10 @@ interface Schedule {
 }
 
 /**
- * Schedule snapshot used for a contiguous effective window.
+ * Config snapshot used for a contiguous effective window.
  * Stored on the class parent (current) or in classes/{id}/versions/{id} (prior).
  */
-interface ClassScheduleVersion {
+interface ClassConfigVersion {
   id: string;
   createdAt: Date;
   scheduleType: 'single' | 'multiple';
@@ -202,6 +202,7 @@ interface ClassScheduleVersion {
     type: string;
     every: number;
   };
+  paymentConfig?: any;
 }
 
 /**
@@ -396,13 +397,15 @@ export const getClassScheduleHttp = onRequest({
         // Extract just the Date objects for backward compatibility
         const classDates = calculatedDates.map(cd => cd.date);
 
-        // Calculate payment due dates
-        const paymentDates = calculatePaymentDueDates(
+        // Calculate payment due dates per config version window
+        const versionedPaymentDues = await calculateVersionedPaymentDueDates(
           classData,
           userData,
           startDate,
-          endDate
+          endDate,
+          classId
         );
+        const paymentDates = versionedPaymentDues.map((entry) => entry.date);
 
         return {
           classInfo: {
@@ -430,10 +433,10 @@ export const getClassScheduleHttp = onRequest({
             scheduleType: classData.scheduleType || 'single',
             schedules: classData.schedules || []
           },
-          paymentEntries: paymentDates.map(date => ({
+          paymentEntries: versionedPaymentDues.map(({ date, paymentConfig }) => ({
             date,
-            paymentLink: classData.paymentConfig?.paymentLink || null,
-            amount: classData.paymentConfig?.amount || null
+            paymentLink: paymentConfig?.paymentLink || null,
+            amount: paymentConfig?.amount || null
           }))
         };
       });
@@ -577,16 +580,6 @@ function timestampToDate(value: any): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function dateFromDateKey(dateKey: string): Date {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function endOfDateKey(dateKey: string): Date {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day, 23, 59, 59, 999);
-}
-
 function maxDate(a: Date, b: Date): Date {
   return a.getTime() >= b.getTime() ? a : b;
 }
@@ -595,9 +588,10 @@ function minDate(a: Date, b: Date): Date {
   return a.getTime() <= b.getTime() ? a : b;
 }
 
-function currentScheduleFromClassData(classData: any): ClassScheduleVersion {
+function currentConfigFromClassData(classData: any): ClassConfigVersion {
   const effectiveFrom =
-    timestampToDate(classData.scheduleEffectiveFrom) ||
+    timestampToDate(classData.configEffectiveFrom) ||
+    timestampToDate(classData.startDate) ||
     timestampToDate(classData.createdAt) ||
     new Date(0);
 
@@ -611,94 +605,182 @@ function currentScheduleFromClassData(classData: any): ClassScheduleVersion {
     endTime: classData.endTime,
     timezone: classData.timezone,
     frequency: classData.frequency || { type: 'weekly', every: 1 },
+    paymentConfig: classData.paymentConfig,
+  };
+}
+
+function resolveVersionScheduleType(data: any): 'single' | 'multiple' {
+  if (data.scheduleType === 'multiple' || data.scheduleType === 'single') {
+    return data.scheduleType;
+  }
+  if (Array.isArray(data.schedules) && data.schedules.length > 0) {
+    return data.schedules.length > 1 ? 'multiple' : 'single';
+  }
+  return 'single';
+}
+
+function mapConfigVersionDoc(
+  docSnap: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore.DocumentSnapshot
+): ClassConfigVersion {
+  const data = docSnap.data() || {};
+  return {
+    id: docSnap.id,
+    createdAt: timestampToDate(data.createdAt) || new Date(0),
+    scheduleType: resolveVersionScheduleType(data),
+    schedules: data.schedules,
+    dayOfWeek: data.dayOfWeek,
+    startTime: data.startTime,
+    endTime: data.endTime,
+    timezone: data.timezone,
+    frequency: data.frequency || { type: 'weekly', every: 1 },
+    paymentConfig: data.paymentConfig,
   };
 }
 
 /**
- * Fetch the next older schedule version with createdAt strictly before beforeCreatedAt.
+ * Load all archived config versions for a class (oldest first).
+ * Uses a plain collection read so missing indexes / inequality queries cannot drop history.
  */
-async function fetchNextOlderScheduleVersion(
-  classId: string,
-  beforeCreatedAt: Date
-): Promise<ClassScheduleVersion | null> {
+async function fetchArchivedConfigVersions(classId: string): Promise<ClassConfigVersion[]> {
   try {
     const snap = await admin
       .firestore()
       .collection('classes')
       .doc(classId)
       .collection('versions')
-      .where('createdAt', '<', admin.firestore.Timestamp.fromDate(beforeCreatedAt))
-      .orderBy('createdAt', 'desc')
-      .limit(1)
       .get();
 
-    if (snap.empty) {
-      return null;
-    }
-
-    const docSnap = snap.docs[0];
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      createdAt: timestampToDate(data.createdAt) || beforeCreatedAt,
-      scheduleType: data.scheduleType || 'single',
-      schedules: data.schedules,
-      dayOfWeek: data.dayOfWeek,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      timezone: data.timezone,
-      frequency: data.frequency || { type: 'weekly', every: 1 },
-    };
+    const versions = snap.docs.map((docSnap) => mapConfigVersionDoc(docSnap));
+    versions.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return versions;
   } catch (error) {
-    logger.error(`Error fetching older schedule version for class ${classId}:`, error);
-    return null;
+    logger.error(`Error fetching config versions for class ${classId}:`, error);
+    return [];
   }
+}
+
+interface ConfigVersionsForRange {
+  versions: ClassConfigVersion[];
+  /** True when nothing older exists — oldest version applies from the range start (class history begins there). */
+  oldestExtendsToStart: boolean;
 }
 
 /**
- * Lazily load schedule versions needed to cover [monthStart, ...].
- * Starts with the current parent schedule; walks older versions only while needed.
+ * Load config versions needed to cover [monthStart, ...].
+ * Current parent config is always last; archived versions with createdAt before
+ * the current config effective date are included when the month needs them.
  */
-async function fetchScheduleVersionsNeeded(
+async function fetchConfigVersionsNeeded(
   classId: string,
   monthStart: Date,
   classData: any
-): Promise<ClassScheduleVersion[]> {
-  const current = currentScheduleFromClassData(classData);
-  const versions: ClassScheduleVersion[] = [current];
-  let oldest = current;
+): Promise<ConfigVersionsForRange> {
+  const current = currentConfigFromClassData(classData);
 
-  while (toDateKey(monthStart) < toDateKey(oldest.createdAt)) {
-    const older = await fetchNextOlderScheduleVersion(classId, oldest.createdAt);
-    if (!older) {
-      break;
-    }
-    versions.unshift(older);
-    oldest = older;
+  // Month is entirely on/after the current config — no history needed
+  if (toDateKey(monthStart) >= toDateKey(current.createdAt)) {
+    return { versions: [current], oldestExtendsToStart: false };
   }
 
-  return versions;
+  const archived = await fetchArchivedConfigVersions(classId);
+  // Only versions that were effective before the current config
+  const prior = archived.filter(
+    (version) => version.createdAt.getTime() < current.createdAt.getTime()
+  );
+
+  const versions = [...prior, current];
+  const oldest = versions[0];
+  // Extend the earliest known config back to the range start when history begins there
+  // (never invent the *current* schedule for pre-edit dates if an archive exists).
+  const oldestExtendsToStart = toDateKey(monthStart) < toDateKey(oldest.createdAt);
+
+  if (prior.length === 0) {
+    logger.warn(
+      `Class ${classId}: month ${toDateKey(monthStart)} is before configEffectiveFrom ` +
+        `${toDateKey(current.createdAt)} but no archived versions were found; ` +
+        `extending current config backward.`
+    );
+  }
+
+  return { versions, oldestExtendsToStart };
 }
 
-function applyVersionToClassData(classData: any, version: ClassScheduleVersion): any {
+function applyVersionToClassData(
+  classData: any,
+  version: ClassConfigVersion,
+  paymentConfigOverride?: any
+): any {
+  // If the version has a schedules array, drive generation from it (even when length === 1)
+  const hasSchedules = Array.isArray(version.schedules) && version.schedules.length > 0;
+  const scheduleType = hasSchedules
+    ? 'multiple'
+    : version.scheduleType || classData.scheduleType || 'single';
+
+  const paymentConfig =
+    paymentConfigOverride !== undefined
+      ? paymentConfigOverride
+      : version.paymentConfig !== undefined
+        ? version.paymentConfig
+        : classData.paymentConfig;
+
   return {
     ...classData,
-    scheduleType: version.scheduleType,
-    schedules: version.schedules,
-    dayOfWeek: version.dayOfWeek,
-    startTime: version.startTime,
-    endTime: version.endTime,
+    scheduleType,
+    schedules: hasSchedules ? version.schedules : classData.schedules,
+    dayOfWeek: version.dayOfWeek !== undefined ? version.dayOfWeek : classData.dayOfWeek,
+    startTime: version.startTime ?? classData.startTime,
+    endTime: version.endTime ?? classData.endTime,
     timezone: version.timezone || classData.timezone,
     frequency: version.frequency || classData.frequency,
+    paymentConfig,
   };
 }
 
-function enrichDateWithVersion(date: Date, version: ClassScheduleVersion): CalculatedClassDate {
+/**
+ * Resolve paymentConfig for a version window.
+ * Older schedule-only archives often omit paymentConfig; inheriting from the nearest
+ * *later archived* version captures the payment that was live then (snapshotted on a
+ * later edit). Never inherit from the live parent/`current` — that rewrites past dues
+ * when payment is edited.
+ */
+function resolvePaymentConfigForVersion(
+  version: ClassConfigVersion,
+  versionIndex: number,
+  versions: ClassConfigVersion[],
+  parentPaymentConfig: any
+): any {
+  if (version.paymentConfig != null) {
+    return version.paymentConfig;
+  }
+
+  if (version.id === 'current') {
+    return parentPaymentConfig;
+  }
+
+  for (let j = versionIndex + 1; j < versions.length; j++) {
+    const later = versions[j];
+    // Skip live parent — only inherit from another archived snapshot
+    if (later.id === 'current') {
+      break;
+    }
+    if (later.paymentConfig != null) {
+      return later.paymentConfig;
+    }
+  }
+
+  logger.warn(
+    `Config version ${version.id} has no paymentConfig and no later archive with one`
+  );
+  return null;
+}
+
+function enrichDateWithVersion(date: Date, version: ClassConfigVersion): CalculatedClassDate {
   let startTime = version.startTime;
   let endTime = version.endTime;
   let timezone = version.timezone;
+  const scheduleType = resolveVersionScheduleType(version);
 
-  if (version.scheduleType === 'multiple' && Array.isArray(version.schedules)) {
+  if (Array.isArray(version.schedules) && version.schedules.length > 0) {
     const matchingSchedule = version.schedules.find(
       (schedule) => schedule.dayOfWeek === date.getDay()
     );
@@ -714,13 +796,52 @@ function enrichDateWithVersion(date: Date, version: ClassScheduleVersion): Calcu
     startTime,
     endTime,
     timezone,
-    scheduleType: version.scheduleType,
+    scheduleType,
     schedules: version.schedules,
   };
 }
 
 /**
- * Generate regular (non-exception) class dates across schedule version windows.
+ * Build contiguous [windowStart, windowEnd] ranges for each config version.
+ * Uses full timestamps so same-day edits (e.g. 18:52 then 19:10) don't drop a day.
+ * When oldestExtendsToStart is set, the earliest version covers from range start.
+ */
+function getVersionWindows(
+  versions: ClassConfigVersion[],
+  startDate: Date,
+  endDate: Date,
+  oldestExtendsToStart: boolean
+): Array<{ version: ClassConfigVersion; windowStart: Date; windowEnd: Date }> {
+  const windows: Array<{ version: ClassConfigVersion; windowStart: Date; windowEnd: Date }> = [];
+
+  for (let i = 0; i < versions.length; i++) {
+    const version = versions[i];
+    const nextVersion = versions[i + 1];
+
+    const windowStart =
+      i === 0 && oldestExtendsToStart
+        ? startDate
+        : maxDate(startDate, version.createdAt);
+
+    let windowEnd = endDate;
+    if (nextVersion) {
+      // Exclusive end at the next version's effective timestamp
+      const endJustBeforeNext = new Date(nextVersion.createdAt.getTime() - 1);
+      windowEnd = minDate(endDate, endJustBeforeNext);
+    }
+
+    if (windowStart > windowEnd) {
+      continue;
+    }
+
+    windows.push({ version, windowStart, windowEnd });
+  }
+
+  return windows;
+}
+
+/**
+ * Generate regular (non-exception) class dates across config version windows.
  */
 async function calculateVersionedBaseDates(
   classData: any,
@@ -728,29 +849,19 @@ async function calculateVersionedBaseDates(
   endDate: Date,
   classId: string
 ): Promise<CalculatedClassDate[]> {
-  const versions = await fetchScheduleVersionsNeeded(classId, startDate, classData);
+  const { versions, oldestExtendsToStart } = await fetchConfigVersionsNeeded(
+    classId,
+    startDate,
+    classData
+  );
   const dates: CalculatedClassDate[] = [];
 
-  for (let i = 0; i < versions.length; i++) {
-    const version = versions[i];
-    const nextVersion = versions[i + 1];
-
-    const versionStartKey = toDateKey(version.createdAt);
-    const windowStart = maxDate(startDate, dateFromDateKey(versionStartKey));
-
-    let windowEnd = endDate;
-    if (nextVersion) {
-      const nextStartKey = toDateKey(nextVersion.createdAt);
-      // This version applies through the day before the next version's effective date
-      const lastDayOfVersion = dateFromDateKey(nextStartKey);
-      lastDayOfVersion.setDate(lastDayOfVersion.getDate() - 1);
-      windowEnd = minDate(endDate, endOfDateKey(toDateKey(lastDayOfVersion)));
-    }
-
-    if (windowStart > windowEnd) {
-      continue;
-    }
-
+  for (const { version, windowStart, windowEnd } of getVersionWindows(
+    versions,
+    startDate,
+    endDate,
+    oldestExtendsToStart
+  )) {
     const versionedClassData = applyVersionToClassData(classData, version);
     const baseDates = calculateClassDates(versionedClassData, windowStart, windowEnd);
     for (const date of baseDates) {
@@ -1151,6 +1262,18 @@ function calculateClassDates(classData: any, startDate: Date, endDate: Date): Da
 }
 
 /**
+ * Calendar due dates are date-only. Use noon UTC so the civil day stays stable in
+ * Cloud Functions (TZ=UTC) and in US/Brazil local display (midnight UTC shifts back a day).
+ */
+function calendarDateToUtcNoon(year: number, monthIndex: number, day: number): Date {
+  return new Date(Date.UTC(year, monthIndex, day, 12, 0, 0, 0));
+}
+
+function toUtcNoon(date: Date): Date {
+  return calendarDateToUtcNoon(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+/**
  * Calculate payment due dates based on class and user payment configuration
  */
 function calculatePaymentDueDates(classData: any, userData: any, startDate: Date, endDate: Date): Date[] {
@@ -1163,22 +1286,22 @@ function calculatePaymentDueDates(classData: any, userData: any, startDate: Date
     return dates;
   }
 
-  // Get payment start date
+  // Get payment start date (noon UTC for date-only stability)
   let paymentStartDate: Date;
   if (paymentConfig.startDate) {
-    // Parse the YYYY-MM-DD date string
     const [year, month, day] = paymentConfig.startDate.split('-').map(Number);
-    paymentStartDate = new Date(year, month - 1, day);
+    paymentStartDate = calendarDateToUtcNoon(year, month - 1, day);
   } else if (classData.startDate) {
-    // Use class start date if payment start date is not specified
-    paymentStartDate = classData.startDate.toDate();
+    paymentStartDate = toUtcNoon(classData.startDate.toDate());
   } else {
-    // Default to the start of the requested month
-    paymentStartDate = new Date(startDate);
+    paymentStartDate = toUtcNoon(startDate);
   }
 
+  const rangeStart = toUtcNoon(startDate);
+  const rangeEnd = toUtcNoon(endDate);
+
   // If payment start date is after the end of the requested month, no payments are due
-  if (paymentStartDate > endDate) {
+  if (paymentStartDate > rangeEnd) {
     return dates;
   }
 
@@ -1188,76 +1311,168 @@ function calculatePaymentDueDates(classData: any, userData: any, startDate: Date
     let currentPaymentDate = new Date(paymentStartDate);
 
     // Adjust to be within the month range
-    if (currentPaymentDate < startDate) {
-      // Calculate how many intervals to add to reach or exceed the start date
-      const diffTime = startDate.getTime() - currentPaymentDate.getTime();
+    if (currentPaymentDate < rangeStart) {
+      const diffTime = rangeStart.getTime() - currentPaymentDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const intervalsToAdd = Math.ceil(diffDays / (7 * interval));
 
-      currentPaymentDate.setDate(currentPaymentDate.getDate() + (intervalsToAdd * 7 * interval));
+      currentPaymentDate = new Date(
+        currentPaymentDate.getTime() + intervalsToAdd * 7 * interval * 24 * 60 * 60 * 1000
+      );
+      currentPaymentDate = toUtcNoon(currentPaymentDate);
     }
 
     // Generate payment dates
-    while (currentPaymentDate <= endDate) {
-      dates.push(new Date(currentPaymentDate));
-      currentPaymentDate.setDate(currentPaymentDate.getDate() + (7 * interval));
+    while (currentPaymentDate <= rangeEnd) {
+      if (currentPaymentDate >= paymentStartDate) {
+        dates.push(toUtcNoon(currentPaymentDate));
+      }
+      currentPaymentDate = new Date(
+        currentPaymentDate.getTime() + 7 * interval * 24 * 60 * 60 * 1000
+      );
+      currentPaymentDate = toUtcNoon(currentPaymentDate);
     }
   } else if (paymentConfig.type === 'monthly') {
     const monthlyOption = paymentConfig.monthlyOption || 'first';
 
-    // Calculate the payment day for the requested month
-    const year = startDate.getFullYear();
-    const month = startDate.getMonth();
+    // Use UTC parts of the range so CF timezone does not shift the civil month
+    const year = rangeStart.getUTCFullYear();
+    const month = rangeStart.getUTCMonth();
 
     let paymentDate: Date;
     switch (monthlyOption) {
       case 'first':
-        paymentDate = new Date(year, month, 1);
+        paymentDate = calendarDateToUtcNoon(year, month, 1);
         break;
       case 'fifteen':
-        paymentDate = new Date(year, month, 15);
+        paymentDate = calendarDateToUtcNoon(year, month, 15);
         break;
       case 'last':
-        paymentDate = new Date(year, month + 1, 0); // Last day of the month
+        paymentDate = calendarDateToUtcNoon(year, month + 1, 0); // Last day of the month
         break;
       default:
-        paymentDate = new Date(year, month, 1);
+        paymentDate = calendarDateToUtcNoon(year, month, 1);
     }
 
     // Add the payment date if it's within the range and after the payment start date
-    if (paymentDate >= paymentStartDate && paymentDate <= endDate) {
+    if (paymentDate >= paymentStartDate && paymentDate <= rangeEnd) {
       dates.push(paymentDate);
     }
 
     // Check if we need to include the next month's payment date
     // This happens when the month spans into the next month
-    if (endDate.getMonth() !== startDate.getMonth()) {
-      const nextMonth = startDate.getMonth() + 1;
-      const nextYear = startDate.getFullYear() + (nextMonth > 11 ? 1 : 0);
+    if (rangeEnd.getUTCMonth() !== rangeStart.getUTCMonth() ||
+        rangeEnd.getUTCFullYear() !== rangeStart.getUTCFullYear()) {
+      const nextMonth = month + 1;
+      const nextYear = year + (nextMonth > 11 ? 1 : 0);
       const normalizedNextMonth = nextMonth % 12;
 
       let nextPaymentDate: Date;
       switch (monthlyOption) {
         case 'first':
-          nextPaymentDate = new Date(nextYear, normalizedNextMonth, 1);
+          nextPaymentDate = calendarDateToUtcNoon(nextYear, normalizedNextMonth, 1);
           break;
         case 'fifteen':
-          nextPaymentDate = new Date(nextYear, normalizedNextMonth, 15);
+          nextPaymentDate = calendarDateToUtcNoon(nextYear, normalizedNextMonth, 15);
           break;
         case 'last':
-          nextPaymentDate = new Date(nextYear, normalizedNextMonth + 1, 0);
+          nextPaymentDate = calendarDateToUtcNoon(nextYear, normalizedNextMonth + 1, 0);
           break;
         default:
-          nextPaymentDate = new Date(nextYear, normalizedNextMonth, 1);
+          nextPaymentDate = calendarDateToUtcNoon(nextYear, normalizedNextMonth, 1);
       }
 
-      if (nextPaymentDate >= paymentStartDate && nextPaymentDate <= endDate) {
+      if (nextPaymentDate >= paymentStartDate && nextPaymentDate <= rangeEnd) {
         dates.push(nextPaymentDate);
       }
     }
   }
 
   return dates.sort((a, b) => a.getTime() - b.getTime());
+}
+
+interface VersionedPaymentDue {
+  date: Date;
+  paymentConfig: any;
+}
+
+/**
+ * Generate payment due dates across config version windows.
+ * Uses each version's paymentConfig; schedule-only archives inherit payment from the
+ * nearest later version that stored one (not from the live parent).
+ */
+async function calculateVersionedPaymentDueDates(
+  classData: any,
+  userData: any,
+  startDate: Date,
+  endDate: Date,
+  classId: string
+): Promise<VersionedPaymentDue[]> {
+  const { versions, oldestExtendsToStart } = await fetchConfigVersionsNeeded(
+    classId,
+    startDate,
+    classData
+  );
+  const byDateKey = new Map<string, VersionedPaymentDue>();
+  const windows = getVersionWindows(
+    versions,
+    startDate,
+    endDate,
+    oldestExtendsToStart
+  );
+
+  for (const { version, windowStart, windowEnd } of windows) {
+    const versionIndex = versions.findIndex((v) => v.id === version.id);
+    const paymentConfig = resolvePaymentConfigForVersion(
+      version,
+      versionIndex >= 0 ? versionIndex : versions.length - 1,
+      versions,
+      classData.paymentConfig
+    );
+
+    // Do not fall back to user-level paymentConfig for archived windows — that also
+    // ignores class payment history. Current window may still use user fallback below.
+    const versionedClassData = applyVersionToClassData(
+      classData,
+      version,
+      paymentConfig
+    );
+
+    let windowDates: Date[];
+    if (paymentConfig) {
+      windowDates = calculatePaymentDueDates(
+        versionedClassData,
+        null,
+        windowStart,
+        windowEnd
+      );
+    } else if (version.id === 'current') {
+      windowDates = calculatePaymentDueDates(
+        versionedClassData,
+        userData,
+        windowStart,
+        windowEnd
+      );
+    } else {
+      windowDates = [];
+    }
+
+    const resolvedPaymentConfig =
+      paymentConfig ||
+      (version.id === 'current' && userData && userData.paymentConfig) ||
+      null;
+
+    for (const date of windowDates) {
+      const key = toDateKey(date);
+      if (!byDateKey.has(key)) {
+        byDateKey.set(key, { date, paymentConfig: resolvedPaymentConfig });
+      }
+    }
+  }
+
+  return Array.from(byDateKey.values()).sort(
+    (a, b) => a.date.getTime() - b.date.getTime()
+  );
 }
 
 /**
@@ -1509,13 +1724,15 @@ export const getCalendarDataHttp = onRequest({
         // Extract just the Date objects for backward compatibility
         const classDates = calculatedDates.map(cd => cd.date);
 
-        // Calculate payment due dates
-        const paymentDates = calculatePaymentDueDates(
+        // Calculate payment due dates per config version window
+        const versionedPaymentDues = await calculateVersionedPaymentDueDates(
           classData,
           userData,
           startDate,
-          endDate
+          endDate,
+          classId
         );
+        const paymentDates = versionedPaymentDues.map((entry) => entry.date);
 
         // Create a base class object
         const baseClassInfo: Partial<ClassInfo> = {
@@ -1552,18 +1769,13 @@ export const getCalendarDataHttp = onRequest({
           timezone: classData.timezone,
           dates: classDates,
           calculatedDates, // Include full exception metadata
-          paymentDueDates: calculatePaymentDueDates(
-            classData.paymentConfig,
-            classDates,
-            effectiveStartDate,
-            effectiveEndDate
-          ),
+          paymentDueDates: paymentDates,
           scheduleType: classData.scheduleType || 'single',
           schedules: classData.schedules || []
         };
 
-        // Build payment entries
-        const paymentEntries = paymentDates.map(date => ({
+        // Build payment entries (link/amount from the version effective on that due date)
+        const paymentEntries = versionedPaymentDues.map(({ date, paymentConfig }) => ({
           date,
           user: {
             name: userData.name,
@@ -1575,10 +1787,10 @@ export const getCalendarDataHttp = onRequest({
             startTime: classData.startTime,
             endTime: classData.endTime,
             courseType: classData.courseType,
-            paymentConfig: classData.paymentConfig
+            paymentConfig: paymentConfig || classData.paymentConfig
           },
-          paymentLink: classData.paymentConfig?.paymentLink || null,
-          amount: classData.paymentConfig?.amount || null
+          paymentLink: paymentConfig?.paymentLink || null,
+          amount: paymentConfig?.amount || null
         }));
 
         return { classId, classInfo: singleClassInfo, paymentEntries };
@@ -1973,6 +2185,14 @@ export const getAllClassesForMonthHttp = onRequest({
           return user || { email };
         });
 
+        const versionedPaymentDues = await calculateVersionedPaymentDueDates(
+          classData,
+          students[0] || null,
+          startDate,
+          endDate,
+          classId
+        );
+
         // Create a class object that matches the ClassSession interface in the frontend
         const classInfo: ClassInfo = {
           id: classId, // Add ID for single schedule classes
@@ -2001,12 +2221,7 @@ export const getAllClassesForMonthHttp = onRequest({
           timezone: classData.timezone,
           dates: classDates,
           calculatedDates, // Include full exception metadata
-          paymentDueDates: calculatePaymentDueDates(
-            classData.paymentConfig,
-            classDates,
-            effectiveStartDate,
-            effectiveEndDate
-          ),
+          paymentDueDates: versionedPaymentDues.map((entry) => entry.date),
           scheduleType: classData.scheduleType || 'single',
           schedules: classData.schedules || []
         };

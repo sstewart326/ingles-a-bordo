@@ -49,6 +49,8 @@ export interface ClassSession {
     startDate: string;
   };
   dates?: string[] | Date[];  // Allow both string[] and Date[] for dates
+  /** Server-computed due dates for the loaded month(s); prefer over live paymentConfig. */
+  paymentDueDates?: Array<string | Date>;
   scheduleType?: 'single' | 'multiple';
   schedules?: Array<{
     dayOfWeek: number;

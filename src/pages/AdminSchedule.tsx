@@ -28,11 +28,11 @@ import { Class, SelectOption, User } from '../types/interfaces';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { Tooltip } from '../components/Tooltip';
-import { archiveClassScheduleVersion } from '../utils/classScheduleVersionUtils';
+import { archiveClassConfigVersion } from '../utils/classConfigVersionUtils';
 
 /**
  * Helper function to check if schedule-related fields have changed.
- * Used to determine if we need to archive the old schedule.
+ * Used to determine if we need to archive the old config.
  */
 const hasScheduleChanged = (
   originalClass: Class,
@@ -69,6 +69,27 @@ const hasScheduleChanged = (
     if ((orig.timezone || originalClass.timezone) !== (edit.timezone || editedClass.timezone)) return true;
   }
   
+  return false;
+};
+
+/**
+ * Helper function to check if payment config fields have changed.
+ */
+const hasPaymentConfigChanged = (
+  originalClass: Class,
+  editedClass: any
+): boolean => {
+  const orig = originalClass.paymentConfig || ({} as Class['paymentConfig']);
+  const edit = editedClass.paymentConfig || {};
+
+  if (orig.type !== edit.type) return true;
+  if ((orig.weeklyInterval || null) !== (edit.weeklyInterval || null)) return true;
+  if ((orig.monthlyOption || null) !== (edit.monthlyOption || null)) return true;
+  if ((orig.startDate || null) !== (edit.startDate || null)) return true;
+  if ((orig.amount ?? null) !== (edit.amount ?? null)) return true;
+  if ((orig.currency || null) !== (edit.currency || null)) return true;
+  if ((orig.paymentLink || null) !== (edit.paymentLink || null)) return true;
+
   return false;
 };
 
@@ -583,7 +604,8 @@ export const AdminSchedule = () => {
         endDate: newClass.endDate ? Timestamp.fromDate(newClass.endDate) : null,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
-        scheduleEffectiveFrom: Timestamp.now(),
+        // Config applies from class start so past occurrences in the class range are covered
+        configEffectiveFrom: Timestamp.fromDate(newClass.startDate),
       };
 
       logQuery('Creating new class', classToCreate);
@@ -837,22 +859,28 @@ export const AdminSchedule = () => {
         updatedContractUrl = await getDownloadURL(storageRef);
       }
 
-      // Find the original class to check for schedule changes
+      // Find the original class to check for versioned config changes
       const originalClass = classes.find(c => c.id === editingClass.id);
       const scheduleChanged =
         !!originalClass && hasScheduleChanged(originalClass, editingClass);
+      const paymentChanged =
+        !!originalClass && hasPaymentConfigChanged(originalClass, editingClass);
+      const configChanged = scheduleChanged || paymentChanged;
 
-      if (scheduleChanged && originalClass) {
-        logQuery('Schedule changed, archiving prior schedule to versions subcollection', {
+      if (configChanged && originalClass) {
+        logQuery('Config changed, archiving prior config to versions subcollection', {
           classId: editingClass.id,
+          scheduleChanged,
+          paymentChanged,
         });
-        await archiveClassScheduleVersion(editingClass.id, originalClass);
+        await archiveClassConfigVersion(editingClass.id, originalClass);
       }
 
-      const scheduleEffectiveFrom = scheduleChanged
+      const configEffectiveFrom = configChanged
         ? Timestamp.now()
-        : (editingClass.scheduleEffectiveFrom ||
-            originalClass?.scheduleEffectiveFrom ||
+        : (editingClass.configEffectiveFrom ||
+            originalClass?.configEffectiveFrom ||
+            originalClass?.startDate ||
             originalClass?.createdAt ||
             Timestamp.now());
 
@@ -862,7 +890,7 @@ export const AdminSchedule = () => {
         startDate: Timestamp.fromDate(editingClass.startDate instanceof Date ? editingClass.startDate : editingClass.startDate.toDate()),
         endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate instanceof Date ? editingClass.endDate : editingClass.endDate.toDate()) : null,
         updatedAt: Timestamp.now(),
-        scheduleEffectiveFrom,
+        configEffectiveFrom,
       };
 
       // Strip legacy embedded scheduleHistory if present
