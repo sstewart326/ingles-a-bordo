@@ -186,17 +186,20 @@ interface Schedule {
 }
 
 /**
- * Represents a historical version of a class schedule.
- * Used for preserving schedule history when permanent changes are made.
+ * Schedule snapshot used for a contiguous effective window.
+ * Stored on the class parent (current) or in classes/{id}/versions/{id} (prior).
  */
-interface ScheduleVersion {
-  version: number;            // Incrementing int (1, 2, 3, ...)
-  effectiveFrom: Date;        // When this schedule version starts
+interface ClassScheduleVersion {
+  id: string;
+  createdAt: Date;
   scheduleType: 'single' | 'multiple';
-  schedules: Schedule[];      // The schedule(s) for this version
+  schedules?: Schedule[];
+  dayOfWeek: number;
+  startTime?: string;
+  endTime?: string;
   timezone: string;
-  frequency: {
-    type: 'weekly' | 'biweekly' | 'custom';
+  frequency?: {
+    type: string;
     every: number;
   };
 }
@@ -230,6 +233,9 @@ interface CalculatedClassDate {
   startTime?: string;
   endTime?: string;
   timezone?: string;
+  /** Schedule that applied on this date (for versioned schedules). */
+  scheduleType?: 'single' | 'multiple';
+  schedules?: Schedule[];
   isCancelled?: boolean;
   isRescheduled?: boolean;
   originalDate?: string | null;  // For rescheduled classes, shows where it came from (YYYY-MM-DD format)
@@ -262,7 +268,6 @@ interface ClassInfo {
     every: number;
   };
   paymentDueDates?: Date[];
-  scheduleHistory?: ScheduleVersion[];
 }
 
 /**
@@ -552,69 +557,6 @@ function buildExceptionMaps(exceptions: ClassException[]): {
 }
 
 /**
- * Gets the appropriate schedule version for a specific date.
- * If the class has schedule history, finds the version that was effective on the given date.
- * Otherwise, uses the current schedule fields.
- * 
- * Note: This function is prepared for future schedule versioning support.
- * Uncomment when historical schedule display is needed.
- *
- * function getScheduleForDate(classData: any, date: Date): {
- *   scheduleType: 'single' | 'multiple';
- *   schedules: Schedule[];
- *   dayOfWeek: number;
- *   startTime: string;
- *   endTime: string;
- *   timezone: string;
- *   frequency: { type: string; every: number };
- * } | null {
- *   // Check if class has schedule history
- *   if (classData.scheduleHistory && Array.isArray(classData.scheduleHistory) && classData.scheduleHistory.length > 0) {
- *     // Sort by effectiveFrom descending to find the most recent applicable version
- *     const sortedHistory = [...classData.scheduleHistory].sort((a: any, b: any) => {
- *       const dateA = a.effectiveFrom instanceof Date ? a.effectiveFrom : a.effectiveFrom.toDate();
- *       const dateB = b.effectiveFrom instanceof Date ? b.effectiveFrom : b.effectiveFrom.toDate();
- *       return dateB.getTime() - dateA.getTime();
- *     });
- *
- *     // Find the version that was effective on the given date
- *     for (const version of sortedHistory) {
- *       const effectiveFrom = version.effectiveFrom instanceof Date 
- *         ? version.effectiveFrom 
- *         : version.effectiveFrom.toDate();
- *       
- *       if (date >= effectiveFrom) {
- *         return {
- *           scheduleType: version.scheduleType,
- *           schedules: version.schedules,
- *           dayOfWeek: version.schedules[0]?.dayOfWeek ?? classData.dayOfWeek,
- *           startTime: version.schedules[0]?.startTime ?? classData.startTime,
- *           endTime: version.schedules[0]?.endTime ?? classData.endTime,
- *           timezone: version.timezone || classData.timezone,
- *           frequency: version.frequency || classData.frequency || { type: 'weekly', every: 1 },
- *         };
- *       }
- *     }
- *   }
- *
- *   return {
- *     scheduleType: classData.scheduleType || 'single',
- *     schedules: classData.schedules || [{
- *       dayOfWeek: classData.dayOfWeek,
- *       startTime: classData.startTime,
- *       endTime: classData.endTime,
- *       timezone: classData.timezone,
- *     }],
- *     dayOfWeek: classData.dayOfWeek,
- *     startTime: classData.startTime,
- *     endTime: classData.endTime,
- *     timezone: classData.timezone,
- *     frequency: classData.frequency || { type: 'weekly', every: 1 },
- *   };
- * }
- */
-
-/**
  * Helper function to get the next day
  */
 function nextDay(date: Date): Date {
@@ -623,10 +565,206 @@ function nextDay(date: Date): Date {
   return next;
 }
 
+function toDateKey(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+function timestampToDate(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === 'function') return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function dateFromDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function endOfDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day, 23, 59, 59, 999);
+}
+
+function maxDate(a: Date, b: Date): Date {
+  return a.getTime() >= b.getTime() ? a : b;
+}
+
+function minDate(a: Date, b: Date): Date {
+  return a.getTime() <= b.getTime() ? a : b;
+}
+
+function currentScheduleFromClassData(classData: any): ClassScheduleVersion {
+  const effectiveFrom =
+    timestampToDate(classData.scheduleEffectiveFrom) ||
+    timestampToDate(classData.createdAt) ||
+    new Date(0);
+
+  return {
+    id: 'current',
+    createdAt: effectiveFrom,
+    scheduleType: classData.scheduleType || 'single',
+    schedules: classData.schedules,
+    dayOfWeek: classData.dayOfWeek,
+    startTime: classData.startTime,
+    endTime: classData.endTime,
+    timezone: classData.timezone,
+    frequency: classData.frequency || { type: 'weekly', every: 1 },
+  };
+}
+
+/**
+ * Fetch the next older schedule version with createdAt strictly before beforeCreatedAt.
+ */
+async function fetchNextOlderScheduleVersion(
+  classId: string,
+  beforeCreatedAt: Date
+): Promise<ClassScheduleVersion | null> {
+  try {
+    const snap = await admin
+      .firestore()
+      .collection('classes')
+      .doc(classId)
+      .collection('versions')
+      .where('createdAt', '<', admin.firestore.Timestamp.fromDate(beforeCreatedAt))
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return null;
+    }
+
+    const docSnap = snap.docs[0];
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      createdAt: timestampToDate(data.createdAt) || beforeCreatedAt,
+      scheduleType: data.scheduleType || 'single',
+      schedules: data.schedules,
+      dayOfWeek: data.dayOfWeek,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      timezone: data.timezone,
+      frequency: data.frequency || { type: 'weekly', every: 1 },
+    };
+  } catch (error) {
+    logger.error(`Error fetching older schedule version for class ${classId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Lazily load schedule versions needed to cover [monthStart, ...].
+ * Starts with the current parent schedule; walks older versions only while needed.
+ */
+async function fetchScheduleVersionsNeeded(
+  classId: string,
+  monthStart: Date,
+  classData: any
+): Promise<ClassScheduleVersion[]> {
+  const current = currentScheduleFromClassData(classData);
+  const versions: ClassScheduleVersion[] = [current];
+  let oldest = current;
+
+  while (toDateKey(monthStart) < toDateKey(oldest.createdAt)) {
+    const older = await fetchNextOlderScheduleVersion(classId, oldest.createdAt);
+    if (!older) {
+      break;
+    }
+    versions.unshift(older);
+    oldest = older;
+  }
+
+  return versions;
+}
+
+function applyVersionToClassData(classData: any, version: ClassScheduleVersion): any {
+  return {
+    ...classData,
+    scheduleType: version.scheduleType,
+    schedules: version.schedules,
+    dayOfWeek: version.dayOfWeek,
+    startTime: version.startTime,
+    endTime: version.endTime,
+    timezone: version.timezone || classData.timezone,
+    frequency: version.frequency || classData.frequency,
+  };
+}
+
+function enrichDateWithVersion(date: Date, version: ClassScheduleVersion): CalculatedClassDate {
+  let startTime = version.startTime;
+  let endTime = version.endTime;
+  let timezone = version.timezone;
+
+  if (version.scheduleType === 'multiple' && Array.isArray(version.schedules)) {
+    const matchingSchedule = version.schedules.find(
+      (schedule) => schedule.dayOfWeek === date.getDay()
+    );
+    if (matchingSchedule) {
+      startTime = matchingSchedule.startTime;
+      endTime = matchingSchedule.endTime;
+      timezone = matchingSchedule.timezone || version.timezone;
+    }
+  }
+
+  return {
+    date,
+    startTime,
+    endTime,
+    timezone,
+    scheduleType: version.scheduleType,
+    schedules: version.schedules,
+  };
+}
+
+/**
+ * Generate regular (non-exception) class dates across schedule version windows.
+ */
+async function calculateVersionedBaseDates(
+  classData: any,
+  startDate: Date,
+  endDate: Date,
+  classId: string
+): Promise<CalculatedClassDate[]> {
+  const versions = await fetchScheduleVersionsNeeded(classId, startDate, classData);
+  const dates: CalculatedClassDate[] = [];
+
+  for (let i = 0; i < versions.length; i++) {
+    const version = versions[i];
+    const nextVersion = versions[i + 1];
+
+    const versionStartKey = toDateKey(version.createdAt);
+    const windowStart = maxDate(startDate, dateFromDateKey(versionStartKey));
+
+    let windowEnd = endDate;
+    if (nextVersion) {
+      const nextStartKey = toDateKey(nextVersion.createdAt);
+      // This version applies through the day before the next version's effective date
+      const lastDayOfVersion = dateFromDateKey(nextStartKey);
+      lastDayOfVersion.setDate(lastDayOfVersion.getDate() - 1);
+      windowEnd = minDate(endDate, endOfDateKey(toDateKey(lastDayOfVersion)));
+    }
+
+    if (windowStart > windowEnd) {
+      continue;
+    }
+
+    const versionedClassData = applyVersionToClassData(classData, version);
+    const baseDates = calculateClassDates(versionedClassData, windowStart, windowEnd);
+    for (const date of baseDates) {
+      dates.push(enrichDateWithVersion(date, version));
+    }
+  }
+
+  return dates.sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
 /**
  * Calculate class dates with schedule versioning and exception support.
  * This is the enhanced version that handles:
- * 1. Historical schedule versions
+ * 1. Historical schedule versions (subcollection, lazy-fetched)
  * 2. Class exceptions (cancellations, reschedules)
  */
 async function calculateClassDatesWithExceptions(
@@ -691,10 +829,11 @@ async function calculateClassDatesWithExceptions(
       }
   }
 
-  // Second pass: Generate regular schedule dates, applying cancellations
-  const baseDates = calculateClassDates(classData, startDate, endDate);
+  // Second pass: Generate regular schedule dates from version windows, applying cancellations
+  const baseDates = await calculateVersionedBaseDates(classData, startDate, endDate, classId);
 
-  for (const date of baseDates) {
+  for (const baseDate of baseDates) {
+    const date = baseDate.date;
     const dateKey = date.toISOString().split('T')[0];
 
     // Check for exceptions on this original date first
@@ -709,7 +848,7 @@ async function calculateClassDatesWithExceptions(
       if (!exception) {
         // This date has a rescheduled class landing on it, but it's also a regular date for this class
         // Add it as a regular class (both the rescheduled and regular will appear)
-        dates.push({ date });
+        dates.push({ ...baseDate });
       }
       continue;
     }
@@ -717,7 +856,7 @@ async function calculateClassDatesWithExceptions(
     if (exception?.type === 'cancelled') {
       // Show cancelled class with cancelled flag
       dates.push({
-        date,
+        ...baseDate,
         isCancelled: true,
         reason: exception.reason,
       });
@@ -742,7 +881,7 @@ async function calculateClassDatesWithExceptions(
 
     // Normal class - add if not already added
     if (!processedDates.has(dateKey)) {
-      dates.push({ date });
+      dates.push({ ...baseDate });
       processedDates.add(dateKey);
     }
   }
@@ -806,27 +945,41 @@ function buildDailyClassMap(classSchedule: any[]): Record<string, any[]> {
 
       let classEntry: any;
 
+      // Prefer the schedule that applied on this date (version window), else parent current schedule
+      const effectiveScheduleType = calcDate.scheduleType || classItem.scheduleType;
+      const effectiveSchedules = calcDate.schedules || classItem.schedules;
+
       // Handle different schedule types
-      if (classItem.scheduleType === 'multiple' && Array.isArray(classItem.schedules)) {
+      if (effectiveScheduleType === 'multiple' && Array.isArray(effectiveSchedules)) {
         // For rescheduled classes, use their specified times even if no matching schedule
         if (calcDate.isRescheduled) {
           classEntry = {
             id: classItem.id,
             startTime: calcDate.startTime || classItem.startTime,
             endTime: calcDate.endTime || classItem.endTime,
-            timezone: classItem.timezone,
+            timezone: calcDate.timezone || classItem.timezone,
             courseType: classItem.courseType,
             students: classItem.students || []
           };
         } else {
           // For regular classes, find the matching schedule for this day
-          const matchingSchedule = classItem.schedules.find((schedule: any) => schedule.dayOfWeek === date.getDay());
+          const matchingSchedule = effectiveSchedules.find((schedule: any) => schedule.dayOfWeek === date.getDay());
           if (matchingSchedule) {
             classEntry = {
               id: classItem.id,
               startTime: calcDate.startTime || matchingSchedule.startTime,
               endTime: calcDate.endTime || matchingSchedule.endTime,
-              timezone: matchingSchedule.timezone || classItem.timezone,
+              timezone: matchingSchedule.timezone || calcDate.timezone || classItem.timezone,
+              courseType: classItem.courseType,
+              students: classItem.students || []
+            };
+          } else if (calcDate.startTime || calcDate.endTime) {
+            // Version may have stamped times even if DOW lookup fails
+            classEntry = {
+              id: classItem.id,
+              startTime: calcDate.startTime || classItem.startTime,
+              endTime: calcDate.endTime || classItem.endTime,
+              timezone: calcDate.timezone || classItem.timezone,
               courseType: classItem.courseType,
               students: classItem.students || []
             };
@@ -838,7 +991,7 @@ function buildDailyClassMap(classSchedule: any[]): Record<string, any[]> {
           id: classItem.id,
           startTime: calcDate.startTime || classItem.startTime,
           endTime: calcDate.endTime || classItem.endTime,
-          timezone: classItem.timezone,
+          timezone: calcDate.timezone || classItem.timezone,
           courseType: classItem.courseType,
           students: classItem.students || []
         };

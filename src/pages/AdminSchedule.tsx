@@ -12,7 +12,7 @@ import {
   getTeacherUsers,
   getUsersClasses
 } from '../utils/firebaseUtils';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, deleteField } from 'firebase/firestore';
 import { useLanguage } from '../hooks/useLanguage';
 import { useTranslation } from '../translations';
 import { styles, classNames } from '../styles/styleUtils';
@@ -24,10 +24,11 @@ import { storage } from '../config/firebase';
 import { invalidateCalendarCache } from '../services/calendarService';
 import { PlusIcon, TrashIcon, PencilIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { formatTimeWithTimezones } from '../utils/dateUtils';
-import { Class, SelectOption, User, ScheduleVersion, ClassSchedule as ClassScheduleType } from '../types/interfaces';
+import { Class, SelectOption, User } from '../types/interfaces';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { Tooltip } from '../components/Tooltip';
+import { archiveClassScheduleVersion } from '../utils/classScheduleVersionUtils';
 
 /**
  * Helper function to check if schedule-related fields have changed.
@@ -69,40 +70,6 @@ const hasScheduleChanged = (
   }
   
   return false;
-};
-
-/**
- * Creates a ScheduleVersion from class data.
- * Used to archive the current schedule before updating.
- */
-const createScheduleVersion = (
-  classData: Class,
-  effectiveFrom: Date,
-  version: number
-): ScheduleVersion => {
-  // Build schedules array
-  const schedules: ClassScheduleType[] = classData.scheduleType === 'multiple' && classData.schedules
-    ? classData.schedules.map(s => ({
-        dayOfWeek: s.dayOfWeek,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        timezone: s.timezone || classData.timezone,
-      }))
-    : [{
-        dayOfWeek: classData.dayOfWeek,
-        startTime: classData.startTime,
-        endTime: classData.endTime,
-        timezone: classData.timezone,
-      }];
-  
-  return {
-    version,
-    effectiveFrom,
-    scheduleType: classData.scheduleType || 'single',
-    schedules,
-    timezone: classData.timezone,
-    frequency: classData.frequency || { type: 'weekly', every: 1 },
-  };
 };
 
 type SelectStyles = StylesConfig<SelectOption, true>;
@@ -615,7 +582,8 @@ export const AdminSchedule = () => {
         startDate: Timestamp.fromDate(newClass.startDate),
         endDate: newClass.endDate ? Timestamp.fromDate(newClass.endDate) : null,
         createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
+        updatedAt: Timestamp.now(),
+        scheduleEffectiveFrom: Timestamp.now(),
       };
 
       logQuery('Creating new class', classToCreate);
@@ -871,50 +839,52 @@ export const AdminSchedule = () => {
 
       // Find the original class to check for schedule changes
       const originalClass = classes.find(c => c.id === editingClass.id);
-      
-      // Check if schedule-related fields have changed
-      let scheduleHistory = editingClass.scheduleHistory || [];
-      
-      if (originalClass && hasScheduleChanged(originalClass, editingClass)) {
-        // Archive the current schedule before updating
-        // Get the effective date: use the original class's startDate or today
-        const effectiveFrom = originalClass.startDate?.toDate() || new Date();
-        
-        // Determine the next version number
-        const nextVersion = scheduleHistory.length + 1;
-        
-        // Create the schedule version from the original class data
-        const scheduleVersion = createScheduleVersion(originalClass, effectiveFrom, nextVersion);
-        
-        // Add to schedule history
-        scheduleHistory = [...scheduleHistory, scheduleVersion];
-        
-        logQuery('Schedule changed, archiving old schedule', { 
-          classId: editingClass.id, 
-          version: nextVersion,
-          effectiveFrom 
+      const scheduleChanged =
+        !!originalClass && hasScheduleChanged(originalClass, editingClass);
+
+      if (scheduleChanged && originalClass) {
+        logQuery('Schedule changed, archiving prior schedule to versions subcollection', {
+          classId: editingClass.id,
         });
+        await archiveClassScheduleVersion(editingClass.id, originalClass);
       }
+
+      const scheduleEffectiveFrom = scheduleChanged
+        ? Timestamp.now()
+        : (editingClass.scheduleEffectiveFrom ||
+            originalClass?.scheduleEffectiveFrom ||
+            originalClass?.createdAt ||
+            Timestamp.now());
 
       const updatedClass = {
         ...editingClass,
         contractUrl: updatedContractUrl,
-        scheduleHistory, // Include updated schedule history
         startDate: Timestamp.fromDate(editingClass.startDate instanceof Date ? editingClass.startDate : editingClass.startDate.toDate()),
         endDate: editingClass.endDate ? Timestamp.fromDate(editingClass.endDate instanceof Date ? editingClass.endDate : editingClass.endDate.toDate()) : null,
-        updatedAt: Timestamp.now()
+        updatedAt: Timestamp.now(),
+        scheduleEffectiveFrom,
+      };
+
+      // Strip legacy embedded scheduleHistory if present
+      const firestoreUpdate = {
+        ...updatedClass,
+        scheduleHistory: deleteField(),
       };
 
       logQuery('Updating class', { classId: editingClass.id, updates: updatedClass });
-      await updateCachedDocument('classes', editingClass.id, updatedClass);
+      await updateCachedDocument('classes', editingClass.id, firestoreUpdate);
       logQuery('Invalidating calendar cache');
       await invalidateCalendarCache();
 
-      // Update local state
+      // Update local state (omit FieldValue sentinels)
       setClasses(prevClasses => 
-        prevClasses.map(c => 
-          c.id === editingClass.id ? { ...c, ...updatedClass } : c
-        )
+        prevClasses.map(c => {
+          if (c.id !== editingClass.id) return c;
+          const { scheduleHistory: _removed, ...rest } = { ...c, ...updatedClass } as Class & {
+            scheduleHistory?: unknown;
+          };
+          return rest as Class;
+        })
       );
 
       setEditingClass(null);

@@ -161,8 +161,8 @@ export interface Class {
     type: 'weekly' | 'biweekly' | 'custom';
     every: number; // 1 for weekly, 2 for biweekly, custom number for every X weeks
   };
-  // Historical schedule versions for preserving schedule history
-  scheduleHistory?: ScheduleVersion[];
+  /** When the current live schedule became effective. Defaults to createdAt when unset. */
+  scheduleEffectiveFrom?: Timestamp;
 }
 
 export interface ClassInfo {
@@ -241,14 +241,17 @@ export interface ClassSchedule {
 }
 
 /**
- * Represents a historical version of a class schedule.
- * Used for preserving schedule history when permanent changes are made.
+ * Frozen schedule snapshot stored at classes/{classId}/versions/{versionId}.
+ * createdAt is when that schedule became effective.
  */
-export interface ScheduleVersion {
-  version: number;            // Incrementing int (1, 2, 3, ...)
-  effectiveFrom: Date;        // When this schedule version starts
+export interface ClassScheduleVersionDoc {
+  id: string;
+  createdAt: Timestamp;
   scheduleType: 'single' | 'multiple';
-  schedules: ClassSchedule[]; // The schedule(s) for this version
+  schedules: ClassSchedule[];
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
   timezone: string;
   frequency: {
     type: 'weekly' | 'biweekly' | 'custom';

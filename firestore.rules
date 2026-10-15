@@ -97,6 +97,12 @@ service cloud.firestore {
         allow create, update, delete: if isAdmin();
       }
 
+      // Prior schedule versions (frozen snapshots when schedule is edited)
+      match /versions/{versionId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if isAdmin();
+      }
+
       // Attendance subcollection: one doc per session date (doc ID = YYYY-MM-DD)
       match /attendance/{classDate} {
         allow read, create, update, delete: if isAdmin();
