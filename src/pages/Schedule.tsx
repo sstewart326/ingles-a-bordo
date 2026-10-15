@@ -60,8 +60,14 @@ interface PaymentDueDate {
   date: string;
   classId: string;
   paymentLink: string | null;
+  amount?: number | null;
+  currency?: string | null;
   classSession: {
     id: string;
+    paymentConfig?: {
+      amount?: number;
+      currency?: string;
+    };
   };
   user?: {
     email: string;
@@ -371,11 +377,19 @@ export const Schedule = () => {
       return paymentDueDateStr === dateStr;
     });
 
-    // Find the associated class for this payment due date to get amount and currency
+    // Prefer completed payment amount, then versioned due-date amount, then live class config
     const associatedClass = calendarData.classes.find(cls => cls.id === paymentDue.classSession.id);
     
-    const amount = completedPayment?.amount || associatedClass?.paymentConfig?.amount;
-    const currency = completedPayment?.currency || associatedClass?.paymentConfig?.currency;
+    const amount =
+      completedPayment?.amount ??
+      paymentDue.amount ??
+      paymentDue.classSession.paymentConfig?.amount ??
+      associatedClass?.paymentConfig?.amount;
+    const currency =
+      completedPayment?.currency ??
+      paymentDue.currency ??
+      paymentDue.classSession.paymentConfig?.currency ??
+      associatedClass?.paymentConfig?.currency;
 
     return {
       isCompleted: !!completedPayment,

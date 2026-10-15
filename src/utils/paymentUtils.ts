@@ -19,9 +19,38 @@ export interface UrgentPayment {
 interface CalendarPaymentDueDate {
   date: string;
   paymentLink: string | null;
-  classSession: { id: string };
+  amount?: number | null;
+  currency?: string | null;
+  classSession: {
+    id: string;
+    paymentConfig?: {
+      amount?: number;
+      currency?: string;
+    };
+  };
   user?: { email: string };
 }
+
+export type VersionedPaymentDueEntry = {
+  date: string | Date;
+  amount?: number | null;
+  currency?: string | null;
+  paymentLink?: string | null;
+  paymentConfig?: ClassSession['paymentConfig'] | null;
+};
+
+export type PaymentDueDateValue = string | Date | VersionedPaymentDueEntry;
+
+/** Stable key for deduping versioned payment due entries across month loads. */
+export const paymentDueDedupKey = (value: PaymentDueDateValue): string => {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && 'date' in value) {
+    const date = value.date;
+    return date instanceof Date ? date.toISOString() : String(date);
+  }
+  return String(value);
+};
 
 interface CalendarCompletedPayment {
   dueDate: string;
@@ -83,8 +112,14 @@ export const getUrgentUnpaidPayments = (
       paymentLink: paymentDue.paymentLink,
       classSessionId: paymentDue.classSession.id,
       userEmail,
-      amount: associatedClass?.paymentConfig?.amount,
-      currency: associatedClass?.paymentConfig?.currency,
+      amount:
+        paymentDue.amount ??
+        paymentDue.classSession.paymentConfig?.amount ??
+        associatedClass?.paymentConfig?.amount,
+      currency:
+        paymentDue.currency ??
+        paymentDue.classSession.paymentConfig?.currency ??
+        associatedClass?.paymentConfig?.currency,
     });
   }
 
@@ -254,7 +289,7 @@ export const getPaymentStatusHint = (dueDate: Date, labels: PaymentStatusLabels)
   }
 };
 
-const normalizePaymentDueDate = (value: string | Date): Date | null => {
+const normalizePaymentDueDate = (value: PaymentDueDateValue): Date | null => {
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value;
   }
@@ -262,7 +297,62 @@ const normalizePaymentDueDate = (value: string | Date): Date | null => {
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
+  if (value && typeof value === 'object' && 'date' in value) {
+    return normalizePaymentDueDate(value.date as string | Date);
+  }
   return null;
+};
+
+const isSameCalendarDay = (a: Date, b: Date): boolean =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+/**
+ * Resolve the paymentConfig that applied on a specific due date.
+ * Prefers server-versioned entry fields over the live class paymentConfig.
+ */
+export const getPaymentConfigForDueDate = (
+  classSession: ClassSession,
+  dueDate: Date
+): ClassSession['paymentConfig'] | undefined => {
+  const live = classSession.paymentConfig;
+  const dues = classSession.paymentDueDates;
+  if (!Array.isArray(dues) || dues.length === 0) {
+    return live;
+  }
+
+  for (const entry of dues) {
+    const entryDate = normalizePaymentDueDate(entry);
+    if (!entryDate || !isSameCalendarDay(entryDate, dueDate)) continue;
+
+    if (entry && typeof entry === 'object' && !(entry instanceof Date) && 'date' in entry) {
+      const versioned = entry.paymentConfig;
+      if (versioned) {
+        return live ? { ...live, ...versioned } : versioned;
+      }
+      if (entry.amount != null || entry.currency != null || entry.paymentLink != null) {
+        if (!live) {
+          return {
+            type: 'monthly',
+            monthlyOption: 'first',
+            startDate: dueDate.toISOString().split('T')[0],
+            amount: entry.amount ?? 0,
+            currency: entry.currency ?? 'USD',
+            paymentLink: entry.paymentLink ?? '',
+          };
+        }
+        return {
+          ...live,
+          amount: entry.amount ?? live.amount,
+          currency: entry.currency ?? live.currency,
+          paymentLink: entry.paymentLink ?? live.paymentLink,
+        };
+      }
+    }
+  }
+
+  return live;
 };
 
 /**
@@ -309,16 +399,16 @@ export const getPaymentsDueForDay = (
   const processedStudentClassPairs = new Set<string>();
   
   upcomingClasses.forEach(classSession => {
-    const paymentConfig = classSession.paymentConfig;
     const paymentDates = getPaymentDatesForClassOnMonth(classSession, date);
 
-    const isPaymentDue = paymentDates.some(paymentDate => 
-      paymentDate.getFullYear() === date.getFullYear() &&
-      paymentDate.getMonth() === date.getMonth() &&
-      paymentDate.getDate() === date.getDate()
+    const isPaymentDue = paymentDates.some(paymentDate =>
+      isSameCalendarDay(paymentDate, date)
     );
     
     if (isPaymentDue) {
+      // Amount/link for this due date come from the version window, not live parent config
+      const paymentConfig = getPaymentConfigForDueDate(classSession, date);
+
       // Add one entry per student, but only if we haven't processed this student-class pair yet
       classSession.studentEmails.forEach(email => {
         const baseClassId = getBaseClassId(classSession.id);
@@ -329,7 +419,7 @@ export const getPaymentsDueForDay = (
           if (user) {
             const classSessionWithConfig: ClassSession = {
               ...classSession,
-              paymentConfig: paymentConfig
+              paymentConfig
             };
             
             let classSessionWithSchedules = classSessionWithConfig;

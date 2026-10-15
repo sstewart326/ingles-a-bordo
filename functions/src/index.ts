@@ -268,7 +268,14 @@ interface ClassInfo {
     type: string;
     every: number;
   };
-  paymentDueDates?: Date[];
+  /** Version-aware dues: date plus the paymentConfig that applied on that due date. */
+  paymentDueDates?: Array<{
+    date: Date;
+    amount?: number | null;
+    currency?: string | null;
+    paymentLink?: string | null;
+    paymentConfig?: any;
+  }>;
 }
 
 /**
@@ -405,7 +412,6 @@ export const getClassScheduleHttp = onRequest({
           endDate,
           classId
         );
-        const paymentDates = versionedPaymentDues.map((entry) => entry.date);
 
         return {
           classInfo: {
@@ -428,7 +434,7 @@ export const getClassScheduleHttp = onRequest({
             },
             dates: classDates,
             calculatedDates, // Include full exception metadata
-            paymentDueDates: paymentDates,
+            paymentDueDates: versionedPaymentDues.map(toPaymentDueDatePayload),
             timezone: classData.timezone || 'UTC',
             scheduleType: classData.scheduleType || 'single',
             schedules: classData.schedules || []
@@ -436,7 +442,8 @@ export const getClassScheduleHttp = onRequest({
           paymentEntries: versionedPaymentDues.map(({ date, paymentConfig }) => ({
             date,
             paymentLink: paymentConfig?.paymentLink || null,
-            amount: paymentConfig?.amount || null
+            amount: paymentConfig?.amount || null,
+            currency: paymentConfig?.currency || null
           }))
         };
       });
@@ -1396,6 +1403,17 @@ interface VersionedPaymentDue {
   paymentConfig: any;
 }
 
+/** Serialize a versioned due for class payloads (amount follows the config window, not live parent). */
+function toPaymentDueDatePayload(entry: VersionedPaymentDue) {
+  return {
+    date: entry.date,
+    amount: entry.paymentConfig?.amount ?? null,
+    currency: entry.paymentConfig?.currency ?? null,
+    paymentLink: entry.paymentConfig?.paymentLink ?? null,
+    paymentConfig: entry.paymentConfig || null,
+  };
+}
+
 /**
  * Generate payment due dates across config version windows.
  * Uses each version's paymentConfig; schedule-only archives inherit payment from the
@@ -1732,7 +1750,6 @@ export const getCalendarDataHttp = onRequest({
           endDate,
           classId
         );
-        const paymentDates = versionedPaymentDues.map((entry) => entry.date);
 
         // Create a base class object
         const baseClassInfo: Partial<ClassInfo> = {
@@ -1769,7 +1786,7 @@ export const getCalendarDataHttp = onRequest({
           timezone: classData.timezone,
           dates: classDates,
           calculatedDates, // Include full exception metadata
-          paymentDueDates: paymentDates,
+          paymentDueDates: versionedPaymentDues.map(toPaymentDueDatePayload),
           scheduleType: classData.scheduleType || 'single',
           schedules: classData.schedules || []
         };
@@ -1790,7 +1807,8 @@ export const getCalendarDataHttp = onRequest({
             paymentConfig: paymentConfig || classData.paymentConfig
           },
           paymentLink: paymentConfig?.paymentLink || null,
-          amount: paymentConfig?.amount || null
+          amount: paymentConfig?.amount || null,
+          currency: paymentConfig?.currency || null
         }));
 
         return { classId, classInfo: singleClassInfo, paymentEntries };
@@ -2221,7 +2239,7 @@ export const getAllClassesForMonthHttp = onRequest({
           timezone: classData.timezone,
           dates: classDates,
           calculatedDates, // Include full exception metadata
-          paymentDueDates: versionedPaymentDues.map((entry) => entry.date),
+          paymentDueDates: versionedPaymentDues.map(toPaymentDueDatePayload),
           scheduleType: classData.scheduleType || 'single',
           schedules: classData.schedules || []
         };

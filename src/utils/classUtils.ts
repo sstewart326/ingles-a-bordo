@@ -1,6 +1,7 @@
 import { ClassSession, getBaseClassId } from './scheduleUtils';
 import { getClassMaterials } from './classMaterialsUtils';
 import { filterMaterialsForClassSession } from './scheduleClassMaterialsUtils';
+import { paymentDueDedupKey } from './paymentUtils';
 import toast from 'react-hot-toast';
 import { ClassMaterial } from '../types/interfaces';
 
@@ -78,7 +79,7 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       ];
       const seen = new Set<string>();
       const paymentDueDates = mergedPaymentDueDates.filter((d) => {
-        const key = d instanceof Date ? d.toISOString() : String(d);
+        const key = paymentDueDedupKey(d);
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -144,7 +145,7 @@ export const updateClassList = ({ classes, upcomingClasses, pastClasses, setUpco
       ];
       const seen = new Set<string>();
       const paymentDueDates = mergedPaymentDueDates.filter((d) => {
-        const key = d instanceof Date ? d.toISOString() : String(d);
+        const key = paymentDueDedupKey(d);
         if (seen.has(key)) return false;
         seen.add(key);
         return true;

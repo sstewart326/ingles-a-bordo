@@ -49,8 +49,22 @@ export interface ClassSession {
     startDate: string;
   };
   dates?: string[] | Date[];  // Allow both string[] and Date[] for dates
-  /** Server-computed due dates for the loaded month(s); prefer over live paymentConfig. */
-  paymentDueDates?: Array<string | Date>;
+  /**
+   * Server-computed due dates for the loaded month(s); prefer over live paymentConfig.
+   * Structured entries include the paymentConfig that applied on that due date.
+   * Plain date/string entries are supported for backward compatibility.
+   */
+  paymentDueDates?: Array<
+    | string
+    | Date
+    | {
+        date: string | Date;
+        amount?: number | null;
+        currency?: string | null;
+        paymentLink?: string | null;
+        paymentConfig?: ClassSession['paymentConfig'] | null;
+      }
+  >;
   scheduleType?: 'single' | 'multiple';
   schedules?: Array<{
     dayOfWeek: number;

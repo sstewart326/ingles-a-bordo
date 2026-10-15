@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar } from './Calendar';
 import { CalendarDay } from './CalendarDay';
 import { ClassSession } from '../utils/scheduleUtils';
-import { getPaymentsDueForDay } from '../utils/paymentUtils';
+import { getPaymentConfigForDueDate, getPaymentsDueForDay } from '../utils/paymentUtils';
 import { getPaymentsByTeacherAndMonth } from '../services/paymentService';
 import { Payment } from '../types/payment';
 import { User } from '../types/interfaces';
@@ -116,7 +116,21 @@ export const CalendarSection = ({
           if (user && classSession) {
             const key = `${user.email}__${classSession.id}`;
             if (!paymentsDueSet.has(key)) {
-              dayPaymentsDue.push({ user, classSession });
+              const versionedPaymentConfig = getPaymentConfigForDueDate(classSession, date);
+              dayPaymentsDue.push({
+                user,
+                classSession: {
+                  ...classSession,
+                  paymentConfig: versionedPaymentConfig
+                    ? {
+                        ...versionedPaymentConfig,
+                        // Completed payment record wins over config for display/marking
+                        amount: payment.amount ?? versionedPaymentConfig.amount,
+                        currency: payment.currency ?? versionedPaymentConfig.currency,
+                      }
+                    : classSession.paymentConfig,
+                },
+              });
               paymentsDueSet.add(key);
             }
           }

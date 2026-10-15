@@ -7,6 +7,7 @@ import { ClassSession, sortClassesByTime } from '../utils/scheduleUtils';
 import { ClassMaterial, User } from '../types/interfaces';
 import { updateClassList, fetchMaterialsForClasses } from '../utils/classUtils';
 import { getAllClassesForMonth, invalidateCalendarCache } from '../services/calendarService';
+import { paymentDueDedupKey } from '../utils/paymentUtils';
 
 // We can now use ClassSession directly since it includes all the properties we need
 type ExtendedClassSession = ClassSession;
@@ -184,7 +185,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
                 ];
                 const seenDue = new Set<string>();
                 const paymentDueDates = mergedPaymentDueDates.filter((d) => {
-                  const key = d instanceof Date ? d.toISOString() : String(d);
+                  const key = paymentDueDedupKey(d);
                   if (seenDue.has(key)) return false;
                   seenDue.add(key);
                   return true;
@@ -306,7 +307,7 @@ export const useDashboardData = (): UseDashboardDataReturn => {
                 ];
                 const seen = new Set<string>();
                 const paymentDueDates = merged.filter((d) => {
-                  const key = d instanceof Date ? d.toISOString() : String(d);
+                  const key = paymentDueDedupKey(d);
                   if (seen.has(key)) return false;
                   seen.add(key);
                   return true;

@@ -790,47 +790,47 @@ export const DayDetails = ({
                               </div>
                             )}
                           </div>
-                          {classSession.paymentConfig?.amount !== undefined && classSession.paymentConfig.amount > 0 && classSession.paymentConfig?.currency && (
-                            <div className="mt-1">
-                              {(() => {
-                                // Get the selected date from context
-                                const selectedDateStart = new Date(selectedDayDetails.date);
-                                selectedDateStart.setHours(0, 0, 0, 0);
-                                
-                                // Find valid payment with matching date
-                                const paymentForAmount = completedPayments[classSession.id]?.find(p => {
-                                  // First check if this payment is for the correct user
-                                  if (p.userId !== user.email) return false;
-                                  
-                                  // Then check if the payment's due date matches the selected date
-                                  if (p.dueDate) {
-                                    // Convert Firebase Timestamp to JavaScript Date
-                                    let dueDateObj;
-                                    if (typeof p.dueDate === 'object' && 'seconds' in p.dueDate) {
-                                      // If it's a Firestore Timestamp
-                                      dueDateObj = new Date(p.dueDate.seconds * 1000);
-                                    } else if (Object.prototype.toString.call(p.dueDate) === '[object Date]') {
-                                      // If it's already a Date object
-                                      dueDateObj = p.dueDate as unknown as Date;
-                                    } else {
-                                      // If it's a date string or timestamp
-                                      dueDateObj = new Date(p.dueDate as any);
-                                    }
-                                    
-                                    // Reset hours to compare just the date
-                                    dueDateObj.setHours(0, 0, 0, 0);
-                                    
-                                    // Compare the dates
-                                    return dueDateObj.getTime() === selectedDateStart.getTime();
-                                  }
-                                  
-                                  return false;
-                                });
-                                
-                                return paymentForAmount ? t.amountPaid : t.amountDue;
-                              })()}: {classSession.paymentConfig.currency} {classSession.paymentConfig.amount.toFixed(2)}
-                            </div>
-                          )}
+                          {(() => {
+                            // Prefer amount stored on the completed payment; else versioned due-date config
+                            const selectedDateStart = new Date(selectedDayDetails.date);
+                            selectedDateStart.setHours(0, 0, 0, 0);
+
+                            const paymentForAmount = completedPayments[classSession.id]?.find(p => {
+                              if (p.userId !== user.email) return false;
+                              if (!p.dueDate) return false;
+
+                              let dueDateObj;
+                              if (typeof p.dueDate === 'object' && 'seconds' in p.dueDate) {
+                                dueDateObj = new Date(p.dueDate.seconds * 1000);
+                              } else if (Object.prototype.toString.call(p.dueDate) === '[object Date]') {
+                                dueDateObj = p.dueDate as unknown as Date;
+                              } else {
+                                dueDateObj = new Date(p.dueDate as any);
+                              }
+                              dueDateObj.setHours(0, 0, 0, 0);
+                              return dueDateObj.getTime() === selectedDateStart.getTime();
+                            });
+
+                            const displayAmount =
+                              paymentForAmount?.amount ?? classSession.paymentConfig?.amount;
+                            const displayCurrency =
+                              paymentForAmount?.currency ?? classSession.paymentConfig?.currency;
+
+                            if (
+                              displayAmount === undefined ||
+                              displayAmount <= 0 ||
+                              !displayCurrency
+                            ) {
+                              return null;
+                            }
+
+                            return (
+                              <div className="mt-1">
+                                {paymentForAmount ? t.amountPaid : t.amountDue}:{' '}
+                                {displayCurrency} {displayAmount.toFixed(2)}
+                              </div>
+                            );
+                          })()}
                           
                           {/* Payment Link Section */}
                           <div className="mt-1">
