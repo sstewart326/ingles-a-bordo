@@ -832,7 +832,8 @@ export const DayDetails = ({
                             );
                           })()}
                           
-                          {/* Payment Link Section */}
+                          {/* Payment link only while this payment is unpaid */}
+                          {!completed && (
                           <div className="mt-1">
                             {editingPaymentLink[classSession.id] !== undefined && editingPaymentLink[classSession.id] !== null ? (
                               <div>
@@ -873,6 +874,7 @@ export const DayDetails = ({
                               </div>
                             )}
                           </div>
+                          )}
                         </div>
                       </div>
                     </div>

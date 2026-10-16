@@ -1327,8 +1327,8 @@ export const Schedule = () => {
                       </div>
                     )}
 
-                    {/* Payment Link Section */}
-                    {calendarData?.paymentDueDates && calendarData.paymentDueDates.some(payment => {
+                    {/* Payment link only while this payment is unpaid */}
+                    {!getPaymentStatus(selectedDayDetails.date).isCompleted && calendarData?.paymentDueDates && calendarData.paymentDueDates.some(payment => {
                       const paymentDateStr = payment.date?.split('T')[0] || '';
                       const selectedDateStr = formatDateForComparison(selectedDayDetails.date);
                       return paymentDateStr === selectedDateStr && payment.paymentLink;
